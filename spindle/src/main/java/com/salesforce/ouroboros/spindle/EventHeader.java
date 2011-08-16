@@ -150,7 +150,7 @@ public class EventHeader implements Cloneable {
      * @return the size of the payload
      */
     public int size() {
-        return bytes.getInt(SIZE_OFFSET) - HEADER_BYTE_SIZE;
+        return bytes.getInt(SIZE_OFFSET);
     }
 
     /**
@@ -170,7 +170,7 @@ public class EventHeader implements Cloneable {
 
     protected void initialize(int size, int magic, UUID channel,
                               long timestamp, int crc32) {
-        bytes.putInt(SIZE_OFFSET, size + HEADER_BYTE_SIZE);
+        bytes.putInt(SIZE_OFFSET, size);
         bytes.putInt(MAGIC_OFFSET, magic);
         bytes.putLong(CH1_OFFSET, channel.getMostSignificantBits());
         bytes.putLong(CH2_OFFSET, channel.getLeastSignificantBits());
@@ -178,7 +178,7 @@ public class EventHeader implements Cloneable {
         bytes.putInt(CRC_OFFSET, crc32);
     }
 
-    public long totalSize() {
+    public int totalSize() {
         return HEADER_BYTE_SIZE + size();
     }
 }

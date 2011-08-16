@@ -123,15 +123,15 @@ public class Event extends EventHeader {
                                                           read,
                                                           HEADER_BYTE_SIZE));
         }
-        int eventTotalSize = header.getInt(0);
+        int size = header.getInt(0);
         header.rewind();
-        ByteBuffer event = ByteBuffer.allocate(eventTotalSize);
+        ByteBuffer event = ByteBuffer.allocate(size + HEADER_BYTE_SIZE);
         event.put(header);
         read = channel.read(event);
-        if (read != eventTotalSize - HEADER_BYTE_SIZE) {
+        if (read != size) {
             throw new IllegalStateException(
                                             String.format("Unable to completely read the payload, bytes read: %s, expected: %s",
-                                                          read, eventTotalSize));
+                                                          read, size));
         }
         return event;
     }

@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -38,13 +37,9 @@ import java.util.concurrent.ConcurrentMap;
  * 
  */
 public class Wrangler implements Bundle {
-    public static File channelFor(File root, UUID channel) {
-        return new File(root, channel.toString().replace('-', '/'));
-    }
-
-    private final File                        root;
-    private final long                        maxSegmentSize;
-    private ConcurrentMap<UUID, EventChannel> openChannels = new ConcurrentHashMap<UUID, EventChannel>();
+    private final File                              root;
+    private final long                              maxSegmentSize;
+    private final ConcurrentMap<UUID, EventChannel> openChannels = new ConcurrentHashMap<UUID, EventChannel>();
 
     public Wrangler(final File root, final long maxSegmentSize) {
         this.root = root;
@@ -61,21 +56,23 @@ public class Wrangler implements Bundle {
                                             String.format("No open channel: %s",
                                                           channelTag));
         }
-        File segment = new File(
-                                channelFor(channelTag),
-                                channel.appendSegmentNameFor((int) header.totalSize(),
-                                                             maxSegmentSize));
-        FileOutputStream fos = new FileOutputStream(segment, true);
-        return new Segment(fos);
+        return channel.getAppendSegmentFor(header, maxSegmentSize);
     }
 
-    public File channelFor(UUID channelTag) {
-        return new File(root, channelTag.toString().replace('-', '/'));
+    public void open(UUID channel) {
+        openChannels.putIfAbsent(channel, new EventChannel(channel, root));
     }
 
     @Override
-    public Segment segmentFor(long offset, EventHeader header) {
-        // TODO Auto-generated method stub
-        return null;
+    public Segment segmentFor(long offset, EventHeader header)
+                                                              throws FileNotFoundException {
+        UUID channelTag = header.getChannel();
+        EventChannel channel = openChannels.get(channelTag);
+        if (channel == null) {
+            throw new IllegalStateException(
+                                            String.format("No open channel: %s",
+                                                          channelTag));
+        }
+        return channel.getSegmentFor(offset, header.totalSize(), maxSegmentSize);
     }
 }
