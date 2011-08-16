@@ -103,7 +103,8 @@ public class Event extends EventHeader {
         return crc ^ 0xffffffff;
     }
 
-    public static int crc32(ByteBuffer buffer) {
+    public static int crc32(ByteBuffer buffer, int position) {
+        buffer.position(position);
         int crc = 0xffffffff;
         while (buffer.hasRemaining()) {
             crc = crc >>> 8 ^ CRC_TABLE[(crc ^ buffer.get()) & 0xff];
@@ -139,17 +140,19 @@ public class Event extends EventHeader {
         super(bytes);
     }
 
-    public Event(int magic, UUID tag, ByteBuffer payload) {
+    public Event(int magic, UUID channel, long timestamp, ByteBuffer payload) {
         this(ByteBuffer.allocate(HEADER_BYTE_SIZE + payload.remaining()));
-        initialize(payload.remaining(), magic, tag, payload);
+        initialize(payload.remaining(), magic, channel, timestamp, payload);
     }
 
     public Event(ReadableByteChannel channel) throws IOException {
         this(readFrom(channel));
     }
 
+    @Override
     public Event clone() {
         ByteBuffer duplicateBytes = ByteBuffer.allocate(HEADER_BYTE_SIZE);
+        bytes.rewind();
         duplicateBytes.put(bytes);
         return new Event(duplicateBytes);
     }
@@ -158,6 +161,7 @@ public class Event extends EventHeader {
      * @return the read only buffer containing the event's payload
      */
     public ByteBuffer getPayload() {
+        bytes.rewind();
         bytes.position(HEADER_BYTE_SIZE);
         return bytes.slice().asReadOnlyBuffer();
     }
@@ -166,13 +170,15 @@ public class Event extends EventHeader {
      * @return true if the payload's CRC matches the CRC in the header
      */
     public boolean validate() {
-        bytes.position(HEADER_BYTE_SIZE);
-        return getCrc32() == crc32(bytes);
+        return getCrc32() == crc32(bytes, HEADER_BYTE_SIZE);
     }
 
-    protected void initialize(int size, int magic, UUID tag, ByteBuffer payload) {
-        initialize(payload.remaining(), magic, tag, crc32(payload));
-        payload.position(0);
+    protected void initialize(int size, int magic, UUID channel,
+                              long timestamp, ByteBuffer payload) {
+        initialize(payload.remaining(), magic, channel, timestamp,
+                   crc32(payload, 0));
+        payload.rewind();
+        bytes.position(HEADER_BYTE_SIZE);
         bytes.put(payload);
     }
 }

@@ -35,23 +35,28 @@ import java.util.UUID;
  * An event header comprised of:
  * 
  * <pre>
- *      4 byte size
- *      4 byte magic
- *      8 byte tag
- *      4 byte CRC32
+ *       4 byte size
+ *       4 byte magic
+ *      16 byte channel
+ *       8 byte timestamp
+ *       4 byte CRC32
  * </pre>
+ * 
+ * The unique identifier of an event is the tuple {tag, timestamp}. Event
+ * timestamps are unique within a
  * 
  * @author hhildebrand
  * 
  */
 public class EventHeader implements Cloneable {
 
-    protected static final int SIZE_OFFSET      = 0;
-    protected static final int MAGIC_OFFSET     = SIZE_OFFSET + 4;
-    protected static final int TAG1_OFFSET      = MAGIC_OFFSET + 4;
-    protected static final int TAG2_OFFSET      = TAG1_OFFSET + 8;
-    protected static final int CRC_OFFSET       = TAG2_OFFSET + 8;
-    protected static final int HEADER_BYTE_SIZE = CRC_OFFSET + 4;
+    protected static final int SIZE_OFFSET       = 0;
+    protected static final int MAGIC_OFFSET      = SIZE_OFFSET + 4;
+    protected static final int CH1_OFFSET        = MAGIC_OFFSET + 4;
+    protected static final int CH2_OFFSET        = CH1_OFFSET + 8;
+    protected static final int TIME_STAMP_OFFSET = CH2_OFFSET + 8;
+    protected static final int CRC_OFFSET        = TIME_STAMP_OFFSET + 8;
+    protected static final int HEADER_BYTE_SIZE  = CRC_OFFSET + 4;
 
     protected final ByteBuffer bytes;
 
@@ -59,9 +64,10 @@ public class EventHeader implements Cloneable {
         this.bytes = bytes;
     }
 
-    public EventHeader(int size, int magic, UUID tag, int crc32) {
+    public EventHeader(int size, int magic, UUID channel, long timestamp,
+                       int crc32) {
         this(ByteBuffer.allocate(HEADER_BYTE_SIZE));
-        initialize(size, magic, tag, crc32);
+        initialize(size, magic, channel, timestamp, crc32);
     }
 
     /**
@@ -74,8 +80,16 @@ public class EventHeader implements Cloneable {
     @Override
     public EventHeader clone() {
         ByteBuffer duplicateBytes = ByteBuffer.allocate(HEADER_BYTE_SIZE);
+        bytes.rewind();
         duplicateBytes.put(bytes);
         return new EventHeader(duplicateBytes);
+    }
+
+    /**
+     * @return the channel identifier for the event
+     */
+    public UUID getChannel() {
+        return new UUID(bytes.getLong(CH1_OFFSET), bytes.getLong(CH2_OFFSET));
     }
 
     /**
@@ -93,10 +107,10 @@ public class EventHeader implements Cloneable {
     }
 
     /**
-     * @return the value the header is tagged with
+     * @return the timestamp of the event
      */
-    public UUID getTag() {
-        return new UUID(bytes.getLong(TAG1_OFFSET), bytes.getLong(TAG2_OFFSET));
+    public long getTimestamp() {
+        return bytes.getLong(TIME_STAMP_OFFSET);
     }
 
     /**
@@ -117,6 +131,19 @@ public class EventHeader implements Cloneable {
      */
     public void rewind() {
         bytes.rewind();
+    }
+
+    /**
+     * Position the channel at the start of the event's payload
+     * 
+     * @param offset
+     *            - the offset of the event in the channel
+     * @param segment
+     *            - the source
+     * @throws IOException
+     */
+    public void seekToPayload(long offset, Segment segment) throws IOException {
+        segment.position(offset + HEADER_BYTE_SIZE);
     }
 
     /**
@@ -141,7 +168,17 @@ public class EventHeader implements Cloneable {
         return !bytes.hasRemaining();
     }
 
-    protected void initialize(int size, int magic, UUID tag, int crc32) {
-        bytes.putInt(size + HEADER_BYTE_SIZE).putInt(magic).putLong(tag.getMostSignificantBits()).putLong(tag.getLeastSignificantBits()).putInt(crc32);
+    protected void initialize(int size, int magic, UUID channel,
+                              long timestamp, int crc32) {
+        bytes.putInt(SIZE_OFFSET, size + HEADER_BYTE_SIZE);
+        bytes.putInt(MAGIC_OFFSET, magic);
+        bytes.putLong(CH1_OFFSET, channel.getMostSignificantBits());
+        bytes.putLong(CH2_OFFSET, channel.getLeastSignificantBits());
+        bytes.putLong(TIME_STAMP_OFFSET, timestamp);
+        bytes.putInt(CRC_OFFSET, crc32);
+    }
+
+    public long totalSize() {
+        return HEADER_BYTE_SIZE + size();
     }
 }

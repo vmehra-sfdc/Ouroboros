@@ -39,10 +39,12 @@ import org.junit.Test;
 public class TestEventHeader {
     @Test
     public void testOffsets() {
-        UUID tag = UUID.randomUUID();
-        EventHeader header = new EventHeader(25, 777, tag, 23456);
+        UUID channel = UUID.randomUUID();
+        long timestamp = System.currentTimeMillis();
+        EventHeader header = new EventHeader(25, 777, channel, timestamp, 23456);
         assertEquals(25, header.size());
-        assertEquals(tag, header.getTag());
+        assertEquals(channel, header.getChannel());
+        assertEquals(timestamp, header.getTimestamp());
         assertEquals(777, header.getMagic());
         assertEquals(23456, header.getCrc32());
     }

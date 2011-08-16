@@ -25,7 +25,7 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.nio.channels.FileChannel;
+import java.io.FileNotFoundException;
 
 /**
  * 
@@ -33,5 +33,26 @@ import java.nio.channels.FileChannel;
  * 
  */
 public interface Bundle {
-    FileChannel segmentFor(EventHeader header);
+    /**
+     * Answer the physical segment where the event should be appended
+     * 
+     * @param header
+     *            - the event header
+     * @return the Segment where the event should be appended
+     * @throws FileNotFoundException
+     */
+    Segment appendSegmentFor(EventHeader header) throws FileNotFoundException;
+
+    /**
+     * Answer the physical segment where the event should be contained
+     * 
+     * @param offset
+     *            - the absolute offset of the event within the channel
+     * @param header
+     *            - the event header
+     * @return the Segment where the event is located
+     * @throws FileNotFoundException
+     */
+    Segment segmentFor(long offset, EventHeader header)
+                                                       throws FileNotFoundException;
 }

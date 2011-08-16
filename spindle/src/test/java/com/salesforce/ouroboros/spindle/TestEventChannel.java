@@ -25,53 +25,24 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.util.UUID;
+import org.junit.Test;
+import static junit.framework.Assert.*;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class EventChannel {
+public class TestEventChannel {
 
-    private static final String SEGMENT_SUFFIX = ".segment";
-
-    public static long prefixFor(long offset, long maxSegmentSize) {
-        return (long) Math.floor(offset / maxSegmentSize) * maxSegmentSize;
-    }
-
-    public static long segmentFor(long offset, int eventSize,
-                                  long maxSegmentSize) {
-        long homeSegment = prefixFor(offset, maxSegmentSize);
-        long endSegment = prefixFor(offset + eventSize, maxSegmentSize);
-        return homeSegment != endSegment ? endSegment : homeSegment;
-    }
-
-    private static String segmentName(long endSegment) {
-        return Long.toHexString(endSegment).toLowerCase() + SEGMENT_SUFFIX;
-    }
-
-    private final UUID    tag;
-    private volatile long commitedOffset;
-    private volatile long appendedOffset;
-
-    public EventChannel(UUID tag) {
-        this.tag = tag;
-    }
-
-    public String appendSegmentNameFor(int eventSize, long maxSegmentSize) {
-        return segmentName(segmentFor(appendedOffset, eventSize, maxSegmentSize));
-    }
-
-    public void commit(final long offset) {
-        commitedOffset = offset;
-    }
-
-    public long getCommittedOffset() {
-        return commitedOffset;
-    }
-
-    public UUID getTag() {
-        return tag;
+    @Test
+    public void testPrefix() {
+        assertEquals(0L, EventChannel.prefixFor(666L, 1024L));
+        assertEquals(1024L, EventChannel.prefixFor(1024, 1024L));
+        assertEquals(1024L, EventChannel.prefixFor(1025, 1024L));
+        assertEquals(2048, EventChannel.prefixFor(2048, 1024L));
+        assertEquals(1024 * 11, EventChannel.prefixFor(1024 * 11, 1024L));
+        assertEquals(1024 * 10, EventChannel.prefixFor((1024 * 11) - 1, 1024L));
+        assertEquals(1024 * 11, EventChannel.prefixFor((1024 * 11) + 15, 1024L));
     }
 }

@@ -41,7 +41,7 @@ import org.junit.Test;
 /**
  * 
  * @author hhildebrand
- *
+ * 
  */
 public class TestEvent {
     @Test
@@ -49,11 +49,13 @@ public class TestEvent {
         byte[] src = new byte[23];
         Arrays.fill(src, (byte) 7);
         ByteBuffer payload = ByteBuffer.wrap(src);
-        UUID tag = UUID.randomUUID();
-        Event event = new Event(777, tag, payload);
+        UUID channel = UUID.randomUUID();
+        long timestamp = System.currentTimeMillis();
+        Event event = new Event(777, channel, timestamp, payload);
         assertEquals(src.length, event.size());
-        assertEquals(tag, event.getTag());
+        assertEquals(channel, event.getChannel());
         assertEquals(777, event.getMagic());
+        assertEquals(timestamp, event.getTimestamp());
         assertEquals(Event.crc32(src), event.getCrc32());
         assertTrue(event.validate());
     }
@@ -61,10 +63,11 @@ public class TestEvent {
     @Test
     public void testReadWrite() throws Exception {
         int magic = 666;
-        UUID tag = UUID.randomUUID();
+        UUID channel = UUID.randomUUID();
+        long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        Event written = new Event(magic, tag, payloadBuffer);
+        Event written = new Event(magic, channel, timestamp, payloadBuffer);
 
         File tmpFile = File.createTempFile("read-write", ".tst");
         tmpFile.deleteOnExit();
@@ -75,15 +78,16 @@ public class TestEvent {
         segment.close();
 
         assertEquals(magic, written.getMagic());
-        assertEquals(tag, written.getTag());
+        assertEquals(channel, written.getChannel());
+        assertEquals(timestamp, written.getTimestamp());
         assertEquals(payload.length, written.size());
 
         FileInputStream fis = new FileInputStream(tmpFile);
         segment = fis.getChannel();
         Event read = new Event(segment);
         segment.close();
-        assertEquals(written.getTag(), read.getTag());
-        assertEquals(written.getTag(), read.getTag());
+        assertEquals(written.getChannel(), read.getChannel());
+        assertEquals(written.getChannel(), read.getChannel());
         assertEquals(written.size(), read.size());
     }
 }

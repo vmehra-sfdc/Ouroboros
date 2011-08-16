@@ -25,53 +25,18 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.util.UUID;
-
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class EventChannel {
+public class SegmentAddress {
+    public final String segment;
+    public long         offset;
 
-    private static final String SEGMENT_SUFFIX = ".segment";
-
-    public static long prefixFor(long offset, long maxSegmentSize) {
-        return (long) Math.floor(offset / maxSegmentSize) * maxSegmentSize;
-    }
-
-    public static long segmentFor(long offset, int eventSize,
-                                  long maxSegmentSize) {
-        long homeSegment = prefixFor(offset, maxSegmentSize);
-        long endSegment = prefixFor(offset + eventSize, maxSegmentSize);
-        return homeSegment != endSegment ? endSegment : homeSegment;
-    }
-
-    private static String segmentName(long endSegment) {
-        return Long.toHexString(endSegment).toLowerCase() + SEGMENT_SUFFIX;
-    }
-
-    private final UUID    tag;
-    private volatile long commitedOffset;
-    private volatile long appendedOffset;
-
-    public EventChannel(UUID tag) {
-        this.tag = tag;
-    }
-
-    public String appendSegmentNameFor(int eventSize, long maxSegmentSize) {
-        return segmentName(segmentFor(appendedOffset, eventSize, maxSegmentSize));
-    }
-
-    public void commit(final long offset) {
-        commitedOffset = offset;
-    }
-
-    public long getCommittedOffset() {
-        return commitedOffset;
-    }
-
-    public UUID getTag() {
-        return tag;
+    public SegmentAddress(String segment, long offset) {
+        super();
+        this.segment = segment;
+        this.offset = offset;
     }
 }
