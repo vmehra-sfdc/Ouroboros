@@ -25,7 +25,6 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -140,7 +139,7 @@ public class Appender {
         }
         if (read) {
             try {
-                eventChannel = bundle.eventChannelForAppend(header);
+                eventChannel = bundle.eventChannelFor(header);
                 segment = eventChannel.getAppendSegmentFor(header);
             } catch (IOException e) {
                 return;

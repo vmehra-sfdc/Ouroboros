@@ -33,6 +33,6 @@ import java.io.FileNotFoundException;
  * 
  */
 public interface Bundle {
-    EventChannel eventChannelForAppend(EventHeader header)
+    EventChannel eventChannelFor(EventHeader header)
                                                           throws FileNotFoundException;
 }

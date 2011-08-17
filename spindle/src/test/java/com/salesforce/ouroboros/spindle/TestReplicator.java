@@ -26,9 +26,9 @@
 package com.salesforce.ouroboros.spindle;
 
 import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertTrue;
-import static org.mockito.Matchers.isA;
+import static junit.framework.Assert.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -68,22 +68,20 @@ public class TestReplicator {
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         EventHeader event = new EventHeader(payload.length, magic, channel,
                                             timestamp, Event.crc32(payload));
+        EventChannel eventChannel = mock(EventChannel.class);
+
         event.rewind();
         event.write(segment);
         segment.write(payloadBuffer);
         segment.force(false);
 
         EventEntry entry = new EventEntry();
-        entry.setHeader(event);
-        entry.setOffset(0);
+        entry.set(eventChannel, 0, segment, event.totalSize());
 
         Bundle bundle = mock(Bundle.class);
         @SuppressWarnings("unchecked")
         ConsumerBarrier<EventEntry> consumerBarrier = mock(ConsumerBarrier.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
-
-        when(bundle.segmentFor(isA(Long.class), isA(EventHeader.class))).thenReturn(segment,
-                                                                                    segment);
         when(consumerBarrier.waitFor(0)).thenReturn(0L).thenThrow(AlertException.ALERT_EXCEPTION);
         when(consumerBarrier.getEntry(0)).thenReturn(entry);
 
@@ -130,22 +128,14 @@ public class TestReplicator {
         }, "Inbound read thread");
         inboundRead.start();
         replicator.handleConnect(outbound, handler);
-        Util.waitFor("Never achieved WRITE_HEADER state", new Util.Condition() {
+        Util.waitFor("Never achieved WRITE state", new Util.Condition() {
 
             @Override
             public boolean value() {
-                return State.WRITE_HEADER == replicator.getState();
+                return State.WRITE == replicator.getState();
             }
         }, 1000L, 100L);
         replicator.halt();
-        Util.waitFor("Never achieved WRITE_PAYLOAD state",
-                     new Util.Condition() {
-                         @Override
-                         public boolean value() {
-                             replicator.handleWrite(outbound);
-                             return State.WRITE_PAYLOAD == replicator.getState();
-                         }
-                     }, 1000L, 100L);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
             public boolean value() {
@@ -163,5 +153,8 @@ public class TestReplicator {
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertEquals(event.getTimestamp(), replicatedEvent.getTimestamp());
         assertTrue(replicatedEvent.validate());
+        assertNull(entry.getChannel());
+        assertNull(entry.getSegment());
+        verify(eventChannel).commit(0);
     }
 }

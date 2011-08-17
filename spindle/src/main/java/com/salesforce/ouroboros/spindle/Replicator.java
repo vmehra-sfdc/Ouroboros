@@ -25,7 +25,6 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
@@ -59,19 +58,18 @@ import com.lmax.disruptor.RingBuffer;
  */
 public final class Replicator implements CommunicationsHandler {
     public enum State {
-        WAITING, WRITE_HEADER, WRITE_PAYLOAD;
+        WAITING, WRITE;
     }
 
     private static final Logger               log      = LoggerFactory.getLogger(Replicator.class);
 
-    private volatile Appender                 appender;
-    private final Bundle                      bundle;
+    private final Appender                    appender;
     private final ConsumerBarrier<EventEntry> consumerBarrier;
     private final Executor                    executor;
     private volatile SocketChannelHandler     handler;
-    private volatile EventHeader              header;
+    private volatile EventChannel             eventChannel;
     private volatile long                     offset;
-    private volatile int                      payloadRemaining;
+    private volatile int                      remaining;
     private volatile long                     position;
     private final AtomicBoolean               running  = new AtomicBoolean();
     private volatile Segment                  segment;
@@ -81,9 +79,9 @@ public final class Replicator implements CommunicationsHandler {
     public Replicator(final Bundle bundle,
                       final ConsumerBarrier<EventEntry> consumerBarrier,
                       final Executor executor) {
-        this.bundle = bundle;
         this.consumerBarrier = consumerBarrier;
         this.executor = executor;
+        appender = new Appender(bundle, Producer.NULL_PRODUCER);
     }
 
     @Override
@@ -125,7 +123,7 @@ public final class Replicator implements CommunicationsHandler {
     @Override
     public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
         this.handler = handler;
-        appender = new Appender(bundle, Producer.NULL_PRODUCER);
+        appender.handleAccept(channel, handler);
         run();
     }
 
@@ -133,7 +131,6 @@ public final class Replicator implements CommunicationsHandler {
     public void handleConnect(SocketChannel channel,
                               final SocketChannelHandler handler) {
         this.handler = handler;
-        appender = new Appender(bundle, Producer.NULL_PRODUCER);
         appender.handleAccept(channel, handler);
         run();
     }
@@ -146,21 +143,11 @@ public final class Replicator implements CommunicationsHandler {
     @Override
     public void handleWrite(SocketChannel channel) {
         switch (state) {
-            case WRITE_HEADER: {
+            case WRITE: {
                 try {
-                    if (header.write(channel)) {
-                        state = State.WRITE_PAYLOAD;
-                    }
-                } catch (IOException e) {
-                    log.error(String.format("Unable to replicate header for event: %s from: %s",
-                                            offset, segment), e);
-                }
-                break;
-            }
-            case WRITE_PAYLOAD: {
-                try {
-                    if (writePayload(channel)) {
+                    if (transferTo(channel)) {
                         state = State.WAITING;
+                        eventChannel.commit(offset);
                         evaluate();
                     }
                 } catch (IOException e) {
@@ -202,24 +189,13 @@ public final class Replicator implements CommunicationsHandler {
     }
 
     private void replicate(EventEntry entry) {
-        header = entry.getHeader().clone();
         offset = entry.getOffset();
-        try {
-            segment = bundle.segmentFor(offset, header);
-        } catch (FileNotFoundException e1) {
-            log.error(String.format("Unable to find segment for event: %s, offset: %s",
-                                    header.getChannel(), offset));
-        }
-        payloadRemaining = header.size();
-        position = offset + EventHeader.HEADER_BYTE_SIZE;
-        header.rewind();
-        try {
-            seekToPayload();
-        } catch (IOException e) {
-            log.error(String.format("Unable to seek to event payload on: %s, offset: %s",
-                                    segment, offset));
-        }
-        state = State.WRITE_HEADER;
+        segment = entry.getSegment();
+        remaining = entry.getSize();
+        eventChannel = entry.getChannel();
+        entry.clear();
+        position = offset;
+        state = State.WRITE;
         handler.selectForWrite();
     }
 
@@ -228,17 +204,12 @@ public final class Replicator implements CommunicationsHandler {
         evaluate();
     }
 
-    private void seekToPayload() throws IOException {
-        header.seekToPayload(offset, segment);
-    }
-
-    private boolean writePayload(SocketChannel channel) throws IOException {
-        int remaining = payloadRemaining;
+    private boolean transferTo(SocketChannel channel) throws IOException {
         long p = position;
         int written = (int) segment.transferTo(p, remaining, channel);
-        payloadRemaining = remaining - written;
+        remaining = remaining - written;
         position = p + written;
-        if (payloadRemaining == 0) {
+        if (remaining == 0) {
             return true;
         }
         return false;

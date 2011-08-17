@@ -47,8 +47,8 @@ public class Wrangler implements Bundle {
     }
 
     @Override
-    public Segment appendSegmentFor(EventHeader header)
-                                                       throws FileNotFoundException {
+    public EventChannel eventChannelFor(EventHeader header)
+                                                           throws FileNotFoundException {
         UUID channelTag = header.getChannel();
         EventChannel channel = openChannels.get(channelTag);
         if (channel == null) {
@@ -56,23 +56,11 @@ public class Wrangler implements Bundle {
                                             String.format("No open channel: %s",
                                                           channelTag));
         }
-        return channel.getAppendSegmentFor(header, maxSegmentSize);
+        return channel;
     }
 
     public void open(UUID channel) {
-        openChannels.putIfAbsent(channel, new EventChannel(channel, root));
-    }
-
-    @Override
-    public Segment segmentFor(long offset, EventHeader header)
-                                                              throws FileNotFoundException {
-        UUID channelTag = header.getChannel();
-        EventChannel channel = openChannels.get(channelTag);
-        if (channel == null) {
-            throw new IllegalStateException(
-                                            String.format("No open channel: %s",
-                                                          channelTag));
-        }
-        return channel.getSegmentFor(offset, header.totalSize(), maxSegmentSize);
+        openChannels.putIfAbsent(channel, new EventChannel(channel, root,
+                                                           maxSegmentSize));
     }
 }

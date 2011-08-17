@@ -46,12 +46,9 @@ public class EventEntry extends AbstractEntry {
     private Segment                              segment;
     private int                                  size;
 
-    public void set(final EventChannel channel, final long offset,
-                    final Segment segment, final int size) {
-        this.channel = channel;
-        this.offset = offset;
-        this.segment = segment;
-        this.size = size;
+    public void clear() {
+        channel = null;
+        segment = null;
     }
 
     /**
@@ -80,6 +77,14 @@ public class EventEntry extends AbstractEntry {
      */
     public int getSize() {
         return size;
+    }
+
+    public void set(final EventChannel channel, final long offset,
+                    final Segment segment, final int size) {
+        this.channel = channel;
+        this.offset = offset;
+        this.segment = segment;
+        this.size = size;
     }
 
     /**

@@ -73,7 +73,7 @@ public class TestSpinner {
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        when(bundle.eventChannelForAppend(isA(EventHeader.class))).thenReturn(eventChannel);
+        when(bundle.eventChannelFor(isA(EventHeader.class))).thenReturn(eventChannel);
         when(eventChannel.getAppendSegmentFor(isA(EventHeader.class))).thenReturn(writeSegment);
         EventEntry entry = new EventEntry();
         when(producerBarrier.nextEntry()).thenReturn(entry);
@@ -137,7 +137,7 @@ public class TestSpinner {
         }
 
         verify(handler, new Times(3)).selectForRead();
-        verify(bundle).eventChannelForAppend(isA(EventHeader.class));
+        verify(bundle).eventChannelFor(isA(EventHeader.class));
         verify(eventChannel).getAppendSegmentFor(isA(EventHeader.class));
         verify(producerBarrier).nextEntry();
         verify(producerBarrier).commit(entry);
@@ -153,7 +153,7 @@ public class TestSpinner {
         when(channel.getAppendSegmentFor(isA(EventHeader.class))).thenReturn(segment);
         Bundle bundle = new Bundle() {
             @Override
-            public EventChannel eventChannelForAppend(EventHeader header)
+            public EventChannel eventChannelFor(EventHeader header)
                                                                          throws FileNotFoundException {
                 return channel;
             }
