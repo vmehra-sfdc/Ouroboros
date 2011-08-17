@@ -25,8 +25,8 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -48,23 +48,23 @@ import java.nio.channels.WritableByteChannel;
  * 
  */
 public class Segment implements Channel, InterruptibleChannel, ByteChannel,
-        GatheringByteChannel, ScatteringByteChannel {
-    private final FileChannel channel;
-    private final Object      stream;
+        GatheringByteChannel, ScatteringByteChannel, Cloneable {
+    private volatile FileChannel      channel;
+    private final File                file;
+    private volatile RandomAccessFile raf;
 
-    public Segment(FileInputStream fis) {
-        stream = fis;
-        channel = fis.getChannel();
+    public Segment(File file) throws FileNotFoundException {
+        this.file = file;
+        open();
     }
 
-    public Segment(FileOutputStream fos) {
-        stream = fos;
-        channel = fos.getChannel();
-    }
-
-    public Segment(RandomAccessFile raf) {
-        stream = raf;
-        channel = raf.getChannel();
+    @Override
+    public Segment clone() {
+        try {
+            return new Segment(file);
+        } catch (FileNotFoundException e) {
+            throw new IllegalStateException("Segment file does not exist", e);
+        }
     }
 
     /**
@@ -74,7 +74,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     @Override
     public final void close() throws IOException {
         channel.close();
-        stream.hashCode(); // to ensure no GC optimization
+        raf.close();
     }
 
     /**
@@ -345,5 +345,10 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     public long write(ByteBuffer[] paramArrayOfByteBuffer, int paramInt1,
                       int paramInt2) throws IOException {
         return channel.write(paramArrayOfByteBuffer, paramInt1, paramInt2);
+    }
+
+    private void open() throws FileNotFoundException {
+        raf = new RandomAccessFile(file, "rw");
+        channel = raf.getChannel();
     }
 }

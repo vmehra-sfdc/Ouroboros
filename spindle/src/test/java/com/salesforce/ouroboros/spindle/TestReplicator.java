@@ -33,7 +33,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
@@ -60,10 +59,7 @@ public class TestReplicator {
     public void testEventReplication() throws Exception {
         File tmpFile = File.createTempFile("event-replication", ".tst");
         tmpFile.deleteOnExit();
-
-        RandomAccessFile ra = new RandomAccessFile(tmpFile, "rw");
-        Segment segment = new Segment(ra);
-        
+        Segment segment = new Segment(tmpFile);
 
         int magic = 666;
         UUID channel = UUID.randomUUID();

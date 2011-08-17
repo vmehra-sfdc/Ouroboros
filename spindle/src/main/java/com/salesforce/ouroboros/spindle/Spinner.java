@@ -52,10 +52,10 @@ public class Spinner implements CommunicationsHandler, Producer {
     }
 
     @Override
-    public void commit(EventHeader header, long offset) {
+    public void commit(EventChannel channel, Segment segment, long offset,
+                       EventHeader header) {
         EventEntry entry = producerBarrier.nextEntry();
-        entry.setHeader(header);
-        entry.setOffset(offset);
+        entry.set(channel, offset, segment, header.size());
         producerBarrier.commit(entry);
     }
 

@@ -35,29 +35,83 @@ import com.lmax.disruptor.EntryFactory;
  * 
  */
 public class EventEntry extends AbstractEntry {
-    private long                                 offset;
-    private EventHeader                          header;
-
     public final static EntryFactory<EventEntry> ENTRY_FACTORY = new EntryFactory<EventEntry>() {
                                                                    @Override
                                                                    public EventEntry create() {
                                                                        return new EventEntry();
                                                                    }
                                                                };
+    private EventChannel                         channel;
+    private long                                 offset;
+    private Segment                              segment;
+    private int                                  size;
 
-    public EventHeader getHeader() {
-        return header;
+    public void set(final EventChannel channel, final long offset,
+                    final Segment segment, final int size) {
+        this.channel = channel;
+        this.offset = offset;
+        this.segment = segment;
+        this.size = size;
     }
 
+    /**
+     * @return the channel
+     */
+    public EventChannel getChannel() {
+        return channel;
+    }
+
+    /**
+     * @return the offset
+     */
     public long getOffset() {
         return offset;
     }
 
-    public void setHeader(EventHeader header) {
-        this.header = header;
+    /**
+     * @return the segment
+     */
+    public Segment getSegment() {
+        return segment;
     }
 
+    /**
+     * @return the size
+     */
+    public int getSize() {
+        return size;
+    }
+
+    /**
+     * @param channel
+     *            the channel to set
+     */
+    public void setChannel(EventChannel channel) {
+        this.channel = channel;
+    }
+
+    /**
+     * @param offset
+     *            the offset to set
+     */
     public void setOffset(long offset) {
         this.offset = offset;
     }
+
+    /**
+     * @param segment
+     *            the segment to set
+     */
+    public void setSegment(Segment segment) {
+        this.segment = segment;
+    }
+
+    /**
+     * @param size
+     *            the size to set
+     */
+    public void setSize(int size) {
+        this.size = size;
+    }
+
 }

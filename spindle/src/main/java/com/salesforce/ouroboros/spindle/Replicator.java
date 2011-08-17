@@ -44,14 +44,15 @@ import com.lmax.disruptor.RingBuffer;
 /**
  * A full duplex replicator of event streams. The replicator provides both
  * outbound replication of events sourced in the host process as well as
- * accepting replicated events from partner processes on the same channel.
+ * accepting replicated events from the mirrored partner process on the same
+ * channel.
  * 
- * Replicators have a strict sense of connecting with their paired process. In
+ * Replicators have a strict sense of connecting with their mirror process. In
  * order to use both the inbound and outbound streams of the socket, each pair
- * of processes must only connect once. Thus, one process of the pair will
- * initiate the connection and the other pair will accept the new connection.
- * Once the replication connection is established, both sides will replicate
- * events between them.
+ * of processes must only connect once. Thus, one process of the mirror pair
+ * will initiate the connection and the other pair will accept the new
+ * connection. Once the replication connection is established, both sides will
+ * replicate events between them.
  * 
  * @author hhildebrand
  * 
@@ -133,8 +134,8 @@ public final class Replicator implements CommunicationsHandler {
                               final SocketChannelHandler handler) {
         this.handler = handler;
         appender = new Appender(bundle, Producer.NULL_PRODUCER);
-        run();
         appender.handleAccept(channel, handler);
+        run();
     }
 
     @Override

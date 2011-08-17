@@ -36,7 +36,6 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -68,13 +67,14 @@ public class TestSpinner {
     public void testAppend() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
+        EventChannel eventChannel = mock(EventChannel.class);
         @SuppressWarnings("unchecked")
         ProducerBarrier<EventEntry> producerBarrier = mock(ProducerBarrier.class);
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
-        FileOutputStream fos = new FileOutputStream(tmpFile, true);
-        final Segment writeSegment = new Segment(fos);
-        when(bundle.appendSegmentFor(isA(EventHeader.class))).thenReturn(writeSegment);
+        final Segment writeSegment = new Segment(tmpFile);
+        when(bundle.eventChannelForAppend(isA(EventHeader.class))).thenReturn(eventChannel);
+        when(eventChannel.getAppendSegmentFor(isA(EventHeader.class))).thenReturn(writeSegment);
         EventEntry entry = new EventEntry();
         when(producerBarrier.nextEntry()).thenReturn(entry);
         final Spinner spinner = new Spinner(bundle, producerBarrier);
@@ -137,31 +137,25 @@ public class TestSpinner {
         }
 
         verify(handler, new Times(3)).selectForRead();
-        verify(bundle).appendSegmentFor(isA(EventHeader.class));
+        verify(bundle).eventChannelForAppend(isA(EventHeader.class));
+        verify(eventChannel).getAppendSegmentFor(isA(EventHeader.class));
         verify(producerBarrier).nextEntry();
         verify(producerBarrier).commit(entry);
-        verifyNoMoreInteractions(handler, bundle, producerBarrier);
+        verifyNoMoreInteractions(handler, bundle, eventChannel, producerBarrier);
     }
 
     @Test
     public void testMultiAppend() throws Exception {
         final File tmpFile = File.createTempFile("multi-append", ".tst");
         tmpFile.deleteOnExit();
+        final EventChannel channel = mock(EventChannel.class);
+        Segment segment = new Segment(tmpFile);
+        when(channel.getAppendSegmentFor(isA(EventHeader.class))).thenReturn(segment);
         Bundle bundle = new Bundle() {
             @Override
-            public Segment appendSegmentFor(EventHeader header) {
-                FileOutputStream fos;
-                try {
-                    fos = new FileOutputStream(tmpFile, true);
-                } catch (FileNotFoundException e) {
-                    throw new IllegalStateException();
-                }
-                return new Segment(fos);
-            }
-
-            @Override
-            public Segment segmentFor(long offset, EventHeader header) {
-                throw new IllegalStateException("should never have been called");
+            public EventChannel eventChannelForAppend(EventHeader header)
+                                                                         throws FileNotFoundException {
+                return channel;
             }
         };
         ProducerBarrier<EventEntry> barrier = new PBarrier();
@@ -195,12 +189,12 @@ public class TestSpinner {
 
         for (int i = 0; i < 666; i++) {
             int magic = i;
-            UUID channel = new UUID(0, i);
+            UUID channelTag = new UUID(0, i);
             long timestamp = i;
             payload[i] = ("Give me Slack, or give me Food, or Kill me #" + i).getBytes();
             ByteBuffer payloadBuffer = ByteBuffer.wrap(payload[i]);
             EventHeader header = new EventHeader(payload[i].length, magic,
-                                                 channel, timestamp,
+                                                 channelTag, timestamp,
                                                  Event.crc32(payload[i]));
             header.rewind();
             header.write(outbound);
@@ -209,6 +203,7 @@ public class TestSpinner {
             Thread.sleep(1);
         }
         outbound.close();
+        segment.close();
 
         FileInputStream fis = new FileInputStream(tmpFile);
         FileChannel readSegment = fis.getChannel();

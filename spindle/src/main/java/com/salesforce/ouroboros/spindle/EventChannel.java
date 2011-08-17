@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -57,14 +56,18 @@ public class EventChannel {
         return Long.toHexString(endSegment).toLowerCase() + SEGMENT_SUFFIX;
     }
 
-    private volatile long appendedOffset;
+    private final long    maxSegmentSize;
+    private volatile long nextOffset;
+    private volatile long lastTimestamp;
     private final File    channel;
     private volatile long commitedOffset;
     private final UUID    tag;
 
-    public EventChannel(final UUID channelTag, final File root) {
+    public EventChannel(final UUID channelTag, final File root,
+                        final long maxSegmentSize) {
         tag = channelTag;
         channel = new File(root, channelTag.toString().replace('-', '/'));
+        this.maxSegmentSize = maxSegmentSize;
         if (!channel.mkdirs()) {
             String msg = String.format("Unable to create channel directory for channel: %s",
                                        channel);
@@ -73,29 +76,38 @@ public class EventChannel {
         }
     }
 
+    public void append(long offset, int size, long timestamp) {
+        nextOffset = offset + EventHeader.HEADER_BYTE_SIZE + size;
+        lastTimestamp = timestamp;
+    }
+
     public void commit(final long offset) {
         commitedOffset = offset;
     }
 
-    public Segment getAppendSegmentFor(EventHeader header, long maxSegmentSize)
-                                                                               throws FileNotFoundException {
-        File segment = new File(channel,
-                                appendSegmentNameFor(header.totalSize(),
-                                                     maxSegmentSize));
-        FileOutputStream fos = new FileOutputStream(segment, true);
-        return new Segment(fos);
+    public Segment getAppendSegmentFor(EventHeader header)
+                                                          throws FileNotFoundException {
+        return new Segment(new File(channel,
+                                    appendSegmentNameFor(header.totalSize(),
+                                                         maxSegmentSize)));
     }
 
     public long getCommittedOffset() {
         return commitedOffset;
     }
 
-    public Segment getSegmentFor(long offset, int totalSize, long maxSegmentSize)
-                                                                                 throws FileNotFoundException {
-        File segment = new File(channel, segmentName(prefixFor(totalSize,
-                                                               maxSegmentSize)));
-        FileOutputStream fos = new FileOutputStream(segment, true);
-        return new Segment(fos);
+    public Segment getSegmentFor(long offset, int totalSize)
+                                                            throws FileNotFoundException {
+        return new Segment(new File(channel,
+                                    segmentName(prefixFor(totalSize,
+                                                          maxSegmentSize))));
+    }
+
+    public Segment getSegmentFor(long offset, EventHeader header)
+                                                                 throws FileNotFoundException {
+        return new Segment(new File(channel,
+                                    segmentName(prefixFor(header.totalSize(),
+                                                          maxSegmentSize))));
     }
 
     public UUID getTag() {
@@ -103,6 +115,6 @@ public class EventChannel {
     }
 
     private String appendSegmentNameFor(int eventSize, long maxSegmentSize) {
-        return segmentName(segmentFor(appendedOffset, eventSize, maxSegmentSize));
+        return segmentName(segmentFor(nextOffset, eventSize, maxSegmentSize));
     }
 }

@@ -33,26 +33,6 @@ import java.io.FileNotFoundException;
  * 
  */
 public interface Bundle {
-    /**
-     * Answer the physical segment where the event should be appended
-     * 
-     * @param header
-     *            - the event header
-     * @return the Segment where the event should be appended
-     * @throws FileNotFoundException
-     */
-    Segment appendSegmentFor(EventHeader header) throws FileNotFoundException;
-
-    /**
-     * Answer the physical segment where the event should be contained
-     * 
-     * @param offset
-     *            - the absolute offset of the event within the channel
-     * @param header
-     *            - the event header
-     * @return the Segment where the event is located
-     * @throws FileNotFoundException
-     */
-    Segment segmentFor(long offset, EventHeader header)
-                                                       throws FileNotFoundException;
+    EventChannel eventChannelForAppend(EventHeader header)
+                                                          throws FileNotFoundException;
 }

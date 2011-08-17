@@ -45,17 +45,18 @@ public class Appender {
         ACCEPTED, APPEND, INITIALIZED, READ_HEADER;
     }
 
-    private static final Logger  log   = LoggerFactory.getLogger(Appender.class);
+    private static final Logger   log   = LoggerFactory.getLogger(Appender.class);
 
-    private final Bundle         bundle;
-    private SocketChannelHandler handler;
-    private final EventHeader    header;
-    private long                 offset;
-    private long                 position;
-    private long                 remaining;
-    private Segment              segment;
-    private State                state = State.INITIALIZED;
-    private final Producer       producer;
+    private final Bundle          bundle;
+    private SocketChannelHandler  handler;
+    private final EventHeader     header;
+    private volatile long         offset;
+    private volatile long         position;
+    private volatile long         remaining;
+    private volatile EventChannel eventChannel;
+    private volatile Segment      segment;
+    private volatile State        state = State.INITIALIZED;
+    private final Producer        producer;
 
     public Appender(Bundle bundle, Producer producer) {
         this.producer = producer;
@@ -116,14 +117,15 @@ public class Appender {
         remaining -= written;
         if (remaining == 0) {
             try {
-                segment.close();
+                segment.position(position);
             } catch (IOException e) {
-                log.error("Exception closing segment", e);
+                log.error(String.format("Cannot determine position in segment: %s",
+                                        segment), e);
             }
             segment = null;
             state = State.ACCEPTED;
             if (producer != null) {
-                producer.commit(header, offset);
+                producer.commit(eventChannel, segment, offset, header);
             }
         }
     }
@@ -138,16 +140,16 @@ public class Appender {
         }
         if (read) {
             try {
-                segment = bundle.appendSegmentFor(header);
-            } catch (FileNotFoundException e) {
-                log.error(String.format("Cannot find append segment for: %s",
-                                        header.getChannel()), e);
+                eventChannel = bundle.eventChannelForAppend(header);
+                segment = eventChannel.getAppendSegmentFor(header);
+            } catch (IOException e) {
                 return;
             }
             try {
-                offset = position = segment.size();
+                offset = position = segment.position();
             } catch (IOException e) {
-                log.error("Exception during header read", e);
+                log.error(String.format("Cannot determine position in segment: %s",
+                                        segment), e);
                 return;
             }
             writeHeader();
@@ -167,12 +169,7 @@ public class Appender {
             log.error("Exception during header read", e);
             return;
         }
-        try {
-            position = segment.position();
-        } catch (IOException e) {
-            log.error("Exception during reading of segment position", e);
-            return;
-        }
+        position += Event.HEADER_BYTE_SIZE;
         state = State.APPEND;
     }
 }
