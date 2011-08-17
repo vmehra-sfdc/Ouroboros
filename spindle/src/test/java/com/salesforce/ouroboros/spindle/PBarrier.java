@@ -6,11 +6,11 @@ import com.lmax.disruptor.SequenceBatch;
 public class PBarrier implements ProducerBarrier<EventEntry> {
 
     @Override
-    public void commit(SequenceBatch sequenceBatch) {
+    public void commit(EventEntry entry) {
     }
 
     @Override
-    public void commit(EventEntry entry) {
+    public void commit(SequenceBatch sequenceBatch) {
     }
 
     @Override

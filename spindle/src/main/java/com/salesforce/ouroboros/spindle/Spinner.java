@@ -32,18 +32,21 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.lmax.disruptor.ProducerBarrier;
 
 /**
- * An append sink for a channel.
+ * The inbound event sink for event channels. The spinner has an appender that
+ * appends inbound events to the correct segment of the event channel to which
+ * the event belongs. When the event is fully appended, the event is commited by
+ * queuing the event for replication.
  * 
  * @author hhildebrand
  * 
  */
 public class Spinner implements CommunicationsHandler, Producer {
 
-    private final ProducerBarrier<EventEntry> producerBarrier;
+    private final ProducerBarrier<EventEntry> replicationBarrier;
     private final Appender                    appender;
 
-    public Spinner(Bundle bundle, ProducerBarrier<EventEntry> producerBarrier) {
-        this.producerBarrier = producerBarrier;
+    public Spinner(Bundle bundle, ProducerBarrier<EventEntry> replicationBarrier) {
+        this.replicationBarrier = replicationBarrier;
         appender = new Appender(bundle, this);
     }
 
@@ -54,9 +57,14 @@ public class Spinner implements CommunicationsHandler, Producer {
     @Override
     public void commit(EventChannel channel, Segment segment, long offset,
                        EventHeader header) {
-        EventEntry entry = producerBarrier.nextEntry();
+        EventEntry entry = replicationBarrier.nextEntry();
         entry.set(channel, offset, segment, header.size());
-        producerBarrier.commit(entry);
+        channel.append(offset, header);
+        replicationBarrier.commit(entry);
+    }
+
+    public Appender.State getState() {
+        return appender.getState();
     }
 
     @Override
@@ -78,10 +86,6 @@ public class Spinner implements CommunicationsHandler, Producer {
     @Override
     public void handleWrite(SocketChannel channel) {
         throw new UnsupportedOperationException();
-    }
-
-    public Appender.State getState() {
-        return appender.getState();
     }
 
 }

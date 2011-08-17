@@ -42,18 +42,15 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 import org.mockito.internal.verification.Times;
 
-import com.hellblazer.pinkie.CommunicationsHandler;
-import com.hellblazer.pinkie.CommunicationsHandlerFactory;
-import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
-import com.lmax.disruptor.ProducerBarrier;
 import com.salesforce.ouroboros.spindle.Appender.State;
 
 /**
@@ -61,23 +58,21 @@ import com.salesforce.ouroboros.spindle.Appender.State;
  * @author hhildebrand
  * 
  */
-public class TestSpinner {
+public class TestAppender {
 
     @Test
     public void testAppend() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
+        Producer producer = mock(Producer.class);
         EventChannel eventChannel = mock(EventChannel.class);
-        @SuppressWarnings("unchecked")
-        ProducerBarrier<EventEntry> producerBarrier = mock(ProducerBarrier.class);
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
         when(bundle.eventChannelFor(isA(EventHeader.class))).thenReturn(eventChannel);
         when(eventChannel.getAppendSegmentFor(isA(EventHeader.class))).thenReturn(writeSegment);
-        EventEntry entry = new EventEntry();
-        when(producerBarrier.nextEntry()).thenReturn(entry);
-        final Spinner spinner = new Spinner(bundle, producerBarrier);
+        when(eventChannel.isDuplicate(isA(EventHeader.class))).thenReturn(false);
+        final Appender appender = new Appender(bundle, producer);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress(0));
@@ -87,8 +82,8 @@ public class TestSpinner {
         final SocketChannel inbound = server.accept();
         inbound.configureBlocking(false);
 
-        spinner.handleAccept(inbound, handler);
-        assertEquals(State.ACCEPTED, spinner.getState());
+        appender.handleAccept(inbound, handler);
+        assertEquals(State.ACCEPTED, appender.getState());
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
@@ -103,8 +98,8 @@ public class TestSpinner {
         Util.waitFor("Header has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                spinner.handleRead(inbound);
-                return spinner.getState() == State.APPEND;
+                appender.handleRead(inbound);
+                return appender.getState() == State.APPEND;
             }
         }, 1000, 100);
 
@@ -113,8 +108,8 @@ public class TestSpinner {
         Util.waitFor("Payload has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                spinner.handleRead(inbound);
-                return spinner.getState() == State.ACCEPTED;
+                appender.handleRead(inbound);
+                return appender.getState() == State.ACCEPTED;
             }
         }, 1000, 100);
 
@@ -139,55 +134,78 @@ public class TestSpinner {
         verify(handler, new Times(3)).selectForRead();
         verify(bundle).eventChannelFor(isA(EventHeader.class));
         verify(eventChannel).getAppendSegmentFor(isA(EventHeader.class));
-        verify(producerBarrier).nextEntry();
-        verify(producerBarrier).commit(entry);
-        verifyNoMoreInteractions(handler, bundle, eventChannel, producerBarrier);
+        verify(eventChannel).isDuplicate(isA(EventHeader.class));
+        verify(producer).commit(isA(EventChannel.class), isA(Segment.class),
+                                isA(Long.class), isA(EventHeader.class));
+        verifyNoMoreInteractions(handler, bundle, eventChannel, producer);
     }
 
     @Test
     public void testMultiAppend() throws Exception {
         final File tmpFile = File.createTempFile("multi-append", ".tst");
         tmpFile.deleteOnExit();
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
         final EventChannel channel = mock(EventChannel.class);
         Segment segment = new Segment(tmpFile);
         when(channel.getAppendSegmentFor(isA(EventHeader.class))).thenReturn(segment);
         Bundle bundle = new Bundle() {
             @Override
             public EventChannel eventChannelFor(EventHeader header)
-                                                                         throws FileNotFoundException {
+                                                                   throws FileNotFoundException {
                 return channel;
             }
         };
-        ProducerBarrier<EventEntry> barrier = new PBarrier();
-        final Spinner spinner = new Spinner(bundle, barrier);
-        CommunicationsHandlerFactory factory = new CommunicationsHandlerFactory() {
+
+        final AtomicInteger counter = new AtomicInteger();
+        Producer producer = new Producer() {
             @Override
-            public CommunicationsHandler createCommunicationsHandler() {
-                return spinner;
+            public void commit(EventChannel channel, Segment segment,
+                               long offset, EventHeader header) {
+                counter.incrementAndGet();
             }
         };
+
+        final Appender appender = new Appender(bundle, producer);
         SocketOptions socketOptions = new SocketOptions();
         socketOptions.setSend_buffer_size(8);
         socketOptions.setReceive_buffer_size(8);
         socketOptions.setTimeout(100);
-        InetSocketAddress endpoint = new InetSocketAddress(0);
-        Executor commsExec = Executors.newFixedThreadPool(4);
-
-        ServerSocketChannelHandler handler = new ServerSocketChannelHandler(
-                                                                            "test-spinner",
-                                                                            socketOptions,
-                                                                            endpoint,
-                                                                            commsExec,
-                                                                            factory);
-        handler.start();
+        ServerSocketChannel server = ServerSocketChannel.open();
+        server.configureBlocking(true);
+        server.socket().bind(new InetSocketAddress(0));
         SocketChannel outbound = SocketChannel.open();
-        socketOptions.configure(outbound.socket());
         outbound.configureBlocking(true);
-        outbound.connect(handler.getLocalAddress());
+        outbound.connect(server.socket().getLocalSocketAddress());
+        final SocketChannel inbound = server.accept();
+        inbound.configureBlocking(false);
+        appender.handleAccept(inbound, handler);
 
-        byte[][] payload = new byte[666][];
+        final int msgCount = 666;
+        final CyclicBarrier barrier = new CyclicBarrier(2);
 
-        for (int i = 0; i < 666; i++) {
+        Thread appenderThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (msgCount != counter.get()) {
+                    appender.handleRead(inbound);
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+                try {
+                    barrier.await();
+                } catch (Exception e) {
+                    return;
+                }
+            }
+        }, "Appender driver");
+        appenderThread.start();
+
+        byte[][] payload = new byte[msgCount][];
+
+        for (int i = 0; i < msgCount; i++) {
             int magic = i;
             UUID channelTag = new UUID(0, i);
             long timestamp = i;
@@ -198,17 +216,18 @@ public class TestSpinner {
                                                  Event.crc32(payload[i]));
             header.rewind();
             header.write(outbound);
-            Thread.sleep(1);
             outbound.write(payloadBuffer);
-            Thread.sleep(1);
         }
+
+        barrier.await(30, TimeUnit.SECONDS);
+
         outbound.close();
         segment.close();
 
         FileInputStream fis = new FileInputStream(tmpFile);
         FileChannel readSegment = fis.getChannel();
 
-        for (int i = 0; i < 666; i++) {
+        for (int i = 0; i < msgCount; i++) {
             Event event = new Event(readSegment);
             assertTrue(event.validate());
             assertEquals(i, event.getMagic());

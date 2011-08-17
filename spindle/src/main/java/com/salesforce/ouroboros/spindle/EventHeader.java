@@ -153,6 +153,10 @@ public class EventHeader implements Cloneable {
         return bytes.getInt(SIZE_OFFSET);
     }
 
+    public int totalSize() {
+        return HEADER_BYTE_SIZE + size();
+    }
+
     /**
      * Write the byte contents of the receiver on the channel
      * 
@@ -176,9 +180,5 @@ public class EventHeader implements Cloneable {
         bytes.putLong(CH2_OFFSET, channel.getLeastSignificantBits());
         bytes.putLong(TIME_STAMP_OFFSET, timestamp);
         bytes.putInt(CRC_OFFSET, crc32);
-    }
-
-    public int totalSize() {
-        return HEADER_BYTE_SIZE + size();
     }
 }

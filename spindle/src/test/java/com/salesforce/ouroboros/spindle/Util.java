@@ -25,7 +25,7 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import static junit.framework.Assert.*;
+import static junit.framework.Assert.fail;
 
 /**
  * 
@@ -33,6 +33,10 @@ import static junit.framework.Assert.*;
  * 
  */
 public class Util {
+    public static interface Condition {
+        boolean value();
+    }
+
     public static void waitFor(String reason, Condition condition,
                                long timeout, long interval)
                                                            throws InterruptedException {
@@ -43,9 +47,5 @@ public class Util {
             }
             Thread.sleep(interval);
         }
-    }
-
-    public static interface Condition {
-        boolean value();
     }
 }

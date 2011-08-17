@@ -56,7 +56,7 @@ import com.lmax.disruptor.RingBuffer;
  * @author hhildebrand
  * 
  */
-public final class Replicator implements CommunicationsHandler {
+public final class Replicator implements CommunicationsHandler, Producer {
     public enum State {
         WAITING, WRITE;
     }
@@ -86,6 +86,12 @@ public final class Replicator implements CommunicationsHandler {
 
     @Override
     public void closing(SocketChannel channel) {
+    }
+
+    @Override
+    public void commit(EventChannel channel, Segment segment, long offset,
+                       EventHeader header) {
+        channel.append(offset, header);
     }
 
     /**

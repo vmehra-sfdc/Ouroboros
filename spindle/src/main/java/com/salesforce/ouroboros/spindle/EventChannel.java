@@ -41,10 +41,31 @@ public class EventChannel {
     private static final Logger log            = LoggerFactory.getLogger(Wrangler.class);
     private static final String SEGMENT_SUFFIX = ".segment";
 
+    /**
+     * Answer the logical segment prefix for the event offset and given maximum
+     * segment size
+     * 
+     * @param offset
+     *            - the offset of the event
+     * @param maxSegmentSize
+     *            - the maximum segment size
+     * @return
+     */
     public static long prefixFor(long offset, long maxSegmentSize) {
         return (long) Math.floor(offset / maxSegmentSize) * maxSegmentSize;
     }
 
+    /**
+     * Answer the logical segment two which the segment belongs
+     * 
+     * @param offset
+     *            - the proposed offset of the event
+     * @param eventSize
+     *            - the total size of the event
+     * @param maxSegmentSize
+     *            - the maximum segment size
+     * @return
+     */
     public static long segmentFor(long offset, int eventSize,
                                   long maxSegmentSize) {
         long homeSegment = prefixFor(offset, maxSegmentSize);
@@ -52,8 +73,14 @@ public class EventChannel {
         return homeSegment != endSegment ? endSegment : homeSegment;
     }
 
-    public static String segmentName(long endSegment) {
-        return Long.toHexString(endSegment).toLowerCase() + SEGMENT_SUFFIX;
+    /**
+     * Answer the segment file name for the segment prefix
+     * 
+     * @param segmentPrefix
+     * @return
+     */
+    public static String segmentName(long segmentPrefix) {
+        return Long.toHexString(segmentPrefix).toLowerCase() + SEGMENT_SUFFIX;
     }
 
     private final long    maxSegmentSize;
@@ -76,15 +103,35 @@ public class EventChannel {
         }
     }
 
-    public void append(long offset, int size, long timestamp) {
-        nextOffset = offset + EventHeader.HEADER_BYTE_SIZE + size;
-        lastTimestamp = timestamp;
+    /**
+     * Mark the appending of the event at the offset in the channel
+     * 
+     * @param offset
+     * @param header
+     */
+    public void append(long offset, EventHeader header) {
+        nextOffset = offset + header.totalSize();
+        lastTimestamp = header.getTimestamp();
     }
 
+    /**
+     * Commit the event offset in the channel
+     * 
+     * @param offset
+     */
     public void commit(final long offset) {
         commitedOffset = offset;
     }
 
+    /**
+     * Answer the segment that the event can be appended to.
+     * 
+     * @param header
+     *            - the event header
+     * @return the Segment to append the event
+     * @throws FileNotFoundException
+     *             - if the segment file cannot be found
+     */
     public Segment getAppendSegmentFor(EventHeader header)
                                                           throws FileNotFoundException {
         return new Segment(new File(channel,
@@ -96,22 +143,22 @@ public class EventChannel {
         return commitedOffset;
     }
 
-    public Segment getSegmentFor(long offset, int totalSize)
-                                                            throws FileNotFoundException {
-        return new Segment(new File(channel,
-                                    segmentName(prefixFor(totalSize,
-                                                          maxSegmentSize))));
-    }
-
-    public Segment getSegmentFor(long offset, EventHeader header)
-                                                                 throws FileNotFoundException {
-        return new Segment(new File(channel,
-                                    segmentName(prefixFor(header.totalSize(),
-                                                          maxSegmentSize))));
-    }
-
+    /**
+     * @return the unique tag of the channel
+     */
     public UUID getTag() {
         return tag;
+    }
+
+    /**
+     * Answer true if the header represents a duplicate event in the channel
+     * 
+     * @param header
+     *            - the event header to test
+     * @return true if the header represents a duplicate event.
+     */
+    public boolean isDuplicate(EventHeader header) {
+        return header.getTimestamp() < lastTimestamp;
     }
 
     private String appendSegmentNameFor(int eventSize, long maxSegmentSize) {

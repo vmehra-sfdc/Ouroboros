@@ -25,8 +25,9 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import static junit.framework.Assert.assertEquals;
+
 import org.junit.Test;
-import static junit.framework.Assert.*;
 
 /**
  * 
@@ -42,7 +43,7 @@ public class TestEventChannel {
         assertEquals(1024L, EventChannel.prefixFor(1025, 1024L));
         assertEquals(2048, EventChannel.prefixFor(2048, 1024L));
         assertEquals(1024 * 11, EventChannel.prefixFor(1024 * 11, 1024L));
-        assertEquals(1024 * 10, EventChannel.prefixFor((1024 * 11) - 1, 1024L));
-        assertEquals(1024 * 11, EventChannel.prefixFor((1024 * 11) + 15, 1024L));
+        assertEquals(1024 * 10, EventChannel.prefixFor(1024 * 11 - 1, 1024L));
+        assertEquals(1024 * 11, EventChannel.prefixFor(1024 * 11 + 15, 1024L));
     }
 }

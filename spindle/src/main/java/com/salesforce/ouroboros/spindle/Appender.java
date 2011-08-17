@@ -35,16 +35,19 @@ import org.slf4j.LoggerFactory;
 import com.hellblazer.pinkie.SocketChannelHandler;
 
 /**
+ * The asynchronous appender of events. Instances of this class are responsible
+ * for accepting inbound events from the socket channel and appending them to
+ * the appropriate segment of the event channel to which they belong.
  * 
  * @author hhildebrand
  * 
  */
 public class Appender {
     public enum State {
-        ACCEPTED, APPEND, INITIALIZED, READ_HEADER;
+        ACCEPTED, APPEND, INITIALIZED, READ_HEADER, IGNORE_DUPLICATE;
     }
 
-    private static final Logger   log   = LoggerFactory.getLogger(Appender.class);
+    private static final Logger   log     = LoggerFactory.getLogger(Appender.class);
 
     private final Bundle          bundle;
     private SocketChannelHandler  handler;
@@ -54,8 +57,9 @@ public class Appender {
     private volatile long         remaining;
     private volatile EventChannel eventChannel;
     private volatile Segment      segment;
-    private volatile State        state = State.INITIALIZED;
+    private volatile State        state   = State.INITIALIZED;
     private final Producer        producer;
+    private final ByteBuffer[]    devNull = { ByteBuffer.allocate(1024) };
 
     public Appender(Bundle bundle, Producer producer) {
         this.producer = producer;
@@ -81,6 +85,10 @@ public class Appender {
                 header.clear();
                 state = State.READ_HEADER;
                 readHeader(channel);
+                break;
+            }
+            case IGNORE_DUPLICATE: {
+                devNull(channel);
                 break;
             }
             case READ_HEADER: {
@@ -121,11 +129,29 @@ public class Appender {
                 log.error(String.format("Cannot determine position in segment: %s",
                                         segment), e);
             }
-            segment = null;
-            state = State.ACCEPTED;
             if (producer != null) {
                 producer.commit(eventChannel, segment, offset, header);
             }
+            segment = null;
+            state = State.ACCEPTED;
+        }
+    }
+
+    private void devNull(SocketChannel channel) {
+        long read;
+        do {
+            try {
+                read = channel.read(devNull, 0, (int) remaining);
+            } catch (IOException e) {
+                log.error("Exception during append", e);
+                return;
+            }
+            position += read;
+            remaining -= read;
+        } while (remaining != 0 || read != 0);
+        if (remaining == 0) {
+            segment = null;
+            state = State.ACCEPTED;
         }
     }
 
@@ -151,9 +177,13 @@ public class Appender {
                                         segment), e);
                 return;
             }
-            writeHeader();
             remaining = header.size();
-            append(channel);
+            if (eventChannel.isDuplicate(header)) {
+                state = State.IGNORE_DUPLICATE;
+            } else {
+                writeHeader();
+                append(channel);
+            }
         }
     }
 
@@ -168,7 +198,7 @@ public class Appender {
             log.error("Exception during header read", e);
             return;
         }
-        position += Event.HEADER_BYTE_SIZE;
+        position += EventHeader.HEADER_BYTE_SIZE;
         state = State.APPEND;
     }
 }
