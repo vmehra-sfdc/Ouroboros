@@ -25,7 +25,6 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.io.FileNotFoundException;
 
 /**
  * 
@@ -33,6 +32,13 @@ import java.io.FileNotFoundException;
  * 
  */
 public interface Bundle {
-    EventChannel eventChannelFor(EventHeader header)
-                                                    throws FileNotFoundException;
+    /**
+     * Answer the event channel the event is part of.
+     * 
+     * @param header
+     *            - the event header
+     * @return the EventChannel for this event, or null if no such channel
+     *         exists.
+     */
+    EventChannel eventChannelFor(EventHeader header);
 }

@@ -42,6 +42,9 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.channels.WritableByteChannel;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * 
  * @author hhildebrand
@@ -49,6 +52,9 @@ import java.nio.channels.WritableByteChannel;
  */
 public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         GatheringByteChannel, ScatteringByteChannel, Cloneable {
+
+    private static final Logger       log = LoggerFactory.getLogger(Segment.class);
+
     private volatile FileChannel      channel;
     private final File                file;
     private volatile RandomAccessFile raf;
@@ -63,7 +69,10 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         try {
             return new Segment(file);
         } catch (FileNotFoundException e) {
-            throw new IllegalStateException("Segment file does not exist", e);
+            String msg = String.format("Segment file does not exist: %s",
+                                       file.getAbsolutePath());
+            log.error(msg, e);
+            throw new IllegalStateException(msg, e);
         }
     }
 

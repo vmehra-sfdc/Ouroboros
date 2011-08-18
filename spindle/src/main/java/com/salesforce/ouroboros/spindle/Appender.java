@@ -44,7 +44,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
  */
 public class Appender {
     public enum State {
-        ACCEPTED, APPEND, INITIALIZED, READ_HEADER, IGNORE_DUPLICATE;
+        ACCEPTED, APPEND, INITIALIZED, READ_HEADER, DEV_NULL;
     }
 
     private static final Logger   log   = LoggerFactory.getLogger(Appender.class);
@@ -87,7 +87,7 @@ public class Appender {
                 readHeader(channel);
                 break;
             }
-            case IGNORE_DUPLICATE: {
+            case DEV_NULL: {
                 devNull(channel);
                 break;
             }
@@ -162,24 +162,21 @@ public class Appender {
             return;
         }
         if (read) {
-            try {
-                eventChannel = bundle.eventChannelFor(header);
-            } catch (IOException e) {
-                log.error(String.format("Exception retrieving event channel for: %s",
-                                        header), e);
+            eventChannel = bundle.eventChannelFor(header);
+            if (eventChannel == null) {
+                log.info(String.format("No existing event channel for: %s",
+                                       header));
+                state = State.DEV_NULL;
+                segment = null;
+                devNull = ByteBuffer.allocate(header.size());
+                devNull(channel);
                 return;
             }
-            try {
-                segment = eventChannel.appendSegmentFor(header);
-            } catch (IOException e) {
-                log.error(String.format("Exception retrieving append segment for: %s",
-                                        header), e);
-                return;
-            }
+            segment = eventChannel.appendSegmentFor(header);
             offset = position = eventChannel.nextOffset();
             remaining = header.size();
             if (eventChannel.isDuplicate(header)) {
-                state = State.IGNORE_DUPLICATE;
+                state = State.DEV_NULL;
                 segment = null;
                 devNull = ByteBuffer.allocate(header.size());
                 devNull(channel);

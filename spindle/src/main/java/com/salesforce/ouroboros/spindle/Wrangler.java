@@ -26,7 +26,6 @@
 package com.salesforce.ouroboros.spindle;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -47,16 +46,9 @@ public class Wrangler implements Bundle {
     }
 
     @Override
-    public EventChannel eventChannelFor(EventHeader header)
-                                                           throws FileNotFoundException {
+    public EventChannel eventChannelFor(EventHeader header) {
         UUID channelTag = header.getChannel();
-        EventChannel channel = openChannels.get(channelTag);
-        if (channel == null) {
-            throw new IllegalStateException(
-                                            String.format("No open channel: %s",
-                                                          channelTag));
-        }
-        return channel;
+        return openChannels.get(channelTag);
     }
 
     public void open(UUID channel) {

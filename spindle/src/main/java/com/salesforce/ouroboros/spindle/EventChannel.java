@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -133,14 +134,29 @@ public class EventChannel {
      * @param header
      *            - the event header
      * @return the Segment to append the event
-     * @throws FileNotFoundException
-     *             - if the segment file cannot be found
      */
-    public Segment appendSegmentFor(EventHeader header)
-                                                          throws FileNotFoundException {
-        return new Segment(new File(channel,
-                                    appendSegmentNameFor(header.totalSize(),
-                                                         maxSegmentSize)));
+    public Segment appendSegmentFor(EventHeader header) {
+        File segment = new File(channel,
+                                appendSegmentNameFor(header.totalSize(),
+                                                     maxSegmentSize));
+        if (!segment.exists()) {
+            try {
+                segment.createNewFile();
+            } catch (IOException e) {
+                String msg = String.format("Cannot create the new segment file: %s",
+                                           segment.getAbsolutePath());
+                log.error(msg);
+                throw new IllegalStateException(msg);
+            }
+        }
+        try {
+            return new Segment(segment);
+        } catch (FileNotFoundException e) {
+            String msg = String.format("The segment file cannot be found, yet was created: %s",
+                                       segment.getAbsolutePath());
+            log.error(msg);
+            throw new IllegalStateException(msg);
+        }
     }
 
     /**

@@ -35,7 +35,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -165,8 +164,7 @@ public class TestAppender {
         });
         Bundle bundle = new Bundle() {
             @Override
-            public EventChannel eventChannelFor(EventHeader header)
-                                                                   throws FileNotFoundException {
+            public EventChannel eventChannelFor(EventHeader header) {
                 return eventChannel;
             }
         };
@@ -302,7 +300,7 @@ public class TestAppender {
             @Override
             public boolean value() {
                 appender.handleRead(inbound);
-                return appender.getState() == State.IGNORE_DUPLICATE;
+                return appender.getState() == State.DEV_NULL;
             }
         }, 1000, 100);
 
