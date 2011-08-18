@@ -48,6 +48,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 import org.mockito.internal.verification.Times;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
@@ -70,8 +72,14 @@ public class TestAppender {
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
         when(bundle.eventChannelFor(isA(EventHeader.class))).thenReturn(eventChannel);
-        when(eventChannel.getAppendSegmentFor(isA(EventHeader.class))).thenReturn(writeSegment);
+        when(eventChannel.appendSegmentFor(isA(EventHeader.class))).thenReturn(writeSegment);
         when(eventChannel.isDuplicate(isA(EventHeader.class))).thenReturn(false);
+        when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
+            @Override
+            public Long answer(InvocationOnMock invocation) throws Throwable {
+                return writeSegment.size();
+            }
+        });
         final Appender appender = new Appender(bundle, producer);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
@@ -133,8 +141,9 @@ public class TestAppender {
 
         verify(handler, new Times(3)).selectForRead();
         verify(bundle).eventChannelFor(isA(EventHeader.class));
-        verify(eventChannel).getAppendSegmentFor(isA(EventHeader.class));
+        verify(eventChannel).appendSegmentFor(isA(EventHeader.class));
         verify(eventChannel).isDuplicate(isA(EventHeader.class));
+        verify(eventChannel).nextOffset();
         verify(producer).commit(isA(EventChannel.class), isA(Segment.class),
                                 isA(Long.class), isA(EventHeader.class));
         verifyNoMoreInteractions(handler, bundle, eventChannel, producer);
@@ -145,14 +154,20 @@ public class TestAppender {
         final File tmpFile = File.createTempFile("multi-append", ".tst");
         tmpFile.deleteOnExit();
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
-        final EventChannel channel = mock(EventChannel.class);
-        Segment segment = new Segment(tmpFile);
-        when(channel.getAppendSegmentFor(isA(EventHeader.class))).thenReturn(segment);
+        final EventChannel eventChannel = mock(EventChannel.class);
+        final Segment segment = new Segment(tmpFile);
+        when(eventChannel.appendSegmentFor(isA(EventHeader.class))).thenReturn(segment);
+        when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
+            @Override
+            public Long answer(InvocationOnMock invocation) throws Throwable {
+                return segment.size();
+            }
+        });
         Bundle bundle = new Bundle() {
             @Override
             public EventChannel eventChannelFor(EventHeader header)
                                                                    throws FileNotFoundException {
-                return channel;
+                return eventChannel;
             }
         };
 

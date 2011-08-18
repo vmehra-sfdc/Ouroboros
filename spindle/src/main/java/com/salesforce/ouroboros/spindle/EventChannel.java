@@ -87,7 +87,7 @@ public class EventChannel {
     private volatile long nextOffset;
     private volatile long lastTimestamp;
     private final File    channel;
-    private volatile long commitedOffset;
+    private volatile long commited;
     private final UUID    tag;
 
     public EventChannel(final UUID channelTag, final File root,
@@ -104,7 +104,7 @@ public class EventChannel {
     }
 
     /**
-     * Mark the appending of the event at the offset in the channel
+     * Mark the appending of the event at the in the channel
      * 
      * @param offset
      * @param header
@@ -120,7 +120,11 @@ public class EventChannel {
      * @param offset
      */
     public void commit(final long offset) {
-        commitedOffset = offset;
+        commited = offset;
+    }
+
+    public long committed() {
+        return commited;
     }
 
     /**
@@ -132,15 +136,11 @@ public class EventChannel {
      * @throws FileNotFoundException
      *             - if the segment file cannot be found
      */
-    public Segment getAppendSegmentFor(EventHeader header)
+    public Segment appendSegmentFor(EventHeader header)
                                                           throws FileNotFoundException {
         return new Segment(new File(channel,
                                     appendSegmentNameFor(header.totalSize(),
                                                          maxSegmentSize)));
-    }
-
-    public long getCommittedOffset() {
-        return commitedOffset;
     }
 
     /**
@@ -159,6 +159,10 @@ public class EventChannel {
      */
     public boolean isDuplicate(EventHeader header) {
         return header.getTimestamp() < lastTimestamp;
+    }
+
+    public long nextOffset() {
+        return nextOffset;
     }
 
     private String appendSegmentNameFor(int eventSize, long maxSegmentSize) {

@@ -166,17 +166,19 @@ public class Appender {
         if (read) {
             try {
                 eventChannel = bundle.eventChannelFor(header);
-                segment = eventChannel.getAppendSegmentFor(header);
             } catch (IOException e) {
+                log.error(String.format("Exception retrieving event channel for: %s",
+                                        header), e);
                 return;
             }
             try {
-                offset = position = segment.position();
+                segment = eventChannel.appendSegmentFor(header);
             } catch (IOException e) {
-                log.error(String.format("Cannot determine position in segment: %s",
-                                        segment), e);
+                log.error(String.format("Exception retrieving append segment for: %s",
+                                        header), e);
                 return;
             }
+            offset = position = eventChannel.nextOffset();
             remaining = header.size();
             if (eventChannel.isDuplicate(header)) {
                 state = State.IGNORE_DUPLICATE;
