@@ -116,19 +116,6 @@ public class EventChannel {
     }
 
     /**
-     * Commit the event offset in the channel
-     * 
-     * @param offset
-     */
-    public void commit(final long offset) {
-        commited = offset;
-    }
-
-    public long committed() {
-        return commited;
-    }
-
-    /**
      * Answer the segment that the event can be appended to.
      * 
      * @param header
@@ -157,6 +144,19 @@ public class EventChannel {
             log.error(msg);
             throw new IllegalStateException(msg);
         }
+    }
+
+    /**
+     * Commit the event offset in the channel
+     * 
+     * @param offset
+     */
+    public void commit(final long offset) {
+        commited = offset;
+    }
+
+    public long committed() {
+        return commited;
     }
 
     /**
