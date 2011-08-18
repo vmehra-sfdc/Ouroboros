@@ -256,4 +256,76 @@ public class TestAppender {
         }
         readSegment.close();
     };
+
+    @Test
+    public void testDuplicate() throws Exception {
+        final SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        Bundle bundle = mock(Bundle.class);
+        Producer producer = mock(Producer.class);
+        EventChannel eventChannel = mock(EventChannel.class);
+        File tmpFile = File.createTempFile("duplicate", ".tst");
+        tmpFile.deleteOnExit();
+        final Segment writeSegment = new Segment(tmpFile);
+        when(bundle.eventChannelFor(isA(EventHeader.class))).thenReturn(eventChannel);
+        when(eventChannel.appendSegmentFor(isA(EventHeader.class))).thenReturn(writeSegment);
+        when(eventChannel.isDuplicate(isA(EventHeader.class))).thenReturn(true);
+        when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
+            @Override
+            public Long answer(InvocationOnMock invocation) throws Throwable {
+                return writeSegment.size();
+            }
+        });
+        final Appender appender = new Appender(bundle, producer);
+        ServerSocketChannel server = ServerSocketChannel.open();
+        server.configureBlocking(true);
+        server.socket().bind(new InetSocketAddress(0));
+        SocketChannel outbound = SocketChannel.open();
+        outbound.configureBlocking(true);
+        outbound.connect(server.socket().getLocalSocketAddress());
+        final SocketChannel inbound = server.accept();
+        inbound.configureBlocking(false);
+
+        appender.handleAccept(inbound, handler);
+        assertEquals(State.ACCEPTED, appender.getState());
+
+        int magic = 666;
+        UUID channel = UUID.randomUUID();
+        long timestamp = System.currentTimeMillis();
+        byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
+        ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
+        EventHeader header = new EventHeader(payload.length, magic, channel,
+                                             timestamp, Event.crc32(payload));
+        header.rewind();
+        header.write(outbound);
+
+        Util.waitFor("Header has not been fully read", new Util.Condition() {
+            @Override
+            public boolean value() {
+                appender.handleRead(inbound);
+                return appender.getState() == State.IGNORE_DUPLICATE;
+            }
+        }, 1000, 100);
+
+        outbound.write(payloadBuffer);
+
+        Util.waitFor("Payload has not been fully read", new Util.Condition() {
+            @Override
+            public boolean value() {
+                appender.handleRead(inbound);
+                return appender.getState() == State.ACCEPTED;
+            }
+        }, 1000, 100);
+
+        outbound.close();
+        inbound.close();
+        server.close();
+
+        assertEquals(0L, tmpFile.length());
+        verify(handler, new Times(3)).selectForRead();
+        verify(bundle).eventChannelFor(isA(EventHeader.class));
+        verify(eventChannel).appendSegmentFor(isA(EventHeader.class));
+        verify(eventChannel).isDuplicate(isA(EventHeader.class));
+        verify(eventChannel).nextOffset();
+        verifyNoMoreInteractions(handler, bundle, eventChannel, producer);
+    }
 }

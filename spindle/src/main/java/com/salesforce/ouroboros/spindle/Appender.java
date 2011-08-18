@@ -47,7 +47,7 @@ public class Appender {
         ACCEPTED, APPEND, INITIALIZED, READ_HEADER, IGNORE_DUPLICATE;
     }
 
-    private static final Logger   log     = LoggerFactory.getLogger(Appender.class);
+    private static final Logger   log   = LoggerFactory.getLogger(Appender.class);
 
     private final Bundle          bundle;
     private SocketChannelHandler  handler;
@@ -57,9 +57,9 @@ public class Appender {
     private volatile long         remaining;
     private volatile EventChannel eventChannel;
     private volatile Segment      segment;
-    private volatile State        state   = State.INITIALIZED;
+    private volatile State        state = State.INITIALIZED;
     private final Producer        producer;
-    private final ByteBuffer[]    devNull = { ByteBuffer.allocate(1024) };
+    private volatile ByteBuffer   devNull;
 
     public Appender(Bundle bundle, Producer producer) {
         this.producer = producer;
@@ -139,18 +139,16 @@ public class Appender {
 
     private void devNull(SocketChannel channel) {
         long read;
-        do {
-            try {
-                read = channel.read(devNull, 0, (int) remaining);
-            } catch (IOException e) {
-                log.error("Exception during append", e);
-                return;
-            }
-            position += read;
-            remaining -= read;
-        } while (remaining != 0 || read != 0);
+        try {
+            read = channel.read(devNull);
+        } catch (IOException e) {
+            log.error("Exception during append", e);
+            return;
+        }
+        position += read;
+        remaining -= read;
         if (remaining == 0) {
-            segment = null;
+            devNull = null;
             state = State.ACCEPTED;
         }
     }
@@ -182,6 +180,9 @@ public class Appender {
             remaining = header.size();
             if (eventChannel.isDuplicate(header)) {
                 state = State.IGNORE_DUPLICATE;
+                segment = null;
+                devNull = ByteBuffer.allocate(header.size());
+                devNull(channel);
             } else {
                 writeHeader();
                 append(channel);
