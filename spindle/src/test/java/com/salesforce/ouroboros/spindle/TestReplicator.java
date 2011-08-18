@@ -39,7 +39,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
-import java.util.concurrent.Executors;
 
 import org.junit.Test;
 
@@ -86,10 +85,7 @@ public class TestReplicator {
         when(consumerBarrier.waitFor(0)).thenReturn(0L).thenThrow(AlertException.ALERT_EXCEPTION);
         when(consumerBarrier.getEntry(0)).thenReturn(entry);
 
-        final Replicator replicator = new Replicator(
-                                                     bundle,
-                                                     consumerBarrier,
-                                                     Executors.newSingleThreadExecutor());
+        final Replicator replicator = new Replicator(bundle, consumerBarrier);
         assertEquals(State.WAITING, replicator.getState());
         SocketOptions options = new SocketOptions();
         options.setTimeout(100);

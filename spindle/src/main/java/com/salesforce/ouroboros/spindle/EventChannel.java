@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * 
  */
 public class EventChannel {
-    private static final Logger log            = LoggerFactory.getLogger(Wrangler.class);
+    private static final Logger log            = LoggerFactory.getLogger(Weaver.class);
     private static final String SEGMENT_SUFFIX = ".segment";
 
     /**

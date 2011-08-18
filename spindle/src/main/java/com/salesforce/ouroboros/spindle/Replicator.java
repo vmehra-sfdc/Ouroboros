@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.spindle;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -56,7 +57,8 @@ import com.lmax.disruptor.RingBuffer;
  * @author hhildebrand
  * 
  */
-public final class Replicator implements CommunicationsHandler, Producer {
+public final class Replicator implements CommunicationsHandler, Producer,
+        Consumer {
     public enum State {
         WAITING, WRITE;
     }
@@ -64,7 +66,7 @@ public final class Replicator implements CommunicationsHandler, Producer {
     private static final Logger               log      = LoggerFactory.getLogger(Replicator.class);
 
     private final Appender                    appender;
-    private final ConsumerBarrier<EventEntry> consumerBarrier;
+    private final ConsumerBarrier<EventEntry> replicationConsumerBarrier;
     private final Executor                    executor;
     private volatile SocketChannelHandler     handler;
     private volatile EventChannel             eventChannel;
@@ -77,10 +79,9 @@ public final class Replicator implements CommunicationsHandler, Producer {
     private volatile State                    state    = State.WAITING;
 
     public Replicator(final Bundle bundle,
-                      final ConsumerBarrier<EventEntry> consumerBarrier,
-                      final Executor executor) {
-        this.consumerBarrier = consumerBarrier;
-        this.executor = executor;
+                      final ConsumerBarrier<EventEntry> replicationConsumerBarrier) {
+        this.replicationConsumerBarrier = replicationConsumerBarrier;
+        executor = Executors.newSingleThreadExecutor();
         appender = new Appender(bundle, this);
     }
 
@@ -107,7 +108,12 @@ public final class Replicator implements CommunicationsHandler, Producer {
      * @return the barrier this {@link Consumer} is using.
      */
     public ConsumerBarrier<EventEntry> getConsumerBarrier() {
-        return consumerBarrier;
+        return replicationConsumerBarrier;
+    }
+
+    @Override
+    public long getSequence() {
+        return sequence;
     }
 
     /**
@@ -120,9 +126,10 @@ public final class Replicator implements CommunicationsHandler, Producer {
     /**
      * Halt the outbound replication process;
      */
+    @Override
     public void halt() {
         if (running.compareAndSet(true, false)) {
-            consumerBarrier.alert();
+            replicationConsumerBarrier.alert();
         }
     }
 
@@ -167,6 +174,14 @@ public final class Replicator implements CommunicationsHandler, Producer {
         }
     }
 
+    @Override
+    public void run() {
+        if (!running.compareAndSet(false, true)) {
+            return;
+        }
+        evaluate();
+    }
+
     private void evaluate() {
         if (running.get()) {
             executor.execute(new Runnable() {
@@ -182,11 +197,11 @@ public final class Replicator implements CommunicationsHandler, Producer {
         long nextSequence = sequence + 1;
         try {
             try {
-                consumerBarrier.waitFor(nextSequence);
+                replicationConsumerBarrier.waitFor(nextSequence);
             } catch (InterruptedException e) {
                 return;
             }
-            EventEntry entry = consumerBarrier.getEntry(nextSequence);
+            EventEntry entry = replicationConsumerBarrier.getEntry(nextSequence);
             sequence = entry.getSequence();
             replicate(entry);
         } catch (final AlertException ex) {
@@ -203,11 +218,6 @@ public final class Replicator implements CommunicationsHandler, Producer {
         position = offset;
         state = State.WRITE;
         handler.selectForWrite();
-    }
-
-    private void run() {
-        running.set(true);
-        evaluate();
     }
 
     private boolean transferTo(SocketChannel channel) throws IOException {
