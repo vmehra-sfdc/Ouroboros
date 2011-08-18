@@ -81,7 +81,7 @@ public final class Replicator implements CommunicationsHandler, Producer {
                       final Executor executor) {
         this.consumerBarrier = consumerBarrier;
         this.executor = executor;
-        appender = new Appender(bundle, Producer.NULL_PRODUCER);
+        appender = new Appender(bundle, this);
     }
 
     @Override
