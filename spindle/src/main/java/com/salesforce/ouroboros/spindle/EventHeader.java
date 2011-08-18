@@ -43,7 +43,8 @@ import java.util.UUID;
  * </pre>
  * 
  * The unique identifier of an event is the tuple {tag, timestamp}. Event
- * timestamps are unique within a
+ * timestamps are unique within a millisecond boundary, and god help you if you
+ * have to be on edge of the rollover of the epoch.
  * 
  * @author hhildebrand
  * 
