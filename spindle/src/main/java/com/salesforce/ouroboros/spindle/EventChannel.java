@@ -34,6 +34,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * The representation of the event channel. A channel is a logical collection of
+ * segments, identified by a UUID. Events published to the channel are only
+ * appended, and only one thread is ever appending to a channel at any given
+ * instant in time. The channels keep track of the offset the last committed
+ * event, as well as the offset of the last appended event and the timestamp of
+ * that event. The channel is responsible for the logic of maintaining the
+ * segments, as well as determining whether events are duplicating events
+ * already in the channel.
  * 
  * @author hhildebrand
  * 

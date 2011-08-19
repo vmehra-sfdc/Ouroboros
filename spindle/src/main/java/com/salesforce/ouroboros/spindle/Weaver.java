@@ -41,6 +41,9 @@ import com.lmax.disruptor.ProducerBarrier;
 import com.lmax.disruptor.RingBuffer;
 
 /**
+ * The Weaver represents the channel buffer process that provides persistent,
+ * replicated buffers of events, their subscriptions and the services for
+ * publishing and consuming these events.
  * 
  * @author hhildebrand
  * 

@@ -29,7 +29,7 @@ import com.lmax.disruptor.AbstractEntry;
 import com.lmax.disruptor.EntryFactory;
 
 /**
- * The ring buffer entry representing an event
+ * The ring buffer entry representing the appending of an event.
  * 
  * @author hhildebrand
  * 

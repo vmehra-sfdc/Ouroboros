@@ -32,6 +32,8 @@ import java.nio.channels.WritableByteChannel;
 import java.util.UUID;
 
 /**
+ * The header containing the metadata of an Event.
+ * 
  * An event header comprised of:
  * 
  * <pre>

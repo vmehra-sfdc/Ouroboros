@@ -34,8 +34,7 @@ import java.util.UUID;
  * The currency of the channels.
  * 
  * Events are identified by their 64 bit offset within a channel. The body of
- * the event consists of uninterpreted bytes. The size of the payload is the 4
- * byte size - <header size>
+ * the event consists of uninterpreted bytes.
  * 
  * @author hhildebrand
  * 

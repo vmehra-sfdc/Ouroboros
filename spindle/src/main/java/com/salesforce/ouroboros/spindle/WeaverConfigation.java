@@ -32,7 +32,7 @@ import java.util.concurrent.Executor;
 import com.hellblazer.pinkie.SocketOptions;
 
 /**
- * The weaver configuration bean
+ * The java bean representation of the configuration of a Weaver.
  * 
  * @author hhildebrand
  * 

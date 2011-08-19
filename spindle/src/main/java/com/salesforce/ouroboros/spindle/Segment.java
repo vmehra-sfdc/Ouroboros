@@ -46,6 +46,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * Segments are the ultimate repository of events, corresponding to files within
+ * the channel.
  * 
  * @author hhildebrand
  * 
