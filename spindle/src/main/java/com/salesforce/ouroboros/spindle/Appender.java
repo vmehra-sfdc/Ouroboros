@@ -44,22 +44,22 @@ import com.hellblazer.pinkie.SocketChannelHandler;
  */
 public class Appender {
     public enum State {
-        ACCEPTED, APPEND, INITIALIZED, READ_HEADER, DEV_NULL;
+        ACCEPTED, APPEND, INITIALIZED, READ_HEADER, READ_OFFSET, DEV_NULL;
     }
 
-    private static final Logger   log   = LoggerFactory.getLogger(Appender.class);
+    private static final Logger     log      = LoggerFactory.getLogger(Appender.class);
 
-    private final Bundle          bundle;
-    private SocketChannelHandler  handler;
-    private final EventHeader     header;
-    private volatile long         offset;
-    private volatile long         position;
-    private volatile long         remaining;
-    private volatile EventChannel eventChannel;
-    private volatile Segment      segment;
-    private volatile State        state = State.INITIALIZED;
-    private final Producer        producer;
-    private volatile ByteBuffer   devNull;
+    protected final Bundle          bundle;
+    protected SocketChannelHandler  handler;
+    protected final EventHeader     header;
+    protected volatile long         offset;
+    protected volatile long         position = -1L;
+    protected volatile long         remaining;
+    protected volatile EventChannel eventChannel;
+    protected volatile Segment      segment;
+    protected volatile State        state    = State.INITIALIZED;
+    protected final Producer        producer;
+    protected volatile ByteBuffer   devNull;
 
     public Appender(Bundle bundle, Producer producer) {
         this.producer = producer;
@@ -82,13 +82,15 @@ public class Appender {
     public void handleRead(SocketChannel channel) {
         switch (state) {
             case ACCEPTED: {
-                header.clear();
-                state = State.READ_HEADER;
-                readHeader(channel);
+                initialRead(channel);
                 break;
             }
             case DEV_NULL: {
                 devNull(channel);
+                break;
+            }
+            case READ_OFFSET: {
+                readOffset(channel);
                 break;
             }
             case READ_HEADER: {
@@ -112,7 +114,7 @@ public class Appender {
                + ", remaining=" + remaining + ", position=" + position + "]";
     }
 
-    private void append(SocketChannel channel) {
+    protected void append(SocketChannel channel) {
         long written;
         try {
             written = segment.transferFrom(channel, position, remaining);
@@ -137,7 +139,7 @@ public class Appender {
         }
     }
 
-    private void devNull(SocketChannel channel) {
+    protected void devNull(SocketChannel channel) {
         long read;
         try {
             read = channel.read(devNull);
@@ -153,7 +155,13 @@ public class Appender {
         }
     }
 
-    private void readHeader(SocketChannel channel) {
+    protected void initialRead(SocketChannel channel) {
+        header.clear();
+        state = State.READ_HEADER;
+        readHeader(channel);
+    }
+
+    protected void readHeader(SocketChannel channel) {
         boolean read;
         try {
             read = header.read(channel);
@@ -187,7 +195,11 @@ public class Appender {
         }
     }
 
-    private void writeHeader() {
+    protected void readOffset(SocketChannel channel) {
+        // Do nothing for the basic appender
+    }
+
+    protected void writeHeader() {
         header.rewind();
         try {
             if (!header.write(segment)) {

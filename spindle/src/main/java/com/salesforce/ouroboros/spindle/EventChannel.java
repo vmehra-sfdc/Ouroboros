@@ -185,8 +185,49 @@ public class EventChannel {
         return header.getTimestamp() < lastTimestamp;
     }
 
+    /**
+     * Answer true if the offset is the next append offset of the channel
+     * 
+     * @param offset
+     *            - the event offset
+     * @return true if the event channel's append offset is equal to the offset
+     */
+    public boolean isNextAppend(long offset) {
+        return nextOffset == offset;
+    }
+
     public long nextOffset() {
         return nextOffset;
+    }
+
+    /**
+     * Answer the segment for the event at the given offset
+     * 
+     * @param offset
+     *            - the offset of the event
+     * @return the segment for the event
+     */
+    public Segment segmentFor(long offset) {
+        File segment = new File(channel, segmentName(prefixFor(offset,
+                                                               maxSegmentSize)));
+        if (!segment.exists()) {
+            try {
+                segment.createNewFile();
+            } catch (IOException e) {
+                String msg = String.format("Cannot create the new segment file: %s",
+                                           segment.getAbsolutePath());
+                log.error(msg);
+                throw new IllegalStateException(msg);
+            }
+        }
+        try {
+            return new Segment(segment);
+        } catch (FileNotFoundException e) {
+            String msg = String.format("The segment file cannot be found, yet was created: %s",
+                                       segment.getAbsolutePath());
+            log.error(msg);
+            throw new IllegalStateException(msg);
+        }
     }
 
     private String appendSegmentNameFor(int eventSize, long maxSegmentSize) {

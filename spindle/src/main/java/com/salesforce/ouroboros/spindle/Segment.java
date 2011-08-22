@@ -42,12 +42,14 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.channels.WritableByteChannel;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Segments are the ultimate repository of events, corresponding to files within
- * the channel.
+ * the channel. Due to the bogosity in the way that FileChannels are linked with
+ * the instances of streams, we have to have an abstraction which wrappers both
+ * the channel and the linked stream, because the finalization of the stream
+ * will close the file channel's handle, which isn't good. Thus, this class is
+ * really nothing more than a huge delegator to the FileChannel member, keeping
+ * around the random access file so it won't be GC'd.
  * 
  * @author hhildebrand
  * 
@@ -55,27 +57,12 @@ import org.slf4j.LoggerFactory;
 public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         GatheringByteChannel, ScatteringByteChannel, Cloneable {
 
-    private static final Logger       log = LoggerFactory.getLogger(Segment.class);
-
     private volatile FileChannel      channel;
-    private final File                file;
     private volatile RandomAccessFile raf;
 
     public Segment(File file) throws FileNotFoundException {
-        this.file = file;
-        open();
-    }
-
-    @Override
-    public Segment clone() {
-        try {
-            return new Segment(file);
-        } catch (FileNotFoundException e) {
-            String msg = String.format("Segment file does not exist: %s",
-                                       file.getAbsolutePath());
-            log.error(msg, e);
-            throw new IllegalStateException(msg, e);
-        }
+        raf = new RandomAccessFile(file, "rw");
+        channel = raf.getChannel();
     }
 
     /**
@@ -356,10 +343,5 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     public long write(ByteBuffer[] paramArrayOfByteBuffer, int paramInt1,
                       int paramInt2) throws IOException {
         return channel.write(paramArrayOfByteBuffer, paramInt1, paramInt2);
-    }
-
-    private void open() throws FileNotFoundException {
-        raf = new RandomAccessFile(file, "rw");
-        channel = raf.getChannel();
     }
 }

@@ -55,8 +55,55 @@ import com.salesforce.ouroboros.spindle.Replicator.State;
  */
 public class TestReplicator {
 
+    private class Reader implements Runnable {
+        long                        offset       = -1;
+        private final SocketChannel inbound;
+        final ByteBuffer            replicated;
+        private final ByteBuffer    offsetBuffer = ByteBuffer.allocate(8);
+
+        public Reader(final SocketChannel inbound, final int payloadLength) {
+            super();
+            this.inbound = inbound;
+            replicated = ByteBuffer.allocate(EventHeader.HEADER_BYTE_SIZE
+                                             + payloadLength);
+        }
+
+        @Override
+        public void run() {
+            try {
+                readOffset();
+                for (inbound.read(replicated); replicated.hasRemaining(); inbound.read(replicated)) {
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+            replicated.flip();
+        }
+
+        private void readOffset() {
+            try {
+                for (inbound.read(offsetBuffer); offsetBuffer.hasRemaining(); inbound.read(offsetBuffer)) {
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+                offsetBuffer.flip();
+                offset = offsetBuffer.getLong();
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
     @Test
-    public void testEventReplication() throws Exception {
+    public void testOutboundReplication() throws Exception {
         File tmpFile = File.createTempFile("event-replication", ".tst");
         tmpFile.deleteOnExit();
         Segment segment = new Segment(tmpFile);
@@ -88,6 +135,8 @@ public class TestReplicator {
         final Replicator replicator = new Replicator(bundle, consumerBarrier);
         assertEquals(State.WAITING, replicator.getState());
         SocketOptions options = new SocketOptions();
+        options.setSend_buffer_size(4);
+        options.setReceive_buffer_size(4);
         options.setTimeout(100);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
@@ -103,33 +152,15 @@ public class TestReplicator {
         assertTrue(inbound.isConnected());
         outbound.configureBlocking(true);
         inbound.configureBlocking(true);
-        final ByteBuffer replicated = ByteBuffer.allocate(EventHeader.HEADER_BYTE_SIZE
-                                                          + payload.length);
-        Thread inboundRead = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    int read = 0;
-                    for (read += inbound.read(replicated); read < EventHeader.HEADER_BYTE_SIZE
-                                                                  + payload.length; read += inbound.read(replicated)) {
-                        try {
-                            Thread.sleep(10);
-                        } catch (InterruptedException e) {
-                            return;
-                        }
-                    }
-                } catch (IOException e) {
-                    throw new IllegalStateException(e);
-                }
-            }
-        }, "Inbound read thread");
+        Reader reader = new Reader(inbound, payload.length);
+        Thread inboundRead = new Thread(reader, "Inbound read thread");
         inboundRead.start();
         replicator.handleConnect(outbound, handler);
-        Util.waitFor("Never achieved WRITE state", new Util.Condition() {
+        Util.waitFor("Never achieved WRITE_OFFSET state", new Util.Condition() {
 
             @Override
             public boolean value() {
-                return State.WRITE == replicator.getState();
+                return State.WRITE_OFFSET == replicator.getState();
             }
         }, 1000L, 100L);
         replicator.halt();
@@ -141,10 +172,9 @@ public class TestReplicator {
             }
         }, 1000L, 100L);
         inboundRead.join(4000);
-        replicated.flip();
-        assertTrue(replicated.hasRemaining());
-
-        Event replicatedEvent = new Event(replicated);
+        assertTrue(reader.replicated.hasRemaining());
+        assertEquals(0, reader.offset);
+        Event replicatedEvent = new Event(reader.replicated);
         assertEquals(event.size(), replicatedEvent.size());
         assertEquals(event.getMagic(), replicatedEvent.getMagic());
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());

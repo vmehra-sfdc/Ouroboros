@@ -26,6 +26,7 @@
 package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -60,29 +61,30 @@ import com.lmax.disruptor.RingBuffer;
 public final class Replicator implements CommunicationsHandler, Producer,
         Consumer {
     public enum State {
-        WAITING, WRITE;
+        WAITING, WRITE, WRITE_OFFSET;
     }
 
-    private static final Logger               log      = LoggerFactory.getLogger(Replicator.class);
+    private static final Logger               log          = LoggerFactory.getLogger(Replicator.class);
 
-    private final Appender                    appender;
-    private final ConsumerBarrier<EventEntry> replicationConsumerBarrier;
+    private final ReplicatingAppender         appender;
+    private volatile EventChannel             eventChannel;
     private final Executor                    executor;
     private volatile SocketChannelHandler     handler;
-    private volatile EventChannel             eventChannel;
     private volatile long                     offset;
-    private volatile int                      remaining;
+    private final ByteBuffer                  offsetBuffer = ByteBuffer.allocate(8);
     private volatile long                     position;
-    private final AtomicBoolean               running  = new AtomicBoolean();
+    private volatile int                      remaining;
+    private final ConsumerBarrier<EventEntry> replicationConsumerBarrier;
+    private final AtomicBoolean               running      = new AtomicBoolean();
     private volatile Segment                  segment;
-    private volatile long                     sequence = RingBuffer.INITIAL_CURSOR_VALUE;
-    private volatile State                    state    = State.WAITING;
+    private volatile long                     sequence     = RingBuffer.INITIAL_CURSOR_VALUE;
+    private volatile State                    state        = State.WAITING;
 
     public Replicator(final Bundle bundle,
                       final ConsumerBarrier<EventEntry> replicationConsumerBarrier) {
         this.replicationConsumerBarrier = replicationConsumerBarrier;
         executor = Executors.newSingleThreadExecutor();
-        appender = new Appender(bundle, this);
+        appender = new ReplicatingAppender(bundle, this);
     }
 
     @Override
@@ -156,21 +158,28 @@ public final class Replicator implements CommunicationsHandler, Producer,
     @Override
     public void handleWrite(SocketChannel channel) {
         switch (state) {
+            case WRITE_OFFSET: {
+                writeOffset(channel);
+                break;
+            }
             case WRITE: {
-                try {
-                    if (transferTo(channel)) {
-                        state = State.WAITING;
-                        eventChannel.commit(offset);
-                        evaluate();
-                    }
-                } catch (IOException e) {
-                    log.error(String.format("Unable to replicate payload for event: %s from: %s",
-                                            offset, segment), e);
-                }
+                writeEvent(channel);
                 break;
             }
             default:
-                log.error("Illegal write state: " + state);
+                log.error(String.format("Illegal write state: %s", state));
+        }
+    }
+
+    private void writeOffset(SocketChannel channel) {
+        try {
+            channel.write(offsetBuffer);
+        } catch (IOException e) {
+            log.error("Error writing offset", e);
+        }
+        if (!offsetBuffer.hasRemaining()) {
+            state = State.WRITE;
+            writeEvent(channel);
         }
     }
 
@@ -216,7 +225,10 @@ public final class Replicator implements CommunicationsHandler, Producer,
         eventChannel = entry.getChannel();
         entry.clear();
         position = offset;
-        state = State.WRITE;
+        offsetBuffer.clear();
+        offsetBuffer.putLong(offset);
+        offsetBuffer.flip();
+        state = State.WRITE_OFFSET;
         handler.selectForWrite();
     }
 
@@ -229,5 +241,18 @@ public final class Replicator implements CommunicationsHandler, Producer,
             return true;
         }
         return false;
+    }
+
+    private void writeEvent(SocketChannel channel) {
+        try {
+            if (transferTo(channel)) {
+                state = State.WAITING;
+                eventChannel.commit(offset);
+                evaluate();
+            }
+        } catch (IOException e) {
+            log.error(String.format("Unable to replicate payload for event: %s from: %s",
+                                    offset, segment), e);
+        }
     }
 }

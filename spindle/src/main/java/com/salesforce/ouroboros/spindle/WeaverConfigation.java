@@ -45,6 +45,7 @@ public class WeaverConfigation {
     private InetSocketAddress   spindleAddress;
     private Executor            spindles;
     private final SocketOptions spindleSocketOptions     = new SocketOptions();
+    private int                 replicationQueueSize     = 100;
 
     /**
      * @return the maxSegmentSize
@@ -58,6 +59,13 @@ public class WeaverConfigation {
      */
     public InetSocketAddress getReplicationAddress() {
         return replicationAddress;
+    }
+
+    /**
+     * @return the replicationQueueSize
+     */
+    public int getReplicationQueueSize() {
+        return replicationQueueSize;
     }
 
     /**
@@ -109,6 +117,14 @@ public class WeaverConfigation {
      */
     public void setReplicationAddress(InetSocketAddress replicationAddress) {
         this.replicationAddress = replicationAddress;
+    }
+
+    /**
+     * @param replicationQueueSize
+     *            the replicationQueueSize to set
+     */
+    public void setReplicationQueueSize(int replicationQueueSize) {
+        this.replicationQueueSize = replicationQueueSize;
     }
 
     /**

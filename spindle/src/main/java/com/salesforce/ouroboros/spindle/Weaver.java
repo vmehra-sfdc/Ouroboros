@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -36,7 +37,6 @@ import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.lmax.disruptor.Consumer;
-import com.lmax.disruptor.ConsumerBarrier;
 import com.lmax.disruptor.ProducerBarrier;
 import com.lmax.disruptor.RingBuffer;
 
@@ -51,7 +51,6 @@ import com.lmax.disruptor.RingBuffer;
 public class Weaver implements Bundle {
 
     private class ConsumerWrapper implements Consumer {
-        private Replicator replicator;
 
         @Override
         public long getSequence() {
@@ -67,20 +66,10 @@ public class Weaver implements Bundle {
         public void run() {
             replicator.run();
         }
-
-        void setReplicator(Replicator replicator) {
-            this.replicator = replicator;
-        }
-
     }
 
     private class ReplicatorFactory implements CommunicationsHandlerFactory {
-        final Replicator         replicator;
         private volatile boolean returned = false;
-
-        public ReplicatorFactory(ConsumerBarrier<EventEntry> replicationBarrier) {
-            replicator = new Replicator(Weaver.this, replicationBarrier);
-        }
 
         @Override
         public CommunicationsHandler createCommunicationsHandler() {
@@ -108,8 +97,9 @@ public class Weaver implements Bundle {
     }
 
     private final long                              maxSegmentSize;
-    private final ConcurrentMap<UUID, EventChannel> openChannels     = new ConcurrentHashMap<UUID, EventChannel>();
-    private final RingBuffer<EventEntry>            replicationQueue = null;
+    private final ConcurrentMap<UUID, EventChannel> openChannels = new ConcurrentHashMap<UUID, EventChannel>();
+    private final RingBuffer<EventEntry>            replicationQueue;
+    private final Replicator                        replicator;
     private final ServerSocketChannelHandler        replicators;
     private final File                              root;
     private final ServerSocketChannelHandler        spindles;
@@ -117,11 +107,15 @@ public class Weaver implements Bundle {
     public Weaver(WeaverConfigation configuration) throws IOException {
         root = configuration.getRoot();
         maxSegmentSize = configuration.getMaxSegmentSize();
+        replicationQueue = new RingBuffer<EventEntry>(
+                                                      EventEntry.ENTRY_FACTORY,
+                                                      configuration.getReplicationQueueSize());
         ConsumerWrapper wrapper = new ConsumerWrapper();
-        ReplicatorFactory replicatorFactory = new ReplicatorFactory(
-                                                                    replicationQueue.createConsumerBarrier(wrapper));
-        wrapper.setReplicator(replicatorFactory.replicator); // hate this shit.
-        ProducerBarrier<EventEntry> replicationBarrier = replicationQueue.createProducerBarrier(replicatorFactory.replicator);
+        replicator = new Replicator(
+                                    Weaver.this,
+                                    replicationQueue.createConsumerBarrier(wrapper));
+        ReplicatorFactory replicatorFactory = new ReplicatorFactory();
+        ProducerBarrier<EventEntry> replicationBarrier = replicationQueue.createProducerBarrier(replicator);
         replicators = new ServerSocketChannelHandler(
                                                      "Weaver Replicator",
                                                      configuration.getReplicationSocketOptions(),
@@ -143,6 +137,14 @@ public class Weaver implements Bundle {
         return openChannels.get(channelTag);
     }
 
+    public InetSocketAddress getReplicatorEndpoint() {
+        return replicators.getLocalAddress();
+    }
+
+    public InetSocketAddress getSpindleEndpoint() {
+        return spindles.getLocalAddress();
+    }
+
     public void open(UUID channel) {
         openChannels.putIfAbsent(channel, new EventChannel(channel, root,
                                                            maxSegmentSize));
@@ -151,5 +153,11 @@ public class Weaver implements Bundle {
     public void start() {
         spindles.start();
         replicators.start();
+    }
+
+    public void terminate() {
+        replicator.halt();
+        spindles.terminate();
+        replicators.terminate();
     }
 }
