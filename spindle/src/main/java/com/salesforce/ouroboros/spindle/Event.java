@@ -139,9 +139,9 @@ public class Event extends EventHeader {
         super(bytes);
     }
 
-    public Event(int magic, UUID channel, long timestamp, ByteBuffer payload) {
+    public Event(int magic, UUID channel, long id, ByteBuffer payload) {
         this(ByteBuffer.allocate(HEADER_BYTE_SIZE + payload.remaining()));
-        initialize(payload.remaining(), magic, channel, timestamp, payload);
+        initialize(payload.remaining(), magic, channel, id, payload);
     }
 
     public Event(ReadableByteChannel channel) throws IOException {
@@ -172,10 +172,9 @@ public class Event extends EventHeader {
         return getCrc32() == crc32(bytes, HEADER_BYTE_SIZE);
     }
 
-    protected void initialize(int size, int magic, UUID channel,
-                              long timestamp, ByteBuffer payload) {
-        initialize(payload.remaining(), magic, channel, timestamp,
-                   crc32(payload, 0));
+    protected void initialize(int size, int magic, UUID channel, long id,
+                              ByteBuffer payload) {
+        initialize(payload.remaining(), magic, channel, id, crc32(payload, 0));
         payload.rewind();
         bytes.position(HEADER_BYTE_SIZE);
         bytes.put(payload);

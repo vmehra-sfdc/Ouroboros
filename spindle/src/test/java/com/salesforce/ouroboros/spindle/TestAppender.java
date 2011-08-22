@@ -27,7 +27,7 @@ package com.salesforce.ouroboros.spindle;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
-import static org.mockito.Matchers.isA;
+import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -70,15 +70,6 @@ public class TestAppender {
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        when(bundle.eventChannelFor(isA(EventHeader.class))).thenReturn(eventChannel);
-        when(eventChannel.appendSegmentFor(isA(EventHeader.class))).thenReturn(writeSegment);
-        when(eventChannel.isDuplicate(isA(EventHeader.class))).thenReturn(false);
-        when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
-            @Override
-            public Long answer(InvocationOnMock invocation) throws Throwable {
-                return writeSegment.size();
-            }
-        });
         final Appender appender = new Appender(bundle, producer);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
@@ -99,6 +90,15 @@ public class TestAppender {
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         EventHeader header = new EventHeader(payload.length, magic, channel,
                                              timestamp, Event.crc32(payload));
+        when(bundle.eventChannelFor(eq(header))).thenReturn(eventChannel);
+        when(eventChannel.appendSegmentFor(eq(header))).thenReturn(writeSegment);
+        when(eventChannel.isDuplicate(eq(header))).thenReturn(false);
+        when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
+            @Override
+            public Long answer(InvocationOnMock invocation) throws Throwable {
+                return writeSegment.size();
+            }
+        });
         header.rewind();
         header.write(outbound);
 
@@ -131,7 +131,7 @@ public class TestAppender {
         assertTrue(event.validate());
         assertEquals(magic, event.getMagic());
         assertEquals(channel, event.getChannel());
-        assertEquals(timestamp, event.getTimestamp());
+        assertEquals(timestamp, event.getId());
         assertEquals(payload.length, event.size());
         ByteBuffer writtenPayload = event.getPayload();
         for (byte b : payload) {
@@ -139,12 +139,12 @@ public class TestAppender {
         }
 
         verify(handler, new Times(3)).selectForRead();
-        verify(bundle).eventChannelFor(isA(EventHeader.class));
-        verify(eventChannel).appendSegmentFor(isA(EventHeader.class));
-        verify(eventChannel).isDuplicate(isA(EventHeader.class));
+        verify(bundle).eventChannelFor(eq(header));
+        verify(eventChannel).appendSegmentFor(eq(header));
+        verify(eventChannel).isDuplicate(eq(header));
         verify(eventChannel).nextOffset();
-        verify(producer).commit(isA(EventChannel.class), isA(Segment.class),
-                                isA(Long.class), isA(EventHeader.class));
+        verify(producer).commit(eq(eventChannel), eq(writeSegment), eq(0L),
+                                eq(event));
         verifyNoMoreInteractions(handler, bundle, eventChannel, producer);
     }
 
@@ -157,15 +157,6 @@ public class TestAppender {
         File tmpFile = File.createTempFile("duplicate", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        when(bundle.eventChannelFor(isA(EventHeader.class))).thenReturn(eventChannel);
-        when(eventChannel.appendSegmentFor(isA(EventHeader.class))).thenReturn(writeSegment);
-        when(eventChannel.isDuplicate(isA(EventHeader.class))).thenReturn(true);
-        when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
-            @Override
-            public Long answer(InvocationOnMock invocation) throws Throwable {
-                return writeSegment.size();
-            }
-        });
         final Appender appender = new Appender(bundle, producer);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
@@ -186,6 +177,15 @@ public class TestAppender {
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         EventHeader header = new EventHeader(payload.length, magic, channel,
                                              timestamp, Event.crc32(payload));
+        when(bundle.eventChannelFor(eq(header))).thenReturn(eventChannel);
+        when(eventChannel.appendSegmentFor(eq(header))).thenReturn(writeSegment);
+        when(eventChannel.isDuplicate(eq(header))).thenReturn(true);
+        when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
+            @Override
+            public Long answer(InvocationOnMock invocation) throws Throwable {
+                return writeSegment.size();
+            }
+        });
         header.rewind();
         header.write(outbound);
 
@@ -213,9 +213,9 @@ public class TestAppender {
 
         assertEquals(0L, tmpFile.length());
         verify(handler, new Times(3)).selectForRead();
-        verify(bundle).eventChannelFor(isA(EventHeader.class));
-        verify(eventChannel).appendSegmentFor(isA(EventHeader.class));
-        verify(eventChannel).isDuplicate(isA(EventHeader.class));
+        verify(bundle).eventChannelFor(eq(header));
+        verify(eventChannel).appendSegmentFor(eq(header));
+        verify(eventChannel).isDuplicate(eq(header));
         verify(eventChannel).nextOffset();
         verifyNoMoreInteractions(handler, bundle, eventChannel, producer);
     };
@@ -317,7 +317,7 @@ public class TestAppender {
             assertTrue(event.validate());
             assertEquals(i, event.getMagic());
             assertEquals(new UUID(0, i), event.getChannel());
-            assertEquals(i, event.getTimestamp());
+            assertEquals(i, event.getId());
             assertEquals(payload[i].length, event.size());
             ByteBuffer writtenPayload = event.getPayload();
             for (byte b : payload[i]) {

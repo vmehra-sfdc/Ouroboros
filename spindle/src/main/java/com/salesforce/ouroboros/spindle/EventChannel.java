@@ -29,9 +29,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.UUID;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The representation of the event channel. A channel is a logical collection of
@@ -47,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * 
  */
 public class EventChannel {
-    private static final Logger log            = LoggerFactory.getLogger(Weaver.class);
+    private static final Logger log            = Logger.getLogger(Weaver.class.getCanonicalName());
     private static final String SEGMENT_SUFFIX = ".segment";
 
     /**
@@ -107,7 +106,7 @@ public class EventChannel {
         if (!channel.mkdirs()) {
             String msg = String.format("Unable to create channel directory for channel: %s",
                                        channel);
-            log.error(msg);
+            log.severe(msg);
             throw new IllegalStateException(msg);
         }
     }
@@ -120,7 +119,7 @@ public class EventChannel {
      */
     public void append(long offset, EventHeader header) {
         nextOffset = offset + header.totalSize();
-        lastTimestamp = header.getTimestamp();
+        lastTimestamp = header.getId();
     }
 
     /**
@@ -140,7 +139,7 @@ public class EventChannel {
             } catch (IOException e) {
                 String msg = String.format("Cannot create the new segment file: %s",
                                            segment.getAbsolutePath());
-                log.error(msg);
+                log.log(Level.WARNING, msg, e);
                 throw new IllegalStateException(msg);
             }
         }
@@ -149,7 +148,7 @@ public class EventChannel {
         } catch (FileNotFoundException e) {
             String msg = String.format("The segment file cannot be found, yet was created: %s",
                                        segment.getAbsolutePath());
-            log.error(msg);
+            log.log(Level.WARNING, msg, e);
             throw new IllegalStateException(msg);
         }
     }
@@ -167,11 +166,24 @@ public class EventChannel {
         return commited;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof EventChannel)) {
+            return false;
+        }
+        return tag.equals(o);
+    }
+
     /**
      * @return the unique tag of the channel
      */
     public UUID getTag() {
         return tag;
+    }
+
+    @Override
+    public int hashCode() {
+        return tag.hashCode();
     }
 
     /**
@@ -182,7 +194,7 @@ public class EventChannel {
      * @return true if the header represents a duplicate event.
      */
     public boolean isDuplicate(EventHeader header) {
-        return header.getTimestamp() < lastTimestamp;
+        return header.getId() < lastTimestamp;
     }
 
     /**
@@ -216,7 +228,7 @@ public class EventChannel {
             } catch (IOException e) {
                 String msg = String.format("Cannot create the new segment file: %s",
                                            segment.getAbsolutePath());
-                log.error(msg);
+                log.log(Level.WARNING, msg, e);
                 throw new IllegalStateException(msg);
             }
         }
@@ -225,7 +237,7 @@ public class EventChannel {
         } catch (FileNotFoundException e) {
             String msg = String.format("The segment file cannot be found, yet was created: %s",
                                        segment.getAbsolutePath());
-            log.error(msg);
+            log.log(Level.WARNING, msg, e);
             throw new IllegalStateException(msg);
         }
     }

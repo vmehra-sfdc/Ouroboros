@@ -28,9 +28,8 @@ package com.salesforce.ouroboros.spindle;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 
@@ -47,7 +46,7 @@ public class Appender {
         ACCEPTED, APPEND, INITIALIZED, READ_HEADER, READ_OFFSET, DEV_NULL;
     }
 
-    private static final Logger     log      = LoggerFactory.getLogger(Appender.class);
+    private static final Logger     log      = Logger.getLogger(Appender.class.getCanonicalName());
 
     protected final Bundle          bundle;
     protected SocketChannelHandler  handler;
@@ -74,12 +73,18 @@ public class Appender {
 
     public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
         assert state == State.INITIALIZED;
+        if (log.isLoggable(Level.FINER)) {
+            log.finer("ACCEPT");
+        }
         state = State.ACCEPTED;
         this.handler = handler;
         this.handler.selectForRead();
     }
 
     public void handleRead(SocketChannel channel) {
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("READ, state=%s", state));
+        }
         switch (state) {
             case ACCEPTED: {
                 initialRead(channel);
@@ -102,7 +107,7 @@ public class Appender {
                 break;
             }
             default: {
-                log.error("Invalid read state: " + state);
+                log.severe(String.format("Invalid read state: %s", state));
             }
         }
         handler.selectForRead();
@@ -119,17 +124,22 @@ public class Appender {
         try {
             written = segment.transferFrom(channel, position, remaining);
         } catch (IOException e) {
-            log.error("Exception during append", e);
+            log.log(Level.SEVERE, "Exception during append", e);
             return;
         }
         position += written;
         remaining -= written;
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Appending, position=%s, remaining=%s, written=%s",
+                                   position, remaining, written));
+        }
         if (remaining == 0) {
             try {
                 segment.position(position);
             } catch (IOException e) {
-                log.error(String.format("Cannot determine position in segment: %s",
-                                        segment), e);
+                log.log(Level.SEVERE,
+                        String.format("Cannot determine position in segment: %s",
+                                      segment), e);
             }
             if (producer != null) {
                 producer.commit(eventChannel, segment, offset, header);
@@ -144,7 +154,7 @@ public class Appender {
         try {
             read = channel.read(devNull);
         } catch (IOException e) {
-            log.error("Exception during append", e);
+            log.log(Level.SEVERE, "Exception during append", e);
             return;
         }
         position += read;
@@ -166,14 +176,17 @@ public class Appender {
         try {
             read = header.read(channel);
         } catch (IOException e) {
-            log.error("Exception during header read", e);
+            log.log(Level.SEVERE, "Exception during header read", e);
             return;
         }
         if (read) {
             eventChannel = bundle.eventChannelFor(header);
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("Header read, header=%s", header));
+            }
             if (eventChannel == null) {
-                log.info(String.format("No existing event channel for: %s",
-                                       header));
+                log.warning(String.format("No existing event channel for: %s",
+                                          header));
                 state = State.DEV_NULL;
                 segment = null;
                 devNull = ByteBuffer.allocate(header.size());
@@ -203,11 +216,12 @@ public class Appender {
         header.rewind();
         try {
             if (!header.write(segment)) {
-                log.error(String.format("Unable to write complete header on: %s",
-                                        segment));
+                log.log(Level.SEVERE,
+                        String.format("Unable to write complete header on: %s",
+                                      segment));
             }
         } catch (IOException e) {
-            log.error("Exception during header read", e);
+            log.log(Level.SEVERE, "Exception during header read", e);
             return;
         }
         position += EventHeader.HEADER_BYTE_SIZE;

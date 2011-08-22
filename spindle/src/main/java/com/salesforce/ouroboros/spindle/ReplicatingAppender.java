@@ -3,12 +3,11 @@ package com.salesforce.ouroboros.spindle;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ReplicatingAppender extends Appender {
-    private static final Logger log          = LoggerFactory.getLogger(ReplicatingAppender.class);
+    private static final Logger log          = Logger.getLogger(ReplicatingAppender.class.getCanonicalName());
     private final ByteBuffer    offsetBuffer = ByteBuffer.allocate(8);
 
     public ReplicatingAppender(Bundle bundle, Producer producer) {
@@ -34,10 +33,13 @@ public class ReplicatingAppender extends Appender {
         try {
             read = header.read(channel);
         } catch (IOException e) {
-            log.error("Exception during header read", e);
+            log.log(Level.WARNING, "Exception during header read", e);
             return;
         }
         if (read) {
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("Header read, header=%s", header));
+            }
             eventChannel = bundle.eventChannelFor(header);
             if (eventChannel == null) {
                 log.info(String.format("No existing event channel for: %s",
@@ -70,11 +72,15 @@ public class ReplicatingAppender extends Appender {
         try {
             channel.read(offsetBuffer);
         } catch (IOException e) {
-            log.error("Exception during offset read", e);
+            log.log(Level.WARNING, "Exception during offset read", e);
             return;
         }
         if (!offsetBuffer.hasRemaining()) {
+            offsetBuffer.flip();
             offset = position = offsetBuffer.getLong();
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("Offset read, offset=%s", offset));
+            }
             state = State.READ_HEADER;
             readHeader(channel);
         }

@@ -59,8 +59,10 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
 
     private volatile FileChannel      channel;
     private volatile RandomAccessFile raf;
+    private final File                file;
 
     public Segment(File file) throws FileNotFoundException {
+        this.file = file;
         raf = new RandomAccessFile(file, "rw");
         channel = raf.getChannel();
     }
@@ -82,7 +84,10 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     @Override
     public boolean equals(Object obj) {
-        return channel.equals(obj);
+        if (!(obj instanceof Segment)) {
+            return false;
+        }
+        return file.equals(((Segment) obj).file);
     }
 
     /**
@@ -100,7 +105,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     @Override
     public int hashCode() {
-        return channel.hashCode();
+        return file.hashCode();
     }
 
     /**
@@ -230,7 +235,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     @Override
     public String toString() {
-        return channel.toString();
+        return String.format("Segment[%s]", file);
     }
 
     /**

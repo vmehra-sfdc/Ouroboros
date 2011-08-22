@@ -31,9 +31,8 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
@@ -64,7 +63,7 @@ public final class Replicator implements CommunicationsHandler, Producer,
         WAITING, WRITE, WRITE_OFFSET;
     }
 
-    private static final Logger               log          = LoggerFactory.getLogger(Replicator.class);
+    private static final Logger               log          = Logger.getLogger(Replicator.class.getCanonicalName());
 
     private final ReplicatingAppender         appender;
     private volatile EventChannel             eventChannel;
@@ -95,6 +94,18 @@ public final class Replicator implements CommunicationsHandler, Producer,
     public void commit(EventChannel channel, Segment segment, long offset,
                        EventHeader header) {
         channel.append(offset, header);
+        try {
+            segment.force(false);
+        } catch (IOException e) {
+            log.log(Level.SEVERE,
+                    String.format("Unable to force segment: %s", segment), e);
+        }
+        try {
+            segment.close();
+        } catch (IOException e) {
+            log.log(Level.INFO,
+                    String.format("Unable to close segment: %s", segment), e);
+        }
     }
 
     /**
@@ -167,7 +178,7 @@ public final class Replicator implements CommunicationsHandler, Producer,
                 break;
             }
             default:
-                log.error(String.format("Illegal write state: %s", state));
+                log.warning(String.format("Illegal write state: %s", state));
         }
     }
 
@@ -175,7 +186,7 @@ public final class Replicator implements CommunicationsHandler, Producer,
         try {
             channel.write(offsetBuffer);
         } catch (IOException e) {
-            log.error("Error writing offset", e);
+            log.log(Level.WARNING, "Error writing offset", e);
         }
         if (!offsetBuffer.hasRemaining()) {
             state = State.WRITE;
@@ -251,8 +262,9 @@ public final class Replicator implements CommunicationsHandler, Producer,
                 evaluate();
             }
         } catch (IOException e) {
-            log.error(String.format("Unable to replicate payload for event: %s from: %s",
-                                    offset, segment), e);
+            log.log(Level.WARNING,
+                    String.format("Unable to replicate payload for event: %s from: %s",
+                                  offset, segment), e);
         }
     }
 }
