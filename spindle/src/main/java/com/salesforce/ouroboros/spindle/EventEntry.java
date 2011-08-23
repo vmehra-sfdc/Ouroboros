@@ -26,7 +26,7 @@
 package com.salesforce.ouroboros.spindle;
 
 /**
- * The ring buffer entry representing the appending of an event.
+ * The entry representing the appending of an event.
  * 
  * @author hhildebrand
  * 
