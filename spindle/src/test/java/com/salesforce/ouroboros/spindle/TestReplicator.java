@@ -269,4 +269,131 @@ public class TestReplicator {
         assertNull(entry.getSegment());
         verify(eventChannel).commit(0);
     }
+
+    @Test
+    public void testReplicationLoop() throws Exception {
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+
+        File inboundTmpFile = File.createTempFile("inbound-replication", ".tst");
+        inboundTmpFile.deleteOnExit();
+        Segment inboundSegment = new Segment(inboundTmpFile);
+        EventChannel inboundEventChannel = mock(EventChannel.class);
+        Bundle inboundBundle = mock(Bundle.class);
+        @SuppressWarnings("unchecked")
+        ConsumerBarrier<EventEntry> inboundConsumerBarrier = mock(ConsumerBarrier.class);
+        when(inboundConsumerBarrier.waitFor(0)).thenThrow(AlertException.ALERT_EXCEPTION);
+
+        final Replicator inboundReplicator = new Replicator(inboundBundle,
+                                                            inboundConsumerBarrier);
+
+        File tmpOutboundFile = File.createTempFile("outbound", ".tst");
+        tmpOutboundFile.deleteOnExit();
+        Segment outboundSegment = new Segment(tmpOutboundFile);
+
+        int magic = 666;
+        UUID channel = UUID.randomUUID();
+        long timestamp = System.currentTimeMillis();
+        final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
+        ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
+        EventHeader outboundEvent = new EventHeader(payload.length, magic,
+                                                    channel, timestamp,
+                                                    Event.crc32(payload));
+        EventChannel outboundEventChannel = mock(EventChannel.class);
+
+        outboundEvent.rewind();
+        outboundEvent.write(outboundSegment);
+        outboundSegment.write(payloadBuffer);
+        outboundSegment.force(false);
+
+        EventEntry entry = new EventEntry();
+        entry.set(outboundEventChannel, 0, outboundSegment,
+                  outboundEvent.totalSize());
+
+        Bundle outboundBundle = mock(Bundle.class);
+        @SuppressWarnings("unchecked")
+        ConsumerBarrier<EventEntry> outboundConsumerBarrier = mock(ConsumerBarrier.class);
+        long offset = 0L;
+        when(outboundConsumerBarrier.waitFor(0)).thenReturn(offset).thenThrow(AlertException.ALERT_EXCEPTION);
+
+        when(inboundBundle.eventChannelFor(eq(outboundEvent))).thenReturn(inboundEventChannel);
+        when(inboundEventChannel.segmentFor(offset)).thenReturn(inboundSegment);
+        when(inboundEventChannel.isNextAppend(offset)).thenReturn(true);
+        when(outboundConsumerBarrier.getEntry(0)).thenReturn(entry);
+
+        final Replicator outboundReplicator = new Replicator(outboundBundle,
+                                                             outboundConsumerBarrier);
+        assertEquals(State.WAITING, outboundReplicator.getState());
+        SocketOptions options = new SocketOptions();
+        options.setSend_buffer_size(4);
+        options.setReceive_buffer_size(4);
+        options.setTimeout(100);
+        ServerSocketChannel server = ServerSocketChannel.open();
+        server.configureBlocking(true);
+        server.socket().bind(new InetSocketAddress(0));
+        final SocketChannel outbound = SocketChannel.open();
+        options.configure(outbound.socket());
+        outbound.configureBlocking(true);
+        outbound.connect(server.socket().getLocalSocketAddress());
+        final SocketChannel inbound = server.accept();
+        options.configure(inbound.socket());
+        inbound.configureBlocking(true);
+        assertTrue(inbound.isConnected());
+        outbound.configureBlocking(false);
+        inbound.configureBlocking(false);
+
+        inboundReplicator.handleAccept(inbound, handler);
+        inboundReplicator.handleRead(inbound);
+        assertEquals(Appender.State.READ_OFFSET,
+                     inboundReplicator.getAppenderState());
+
+        Runnable reader = new Runnable() {
+            @Override
+            public void run() {
+                while (Appender.State.ACCEPTED != inboundReplicator.getAppenderState()) {
+                    inboundReplicator.handleRead(inbound);
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+            }
+        };
+        Thread inboundRead = new Thread(reader, "Inbound read thread");
+        inboundRead.start();
+
+        outboundReplicator.handleConnect(outbound, handler);
+        Util.waitFor("Never achieved WRITE_OFFSET state", new Util.Condition() {
+
+            @Override
+            public boolean value() {
+                return State.WRITE_OFFSET == outboundReplicator.getState();
+            }
+        }, 1000L, 100L);
+        outboundReplicator.halt();
+        Util.waitFor("Never achieved WAITING state", new Util.Condition() {
+            @Override
+            public boolean value() {
+                outboundReplicator.handleWrite(outbound);
+                return State.WAITING == outboundReplicator.getState();
+            }
+        }, 1000L, 100L);
+
+        inboundRead.join(4000);
+
+        assertEquals(Appender.State.ACCEPTED,
+                     inboundReplicator.getAppenderState());
+
+        inboundSegment.close();
+        outboundSegment.close();
+
+        Segment segment = new Segment(inboundTmpFile);
+        assertTrue("Nothing written to inbound segment", segment.size() > 0);
+        Event replicatedEvent = new Event(segment);
+        assertEquals(outboundEvent.size(), replicatedEvent.size());
+        assertEquals(outboundEvent.getMagic(), replicatedEvent.getMagic());
+        assertEquals(outboundEvent.getCrc32(), replicatedEvent.getCrc32());
+        assertEquals(outboundEvent.getId(), replicatedEvent.getId());
+        assertTrue(replicatedEvent.validate());
+    }
 }
