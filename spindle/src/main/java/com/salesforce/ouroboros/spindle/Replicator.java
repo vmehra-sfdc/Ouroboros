@@ -59,6 +59,88 @@ import com.lmax.disruptor.RingBuffer;
  */
 public final class Replicator implements CommunicationsHandler, Producer,
         Consumer {
+    public static class ReplicatingAppender extends Appender {
+        private static final Logger log          = Logger.getLogger(ReplicatingAppender.class.getCanonicalName());
+        private final ByteBuffer    offsetBuffer = ByteBuffer.allocate(8);
+
+        public ReplicatingAppender(Bundle bundle, Producer producer) {
+            super(bundle, producer);
+        }
+
+        /* (non-Javadoc)
+         * @see com.salesforce.ouroboros.spindle.Appender#initialRead(java.nio.channels.SocketChannel)
+         */
+        @Override
+        protected void initialRead(SocketChannel channel) {
+            state = State.READ_OFFSET;
+            offsetBuffer.clear();
+            readOffset(channel);
+        }
+
+        /* (non-Javadoc)
+         * @see com.salesforce.ouroboros.spindle.Appender#readHeader(java.nio.channels.SocketChannel)
+         */
+        @Override
+        protected void readHeader(SocketChannel channel) {
+            boolean read;
+            try {
+                read = header.read(channel);
+            } catch (IOException e) {
+                log.log(Level.WARNING, "Exception during header read", e);
+                return;
+            }
+            if (read) {
+                if (log.isLoggable(Level.FINER)) {
+                    log.finer(String.format("Header read, header=%s", header));
+                }
+                eventChannel = bundle.eventChannelFor(header);
+                if (eventChannel == null) {
+                    log.info(String.format("No existing event channel for: %s",
+                                           header));
+                    state = State.DEV_NULL;
+                    segment = null;
+                    devNull = ByteBuffer.allocate(header.size());
+                    devNull(channel);
+                    return;
+                }
+                segment = eventChannel.segmentFor(offset);
+                remaining = header.size();
+                if (!eventChannel.isNextAppend(offset)) {
+                    state = State.DEV_NULL;
+                    segment = null;
+                    devNull = ByteBuffer.allocate(header.size());
+                    devNull(channel);
+                } else {
+                    writeHeader();
+                    append(channel);
+                }
+            }
+        }
+
+        /* (non-Javadoc)
+         * @see com.salesforce.ouroboros.spindle.Appender#readOffset(java.nio.channels.SocketChannel)
+         */
+        @Override
+        protected void readOffset(SocketChannel channel) {
+            try {
+                channel.read(offsetBuffer);
+            } catch (IOException e) {
+                log.log(Level.WARNING, "Exception during offset read", e);
+                return;
+            }
+            if (!offsetBuffer.hasRemaining()) {
+                offsetBuffer.flip();
+                offset = position = offsetBuffer.getLong();
+                if (log.isLoggable(Level.FINER)) {
+                    log.finer(String.format("Offset read, offset=%s", offset));
+                }
+                state = State.READ_HEADER;
+                readHeader(channel);
+            }
+        }
+
+    }
+
     public enum State {
         WAITING, WRITE, WRITE_OFFSET;
     }
@@ -182,18 +264,6 @@ public final class Replicator implements CommunicationsHandler, Producer,
         }
     }
 
-    private void writeOffset(SocketChannel channel) {
-        try {
-            channel.write(offsetBuffer);
-        } catch (IOException e) {
-            log.log(Level.WARNING, "Error writing offset", e);
-        }
-        if (!offsetBuffer.hasRemaining()) {
-            state = State.WRITE;
-            writeEvent(channel);
-        }
-    }
-
     @Override
     public void run() {
         if (!running.compareAndSet(false, true)) {
@@ -265,6 +335,18 @@ public final class Replicator implements CommunicationsHandler, Producer,
             log.log(Level.WARNING,
                     String.format("Unable to replicate payload for event: %s from: %s",
                                   offset, segment), e);
+        }
+    }
+
+    private void writeOffset(SocketChannel channel) {
+        try {
+            channel.write(offsetBuffer);
+        } catch (IOException e) {
+            log.log(Level.WARNING, "Error writing offset", e);
+        }
+        if (!offsetBuffer.hasRemaining()) {
+            state = State.WRITE;
+            writeEvent(channel);
         }
     }
 }
