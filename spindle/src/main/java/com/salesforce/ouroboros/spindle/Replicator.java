@@ -28,229 +28,76 @@ package com.salesforce.ouroboros.spindle;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.lmax.disruptor.AlertException;
-import com.lmax.disruptor.Consumer;
-import com.lmax.disruptor.ConsumerBarrier;
-import com.lmax.disruptor.RingBuffer;
 
 /**
- * A full duplex replicator of event streams. The replicator provides both
- * outbound replication of events sourced in the host process as well as
- * accepting replicated events from the mirrored partner process on the same
- * channel.
- * 
- * Replicators have a strict sense of connecting with their mirror process. In
- * order to use both the inbound and outbound streams of the socket, each pair
- * of processes must only connect once. Thus, one process of the mirror pair
- * will initiate the connection and the other pair will accept the new
- * connection. Once the replication connection is established, both sides will
- * replicate events between them.
+ * A replicator of the event stream of a channel.
  * 
  * @author hhildebrand
  * 
  */
-public final class Replicator implements CommunicationsHandler, Producer,
-        Consumer {
-    public static class ReplicatingAppender extends Appender {
-        private static final Logger log          = Logger.getLogger(ReplicatingAppender.class.getCanonicalName());
-        private final ByteBuffer    offsetBuffer = ByteBuffer.allocate(8);
-
-        public ReplicatingAppender(Bundle bundle, Producer producer) {
-            super(bundle, producer);
-        }
-
-        /* (non-Javadoc)
-         * @see com.salesforce.ouroboros.spindle.Appender#initialRead(java.nio.channels.SocketChannel)
-         */
-        @Override
-        protected void initialRead(SocketChannel channel) {
-            state = State.READ_OFFSET;
-            offsetBuffer.clear();
-            readOffset(channel);
-        }
-
-        /* (non-Javadoc)
-         * @see com.salesforce.ouroboros.spindle.Appender#readHeader(java.nio.channels.SocketChannel)
-         */
-        @Override
-        protected void readHeader(SocketChannel channel) {
-            boolean read;
-            try {
-                read = header.read(channel);
-            } catch (IOException e) {
-                log.log(Level.WARNING, "Exception during header read", e);
-                return;
-            }
-            if (read) {
-                if (log.isLoggable(Level.FINER)) {
-                    log.finer(String.format("Header read, header=%s", header));
-                }
-                eventChannel = bundle.eventChannelFor(header);
-                if (eventChannel == null) {
-                    log.info(String.format("No existing event channel for: %s",
-                                           header));
-                    state = State.DEV_NULL;
-                    segment = null;
-                    devNull = ByteBuffer.allocate(header.size());
-                    devNull(channel);
-                    return;
-                }
-                segment = eventChannel.segmentFor(offset);
-                remaining = header.size();
-                if (!eventChannel.isNextAppend(offset)) {
-                    state = State.DEV_NULL;
-                    segment = null;
-                    devNull = ByteBuffer.allocate(header.size());
-                    devNull(channel);
-                } else {
-                    writeHeader();
-                    append(channel);
-                }
-            }
-        }
-
-        /* (non-Javadoc)
-         * @see com.salesforce.ouroboros.spindle.Appender#readOffset(java.nio.channels.SocketChannel)
-         */
-        @Override
-        protected void readOffset(SocketChannel channel) {
-            try {
-                channel.read(offsetBuffer);
-            } catch (IOException e) {
-                log.log(Level.WARNING, "Exception during offset read", e);
-                return;
-            }
-            if (!offsetBuffer.hasRemaining()) {
-                offsetBuffer.flip();
-                offset = position = offsetBuffer.getLong();
-                if (log.isLoggable(Level.FINER)) {
-                    log.finer(String.format("Offset read, offset=%s", offset));
-                }
-                state = State.READ_HEADER;
-                readHeader(channel);
-            }
-        }
-
-    }
-
+public final class Replicator implements CommunicationsHandler {
     public enum State {
-        WAITING, WRITE, WRITE_OFFSET;
+        INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_OFFSET;
     }
 
-    private static final Logger               log          = Logger.getLogger(Replicator.class.getCanonicalName());
+    static final Logger                     log          = Logger.getLogger(Replicator.class.getCanonicalName());
 
-    private final ReplicatingAppender         appender;
-    private volatile EventChannel             eventChannel;
-    private final Executor                    executor;
-    private volatile SocketChannelHandler     handler;
-    private volatile long                     offset;
-    private final ByteBuffer                  offsetBuffer = ByteBuffer.allocate(8);
-    private volatile long                     position;
-    private volatile int                      remaining;
-    private final ConsumerBarrier<EventEntry> replicationConsumerBarrier;
-    private final AtomicBoolean               running      = new AtomicBoolean();
-    private volatile Segment                  segment;
-    private volatile long                     sequence     = RingBuffer.INITIAL_CURSOR_VALUE;
-    private volatile State                    state        = State.WAITING;
+    private volatile SocketChannelHandler   handler;
+    private volatile long                   offset;
+    private final ByteBuffer                offsetBuffer = ByteBuffer.allocate(8);
+    private final BlockingQueue<EventEntry> pending      = new LinkedBlockingQueue<EventEntry>();
+    private volatile long                   position;
+    private volatile int                    remaining;
+    private volatile Segment                segment;
+    private final AtomicReference<State>    state        = new AtomicReference<State>(
+                                                                                      State.WAITING);
+    final EventChannel                      eventChannel;
 
-    public Replicator(final Bundle bundle,
-                      final ConsumerBarrier<EventEntry> replicationConsumerBarrier) {
-        this.replicationConsumerBarrier = replicationConsumerBarrier;
-        executor = Executors.newSingleThreadExecutor();
-        appender = new ReplicatingAppender(bundle, this);
+    public Replicator(final EventChannel eventChannel) {
+        this.eventChannel = eventChannel;
     }
 
     @Override
     public void closing(SocketChannel channel) {
     }
 
-    @Override
-    public void commit(EventChannel channel, Segment segment, long offset,
-                       EventHeader header) {
-        channel.append(offset, header);
-        try {
-            segment.force(false);
-        } catch (IOException e) {
-            log.log(Level.SEVERE,
-                    String.format("Unable to force segment: %s", segment), e);
-        }
-        try {
-            segment.close();
-        } catch (IOException e) {
-            log.log(Level.INFO,
-                    String.format("Unable to close segment: %s", segment), e);
-        }
-    }
-
-    /**
-     * @return the state of the inbound appender
-     */
-    public Appender.State getAppenderState() {
-        return appender.getState();
-    }
-
-    /**
-     * Get the {@link ConsumerBarrier} the {@link Consumer} is waiting on.
-     * 
-     * @return the barrier this {@link Consumer} is using.
-     */
-    public ConsumerBarrier<EventEntry> getConsumerBarrier() {
-        return replicationConsumerBarrier;
-    }
-
-    @Override
-    public long getSequence() {
-        return sequence;
-    }
-
     /**
      * @return the state of the outbound replicator
      */
     public State getState() {
-        return state;
-    }
-
-    /**
-     * Halt the outbound replication process;
-     */
-    @Override
-    public void halt() {
-        if (running.compareAndSet(true, false)) {
-            replicationConsumerBarrier.alert();
-        }
+        return state.get();
     }
 
     @Override
     public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
-        this.handler = handler;
-        appender.handleAccept(channel, handler);
-        run();
+        throw new UnsupportedOperationException(
+                                                "Inbound channels are not supported");
     }
 
     @Override
     public void handleConnect(SocketChannel channel,
                               final SocketChannelHandler handler) {
         this.handler = handler;
-        appender.handleAccept(channel, handler);
-        run();
     }
 
     @Override
     public void handleRead(SocketChannel channel) {
-        appender.handleRead(channel);
+        throw new UnsupportedOperationException(
+                                                "Inbound channels are not supported");
     }
 
     @Override
     public void handleWrite(SocketChannel channel) {
-        switch (state) {
+        switch (state.get()) {
             case WRITE_OFFSET: {
                 writeOffset(channel);
                 break;
@@ -264,53 +111,9 @@ public final class Replicator implements CommunicationsHandler, Producer,
         }
     }
 
-    @Override
-    public void run() {
-        if (!running.compareAndSet(false, true)) {
-            return;
-        }
-        evaluate();
-    }
-
-    private void evaluate() {
-        if (running.get()) {
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    processNext();
-                }
-            });
-        }
-    }
-
-    private void processNext() {
-        long nextSequence = sequence + 1;
-        try {
-            try {
-                replicationConsumerBarrier.waitFor(nextSequence);
-            } catch (InterruptedException e) {
-                return;
-            }
-            EventEntry entry = replicationConsumerBarrier.getEntry(nextSequence);
-            sequence = entry.getSequence();
-            replicate(entry);
-        } catch (final AlertException ex) {
-            // Wake up from blocking wait
-        }
-    }
-
-    private void replicate(EventEntry entry) {
-        offset = entry.getOffset();
-        segment = entry.getSegment();
-        remaining = entry.getSize();
-        eventChannel = entry.getChannel();
-        entry.clear();
-        position = offset;
-        offsetBuffer.clear();
-        offsetBuffer.putLong(offset);
-        offsetBuffer.flip();
-        state = State.WRITE_OFFSET;
-        handler.selectForWrite();
+    public void replicate(long offset, Segment segment, int size) {
+        pending.add(new EventEntry(offset, segment, size));
+        process();
     }
 
     private boolean transferTo(SocketChannel channel) throws IOException {
@@ -327,9 +130,9 @@ public final class Replicator implements CommunicationsHandler, Producer,
     private void writeEvent(SocketChannel channel) {
         try {
             if (transferTo(channel)) {
-                state = State.WAITING;
+                state.set(State.WAITING);
                 eventChannel.commit(offset);
-                evaluate();
+                process();
             }
         } catch (IOException e) {
             log.log(Level.WARNING,
@@ -345,8 +148,40 @@ public final class Replicator implements CommunicationsHandler, Producer,
             log.log(Level.WARNING, "Error writing offset", e);
         }
         if (!offsetBuffer.hasRemaining()) {
-            state = State.WRITE;
+            state.set(State.WRITE);
             writeEvent(channel);
         }
+    }
+
+    protected void process() {
+        if (!state.compareAndSet(State.WAITING, State.PROCESSING)) {
+            return;
+        }
+        EventEntry entry;
+        try {
+            entry = pending.poll(10, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            state.set(State.INTERRUPTED);
+            return;
+        }
+        if (entry == null) {
+            state.compareAndSet(State.PROCESSING, State.WAITING);
+            return;
+        }
+        process(entry);
+    }
+
+    protected void process(EventEntry entry) {
+        if (!state.compareAndSet(State.PROCESSING, State.WRITE_OFFSET)) {
+            return;
+        }
+        offset = entry.offset;
+        segment = entry.segment;
+        remaining = entry.size;
+        position = offset;
+        offsetBuffer.clear();
+        offsetBuffer.putLong(offset);
+        offsetBuffer.flip();
+        handler.selectForWrite();
     }
 }

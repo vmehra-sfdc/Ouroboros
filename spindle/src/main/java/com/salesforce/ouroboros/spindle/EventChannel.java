@@ -46,6 +46,7 @@ import java.util.logging.Logger;
  * 
  */
 public class EventChannel {
+
     private static final Logger log            = Logger.getLogger(Weaver.class.getCanonicalName());
     private static final String SEGMENT_SUFFIX = ".segment";
 
@@ -91,12 +92,14 @@ public class EventChannel {
         return Long.toHexString(segmentPrefix).toLowerCase() + SEGMENT_SUFFIX;
     }
 
-    private final long    maxSegmentSize;
-    private volatile long nextOffset;
-    private volatile long lastTimestamp;
-    private final File    channel;
-    private volatile long commited;
-    private final UUID    tag;
+    private final File                channel;
+    private volatile long             commited;
+    private volatile long             lastTimestamp;
+    private final long                maxSegmentSize;
+    private volatile long             nextOffset;
+    private final ReplicatingAppender replicationAppender;
+    private final Replicator          replicator;
+    private final UUID                tag;
 
     public EventChannel(final UUID channelTag, final File root,
                         final long maxSegmentSize) {
@@ -109,48 +112,25 @@ public class EventChannel {
             log.severe(msg);
             throw new IllegalStateException(msg);
         }
+        replicator = new Replicator(this);
+        replicationAppender = new ReplicatingAppender(this);
     }
 
-    /**
-     * Mark the appending of the event at the in the channel
-     * 
-     * @param offset
-     * @param header
-     */
-    public void append(long offset, EventHeader header) {
+    public void append(EventHeader header, long offset) {
         nextOffset = offset + header.totalSize();
         lastTimestamp = header.getId();
     }
 
     /**
-     * Answer the segment that the event can be appended to.
+     * Mark the appending of the event at the offset in the channel
      * 
      * @param header
-     *            - the event header
-     * @return the Segment to append the event
+     * @param offset
+     * @param segment
      */
-    public Segment appendSegmentFor(EventHeader header) {
-        File segment = new File(channel,
-                                appendSegmentNameFor(header.totalSize(),
-                                                     maxSegmentSize));
-        if (!segment.exists()) {
-            try {
-                segment.createNewFile();
-            } catch (IOException e) {
-                String msg = String.format("Cannot create the new segment file: %s",
-                                           segment.getAbsolutePath());
-                log.log(Level.WARNING, msg, e);
-                throw new IllegalStateException(msg);
-            }
-        }
-        try {
-            return new Segment(segment);
-        } catch (FileNotFoundException e) {
-            String msg = String.format("The segment file cannot be found, yet was created: %s",
-                                       segment.getAbsolutePath());
-            log.log(Level.WARNING, msg, e);
-            throw new IllegalStateException(msg);
-        }
+    public void append(EventHeader header, long offset, Segment segment) {
+        append(header, offset);
+        replicator.replicate(offset, segment, header.totalSize());
     }
 
     /**
@@ -172,6 +152,17 @@ public class EventChannel {
             return false;
         }
         return tag.equals(o);
+    }
+
+    public ReplicatingAppender getReplicationAppender() {
+        return replicationAppender;
+    }
+
+    /**
+     * @return the replicator
+     */
+    public Replicator getReplicator() {
+        return replicator;
     }
 
     /**
@@ -210,6 +201,37 @@ public class EventChannel {
 
     public long nextOffset() {
         return nextOffset;
+    }
+
+    /**
+     * Answer the segment that the event can be appended to.
+     * 
+     * @param header
+     *            - the event header
+     * @return the Segment to append the event
+     */
+    public Segment segmentFor(EventHeader header) {
+        File segment = new File(channel,
+                                appendSegmentNameFor(header.totalSize(),
+                                                     maxSegmentSize));
+        if (!segment.exists()) {
+            try {
+                segment.createNewFile();
+            } catch (IOException e) {
+                String msg = String.format("Cannot create the new segment file: %s",
+                                           segment.getAbsolutePath());
+                log.log(Level.WARNING, msg, e);
+                throw new IllegalStateException(msg);
+            }
+        }
+        try {
+            return new Segment(segment);
+        } catch (FileNotFoundException e) {
+            String msg = String.format("The segment file cannot be found, yet was created: %s",
+                                       segment.getAbsolutePath());
+            log.log(Level.WARNING, msg, e);
+            throw new IllegalStateException(msg);
+        }
     }
 
     /**

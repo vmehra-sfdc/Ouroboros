@@ -40,12 +40,12 @@ import com.hellblazer.pinkie.SocketOptions;
 public class WeaverConfigation {
     private long                maxSegmentSize;
     private InetSocketAddress   replicationAddress;
+    private int                 replicationQueueSize     = 100;
     private final SocketOptions replicationSocketOptions = new SocketOptions();
     private File                root;
     private InetSocketAddress   spindleAddress;
     private Executor            spindles;
     private final SocketOptions spindleSocketOptions     = new SocketOptions();
-    private int                 replicationQueueSize     = 100;
 
     /**
      * @return the maxSegmentSize

@@ -25,97 +25,21 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import com.lmax.disruptor.AbstractEntry;
-import com.lmax.disruptor.EntryFactory;
-
 /**
  * The ring buffer entry representing the appending of an event.
  * 
  * @author hhildebrand
  * 
  */
-public class EventEntry extends AbstractEntry {
-    public final static EntryFactory<EventEntry> ENTRY_FACTORY = new EntryFactory<EventEntry>() {
-                                                                   @Override
-                                                                   public EventEntry create() {
-                                                                       return new EventEntry();
-                                                                   }
-                                                               };
-    private EventChannel                         channel;
-    private long                                 offset;
-    private Segment                              segment;
-    private int                                  size;
+public class EventEntry {
+    public final long    offset;
+    public final Segment segment;
+    public final int     size;
 
-    public void clear() {
-        channel = null;
-        segment = null;
-    }
-
-    /**
-     * @return the channel
-     */
-    public EventChannel getChannel() {
-        return channel;
-    }
-
-    /**
-     * @return the offset
-     */
-    public long getOffset() {
-        return offset;
-    }
-
-    /**
-     * @return the segment
-     */
-    public Segment getSegment() {
-        return segment;
-    }
-
-    /**
-     * @return the size
-     */
-    public int getSize() {
-        return size;
-    }
-
-    public void set(final EventChannel channel, final long offset,
-                    final Segment segment, final int size) {
-        this.channel = channel;
+    public EventEntry(long offset, Segment segment, int size) {
+        super();
         this.offset = offset;
         this.segment = segment;
-        this.size = size;
-    }
-
-    /**
-     * @param channel
-     *            the channel to set
-     */
-    public void setChannel(EventChannel channel) {
-        this.channel = channel;
-    }
-
-    /**
-     * @param offset
-     *            the offset to set
-     */
-    public void setOffset(long offset) {
-        this.offset = offset;
-    }
-
-    /**
-     * @param segment
-     *            the segment to set
-     */
-    public void setSegment(Segment segment) {
-        this.segment = segment;
-    }
-
-    /**
-     * @param size
-     *            the size to set
-     */
-    public void setSize(int size) {
         this.size = size;
     }
 

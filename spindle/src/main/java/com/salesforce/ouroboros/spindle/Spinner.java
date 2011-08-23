@@ -26,10 +26,10 @@
 package com.salesforce.ouroboros.spindle;
 
 import java.nio.channels.SocketChannel;
+import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.lmax.disruptor.ProducerBarrier;
 
 /**
  * The inbound event sink for event channels. The spinner has an appender that
@@ -40,30 +40,20 @@ import com.lmax.disruptor.ProducerBarrier;
  * @author hhildebrand
  * 
  */
-public class Spinner implements CommunicationsHandler, Producer {
+public class Spinner implements CommunicationsHandler {
+    static final Logger    log = Logger.getLogger(Spinner.class.getCanonicalName());
 
-    private final ProducerBarrier<EventEntry> replicationBarrier;
-    private final Appender                    appender;
+    private final Appender appender;
 
-    public Spinner(Bundle bundle, ProducerBarrier<EventEntry> replicationBarrier) {
-        this.replicationBarrier = replicationBarrier;
-        appender = new Appender(bundle, this);
+    public Spinner(Bundle bundle) {
+        appender = new Appender(bundle);
     }
 
     @Override
     public void closing(SocketChannel channel) {
     }
 
-    @Override
-    public void commit(EventChannel channel, Segment segment, long offset,
-                       EventHeader header) {
-        EventEntry entry = replicationBarrier.nextEntry();
-        entry.set(channel, offset, segment, header.size());
-        channel.append(offset, header);
-        replicationBarrier.commit(entry);
-    }
-
-    public Appender.State getState() {
+    public AbstractAppender.State getState() {
         return appender.getState();
     }
 
@@ -87,5 +77,4 @@ public class Spinner implements CommunicationsHandler, Producer {
     public void handleWrite(SocketChannel channel) {
         throw new UnsupportedOperationException();
     }
-
 }

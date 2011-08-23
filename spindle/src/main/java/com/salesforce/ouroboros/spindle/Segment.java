@@ -58,8 +58,8 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         GatheringByteChannel, ScatteringByteChannel, Cloneable {
 
     private volatile FileChannel      channel;
-    private volatile RandomAccessFile raf;
     private final File                file;
+    private volatile RandomAccessFile raf;
 
     public Segment(File file) throws FileNotFoundException {
         this.file = file;

@@ -27,7 +27,9 @@ package com.salesforce.ouroboros.spindle;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
-import static org.mockito.Matchers.*;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -52,7 +54,7 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
-import com.salesforce.ouroboros.spindle.Appender.State;
+import com.salesforce.ouroboros.spindle.AbstractAppender.State;
 
 /**
  * 
@@ -65,12 +67,11 @@ public class TestAppender {
     public void testAppend() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
-        Producer producer = mock(Producer.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        final Appender appender = new Appender(bundle, producer);
+        final AbstractAppender appender = new Appender(bundle);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress(0));
@@ -91,14 +92,10 @@ public class TestAppender {
         EventHeader header = new EventHeader(payload.length, magic, channel,
                                              timestamp, Event.crc32(payload));
         when(bundle.eventChannelFor(eq(header))).thenReturn(eventChannel);
-        when(eventChannel.appendSegmentFor(eq(header))).thenReturn(writeSegment);
+        when(eventChannel.segmentFor(eq(header))).thenReturn(writeSegment);
         when(eventChannel.isDuplicate(eq(header))).thenReturn(false);
-        when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
-            @Override
-            public Long answer(InvocationOnMock invocation) throws Throwable {
-                return writeSegment.size();
-            }
-        });
+        long offset = 0L;
+        when(eventChannel.nextOffset()).thenReturn(offset);
         header.rewind();
         header.write(outbound);
 
@@ -140,24 +137,22 @@ public class TestAppender {
 
         verify(handler, new Times(3)).selectForRead();
         verify(bundle).eventChannelFor(eq(header));
-        verify(eventChannel).appendSegmentFor(eq(header));
+        verify(eventChannel).append(header, offset, writeSegment);
+        verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
         verify(eventChannel).nextOffset();
-        verify(producer).commit(eq(eventChannel), eq(writeSegment), eq(0L),
-                                eq(event));
-        verifyNoMoreInteractions(handler, bundle, eventChannel, producer);
+        verifyNoMoreInteractions(handler, bundle, eventChannel);
     }
 
     @Test
     public void testDuplicate() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
-        Producer producer = mock(Producer.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("duplicate", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        final Appender appender = new Appender(bundle, producer);
+        final AbstractAppender appender = new Appender(bundle);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress(0));
@@ -178,7 +173,7 @@ public class TestAppender {
         EventHeader header = new EventHeader(payload.length, magic, channel,
                                              timestamp, Event.crc32(payload));
         when(bundle.eventChannelFor(eq(header))).thenReturn(eventChannel);
-        when(eventChannel.appendSegmentFor(eq(header))).thenReturn(writeSegment);
+        when(eventChannel.segmentFor(eq(header))).thenReturn(writeSegment);
         when(eventChannel.isDuplicate(eq(header))).thenReturn(true);
         when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
             @Override
@@ -214,10 +209,10 @@ public class TestAppender {
         assertEquals(0L, tmpFile.length());
         verify(handler, new Times(3)).selectForRead();
         verify(bundle).eventChannelFor(eq(header));
-        verify(eventChannel).appendSegmentFor(eq(header));
+        verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
         verify(eventChannel).nextOffset();
-        verifyNoMoreInteractions(handler, bundle, eventChannel, producer);
+        verifyNoMoreInteractions(handler, bundle, eventChannel);
     };
 
     @Test
@@ -227,13 +222,22 @@ public class TestAppender {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         final EventChannel eventChannel = mock(EventChannel.class);
         final Segment segment = new Segment(tmpFile);
-        when(eventChannel.appendSegmentFor(isA(EventHeader.class))).thenReturn(segment);
+        when(eventChannel.segmentFor(isA(EventHeader.class))).thenReturn(segment);
         when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
             @Override
             public Long answer(InvocationOnMock invocation) throws Throwable {
                 return segment.size();
             }
         });
+        final AtomicInteger counter = new AtomicInteger();
+        doAnswer(new Answer<Void>() {
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                counter.incrementAndGet();
+                return null;
+            }
+        }).when(eventChannel).append(isA(EventHeader.class), isA(Long.class),
+                                     eq(segment));
         Bundle bundle = new Bundle() {
             @Override
             public EventChannel eventChannelFor(EventHeader header) {
@@ -241,16 +245,7 @@ public class TestAppender {
             }
         };
 
-        final AtomicInteger counter = new AtomicInteger();
-        Producer producer = new Producer() {
-            @Override
-            public void commit(EventChannel channel, Segment segment,
-                               long offset, EventHeader header) {
-                counter.incrementAndGet();
-            }
-        };
-
-        final Appender appender = new Appender(bundle, producer);
+        final AbstractAppender appender = new Appender(bundle);
         SocketOptions socketOptions = new SocketOptions();
         socketOptions.setSend_buffer_size(8);
         socketOptions.setReceive_buffer_size(8);

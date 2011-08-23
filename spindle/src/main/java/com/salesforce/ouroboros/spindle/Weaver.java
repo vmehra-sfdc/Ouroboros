@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.spindle;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.SocketChannel;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -36,9 +37,6 @@ import java.util.concurrent.Executors;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
-import com.lmax.disruptor.Consumer;
-import com.lmax.disruptor.ProducerBarrier;
-import com.lmax.disruptor.RingBuffer;
 
 /**
  * The Weaver represents the channel buffer process that provides persistent,
@@ -50,56 +48,26 @@ import com.lmax.disruptor.RingBuffer;
  */
 public class Weaver implements Bundle {
 
-    private class ConsumerWrapper implements Consumer {
-
-        @Override
-        public long getSequence() {
-            return replicator.getSequence();
-        }
-
-        @Override
-        public void halt() {
-            replicator.halt();
-        }
-
-        @Override
-        public void run() {
-            replicator.run();
-        }
-    }
-
     private class ReplicatorFactory implements CommunicationsHandlerFactory {
-        private volatile boolean returned = false;
 
         @Override
-        public CommunicationsHandler createCommunicationsHandler() {
-            if (returned) {
-                throw new IllegalStateException("There can only be one");
-            }
-            returned = true;
-            return replicator;
+        public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
+            return null;
         }
 
     }
 
     private class SpindleFactory implements CommunicationsHandlerFactory {
-        final ProducerBarrier<EventEntry> replicationBarrier;
-
-        public SpindleFactory(ProducerBarrier<EventEntry> replicationBarrier) {
-            this.replicationBarrier = replicationBarrier;
-        }
 
         @Override
-        public CommunicationsHandler createCommunicationsHandler() {
-            return new Spinner(Weaver.this, replicationBarrier);
+        public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
+            return new Spinner(Weaver.this);
         }
 
     }
 
     private final long                              maxSegmentSize;
     private final ConcurrentMap<UUID, EventChannel> openChannels = new ConcurrentHashMap<UUID, EventChannel>();
-    private final RingBuffer<EventEntry>            replicationQueue;
-    private final Replicator                        replicator;
     private final ServerSocketChannelHandler        replicators;
     private final File                              root;
     private final ServerSocketChannelHandler        spindles;
@@ -107,15 +75,7 @@ public class Weaver implements Bundle {
     public Weaver(WeaverConfigation configuration) throws IOException {
         root = configuration.getRoot();
         maxSegmentSize = configuration.getMaxSegmentSize();
-        replicationQueue = new RingBuffer<EventEntry>(
-                                                      EventEntry.ENTRY_FACTORY,
-                                                      configuration.getReplicationQueueSize());
-        ConsumerWrapper wrapper = new ConsumerWrapper();
-        replicator = new Replicator(
-                                    Weaver.this,
-                                    replicationQueue.createConsumerBarrier(wrapper));
         ReplicatorFactory replicatorFactory = new ReplicatorFactory();
-        ProducerBarrier<EventEntry> replicationBarrier = replicationQueue.createProducerBarrier(replicator);
         replicators = new ServerSocketChannelHandler(
                                                      "Weaver Replicator",
                                                      configuration.getReplicationSocketOptions(),
@@ -127,8 +87,7 @@ public class Weaver implements Bundle {
                                                   configuration.getSpindleSocketOptions(),
                                                   configuration.getSpindleAddress(),
                                                   configuration.getSpindles(),
-                                                  new SpindleFactory(
-                                                                     replicationBarrier));
+                                                  new SpindleFactory());
     }
 
     @Override
@@ -156,7 +115,6 @@ public class Weaver implements Bundle {
     }
 
     public void terminate() {
-        replicator.halt();
         spindles.terminate();
         replicators.terminate();
     }
