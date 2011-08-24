@@ -47,6 +47,10 @@ import java.util.logging.Logger;
  */
 public class EventChannel {
 
+    public enum Role {
+        PRIMARY, SECONDARY;
+    }
+
     private static final Logger log            = Logger.getLogger(Weaver.class.getCanonicalName());
     private static final String SEGMENT_SUFFIX = ".segment";
 
@@ -92,17 +96,16 @@ public class EventChannel {
         return Long.toHexString(segmentPrefix).toLowerCase() + SEGMENT_SUFFIX;
     }
 
-    private final File                channel;
-    private volatile long             commited;
-    private volatile long             lastTimestamp;
-    private final long                maxSegmentSize;
-    private volatile long             nextOffset;
-    private final ReplicatingAppender replicationAppender;
-    private final Replicator          replicator;
-    private final UUID                tag;
+    private final File       channel;
+    private volatile long    commited;
+    private volatile long    lastTimestamp;
+    private final long       maxSegmentSize;
+    private volatile long    nextOffset;
+    private final Duplicator replicator;
+    private final UUID       tag;
 
     public EventChannel(final UUID channelTag, final File root,
-                        final long maxSegmentSize) {
+                        final long maxSegmentSize, final Duplicator replicator) {
         tag = channelTag;
         channel = new File(root, channelTag.toString().replace('-', '/'));
         this.maxSegmentSize = maxSegmentSize;
@@ -112,8 +115,7 @@ public class EventChannel {
             log.severe(msg);
             throw new IllegalStateException(msg);
         }
-        replicator = new Replicator(this);
-        replicationAppender = new ReplicatingAppender(this);
+        this.replicator = replicator;
     }
 
     public void append(EventHeader header, long offset) {
@@ -130,7 +132,7 @@ public class EventChannel {
      */
     public void append(EventHeader header, long offset, Segment segment) {
         append(header, offset);
-        replicator.replicate(offset, segment, header.totalSize());
+        replicator.replicate(this, offset, segment, header.totalSize());
     }
 
     /**
@@ -152,17 +154,6 @@ public class EventChannel {
             return false;
         }
         return tag.equals(o);
-    }
-
-    public ReplicatingAppender getReplicationAppender() {
-        return replicationAppender;
-    }
-
-    /**
-     * @return the replicator
-     */
-    public Replicator getReplicator() {
-        return replicator;
     }
 
     /**

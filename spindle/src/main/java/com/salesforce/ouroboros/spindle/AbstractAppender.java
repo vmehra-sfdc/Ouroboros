@@ -46,17 +46,24 @@ abstract public class AbstractAppender {
         ACCEPTED, APPEND, DEV_NULL, INITIALIZED, READ_HEADER, READ_OFFSET;
     }
 
-    private static final Logger    log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
+    private static final Logger             log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
 
-    protected volatile ByteBuffer  devNull;
-    protected SocketChannelHandler handler;
-    protected final EventHeader    header   = new EventHeader(
-                                                              ByteBuffer.allocate(EventHeader.HEADER_BYTE_SIZE));
-    protected volatile long        offset;
-    protected volatile long        position = -1L;
-    protected volatile long        remaining;
-    protected volatile Segment     segment;
-    protected volatile State       state    = State.INITIALIZED;
+    protected final Bundle                  bundle;
+    protected volatile ByteBuffer           devNull;
+    protected volatile EventChannel         eventChannel;
+    protected volatile SocketChannelHandler handler;
+    protected final EventHeader             header   = new EventHeader(
+                                                                       ByteBuffer.allocate(EventHeader.HEADER_BYTE_SIZE));
+    protected volatile long                 offset;
+    protected volatile long                 position = -1L;
+    protected volatile long                 remaining;
+    protected volatile Segment              segment;
+    protected volatile State                state    = State.INITIALIZED;
+
+    public AbstractAppender(Bundle bundle) {
+        super();
+        this.bundle = bundle;
+    }
 
     public State getState() {
         return state;

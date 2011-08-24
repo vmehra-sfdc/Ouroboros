@@ -47,7 +47,7 @@ import com.hellblazer.pinkie.SocketOptions;
 /**
  * 
  * @author hhildebrand
- *
+ * 
  */
 public class TestReplicatingAppender {
 
@@ -76,8 +76,7 @@ public class TestReplicatingAppender {
         when(eventChannel.isNextAppend(offset)).thenReturn(true);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
-        final ReplicatingAppender replicator = new ReplicatingAppender(
-                                                                       eventChannel);
+        final ReplicatingAppender replicator = new ReplicatingAppender(bundle);
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);
         options.setReceive_buffer_size(4);

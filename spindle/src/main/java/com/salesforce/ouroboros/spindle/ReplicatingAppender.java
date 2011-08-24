@@ -31,39 +31,19 @@ import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.hellblazer.pinkie.CommunicationsHandler;
-import com.hellblazer.pinkie.SocketChannelHandler;
-
 /**
  * The appender for receiving duplicated events from the primary.
  * 
  * @author hhildebrand
  * 
  */
-public class ReplicatingAppender extends AbstractAppender implements
-        CommunicationsHandler {
+public class ReplicatingAppender extends AbstractAppender {
     private static final Logger log          = Logger.getLogger(ReplicatingAppender.class.getCanonicalName());
 
-    private final EventChannel  eventChannel;
     private final ByteBuffer    offsetBuffer = ByteBuffer.allocate(8);
 
-    public ReplicatingAppender(EventChannel eventChannel) {
-        this.eventChannel = eventChannel;
-    }
-
-    @Override
-    public void closing(SocketChannel channel) {
-    }
-
-    @Override
-    public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler handler) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void handleWrite(SocketChannel channel) {
-        throw new UnsupportedOperationException();
+    public ReplicatingAppender(final Bundle bundle) {
+        super(bundle);
     }
 
     /* (non-Javadoc)
@@ -79,8 +59,21 @@ public class ReplicatingAppender extends AbstractAppender implements
      */
     @Override
     protected void headerRead(SocketChannel channel) {
-        if (Replicator.log.isLoggable(Level.FINER)) {
-            Replicator.log.finer(String.format("Header read, header=%s", header));
+        if (Duplicator.log.isLoggable(Level.FINER)) {
+            Duplicator.log.finer(String.format("Header read, header=%s", header));
+        }
+        eventChannel = bundle.eventChannelFor(header);
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Header read, header=%s", header));
+        }
+        if (eventChannel == null) {
+            log.warning(String.format("No existing event channel for: %s",
+                                      header));
+            state = State.DEV_NULL;
+            segment = null;
+            devNull = ByteBuffer.allocate(header.size());
+            devNull(channel);
+            return;
         }
         segment = eventChannel.segmentFor(offset);
         remaining = header.size();

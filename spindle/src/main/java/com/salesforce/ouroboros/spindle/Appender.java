@@ -37,13 +37,10 @@ import java.util.logging.Logger;
  * 
  */
 public class Appender extends AbstractAppender {
-    private static final Logger   log = Logger.getLogger(Appender.class.getCanonicalName());
-
-    private final Bundle          bundle;
-    private volatile EventChannel eventChannel;
+    private static final Logger log = Logger.getLogger(Appender.class.getCanonicalName());
 
     public Appender(Bundle bundle) {
-        this.bundle = bundle;
+        super(bundle);
     }
 
     @Override

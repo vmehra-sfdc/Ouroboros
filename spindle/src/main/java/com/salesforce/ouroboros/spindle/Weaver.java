@@ -47,47 +47,44 @@ import com.hellblazer.pinkie.ServerSocketChannelHandler;
  * 
  */
 public class Weaver implements Bundle {
-
     private class ReplicatorFactory implements CommunicationsHandlerFactory {
-
         @Override
         public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
-            return null;
+            return new Replicator(Weaver.this);
         }
-
     }
 
     private class SpindleFactory implements CommunicationsHandlerFactory {
-
         @Override
         public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
             return new Spinner(Weaver.this);
         }
-
     }
 
     private final long                              maxSegmentSize;
     private final ConcurrentMap<UUID, EventChannel> openChannels = new ConcurrentHashMap<UUID, EventChannel>();
-    private final ServerSocketChannelHandler        replicators;
+    private final ReplicatorFactory                 replicatorFactory;
+    private final ConcurrentMap<Long, Replicator>   replicators  = new ConcurrentHashMap<Long, Replicator>();
+    private final ServerSocketChannelHandler        replicationHandler;
     private final File                              root;
-    private final ServerSocketChannelHandler        spindles;
+    private final ServerSocketChannelHandler        spindleHandler;
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         root = configuration.getRoot();
         maxSegmentSize = configuration.getMaxSegmentSize();
-        ReplicatorFactory replicatorFactory = new ReplicatorFactory();
-        replicators = new ServerSocketChannelHandler(
-                                                     "Weaver Replicator",
-                                                     configuration.getReplicationSocketOptions(),
-                                                     configuration.getReplicationAddress(),
-                                                     Executors.newFixedThreadPool(2),
-                                                     replicatorFactory);
-        spindles = new ServerSocketChannelHandler(
-                                                  "Weaver Spindle",
-                                                  configuration.getSpindleSocketOptions(),
-                                                  configuration.getSpindleAddress(),
-                                                  configuration.getSpindles(),
-                                                  new SpindleFactory());
+        replicatorFactory = new ReplicatorFactory();
+        replicationHandler = new ServerSocketChannelHandler(
+                                                            "Weaver Replicator",
+                                                            configuration.getReplicationSocketOptions(),
+                                                            configuration.getReplicationAddress(),
+                                                            Executors.newFixedThreadPool(2),
+                                                            replicatorFactory);
+        spindleHandler = new ServerSocketChannelHandler(
+                                                        "Weaver Spindle",
+                                                        configuration.getSpindleSocketOptions(),
+                                                        configuration.getSpindleAddress(),
+                                                        configuration.getSpindles(),
+                                                        new SpindleFactory());
     }
 
     @Override
@@ -97,25 +94,31 @@ public class Weaver implements Bundle {
     }
 
     public InetSocketAddress getReplicatorEndpoint() {
-        return replicators.getLocalAddress();
+        return replicationHandler.getLocalAddress();
     }
 
     public InetSocketAddress getSpindleEndpoint() {
-        return spindles.getLocalAddress();
+        return spindleHandler.getLocalAddress();
     }
 
     public void open(UUID channel) {
-        openChannels.putIfAbsent(channel, new EventChannel(channel, root,
-                                                           maxSegmentSize));
+        openChannels.putIfAbsent(channel,
+                                 new EventChannel(channel, root,
+                                                  maxSegmentSize, null));
+    }
+
+    @Override
+    public void registerReplicator(long id, Replicator replicator) {
+        replicators.put(id, replicator);
     }
 
     public void start() {
-        spindles.start();
-        replicators.start();
+        spindleHandler.start();
+        replicationHandler.start();
     }
 
     public void terminate() {
-        spindles.terminate();
-        replicators.terminate();
+        spindleHandler.terminate();
+        replicationHandler.terminate();
     }
 }

@@ -28,10 +28,6 @@ package com.salesforce.ouroboros.spindle;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,149 +35,202 @@ import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 
 /**
- * A replicator of the event stream of a channel.
+ * A full duplex replicator of event streams. The replicator provides both
+ * outbound replication of events sourced in the host process as well as
+ * accepting replicated events from the mirrored partner process on the same
+ * channel.
+ * 
+ * Replicators have a strict sense of connecting with their mirror process. In
+ * order to use both the inbound and outbound streams of the socket, each pair
+ * of processes must only connect once. Thus, one process of the mirror pair
+ * will initiate the connection and the other pair will accept the new
+ * connection. Once the replication connection is established, both sides will
+ * replicate events between them.
+ * 
+ * The Replicator acts as the communication handler which is used to establish
+ * the connection between the primary and secondary server and after the
+ * connection is established, delegate the event replication transport to the
+ * appender or duplicator, depending on whether the communication is inbound or
+ * outbound.
  * 
  * @author hhildebrand
  * 
  */
-public final class Replicator implements CommunicationsHandler {
+public class Replicator implements CommunicationsHandler {
     public enum State {
-        INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_OFFSET;
+        ERROR, ESTABLISHED, INITIAL, OUTBOUND_HANDSHAKE, INBOUND_HANDSHAKE;
     }
 
-    static final Logger                     log          = Logger.getLogger(Replicator.class.getCanonicalName());
+    private static final Logger           log            = Logger.getLogger(Replicator.class.getCanonicalName());
 
-    private volatile SocketChannelHandler   handler;
-    private volatile long                   offset;
-    private final ByteBuffer                offsetBuffer = ByteBuffer.allocate(8);
-    private final BlockingQueue<EventEntry> pending      = new LinkedBlockingQueue<EventEntry>();
-    private volatile long                   position;
-    private volatile int                    remaining;
-    private volatile Segment                segment;
-    private final AtomicReference<State>    state        = new AtomicReference<State>(
-                                                                                      State.WAITING);
-    final EventChannel                      eventChannel;
+    private static final int              HANDSHAKE_SIZE = 16;
+    private static final long             MAGIC          = 0x1638L;
 
-    public Replicator(final EventChannel eventChannel) {
-        this.eventChannel = eventChannel;
+    private final ReplicatingAppender     appender;
+    private final Duplicator              duplicator;
+    private volatile State                state          = State.INITIAL;
+    private ByteBuffer                    handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private volatile long                 id;
+    private final Bundle                  bundle;
+    private volatile SocketChannelHandler handler;
+
+    public Replicator(Bundle bundle) {
+        duplicator = new Duplicator();
+        appender = new ReplicatingAppender(bundle);
+        this.bundle = bundle;
+    }
+
+    public Replicator(long id, Bundle bundle) {
+        duplicator = new Duplicator();
+        appender = new ReplicatingAppender(bundle);
+        this.id = id;
+        this.bundle = bundle;
+        handshake.putLong(MAGIC);
+        handshake.putLong(id);
     }
 
     @Override
     public void closing(SocketChannel channel) {
+        // TODO Auto-generated method stub
     }
 
     /**
-     * @return the state of the outbound replicator
+     * @return the appender
+     */
+    public ReplicatingAppender getAppender() {
+        return appender;
+    }
+
+    /**
+     * @return the duplicator
+     */
+    public Duplicator getDuplicator() {
+        return duplicator;
+    }
+
+    /**
+     * @return the state
      */
     public State getState() {
-        return state.get();
+        return state;
     }
 
     @Override
     public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
-        throw new UnsupportedOperationException(
-                                                "Inbound channels are not supported");
+        this.handler = handler;
+        switch (state) {
+            case ESTABLISHED: {
+                duplicator.handleConnect(channel, handler);
+                appender.handleAccept(channel, handler);
+                break;
+            }
+            case INITIAL: {
+                state = State.INBOUND_HANDSHAKE;
+                readHandshake(channel);
+            }
+            default: {
+                log.warning(String.format("Invalid accept state: %s", state));
+            }
+        }
     }
 
     @Override
     public void handleConnect(SocketChannel channel,
-                              final SocketChannelHandler handler) {
-        this.handler = handler;
+                              SocketChannelHandler handler) {
+        switch (state) {
+            case ESTABLISHED: {
+                duplicator.handleConnect(channel, handler);
+                appender.handleAccept(channel, handler);
+                break;
+            }
+            case INITIAL: {
+                state = State.OUTBOUND_HANDSHAKE;
+                writeHandshake(channel);
+            }
+            default: {
+                log.warning(String.format("Invalid connect state: %s", state));
+            }
+        }
     }
 
     @Override
     public void handleRead(SocketChannel channel) {
-        throw new UnsupportedOperationException(
-                                                "Inbound channels are not supported");
+        switch (state) {
+            case ESTABLISHED: {
+                appender.handleRead(channel);
+                break;
+            }
+            case INBOUND_HANDSHAKE: {
+                readHandshake(channel);
+                break;
+            }
+            default: {
+                log.warning(String.format("Invalid read state: %s", state));
+            }
+        }
     }
 
     @Override
     public void handleWrite(SocketChannel channel) {
-        switch (state.get()) {
-            case WRITE_OFFSET: {
-                writeOffset(channel);
+        switch (state) {
+            case ESTABLISHED: {
+                duplicator.handleWrite(channel);
                 break;
             }
-            case WRITE: {
-                writeEvent(channel);
+            case OUTBOUND_HANDSHAKE: {
+                writeHandshake(channel);
                 break;
             }
-            default:
-                log.warning(String.format("Illegal write state: %s", state));
+            default: {
+                log.warning(String.format("Invalid write state: %s", state));
+            }
         }
     }
 
-    public void replicate(long offset, Segment segment, int size) {
-        pending.add(new EventEntry(offset, segment, size));
-        process();
-    }
-
-    private boolean transferTo(SocketChannel channel) throws IOException {
-        long p = position;
-        int written = (int) segment.transferTo(p, remaining, channel);
-        remaining = remaining - written;
-        position = p + written;
-        if (remaining == 0) {
-            return true;
-        }
-        return false;
-    }
-
-    private void writeEvent(SocketChannel channel) {
+    private void readHandshake(SocketChannel channel) {
         try {
-            if (transferTo(channel)) {
-                state.set(State.WAITING);
-                eventChannel.commit(offset);
-                process();
-            }
+            channel.read(handshake);
         } catch (IOException e) {
             log.log(Level.WARNING,
-                    String.format("Unable to replicate payload for event: %s from: %s",
-                                  offset, segment), e);
+                    String.format("Unable to read handshake from: %s", channel),
+                    e);
+            state = State.ERROR;
+            handler.close();
+            return;
         }
+        if (!handshake.hasRemaining()) {
+            handshake.flip();
+            long magic = handshake.getLong();
+            if (MAGIC != magic) {
+                state = State.ERROR;
+                log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
+                                          channel, magic));
+                handler.close();
+                return;
+            }
+            id = handshake.getLong();
+            bundle.registerReplicator(id, this);
+            duplicator.handleConnect(channel, handler);
+            state = State.ESTABLISHED;
+        }
+        handler.selectForRead();
     }
 
-    private void writeOffset(SocketChannel channel) {
+    private void writeHandshake(SocketChannel channel) {
         try {
-            channel.write(offsetBuffer);
+            channel.write(handshake);
         } catch (IOException e) {
-            log.log(Level.WARNING, "Error writing offset", e);
-        }
-        if (!offsetBuffer.hasRemaining()) {
-            state.set(State.WRITE);
-            writeEvent(channel);
-        }
-    }
-
-    protected void process() {
-        if (!state.compareAndSet(State.WAITING, State.PROCESSING)) {
+            log.log(Level.WARNING,
+                    String.format("Unable to write handshake from: %s", channel),
+                    e);
+            state = State.ERROR;
+            handler.close();
             return;
         }
-        EventEntry entry;
-        try {
-            entry = pending.poll(10, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            state.set(State.INTERRUPTED);
-            return;
+        if (!handshake.hasRemaining()) {
+            bundle.registerReplicator(id, this);
+            duplicator.handleConnect(channel, handler);
+            state = State.ESTABLISHED;
         }
-        if (entry == null) {
-            state.compareAndSet(State.PROCESSING, State.WAITING);
-            return;
-        }
-        process(entry);
-    }
-
-    protected void process(EventEntry entry) {
-        if (!state.compareAndSet(State.PROCESSING, State.WRITE_OFFSET)) {
-            return;
-        }
-        offset = entry.offset;
-        segment = entry.segment;
-        remaining = entry.size;
-        position = offset;
-        offsetBuffer.clear();
-        offsetBuffer.putLong(offset);
-        offsetBuffer.flip();
-        handler.selectForWrite();
     }
 }

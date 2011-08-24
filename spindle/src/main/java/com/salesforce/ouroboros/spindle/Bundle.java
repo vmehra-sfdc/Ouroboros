@@ -42,4 +42,12 @@ public interface Bundle {
      *         exists.
      */
     EventChannel eventChannelFor(EventHeader header);
+
+    /**
+     * Register the inbound replicator with the id
+     * 
+     * @param id
+     * @param replicator
+     */
+    void registerReplicator(long id, Replicator replicator);
 }

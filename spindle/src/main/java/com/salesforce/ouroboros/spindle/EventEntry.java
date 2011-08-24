@@ -32,12 +32,14 @@ package com.salesforce.ouroboros.spindle;
  * 
  */
 public class EventEntry {
-    public final long    offset;
-    public final Segment segment;
-    public final int     size;
+    public final EventChannel eventChannel;
+    public final long         offset;
+    public final Segment      segment;
+    public final int          size;
 
-    public EventEntry(long offset, Segment segment, int size) {
-        super();
+    public EventEntry(EventChannel eventChannel, long offset, Segment segment,
+                      int size) {
+        this.eventChannel = eventChannel;
         this.offset = offset;
         this.segment = segment;
         this.size = size;

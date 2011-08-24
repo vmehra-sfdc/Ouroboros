@@ -243,6 +243,11 @@ public class TestAppender {
             public EventChannel eventChannelFor(EventHeader header) {
                 return eventChannel;
             }
+
+            @Override
+            public void registerReplicator(long id, Replicator replicator) {
+                throw new UnsupportedOperationException();
+            }
         };
 
         final AbstractAppender appender = new Appender(bundle);
