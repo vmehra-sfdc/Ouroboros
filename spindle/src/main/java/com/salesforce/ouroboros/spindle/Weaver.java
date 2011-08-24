@@ -63,7 +63,6 @@ public class Weaver implements Bundle {
 
     private final long                              maxSegmentSize;
     private final ConcurrentMap<UUID, EventChannel> openChannels = new ConcurrentHashMap<UUID, EventChannel>();
-    private final ReplicatorFactory                 replicatorFactory;
     private final ConcurrentMap<Long, Replicator>   replicators  = new ConcurrentHashMap<Long, Replicator>();
     private final ServerSocketChannelHandler        replicationHandler;
     private final File                              root;
@@ -71,14 +70,13 @@ public class Weaver implements Bundle {
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         root = configuration.getRoot();
-        maxSegmentSize = configuration.getMaxSegmentSize();
-        replicatorFactory = new ReplicatorFactory();
+        maxSegmentSize = configuration.getMaxSegmentSize(); 
         replicationHandler = new ServerSocketChannelHandler(
                                                             "Weaver Replicator",
                                                             configuration.getReplicationSocketOptions(),
                                                             configuration.getReplicationAddress(),
                                                             Executors.newFixedThreadPool(2),
-                                                            replicatorFactory);
+                                                            new ReplicatorFactory());
         spindleHandler = new ServerSocketChannelHandler(
                                                         "Weaver Spindle",
                                                         configuration.getSpindleSocketOptions(),

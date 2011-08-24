@@ -12,6 +12,16 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>Spindle - Channel Buffering</name>
 	<description>A file based buffering and reading subsystem</description>
+	<url>https://github.com/sfdc-hhildebrand/Ouroboros</url>
+
+	<licenses>
+		<license>
+			<name>BSD 3-Clause License</name>
+			<url>http://www.opensource.org/licenses/BSD-3-Clause</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+	
 	<dependencies>
 		<dependency>
 			<groupId>com.hellblazer</groupId>
