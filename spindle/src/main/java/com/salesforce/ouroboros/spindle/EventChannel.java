@@ -48,7 +48,7 @@ import java.util.logging.Logger;
 public class EventChannel {
 
     public enum Role {
-        PRIMARY, SECONDARY;
+        MIRROR, PRIMARY;
     }
 
     private static final Logger log            = Logger.getLogger(Weaver.class.getCanonicalName());
