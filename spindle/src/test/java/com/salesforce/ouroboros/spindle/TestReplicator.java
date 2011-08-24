@@ -25,8 +25,22 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import static junit.framework.Assert.assertEquals;
+import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+
 import org.junit.Test;
-import static org.mockito.Mockito.*;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+
+import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.spindle.Replicator.State;
 
 /**
  * 
@@ -35,7 +49,81 @@ import static org.mockito.Mockito.*;
  */
 public class TestReplicator {
     @Test
-    public void testInboundEstablish() {
+    public void testInboundEstablish() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        SocketChannel socketChannel = mock(SocketChannel.class);
+
+        Replicator replicator = new Replicator(bundle);
+
+        doReturn(0).doAnswer(new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                buffer.putLong(Replicator.MAGIC);
+                buffer.putLong(0x1638L);
+                return 16;
+            }
+        }).when(socketChannel).read(isA(ByteBuffer.class));
+
+        assertEquals(State.INITIAL, replicator.getState());
+        replicator.handleAccept(socketChannel, handler);
+        assertEquals(State.INBOUND_HANDSHAKE, replicator.getState());
+        replicator.handleRead(socketChannel);
+        assertEquals(State.ESTABLISHED, replicator.getState());
+        verify(bundle).registerReplicator(0x1638L, replicator);
+    }
+
+    @Test
+    public void testInboundEstablishError() throws Exception {
+        Bundle bundle = mock(Bundle.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        SocketChannel socketChannel = mock(SocketChannel.class);
+
+        Replicator replicator = new Replicator(bundle);
+
+        doReturn(0).doAnswer(new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                buffer.putLong(Replicator.MAGIC + 1);
+                buffer.putLong(0x1638L);
+                return 16;
+            }
+        }).when(socketChannel).read(isA(ByteBuffer.class));
+
+        assertEquals(State.INITIAL, replicator.getState());
+        replicator.handleAccept(socketChannel, handler);
+        assertEquals(State.INBOUND_HANDSHAKE, replicator.getState());
+        replicator.handleRead(socketChannel);
+        assertEquals(State.ERROR, replicator.getState());
+        verify(handler).close();
+        verifyNoMoreInteractions(bundle);
+    }
+
+    @Test
+    public void testOutboundEstablish() throws Exception {
+        Bundle bundle = mock(Bundle.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        SocketChannel socketChannel = mock(SocketChannel.class);
+
+        Replicator replicator = new Replicator(0x1638L, bundle);
+
+        doReturn(0).doAnswer(new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                assertEquals(Replicator.MAGIC, buffer.getLong());
+                assertEquals(0x1638L, buffer.getLong());
+                return 16;
+            }
+        }).when(socketChannel).write(isA(ByteBuffer.class));
+
+        assertEquals(State.INITIAL, replicator.getState());
+        replicator.handleConnect(socketChannel, handler);
+        assertEquals(State.OUTBOUND_HANDSHAKE, replicator.getState());
+        replicator.handleWrite(socketChannel);
+        assertEquals(State.ESTABLISHED, replicator.getState());
+        verify(bundle).registerReplicator(0x1638L, replicator);
     }
 }

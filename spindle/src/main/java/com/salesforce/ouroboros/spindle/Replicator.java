@@ -64,7 +64,7 @@ public class Replicator implements CommunicationsHandler {
     private static final Logger           log            = Logger.getLogger(Replicator.class.getCanonicalName());
 
     private static final int              HANDSHAKE_SIZE = 16;
-    private static final long             MAGIC          = 0x1638L;
+    static final long             MAGIC          = 0x1638L;
 
     private final ReplicatingAppender     appender;
     private final Duplicator              duplicator;
@@ -87,6 +87,7 @@ public class Replicator implements CommunicationsHandler {
         this.bundle = bundle;
         handshake.putLong(MAGIC);
         handshake.putLong(id);
+        handshake.flip();
     }
 
     @Override
@@ -127,6 +128,7 @@ public class Replicator implements CommunicationsHandler {
             case INITIAL: {
                 state = State.INBOUND_HANDSHAKE;
                 readHandshake(channel);
+                break;
             }
             default: {
                 log.warning(String.format("Invalid accept state: %s", state));
@@ -146,6 +148,7 @@ public class Replicator implements CommunicationsHandler {
             case INITIAL: {
                 state = State.OUTBOUND_HANDSHAKE;
                 writeHandshake(channel);
+                break;
             }
             default: {
                 log.warning(String.format("Invalid connect state: %s", state));
