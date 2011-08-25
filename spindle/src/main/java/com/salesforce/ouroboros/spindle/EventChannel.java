@@ -47,8 +47,8 @@ import java.util.logging.Logger;
  */
 public class EventChannel {
 
-    public enum Role {
-        MIRROR, PRIMARY;
+    public enum State {
+        INITIALIZED, OPEN_MIRROR, OPEN_PRIMARY, RECOVERING, CLOSED;
     }
 
     private static final Logger log            = Logger.getLogger(Weaver.class.getCanonicalName());
@@ -102,12 +102,13 @@ public class EventChannel {
     private final long       maxSegmentSize;
     private volatile long    nextOffset;
     private final Duplicator replicator;
-    private final UUID       tag;
+    private volatile State   state;
+    private final UUID       id;
 
-    public EventChannel(final UUID channelTag, final File root,
+    public EventChannel(final UUID id, final File root,
                         final long maxSegmentSize, final Duplicator replicator) {
-        tag = channelTag;
-        channel = new File(root, channelTag.toString().replace('-', '/'));
+        this.id = id;
+        channel = new File(root, id.toString().replace('-', '/'));
         this.maxSegmentSize = maxSegmentSize;
         if (!channel.mkdirs()) {
             String msg = String.format("Unable to create channel directory for channel: %s",
@@ -136,6 +137,13 @@ public class EventChannel {
     }
 
     /**
+     * Close the channel
+     */
+    public void close() {
+        deleteDirectory(channel);
+    }
+
+    /**
      * Commit the event offset in the channel
      * 
      * @param offset
@@ -153,19 +161,23 @@ public class EventChannel {
         if (!(o instanceof EventChannel)) {
             return false;
         }
-        return tag.equals(o);
+        return id.equals(o);
     }
 
     /**
-     * @return the unique tag of the channel
+     * @return the unique id of the channel
      */
-    public UUID getTag() {
-        return tag;
+    public UUID getId() {
+        return id;
+    }
+
+    public State getState() {
+        return state;
     }
 
     @Override
     public int hashCode() {
-        return tag.hashCode();
+        return id.hashCode();
     }
 
     /**
@@ -257,5 +269,17 @@ public class EventChannel {
 
     private String appendSegmentNameFor(int eventSize, long maxSegmentSize) {
         return segmentName(segmentFor(nextOffset, eventSize, maxSegmentSize));
+    }
+
+    private void deleteDirectory(File directory) {
+        for (File n : directory.listFiles()) {
+            if (n.isDirectory()) {
+                deleteDirectory(n);
+            }
+            if (!n.delete()) {
+                log.warning(String.format("Channel %s cannot delete: %s", id,
+                                          n.getAbsolutePath()));
+            }
+        }
     }
 }
