@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 // RELEASE-STATUS: DIST
@@ -174,7 +175,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
     public final static int                  REPLICAE_PER_BUCKET = 200;
 
     /** Maps points in the unit interval to buckets. */
-    final protected Map<Long, Object>        replicae            = new HashMap<Long, Object>();
+    final protected Map<Long, Object>        replicae            = new TreeMap<Long, Object>();
 
     /** The cached key set of {@link #replicae}. */
     final protected Set<Entry<Long, Object>> entrySet            = replicae.entrySet();
@@ -306,7 +307,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
      *         buckets and, in case a skip strategy has been specified, it could
      *         be empty even if the bucket set is nonempty.
      */
- 
+
     public List<T> hash(long point, int n) {
         if (n == 0 || buckets.size() == 0) {
             return new ArrayList<T>();
@@ -319,7 +320,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
 
         for (int pass = 2; pass-- != 0;) {
             for (Entry<Long, Object> entry : replicae.entrySet()) {
-                if (pass == 2 && entry.getKey().longValue() != point) {
+                if (pass == 1 && entry.getKey().longValue() < point) {
                     continue;
                 }
                 if (entry.getValue() instanceof SortedSet) {
@@ -327,7 +328,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
                     SortedSet<T> value = (SortedSet<T>) entry.getValue();
                     for (T p : value) {
                         if ((skipStrategy == null || !skipStrategy.isSkippable(p))
-                            && result.add(p) && --n == 0) {
+                            && !result.contains(p) && result.add(p) && --n == 0) {
                             return result;
                         }
                     }
@@ -335,7 +336,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
                     @SuppressWarnings("unchecked")
                     T value = (T) entry.getValue();
                     if ((skipStrategy == null || !skipStrategy.isSkippable(value))
-                               && result.add(value) && --n == 0) {
+                        && !result.contains(value) && result.add(value) && --n == 0) {
                         return result;
                     }
                 }

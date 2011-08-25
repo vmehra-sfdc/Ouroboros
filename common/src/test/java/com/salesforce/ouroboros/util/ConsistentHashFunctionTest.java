@@ -34,6 +34,7 @@ import org.junit.Test;
 
 public class ConsistentHashFunctionTest {
 
+    @Test
     public void testAdd() {
         ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>();
         final String o0 = "0", o1 = "1", o2 = "2";
@@ -46,13 +47,16 @@ public class ConsistentHashFunctionTest {
         boolean found0 = false, found1 = false, found2 = false;
 
         for (int i = 0; i < 200; i++) {
-            if (chf.hash(r.nextLong()) == o0) {
+            long nextLong = r.nextLong();
+            if (chf.hash(nextLong) == o0) {
                 found0 = true;
             }
-            if (chf.hash(r.nextLong()) == o1) {
+            nextLong = r.nextLong();
+            if (chf.hash(nextLong) == o1) {
                 found1 = true;
             }
-            if (chf.hash(r.nextLong()) == o2) {
+            nextLong = r.nextLong();
+            if (chf.hash(nextLong) == o2) {
                 found2 = true;
             }
         }
@@ -62,6 +66,7 @@ public class ConsistentHashFunctionTest {
         assertTrue(found2);
     }
 
+    @Test
     public void testConsistency() {
         final Random r = new Random(1);
         int nBucket = 1 + r.nextInt(4);
@@ -116,6 +121,7 @@ public class ConsistentHashFunctionTest {
 
     }
 
+    @Test
     public void testSecondChance() {
         final Random r = new Random(1);
         int nBucket = 1 + r.nextInt(4);
@@ -149,6 +155,7 @@ public class ConsistentHashFunctionTest {
         }
     }
 
+    @Test
     public void testSpecial() {
         ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>();
         long sample = -3599839008849623859L;
@@ -156,12 +163,12 @@ public class ConsistentHashFunctionTest {
         chf.add("1", 1);
         chf.add("2", 1);
 
-        List<String> r;
-        System.out.println(r = chf.hash(sample, 3));
-        for (Object element : r) {
+        List<String> r = chf.hash(sample, 3);
+        System.out.println("3: " + r);
+        for (String element : r) {
             assertEquals(chf.hash(sample) + " != " + element, chf.hash(sample),
                          element);
-            chf.remove((String) element);
+            chf.remove(element);
         }
         for (int i = r.size() - 1; i >= 0; i--) {
             chf.add(r.get(i), 1);
@@ -170,6 +177,7 @@ public class ConsistentHashFunctionTest {
         System.out.println(chf.hash(sample, 3));
     }
 
+    @Test
     @SuppressWarnings("boxing")
     public void testStress() {
         final Random r = new Random(1);
