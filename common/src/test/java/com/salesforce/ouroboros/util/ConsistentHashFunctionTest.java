@@ -178,7 +178,6 @@ public class ConsistentHashFunctionTest {
     }
 
     @Test
-    @SuppressWarnings("boxing")
     public void testStress() {
         final Random r = new Random(1);
         int nBucket = 1 + r.nextInt(1000);
