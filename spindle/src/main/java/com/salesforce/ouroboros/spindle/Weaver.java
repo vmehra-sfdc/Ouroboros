@@ -37,6 +37,7 @@ import java.util.concurrent.Executors;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
+import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
  * The Weaver represents the channel buffer process that provides persistent,
@@ -61,16 +62,20 @@ public class Weaver implements Bundle {
         }
     }
 
+    private final long                              id;
     private final long                              maxSegmentSize;
     private final ConcurrentMap<UUID, EventChannel> openChannels = new ConcurrentHashMap<UUID, EventChannel>();
     private final ConcurrentMap<Long, Replicator>   replicators  = new ConcurrentHashMap<Long, Replicator>();
     private final ServerSocketChannelHandler        replicationHandler;
     private final File                              root;
     private final ServerSocketChannelHandler        spindleHandler;
+    private final ConsistentHashFunction<Long>      weaverRing   = new ConsistentHashFunction<Long>();
 
     public Weaver(WeaverConfigation configuration) throws IOException {
+        id = configuration.getId();
+        weaverRing.add(id, 1);
         root = configuration.getRoot();
-        maxSegmentSize = configuration.getMaxSegmentSize(); 
+        maxSegmentSize = configuration.getMaxSegmentSize();
         replicationHandler = new ServerSocketChannelHandler(
                                                             "Weaver Replicator",
                                                             configuration.getReplicationSocketOptions(),
@@ -99,6 +104,13 @@ public class Weaver implements Bundle {
         return spindleHandler.getLocalAddress();
     }
 
+    public void close(UUID channel) {
+        EventChannel eventChannel = openChannels.remove(channel);
+        if (channel != null) {
+            eventChannel.close();
+        }
+    }
+
     public void open(UUID channel) {
         openChannels.putIfAbsent(channel,
                                  new EventChannel(channel, root,
@@ -118,5 +130,10 @@ public class Weaver implements Bundle {
     public void terminate() {
         spindleHandler.terminate();
         replicationHandler.terminate();
+    }
+
+    public String toString() {
+        return String.format("Weaver[%s], spindle endpoint: %s, replicator endpoint: %s",
+                             id, getSpindleEndpoint(), getReplicatorEndpoint());
     }
 }

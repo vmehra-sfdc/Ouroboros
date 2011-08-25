@@ -38,6 +38,7 @@ import com.hellblazer.pinkie.SocketOptions;
  * 
  */
 public class WeaverConfigation {
+    private long                id;
     private long                maxSegmentSize;
     private InetSocketAddress   replicationAddress;
     private int                 replicationQueueSize     = 100;
@@ -46,6 +47,13 @@ public class WeaverConfigation {
     private InetSocketAddress   spindleAddress;
     private Executor            spindles;
     private final SocketOptions spindleSocketOptions     = new SocketOptions();
+
+    /**
+     * @return the id
+     */
+    public long getId() {
+        return id;
+    }
 
     /**
      * @return the maxSegmentSize
@@ -101,6 +109,14 @@ public class WeaverConfigation {
      */
     public SocketOptions getSpindleSocketOptions() {
         return spindleSocketOptions;
+    }
+
+    /**
+     * @param id
+     *            the id to set
+     */
+    public void setId(long id) {
+        this.id = id;
     }
 
     /**
