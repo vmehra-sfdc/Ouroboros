@@ -27,7 +27,12 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FilenameFilter;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Deque;
+import java.util.LinkedList;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -47,12 +52,23 @@ import java.util.logging.Logger;
  */
 public class EventChannel {
 
-    public enum State {
-        INITIALIZED, OPEN_MIRROR, OPEN_PRIMARY, RECOVERING, CLOSED;
+    public enum Role {
+        PRIMARY, MIRROR;
     }
 
-    private static final Logger log            = Logger.getLogger(Weaver.class.getCanonicalName());
-    private static final String SEGMENT_SUFFIX = ".segment";
+    public enum State {
+        INITIALIZED, RECOVERING, TRANSFERING, OPEN, CLOSED;
+    }
+
+    private static final Logger         log            = Logger.getLogger(Weaver.class.getCanonicalName());
+    private static final FilenameFilter SEGMENT_FILTER = new FilenameFilter() {
+                                                           @Override
+                                                           public boolean accept(File dir,
+                                                                                 String name) {
+                                                               return name.endsWith(SEGMENT_SUFFIX);
+                                                           }
+                                                       };
+    private static final String         SEGMENT_SUFFIX = ".segment";
 
     /**
      * Answer the logical segment prefix for the event offset and given maximum
@@ -103,11 +119,9 @@ public class EventChannel {
     private volatile long    nextOffset;
     private final Duplicator replicator;
     private volatile State   state;
-    private final UUID       id;
 
     public EventChannel(final UUID id, final File root,
                         final long maxSegmentSize, final Duplicator replicator) {
-        this.id = id;
         channel = new File(root, id.toString().replace('-', '/'));
         this.maxSegmentSize = maxSegmentSize;
         if (!channel.mkdirs()) {
@@ -161,14 +175,7 @@ public class EventChannel {
         if (!(o instanceof EventChannel)) {
             return false;
         }
-        return id.equals(o);
-    }
-
-    /**
-     * @return the unique id of the channel
-     */
-    public UUID getId() {
-        return id;
+        return channel.equals(((EventChannel) o).channel);
     }
 
     public State getState() {
@@ -177,7 +184,7 @@ public class EventChannel {
 
     @Override
     public int hashCode() {
-        return id.hashCode();
+        return channel.hashCode();
     }
 
     /**
@@ -277,9 +284,38 @@ public class EventChannel {
                 deleteDirectory(n);
             }
             if (!n.delete()) {
-                log.warning(String.format("Channel %s cannot delete: %s", id,
+                log.warning(String.format("Channel cannot delete: %s",
                                           n.getAbsolutePath()));
             }
         }
+    }
+
+    /**
+     * @return the deque of segments to be replicated. The segments are sorted
+     *         in increasing offset order
+     * @throws IllegalStateException
+     *             if a valid segment cannot be returned because the file is not
+     *             found
+     */
+    public Deque<Segment> getSegmentStack() {
+        File[] segmentFiles = channel.listFiles(SEGMENT_FILTER);
+        Arrays.sort(segmentFiles, new Comparator<File>() {
+            @Override
+            public int compare(File o1, File o2) {
+                return o1.getName().compareTo(o2.getName());
+            }
+        });
+        Deque<Segment> segments = new LinkedList<Segment>();
+        for (File segmentFile : segmentFiles) {
+            try {
+                segments.push(new Segment(segmentFile));
+            } catch (FileNotFoundException e) {
+                String msg = String.format("Cannot find segment file: %s",
+                                           segmentFile);
+                log.log(Level.SEVERE, msg, e);
+                throw new IllegalStateException(msg, e);
+            }
+        }
+        return segments;
     }
 }
