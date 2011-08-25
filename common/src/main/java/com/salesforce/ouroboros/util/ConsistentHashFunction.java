@@ -29,6 +29,8 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 // RELEASE-STATUS: DIST
 
@@ -123,7 +125,7 @@ import java.util.TreeSet;
  * <P>
  * The number of replicas associated to a bucket is fixed when the bucket is
  * inserted in the map. The actual number depends on the weight and on the
- * constant {@link #REPLICAE_PER_BUCKET}.
+ * constant {@link #replicaePerBucket}.
  * 
  * <P>
  * This class handles overlaps (i.e., conflicts in a replica creation). In that
@@ -148,7 +150,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
      * Sometimes it is useful to restrict the set of buckets that can be
      * returned without modifying a consistent hash function (if not else,
      * because any change requires removing or adding
-     * {@link ConsistentHashFunction#REPLICAE_PER_BUCKET} replicae).
+     * {@link ConsistentHashFunction#replicaePerBucket} replicae).
      * 
      * <P>
      * To do so, it is possible to
@@ -171,29 +173,29 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
         public boolean isSkippable(T bucket);
     }
 
+    private static int                       DEFAULT_REPLICAS = 200;
+    private static final Logger              log              = Logger.getLogger(ConsistentHashFunction.class.getCanonicalName());
+
     /** Each bucket is replicated this number of times. */
-    public final static int                  REPLICAE_PER_BUCKET = 200;
-
-    /** Maps points in the unit interval to buckets. */
-    final protected Map<Long, Object>        replicae            = new TreeMap<Long, Object>();
-
-    /** The cached key set of {@link #replicae}. */
-    final protected Set<Entry<Long, Object>> entrySet            = replicae.entrySet();
-
-    /** For each bucket, its size. */
-    final protected Map<T, Integer>          sizes               = new HashMap<T, Integer>();
-
+    public final int                         replicaePerBucket;
     /** The cached key set of {@link #sizes}. */
-    final protected Set<T>                   buckets             = sizes.keySet();
-
+    final protected Set<T>                   buckets;
+    /** The cached key set of {@link #replicae}. */
+    final protected Set<Entry<Long, Object>> entrySet;
+    /** Maps points in the unit interval to buckets. */
+    final protected Map<Long, Object>        replicae         = new TreeMap<Long, Object>();
+    /** For each bucket, its size. */
+    final protected Map<T, Integer>          sizes            = new HashMap<T, Integer>();
     /** The optional strategy to skip buckets, or <code>null</code>. */
     final protected SkipStrategy<T>          skipStrategy;
 
-    private final static boolean             DEBUG               = false;
-
     /** Creates a new consistent hash function. */
     public ConsistentHashFunction() {
-        this(null);
+        this(DEFAULT_REPLICAS);
+    }
+
+    public ConsistentHashFunction(int replicas) {
+        this(null, replicas);
     }
 
     /**
@@ -201,9 +203,15 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
      * 
      * @param skipStrategy
      *            a skip strategy, or <code>null</code>.
+     * @param replicas
+     *            the number of replicas per bucket
      */
-    public ConsistentHashFunction(final SkipStrategy<T> skipStrategy) {
+    public ConsistentHashFunction(final SkipStrategy<T> skipStrategy,
+                                  int replicas) {
         this.skipStrategy = skipStrategy;
+        this.replicaePerBucket = replicas;
+        buckets = sizes.keySet();
+        entrySet = replicae.entrySet();
     }
 
     /**
@@ -231,20 +239,17 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
         Object o;
         SortedSet<T> conflictSet;
 
-        for (int i = 0; i < weight * REPLICAE_PER_BUCKET; i++) {
+        for (int i = 0; i < weight * replicaePerBucket; i++) {
 
             point = twister.nextLong();
-            if (DEBUG) {
-                point = point % 1024;
-            }
 
             if ((o = replicae.get(point)) != null) {
                 if (o != bucket) { // o == bucket should happen with very low probability.
                     if (o instanceof SortedSet) {
                         ((SortedSet<T>) o).add(bucket);
                     } else {
-                        if (DEBUG) {
-                            System.err.println("Creating conflict set...");
+                        if (log.isLoggable(Level.FINEST)) {
+                            log.finest("Creating conflict set...");
                         }
                         conflictSet = new TreeSet<T>();
                         conflictSet.add((T) o);
@@ -313,9 +318,6 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
             return new ArrayList<T>();
         }
 
-        if (DEBUG) {
-            point %= 1024;
-        }
         final ArrayList<T> result = new ArrayList<T>();
 
         for (int pass = 2; pass-- != 0;) {
@@ -336,7 +338,9 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
                     @SuppressWarnings("unchecked")
                     T value = (T) entry.getValue();
                     if ((skipStrategy == null || !skipStrategy.isSkippable(value))
-                        && !result.contains(value) && result.add(value) && --n == 0) {
+                        && !result.contains(value)
+                        && result.add(value)
+                        && --n == 0) {
                         return result;
                     }
                 }
@@ -412,17 +416,14 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
         Object o;
         SortedSet<T> conflictSet;
 
-        for (int i = 0; i < size * REPLICAE_PER_BUCKET; i++) {
+        for (int i = 0; i < size * replicaePerBucket; i++) {
             point = twister.nextLong();
 
-            if (DEBUG) {
-                point = point % 1024;
-            }
             o = replicae.remove(point);
             if (o instanceof SortedSet) {
-                if (DEBUG) {
-                    System.err.println("Removing from " + point
-                                       + "  conflict set...");
+                if (log.isLoggable(Level.FINEST)) {
+                    log.finest(String.format("Removing %s from conflict set...",
+                                             point));
                 }
                 conflictSet = (SortedSet<T>) o;
                 conflictSet.remove(bucket);

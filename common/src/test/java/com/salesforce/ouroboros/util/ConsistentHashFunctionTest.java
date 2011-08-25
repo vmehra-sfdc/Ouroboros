@@ -36,7 +36,8 @@ public class ConsistentHashFunctionTest {
 
     @Test
     public void testAdd() {
-        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>();
+        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>(
+                                                                                200);
         final String o0 = "0", o1 = "1", o2 = "2";
         Random r = new Random(1);
 
@@ -75,7 +76,8 @@ public class ConsistentHashFunctionTest {
             bucket.add(Integer.toString(i));
         }
 
-        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>();
+        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>(
+                                                                                200);
 
         for (int i = 0; i < nBucket; i++) {
             chf.add(bucket.get(i), 1);
@@ -99,7 +101,8 @@ public class ConsistentHashFunctionTest {
 
     @Test
     public void testRemove() {
-        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>();
+        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>(
+                                                                                200);
         final String o0 = "0", o1 = "1", o2 = "2";
         Random r = new Random(1);
 
@@ -125,7 +128,8 @@ public class ConsistentHashFunctionTest {
     public void testSecondChance() {
         final Random r = new Random(1);
         int nBucket = 1 + r.nextInt(4);
-        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>();
+        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>(
+                                                                                200);
         for (int i = 0; i < nBucket; i++) {
             chf.add(Integer.toString(i), 1);
         }
@@ -157,7 +161,8 @@ public class ConsistentHashFunctionTest {
 
     @Test
     public void testSpecial() {
-        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>();
+        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>(
+                                                                                200);
         long sample = -3599839008849623859L;
         chf.add("0", 1);
         chf.add("1", 1);
@@ -186,7 +191,8 @@ public class ConsistentHashFunctionTest {
             bucket.add(Integer.toString(i));
         }
 
-        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>();
+        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>(
+                                                                                200);
 
         for (int i = 0; i < nBucket; i++) {
             chf.add(bucket.get(i), 1);
@@ -219,5 +225,4 @@ public class ConsistentHashFunctionTest {
             assertEquals(bucket.size(), chf.buckets().size());
         }
     }
-
 }
