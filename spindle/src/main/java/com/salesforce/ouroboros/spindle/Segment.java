@@ -72,7 +72,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.spi.AbstractInterruptibleChannel#close()
      */
     @Override
-    public final void close() throws IOException {
+    public void close() throws IOException {
         channel.close();
         raf.close();
     }
@@ -348,5 +348,16 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     public long write(ByteBuffer[] paramArrayOfByteBuffer, int paramInt1,
                       int paramInt2) throws IOException {
         return channel.write(paramArrayOfByteBuffer, paramInt1, paramInt2);
+    }
+
+    public long getPrefix() {
+        String name = file.getName();
+        int index = name.indexOf(EventChannel.SEGMENT_SUFFIX);
+        if (index == -1) {
+            throw new IllegalStateException(
+                                            String.format("Unable to find segment suffix in segment file name: %s",
+                                                          file.getAbsolutePath()));
+        }
+        return Long.parseLong(name.substring(0, index), 16);
     }
 }

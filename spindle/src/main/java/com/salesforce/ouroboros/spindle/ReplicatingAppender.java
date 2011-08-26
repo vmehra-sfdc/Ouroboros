@@ -59,8 +59,8 @@ public class ReplicatingAppender extends AbstractAppender {
      */
     @Override
     protected void headerRead(SocketChannel channel) {
-        if (Duplicator.log.isLoggable(Level.FINER)) {
-            Duplicator.log.finer(String.format("Header read, header=%s", header));
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Header read, header=%s", header));
         }
         eventChannel = bundle.eventChannelFor(header);
         if (log.isLoggable(Level.FINER)) {
