@@ -48,19 +48,19 @@ public class Xerox implements CommunicationsHandler {
         COPY, ERROR, FINISHED, HANDSHAKE, INITIALIZED, SEND_CLOSE, SEND_HEADER;
     }
 
-    public static final long              MAGIC       = 0x1638L;
-    private static final int              BUFFER_SIZE = 8 + 8 + 8;
-    private static final Logger           log         = Logger.getLogger(Xerox.class.getCanonicalName()); ;
+    public static final long                 MAGIC       = 0x1638L;
+    private static final int                 BUFFER_SIZE = 8 + 8 + 8;
+    private static final Logger              log         = Logger.getLogger(Xerox.class.getCanonicalName()); ;
 
-    private final ByteBuffer              buffer      = ByteBuffer.allocate(BUFFER_SIZE);
-    private final EventChannel            eventChannel;
-    private volatile Segment              current;
-    private volatile SocketChannelHandler handler;
-    private volatile long                 position;
-    private final Deque<Segment>          segments;
-    private volatile long                 segmentSize;
-    private volatile State                state;
-    private final long                    transferSize;
+    private final ByteBuffer                 buffer      = ByteBuffer.allocate(BUFFER_SIZE);
+    private final EventChannel               eventChannel;
+    private volatile Segment                 current;
+    private volatile SocketChannelHandler<?> handler;
+    private volatile long                    position;
+    private final Deque<Segment>             segments;
+    private volatile long                    segmentSize;
+    private volatile State                   state;
+    private final long                       transferSize;
 
     public Xerox(EventChannel channel, int transferSize) {
         eventChannel = channel;
@@ -71,17 +71,20 @@ public class Xerox implements CommunicationsHandler {
 
     @Override
     public void closing(SocketChannel channel) {
-        // TODO Auto-generated method stub
+    }
 
+    public State getState() {
+        return state;
     }
 
     @Override
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+    public void handleAccept(SocketChannel channel,
+                             SocketChannelHandler<?> handler) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void handleConnect(SocketChannel channel, SocketChannelHandler h) {
+    public void handleConnect(SocketChannel channel, SocketChannelHandler<?> h) {
         handler = h;
         switch (state) {
             case INITIALIZED: {
@@ -223,9 +226,5 @@ public class Xerox implements CommunicationsHandler {
                         String.format("Error closing: %s", segment), e1);
             }
         }
-    }
-
-    public State getState() {
-        return state;
     }
 }

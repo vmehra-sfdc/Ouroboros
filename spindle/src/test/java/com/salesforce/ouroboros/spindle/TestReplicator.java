@@ -51,7 +51,7 @@ public class TestReplicator {
     @Test
     public void testInboundEstablish() throws Exception {
         Bundle bundle = mock(Bundle.class);
-        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
 
         Replicator replicator = new Replicator(bundle);
@@ -77,7 +77,7 @@ public class TestReplicator {
     @Test
     public void testInboundEstablishError() throws Exception {
         Bundle bundle = mock(Bundle.class);
-        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
 
         Replicator replicator = new Replicator(bundle);
@@ -104,7 +104,7 @@ public class TestReplicator {
     @Test
     public void testOutboundEstablish() throws Exception {
         Bundle bundle = mock(Bundle.class);
-        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
 
         Replicator replicator = new Replicator(0x1638L, bundle);

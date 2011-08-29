@@ -65,7 +65,7 @@ public class TestAppender {
 
     @Test
     public void testAppend() throws Exception {
-        final SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        final SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("append", ".tst");
@@ -146,7 +146,7 @@ public class TestAppender {
 
     @Test
     public void testDuplicate() throws Exception {
-        final SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        final SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("duplicate", ".tst");
@@ -219,7 +219,7 @@ public class TestAppender {
     public void testMultiAppend() throws Exception {
         final File tmpFile = File.createTempFile("multi-append", ".tst");
         tmpFile.deleteOnExit();
-        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         final EventChannel eventChannel = mock(EventChannel.class);
         final Segment segment = new Segment(tmpFile);
         when(eventChannel.segmentFor(isA(EventHeader.class))).thenReturn(segment);

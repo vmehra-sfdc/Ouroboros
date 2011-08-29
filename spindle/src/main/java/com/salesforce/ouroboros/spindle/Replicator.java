@@ -61,18 +61,18 @@ public class Replicator implements CommunicationsHandler {
         ERROR, ESTABLISHED, INITIAL, OUTBOUND_HANDSHAKE, INBOUND_HANDSHAKE;
     }
 
-    private static final Logger           log            = Logger.getLogger(Replicator.class.getCanonicalName());
+    private static final Logger              log            = Logger.getLogger(Replicator.class.getCanonicalName());
 
-    private static final int              HANDSHAKE_SIZE = 16;
-    static final long             MAGIC          = 0x1638L;
+    private static final int                 HANDSHAKE_SIZE = 16;
+    static final long                        MAGIC          = 0x1638L;
 
-    private final ReplicatingAppender     appender;
-    private final Duplicator              duplicator;
-    private volatile State                state          = State.INITIAL;
-    private ByteBuffer                    handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private volatile long                 id;
-    private final Bundle                  bundle;
-    private volatile SocketChannelHandler handler;
+    private final ReplicatingAppender        appender;
+    private final Duplicator                 duplicator;
+    private volatile State                   state          = State.INITIAL;
+    private ByteBuffer                       handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private volatile long                    id;
+    private final Bundle                     bundle;
+    private volatile SocketChannelHandler<?> handler;
 
     public Replicator(Bundle bundle) {
         duplicator = new Duplicator();
@@ -117,7 +117,8 @@ public class Replicator implements CommunicationsHandler {
     }
 
     @Override
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+    public void handleAccept(SocketChannel channel,
+                             SocketChannelHandler<?> handler) {
         this.handler = handler;
         switch (state) {
             case ESTABLISHED: {
@@ -138,7 +139,7 @@ public class Replicator implements CommunicationsHandler {
 
     @Override
     public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler handler) {
+                              SocketChannelHandler<?> handler) {
         switch (state) {
             case ESTABLISHED: {
                 duplicator.handleConnect(channel, handler);

@@ -99,6 +99,17 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         channel.force(paramBoolean);
     }
 
+    public long getPrefix() {
+        String name = file.getName();
+        int index = name.indexOf(EventChannel.SEGMENT_SUFFIX);
+        if (index == -1) {
+            throw new IllegalStateException(
+                                            String.format("Unable to find segment suffix in segment file name: %s",
+                                                          file.getAbsolutePath()));
+        }
+        return Long.parseLong(name.substring(0, index), 16);
+    }
+
     /**
      * @return
      * @see java.lang.Object#hashCode()
@@ -348,16 +359,5 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     public long write(ByteBuffer[] paramArrayOfByteBuffer, int paramInt1,
                       int paramInt2) throws IOException {
         return channel.write(paramArrayOfByteBuffer, paramInt1, paramInt2);
-    }
-
-    public long getPrefix() {
-        String name = file.getName();
-        int index = name.indexOf(EventChannel.SEGMENT_SUFFIX);
-        if (index == -1) {
-            throw new IllegalStateException(
-                                            String.format("Unable to find segment suffix in segment file name: %s",
-                                                          file.getAbsolutePath()));
-        }
-        return Long.parseLong(name.substring(0, index), 16);
     }
 }

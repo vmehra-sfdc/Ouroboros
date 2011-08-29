@@ -120,7 +120,7 @@ public class TestDuplicator {
         event.write(segment);
         segment.write(payloadBuffer);
         segment.force(false);
-        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
 
         when(bundle.eventChannelFor(eq(event))).thenReturn(eventChannel);
         final Duplicator replicator = new Duplicator();
@@ -178,7 +178,7 @@ public class TestDuplicator {
 
     @Test
     public void testReplicationLoop() throws Exception {
-        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
 
         File inboundTmpFile = File.createTempFile("inbound-replication", ".tst");
         inboundTmpFile.deleteOnExit();

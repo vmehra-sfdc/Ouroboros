@@ -49,18 +49,18 @@ public final class Duplicator {
         INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_OFFSET;
     }
 
-    static final Logger                     log          = Logger.getLogger(Duplicator.class.getCanonicalName());
+    static final Logger                      log          = Logger.getLogger(Duplicator.class.getCanonicalName());
 
-    private volatile EventChannel           eventChannel;
-    private volatile SocketChannelHandler   handler;
-    private volatile long                   offset;
-    private final ByteBuffer                offsetBuffer = ByteBuffer.allocate(8);
-    private final BlockingQueue<EventEntry> pending      = new LinkedBlockingQueue<EventEntry>();
-    private volatile long                   position;
-    private volatile int                    remaining;
-    private volatile Segment                segment;
-    private final AtomicReference<State>    state        = new AtomicReference<State>(
-                                                                                      State.WAITING);
+    private volatile EventChannel            eventChannel;
+    private volatile SocketChannelHandler<?> handler;
+    private volatile long                    offset;
+    private final ByteBuffer                 offsetBuffer = ByteBuffer.allocate(8);
+    private final BlockingQueue<EventEntry>  pending      = new LinkedBlockingQueue<EventEntry>();
+    private volatile long                    position;
+    private volatile int                     remaining;
+    private volatile Segment                 segment;
+    private final AtomicReference<State>     state        = new AtomicReference<State>(
+                                                                                       State.WAITING);
 
     /**
      * @return the state of the outbound replicator
@@ -70,7 +70,7 @@ public final class Duplicator {
     }
 
     public void handleConnect(SocketChannel channel,
-                              final SocketChannelHandler handler) {
+                              final SocketChannelHandler<?> handler) {
         this.handler = handler;
     }
 

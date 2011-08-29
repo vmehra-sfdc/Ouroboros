@@ -25,6 +25,12 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import static junit.framework.Assert.assertEquals;
+import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
@@ -36,9 +42,6 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.spindle.Xerox.State;
-
-import static junit.framework.Assert.*;
-import static org.mockito.Mockito.*;
 
 /**
  * 
@@ -53,7 +56,7 @@ public class TestXerox {
         Segment segment1 = mock(Segment.class);
         Segment segment2 = mock(Segment.class);
         SocketChannel socket = mock(SocketChannel.class);
-        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         final UUID id = UUID.randomUUID();
         final long prefix1 = 77L;
         final long prefix2 = 1056L;

@@ -46,19 +46,19 @@ abstract public class AbstractAppender {
         ACCEPTED, APPEND, DEV_NULL, INITIALIZED, READ_HEADER, READ_OFFSET;
     }
 
-    private static final Logger             log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
+    private static final Logger                log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
 
-    protected final Bundle                  bundle;
-    protected volatile ByteBuffer           devNull;
-    protected volatile EventChannel         eventChannel;
-    protected volatile SocketChannelHandler handler;
-    protected final EventHeader             header   = new EventHeader(
-                                                                       ByteBuffer.allocate(EventHeader.HEADER_BYTE_SIZE));
-    protected volatile long                 offset;
-    protected volatile long                 position = -1L;
-    protected volatile long                 remaining;
-    protected volatile Segment              segment;
-    protected volatile State                state    = State.INITIALIZED;
+    protected final Bundle                     bundle;
+    protected volatile ByteBuffer              devNull;
+    protected volatile EventChannel            eventChannel;
+    protected volatile SocketChannelHandler<?> handler;
+    protected final EventHeader                header   = new EventHeader(
+                                                                          ByteBuffer.allocate(EventHeader.HEADER_BYTE_SIZE));
+    protected volatile long                    offset;
+    protected volatile long                    position = -1L;
+    protected volatile long                    remaining;
+    protected volatile Segment                 segment;
+    protected volatile State                   state    = State.INITIALIZED;
 
     public AbstractAppender(Bundle bundle) {
         super();
@@ -69,7 +69,8 @@ abstract public class AbstractAppender {
         return state;
     }
 
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+    public void handleAccept(SocketChannel channel,
+                             SocketChannelHandler<?> handler) {
         assert state == State.INITIALIZED;
         if (log.isLoggable(Level.FINER)) {
             log.finer("ACCEPT");

@@ -29,12 +29,13 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
-import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
@@ -48,46 +49,63 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * 
  */
 public class Weaver implements Bundle {
-    private class ReplicatorFactory implements CommunicationsHandlerFactory {
+
+    public enum State {
+        CREATED, INITIALIZED, RECOVERING, PARTITION_CHANGE, RUNNING;
+    }
+
+    private class ReplicatorFactory implements
+            CommunicationsHandlerFactory<Replicator> {
         @Override
-        public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
+        public Replicator createCommunicationsHandler(SocketChannel channel) {
             return new Replicator(Weaver.this);
         }
     }
 
-    private class SpindleFactory implements CommunicationsHandlerFactory {
+    private class SpindleFactory implements
+            CommunicationsHandlerFactory<Spinner> {
         @Override
-        public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
+        public Spinner createCommunicationsHandler(SocketChannel channel) {
             return new Spinner(Weaver.this);
         }
     }
 
-    private final long                              id;
-    private final long                              maxSegmentSize;
-    private final ConcurrentMap<UUID, EventChannel> openChannels = new ConcurrentHashMap<UUID, EventChannel>();
-    private final ConcurrentMap<Long, Replicator>   replicators  = new ConcurrentHashMap<Long, Replicator>();
-    private final ServerSocketChannelHandler        replicationHandler;
-    private final File                              root;
-    private final ServerSocketChannelHandler        spindleHandler;
-    private final ConsistentHashFunction<Long>      weaverRing   = new ConsistentHashFunction<Long>();
+    private final long                                   id;
+    private final long                                   maxSegmentSize;
+    private final ConcurrentMap<UUID, EventChannel>      openChannels = new ConcurrentHashMap<UUID, EventChannel>();
+    private final ConcurrentMap<Long, Replicator>        replicators  = new ConcurrentHashMap<Long, Replicator>();
+    private final ServerSocketChannelHandler<Replicator> replicationHandler;
+    private final File                                   root;
+    private final ServerSocketChannelHandler<Spinner>    spindleHandler;
+    private final AtomicReference<State>                 state        = new AtomicReference<Weaver.State>(
+                                                                                                          State.CREATED);
+    private final ConsistentHashFunction<Long>           weaverRing   = new ConsistentHashFunction<Long>();
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         id = configuration.getId();
         weaverRing.add(id, 1);
         root = configuration.getRoot();
         maxSegmentSize = configuration.getMaxSegmentSize();
-        replicationHandler = new ServerSocketChannelHandler(
-                                                            "Weaver Replicator",
-                                                            configuration.getReplicationSocketOptions(),
-                                                            configuration.getReplicationAddress(),
-                                                            Executors.newFixedThreadPool(2),
-                                                            new ReplicatorFactory());
-        spindleHandler = new ServerSocketChannelHandler(
-                                                        "Weaver Spindle",
-                                                        configuration.getSpindleSocketOptions(),
-                                                        configuration.getSpindleAddress(),
-                                                        configuration.getSpindles(),
-                                                        new SpindleFactory());
+        replicationHandler = new ServerSocketChannelHandler<Replicator>(
+                                                                        "Weaver Replicator",
+                                                                        configuration.getReplicationSocketOptions(),
+                                                                        configuration.getReplicationAddress(),
+                                                                        Executors.newFixedThreadPool(2),
+                                                                        new ReplicatorFactory());
+        spindleHandler = new ServerSocketChannelHandler<Spinner>(
+                                                                 "Weaver Spindle",
+                                                                 configuration.getSpindleSocketOptions(),
+                                                                 configuration.getSpindleAddress(),
+                                                                 configuration.getSpindles(),
+                                                                 new SpindleFactory());
+        state.set(State.INITIALIZED);
+    }
+
+    public void close(UUID channel) {
+        EventChannel eventChannel = openChannels.remove(channel);
+        if (channel != null) {
+            eventChannel.close();
+        }
     }
 
     @Override
@@ -104,17 +122,25 @@ public class Weaver implements Bundle {
         return spindleHandler.getLocalAddress();
     }
 
-    public void close(UUID channel) {
-        EventChannel eventChannel = openChannels.remove(channel);
-        if (channel != null) {
-            eventChannel.close();
-        }
+    public State getState() {
+        return state.get();
     }
 
     public void open(UUID channel) {
         openChannels.putIfAbsent(channel,
                                  new EventChannel(channel, root,
                                                   maxSegmentSize, null));
+    }
+
+    /**
+     * The partition has changed.
+     * 
+     * @param weavers
+     *            - the mapping between the weaver's id and the socket address
+     *            for that weaver's replication endpoint
+     */
+    public void partitionChange(Map<Long, InetSocketAddress> weavers) {
+        state.set(State.PARTITION_CHANGE);
     }
 
     @Override
@@ -132,6 +158,7 @@ public class Weaver implements Bundle {
         replicationHandler.terminate();
     }
 
+    @Override
     public String toString() {
         return String.format("Weaver[%s], spindle endpoint: %s, replicator endpoint: %s",
                              id, getSpindleEndpoint(), getReplicatorEndpoint());

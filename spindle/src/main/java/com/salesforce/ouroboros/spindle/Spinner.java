@@ -58,13 +58,14 @@ public class Spinner implements CommunicationsHandler {
     }
 
     @Override
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+    public void handleAccept(SocketChannel channel,
+                             SocketChannelHandler<?> handler) {
         appender.handleAccept(channel, handler);
     }
 
     @Override
     public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler handler) {
+                              SocketChannelHandler<?> handler) {
         throw new UnsupportedOperationException();
     }
 
