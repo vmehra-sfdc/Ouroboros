@@ -20,12 +20,14 @@ package com.salesforce.ouroboros.util;
  */
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -183,7 +185,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
     /** The cached key set of {@link #replicae}. */
     final protected Set<Entry<Long, Object>> entrySet;
     /** Maps points in the unit interval to buckets. */
-    final protected Map<Long, Object>        replicae         = new TreeMap<Long, Object>();
+    final protected SortedMap<Long, Object>  replicae         = new TreeMap<Long, Object>();
     /** For each bucket, its size. */
     final protected Map<T, Integer>          sizes            = new HashMap<T, Integer>();
     /** The optional strategy to skip buckets, or <code>null</code>. */
@@ -315,16 +317,15 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
 
     public List<T> hash(long point, int n) {
         if (n == 0 || buckets.size() == 0) {
-            return new ArrayList<T>();
+            return Collections.emptyList();
         }
 
         final ArrayList<T> result = new ArrayList<T>();
 
-        for (int pass = 2; pass-- != 0;) {
-            for (Entry<Long, Object> entry : replicae.entrySet()) {
-                if (pass == 1 && entry.getKey().longValue() < point) {
-                    continue;
-                }
+        for (int pass = 1; pass < 3; pass++) {
+            Map<Long, Object> map = pass == 1 ? replicae.tailMap(point)
+                                             : replicae.headMap(point);
+            for (Entry<Long, Object> entry : map.entrySet()) {
                 if (entry.getValue() instanceof SortedSet) {
                     @SuppressWarnings("unchecked")
                     SortedSet<T> value = (SortedSet<T>) entry.getValue();
@@ -438,6 +439,10 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
         }
 
         return true;
+    }
+
+    public int size() {
+        return sizes.size();
     }
 
     @Override

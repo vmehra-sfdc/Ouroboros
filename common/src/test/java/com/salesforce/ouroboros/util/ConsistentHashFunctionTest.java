@@ -97,6 +97,27 @@ public class ConsistentHashFunctionTest {
             }
             chf.remove(b);
         }
+        System.out.println();
+    }
+
+    @Test
+    public void testPerf() {
+        ConsistentHashFunction<Integer> ring = new ConsistentHashFunction<Integer>();
+        Random r = new Random(0x1638);
+        while (ring.size() < 100) {
+            int bucket = r.nextInt();
+            if (bucket > 0) {
+                ring.add(bucket, 1);
+            }
+        }
+
+        long now = System.currentTimeMillis();
+        int points = 1000000;
+        for (int i = 0; i < points; i++) {
+            ring.hash(r.nextLong());
+        }
+        System.out.println(String.format("Time to hash %s points: %s ms", points,
+                                         System.currentTimeMillis() - now));
     }
 
     @Test
