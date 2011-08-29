@@ -38,7 +38,7 @@ import com.hellblazer.pinkie.SocketOptions;
  * 
  */
 public class WeaverConfigation {
-    private long                id;
+    private int                 id;
     private long                maxSegmentSize;
     private InetSocketAddress   replicationAddress;
     private int                 replicationQueueSize     = 100;
@@ -51,7 +51,7 @@ public class WeaverConfigation {
     /**
      * @return the id
      */
-    public long getId() {
+    public int getId() {
         return id;
     }
 
@@ -115,7 +115,7 @@ public class WeaverConfigation {
      * @param id
      *            the id to set
      */
-    public void setId(long id) {
+    public void setId(int id) {
         this.id = id;
     }
 

@@ -63,14 +63,14 @@ public class Replicator implements CommunicationsHandler {
 
     private static final Logger              log            = Logger.getLogger(Replicator.class.getCanonicalName());
 
-    private static final int                 HANDSHAKE_SIZE = 16;
+    private static final int                 HANDSHAKE_SIZE = 8 + 4;
     static final long                        MAGIC          = 0x1638L;
 
     private final ReplicatingAppender        appender;
     private final Duplicator                 duplicator;
     private volatile State                   state          = State.INITIAL;
     private ByteBuffer                       handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private volatile long                    id;
+    private volatile int                     id;
     private final Bundle                     bundle;
     private volatile SocketChannelHandler<?> handler;
 
@@ -80,14 +80,18 @@ public class Replicator implements CommunicationsHandler {
         this.bundle = bundle;
     }
 
-    public Replicator(long id, Bundle bundle) {
+    public Replicator(int id, Bundle bundle) {
         duplicator = new Duplicator();
         appender = new ReplicatingAppender(bundle);
         this.id = id;
         this.bundle = bundle;
         handshake.putLong(MAGIC);
-        handshake.putLong(id);
+        handshake.putInt(id);
         handshake.flip();
+    }
+
+    public void close() {
+        handler.close();
     }
 
     @Override
@@ -107,6 +111,10 @@ public class Replicator implements CommunicationsHandler {
      */
     public Duplicator getDuplicator() {
         return duplicator;
+    }
+
+    public long getId() {
+        return id;
     }
 
     /**
@@ -212,7 +220,7 @@ public class Replicator implements CommunicationsHandler {
                 handler.close();
                 return;
             }
-            id = handshake.getLong();
+            id = handshake.getInt();
             bundle.registerReplicator(id, this);
             duplicator.handleConnect(channel, handler);
             state = State.ESTABLISHED;

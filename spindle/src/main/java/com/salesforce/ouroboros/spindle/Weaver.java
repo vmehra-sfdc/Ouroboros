@@ -70,16 +70,17 @@ public class Weaver implements Bundle {
         }
     }
 
-    private final long                                   id;
+    private final int                                    id;
     private final long                                   maxSegmentSize;
-    private final ConcurrentMap<UUID, EventChannel>      openChannels = new ConcurrentHashMap<UUID, EventChannel>();
-    private final ConcurrentMap<Long, Replicator>        replicators  = new ConcurrentHashMap<Long, Replicator>();
+    private final ConcurrentMap<UUID, EventChannel>      openChannels  = new ConcurrentHashMap<UUID, EventChannel>();
+    private final ConcurrentMap<Integer, Replicator>     replicators   = new ConcurrentHashMap<Integer, Replicator>();
     private final ServerSocketChannelHandler<Replicator> replicationHandler;
     private final File                                   root;
     private final ServerSocketChannelHandler<Spinner>    spindleHandler;
-    private final AtomicReference<State>                 state        = new AtomicReference<Weaver.State>(
-                                                                                                          State.CREATED);
-    private final ConsistentHashFunction<Long>           weaverRing   = new ConsistentHashFunction<Long>();
+    private final ConcurrentMap<UUID, Object>            subscriptions = new ConcurrentHashMap<UUID, Object>();
+    private final AtomicReference<State>                 state         = new AtomicReference<Weaver.State>(
+                                                                                                           State.CREATED);
+    private final ConsistentHashFunction<Integer>        weaverRing    = new ConsistentHashFunction<Integer>();
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         id = configuration.getId();
@@ -137,14 +138,45 @@ public class Weaver implements Bundle {
      * 
      * @param weavers
      *            - the mapping between the weaver's id and the socket address
-     *            for that weaver's replication endpoint
+     *            for this weaver's replication endpoint
      */
-    public void partitionChange(Map<Long, InetSocketAddress> weavers) {
+    public void partitionChange(Map<Integer, InetSocketAddress> weavers) {
         state.set(State.PARTITION_CHANGE);
+
+        // Clear out members that are not part of the partition
+        for (Map.Entry<Integer, Replicator> entry : replicators.entrySet()) {
+            Integer weaverId = entry.getKey();
+            if (!weavers.containsKey(weaverId)) {
+                entry.getValue().close();
+                replicators.remove(weaverId);
+                weaverRing.remove(weaverId);
+            }
+        }
+        // Add the new weavers in the partition
+        for (Map.Entry<Integer, InetSocketAddress> entry : weavers.entrySet()) {
+            Integer weaverId = entry.getKey();
+            if (!replicators.containsKey(weaverId)) {
+                weaverRing.add(weaverId, 1);
+                if (thisEndInitiatesConnectionsTo(weaverId)) {
+
+                }
+            }
+        }
+    }
+
+    /**
+     * indicates which end initiates a connection to a given node
+     * 
+     * @param target
+     *            - the other end of the intended connection
+     * @return - true if this end initiates the connection, false otherwise
+     */
+    private boolean thisEndInitiatesConnectionsTo(int target) {
+        return id < target;
     }
 
     @Override
-    public void registerReplicator(long id, Replicator replicator) {
+    public void registerReplicator(int id, Replicator replicator) {
         replicators.put(id, replicator);
     }
 
