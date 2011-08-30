@@ -26,9 +26,12 @@ import static junit.framework.Assert.assertTrue;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Random;
 
 import org.junit.Test;
+
+import com.salesforce.ouroboros.util.ConsistentHashFunction.SkipStrategy;
 
 //RELEASE-STATUS: DIST
 
@@ -65,6 +68,30 @@ public class ConsistentHashFunctionTest {
         assertTrue(found0);
         assertTrue(found1);
         assertTrue(found2);
+    }
+
+    @Test
+    public void testClone() {
+        SkipStrategy<String> strategy = new SkipStrategy<String>() {
+            @Override
+            public boolean isSkippable(List<String> previous, String bucket) {
+                return false;
+            }
+        };
+        ConsistentHashFunction<String> chf = new ConsistentHashFunction<String>(
+                                                                                strategy,
+                                                                                200);
+        Random r = new Random(0x1638);
+        while (chf.size() < 100) {
+            chf.add(Integer.toString(r.nextInt()), Math.max(1, r.nextInt(5)));
+        }
+
+        ConsistentHashFunction<String> dupe = chf.clone();
+        assertEquals(chf.size(), dupe.size());
+        for (Entry<String, Integer> entry : chf.sizes.entrySet()) {
+            assertEquals(chf.sizes.get(entry.getKey()),
+                         dupe.sizes.get(entry.getKey()));
+        }
     }
 
     @Test
@@ -116,8 +143,9 @@ public class ConsistentHashFunctionTest {
         for (int i = 0; i < points; i++) {
             ring.hash(r.nextLong());
         }
-        System.out.println(String.format("Time to hash %s points: %s ms", points,
-                                         System.currentTimeMillis() - now));
+        System.out.println(String.format("Time to hash %s points: %s ms",
+                                         points, System.currentTimeMillis()
+                                                 - now));
     }
 
     @Test

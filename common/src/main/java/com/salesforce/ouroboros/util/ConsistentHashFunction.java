@@ -143,7 +143,8 @@ import java.util.logging.Logger;
  * 
  */
 
-public final class ConsistentHashFunction<T extends Comparable<? super T>> {
+public final class ConsistentHashFunction<T extends Comparable<? super T>>
+        implements Cloneable {
 
     /**
      * Allows to skip suitable items when searching for the closest replica.
@@ -459,5 +460,15 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
     @Override
     public String toString() {
         return replicae.toString();
+    }
+
+    public ConsistentHashFunction<T> clone() {
+        ConsistentHashFunction<T> dupe = new ConsistentHashFunction<T>(
+                                                                       skipStrategy,
+                                                                       replicaePerBucket);
+        for (Entry<T, Integer> entry : sizes.entrySet()) {
+            dupe.add(entry.getKey(), entry.getValue());
+        }
+        return dupe;
     }
 }
