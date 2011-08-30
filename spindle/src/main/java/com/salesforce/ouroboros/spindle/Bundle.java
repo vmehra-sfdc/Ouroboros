@@ -49,5 +49,5 @@ public interface Bundle {
      * @param id
      * @param replicator
      */
-    void registerReplicator(int id, Replicator replicator);
+    void registerReplicator(Node id, Replicator replicator);
 }

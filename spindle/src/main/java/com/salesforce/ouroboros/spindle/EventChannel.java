@@ -33,9 +33,12 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 
 /**
  * The representation of the event channel. A channel is a logical collection of
@@ -135,7 +138,7 @@ public class EventChannel {
             log.severe(msg);
             throw new IllegalStateException(msg);
         }
-        this.duplicator = replicator;
+        duplicator = replicator;
     }
 
     public void append(EventHeader header, long offset) {
@@ -262,10 +265,14 @@ public class EventChannel {
      * 
      * @param replica
      *            - the weaver id of the replica
+     * @param deadMembers
+     *            - the member set containing the ids of members who are no
+     *            longer part of the partition
+     * @return
      */
-    public void makePrimary(Integer replica) {
+    public Xerox makePrimary(Node replica, NodeIdSet deadMembers) {
         // TODO Auto-generated method stub
-
+        return null;
     }
 
     /**
@@ -274,10 +281,15 @@ public class EventChannel {
      * synchronization must occur between the pair.
      * 
      * @param primary
+     *            - the weaver id of the primary
+     * @param deadMembers
+     *            - the member set containing the ids of members who are no
+     *            longer part of the partition
+     * @return
      */
-    public void makeSecondary(Integer primary) {
+    public Xerox makeSecondary(Node primary, NodeIdSet deadMembers) {
         // TODO Auto-generated method stub
-
+        return null;
     }
 
     public long nextOffset() {
@@ -359,5 +371,10 @@ public class EventChannel {
                                           n.getAbsolutePath()));
             }
         }
+    }
+
+    public Xerox transferControl(List<Node> pair, NodeIdSet deadMembers) {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

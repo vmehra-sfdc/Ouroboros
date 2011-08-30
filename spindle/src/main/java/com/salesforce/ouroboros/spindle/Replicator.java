@@ -63,14 +63,14 @@ public class Replicator implements CommunicationsHandler {
 
     private static final Logger              log            = Logger.getLogger(Replicator.class.getCanonicalName());
 
-    private static final int                 HANDSHAKE_SIZE = 8 + 4;
-    static final long                        MAGIC          = 0x1638L;
+    static final int                         HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
+    static final int                         MAGIC          = 0x1638;
 
     private final ReplicatingAppender        appender;
     private final Duplicator                 duplicator;
     private volatile State                   state          = State.INITIAL;
     private ByteBuffer                       handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private volatile int                     id;
+    private volatile Node                    id;
     private final Bundle                     bundle;
     private volatile SocketChannelHandler<?> handler;
 
@@ -80,13 +80,13 @@ public class Replicator implements CommunicationsHandler {
         this.bundle = bundle;
     }
 
-    public Replicator(int id, Bundle bundle) {
+    public Replicator(Node id, Bundle bundle) {
         duplicator = new Duplicator();
         appender = new ReplicatingAppender(bundle);
         this.id = id;
         this.bundle = bundle;
-        handshake.putLong(MAGIC);
-        handshake.putInt(id);
+        handshake.putInt(MAGIC);
+        id.serialize(handshake);
         handshake.flip();
     }
 
@@ -113,7 +113,7 @@ public class Replicator implements CommunicationsHandler {
         return duplicator;
     }
 
-    public long getId() {
+    public Node getId() {
         return id;
     }
 
@@ -212,7 +212,7 @@ public class Replicator implements CommunicationsHandler {
         }
         if (!handshake.hasRemaining()) {
             handshake.flip();
-            long magic = handshake.getLong();
+            int magic = handshake.getInt();
             if (MAGIC != magic) {
                 state = State.ERROR;
                 log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
@@ -220,7 +220,7 @@ public class Replicator implements CommunicationsHandler {
                 handler.close();
                 return;
             }
-            id = handshake.getInt();
+            id = new Node(handshake);
             bundle.registerReplicator(id, this);
             duplicator.handleConnect(channel, handler);
             state = State.ESTABLISHED;

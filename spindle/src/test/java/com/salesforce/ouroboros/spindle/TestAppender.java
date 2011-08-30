@@ -245,7 +245,7 @@ public class TestAppender {
             }
 
             @Override
-            public void registerReplicator(int id, Replicator replicator) {
+            public void registerReplicator(Node id, Replicator replicator) {
                 throw new UnsupportedOperationException();
             }
         };

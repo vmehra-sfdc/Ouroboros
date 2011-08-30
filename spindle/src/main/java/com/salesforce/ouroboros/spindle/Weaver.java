@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -41,6 +42,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
@@ -79,17 +82,17 @@ public class Weaver implements Bundle {
 
     private static final Logger                          log           = Logger.getLogger(Weaver.class.getCanonicalName());
 
-    private final int                                    id;
+    private final Node                                   id;
     private final long                                   maxSegmentSize;
     private final ConcurrentMap<UUID, EventChannel>      channels      = new ConcurrentHashMap<UUID, EventChannel>();
-    private final ConcurrentMap<Integer, Replicator>     replicators   = new ConcurrentHashMap<Integer, Replicator>();
+    private final ConcurrentMap<Node, Replicator>        replicators   = new ConcurrentHashMap<Node, Replicator>();
     private final ServerSocketChannelHandler<Replicator> replicationHandler;
     private final File                                   root;
     private final ServerSocketChannelHandler<Spinner>    spindleHandler;
     private final AtomicReference<State>                 state         = new AtomicReference<Weaver.State>(
                                                                                                            State.CREATED);
     private final Set<UUID>                              subscriptions = new HashSet<UUID>();
-    private final ConsistentHashFunction<Integer>        weaverRing    = new ConsistentHashFunction<Integer>();
+    private final ConsistentHashFunction<Node>           weaverRing    = new ConsistentHashFunction<Node>();
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         id = configuration.getId();
@@ -147,7 +150,7 @@ public class Weaver implements Bundle {
      *         occured during the adjustment to the partitioning event,
      *         requiring the partition to be disolved and reestablished
      */
-    public boolean partition(Map<Integer, InetSocketAddress> weavers) {
+    public boolean partition(Map<Node, InetSocketAddress> weavers) {
         state.set(State.PARTITION);
 
         // Clear out members that are not part of the partition
@@ -161,8 +164,65 @@ public class Weaver implements Bundle {
     }
 
     @Override
-    public void registerReplicator(int id, Replicator replicator) {
+    public void registerReplicator(Node id, Replicator replicator) {
         replicators.put(id, replicator);
+    }
+
+    public void rehashChannels(NodeIdSet newMembers,
+                               NodeIdSet survivingMembers, NodeIdSet deadMembers) {
+        if (state.compareAndSet(State.PARTITION, State.REHASHING)) {
+            String msg = String.format("Attempt to rehash when not in the PARTITION state: %s",
+                                       state.get());
+            log.severe(msg);
+            throw new IllegalStateException(msg);
+        }
+
+        List<Xerox> copiers = new LinkedList<Xerox>();
+
+        for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
+            final UUID channelId = entry.getKey();
+            final EventChannel channel = entry.getValue();
+
+            List<Node> pair = weaverRing.hash(point(channelId), 2);
+            Xerox xerox;
+            if (pair.get(0).equals(id)) {
+                xerox = channel.makePrimary(pair.get(1), deadMembers);
+            } else if (pair.get(1).equals(id)) {
+                xerox = channel.makeSecondary(pair.get(0), deadMembers);
+            } else {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine(String.format("Weaver[%s] is no longer the primary or secondary for: %s",
+                                           id, channelId));
+                }
+                xerox = channel.transferControl(pair, deadMembers);
+            }
+            if (xerox != null) {
+                copiers.add(xerox);
+            }
+        }
+
+        for (UUID channel : subscriptions) {
+            if (!channels.containsKey(channel)) {
+                List<Node> pair = weaverRing.hash(point(channel), 2);
+                if (pair.get(0).equals(id)) {
+                    EventChannel ec = new EventChannel(
+                                                       EventChannel.Role.PRIMARY,
+                                                       channel,
+                                                       root,
+                                                       maxSegmentSize,
+                                                       replicators.get(pair.get(1)).getDuplicator());
+                    channels.put(channel, ec);
+                } else if (pair.get(1).equals(id)) {
+                    EventChannel ec = new EventChannel(
+                                                       EventChannel.Role.MIRROR,
+                                                       channel,
+                                                       root,
+                                                       maxSegmentSize,
+                                                       replicators.get(pair.get(0)).getDuplicator());
+                    channels.put(channel, ec);
+                }
+            }
+        }
     }
 
     public void start() {
@@ -181,9 +241,9 @@ public class Weaver implements Bundle {
                              id, getSpindleEndpoint(), getReplicatorEndpoint());
     }
 
-    private void clearDefunctMembers(Map<Integer, InetSocketAddress> weavers) {
-        for (Entry<Integer, Replicator> entry : replicators.entrySet()) {
-            Integer weaverId = entry.getKey();
+    private void clearDefunctMembers(Map<Node, InetSocketAddress> weavers) {
+        for (Entry<Node, Replicator> entry : replicators.entrySet()) {
+            Node weaverId = entry.getKey();
             if (!weavers.containsKey(weaverId)) {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Weaver[%s] is no longer a member of the partition",
@@ -196,9 +256,9 @@ public class Weaver implements Bundle {
         }
     }
 
-    private boolean establishNewMembers(Map<Integer, InetSocketAddress> weavers) {
-        for (Entry<Integer, InetSocketAddress> entry : weavers.entrySet()) {
-            Integer weaverId = entry.getKey();
+    private boolean establishNewMembers(Map<Node, InetSocketAddress> weavers) {
+        for (Entry<Node, InetSocketAddress> entry : weavers.entrySet()) {
+            Node weaverId = entry.getKey();
             if (!replicators.containsKey(weaverId)) {
                 if (log.isLoggable(Level.INFO)) {
                     log.fine(String.format("Adding new weaver[%s] to the partition",
@@ -234,54 +294,6 @@ public class Weaver implements Bundle {
         return true;
     }
 
-    public void rehashChannels() {
-        if (state.compareAndSet(State.PARTITION, State.REHASHING)) {
-            String msg = String.format("Attempt to rehash when not in the PARTITION state: %s",
-                                       state.get());
-            log.severe(msg);
-            throw new IllegalStateException(msg);
-        }
-
-        for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
-            List<Integer> pair = weaverRing.hash(point(entry.getKey()), 2);
-            if (pair.get(0).equals(id)) {
-                entry.getValue().makePrimary(pair.get(1));
-            } else if (pair.get(1).equals(id)) {
-                entry.getValue().makeSecondary(pair.get(0));
-            } else {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine(String.format("Weaver[%s] is no longer the primary or secondary for: %s",
-                                           id, entry.getKey()));
-                }
-                channels.remove(entry.getKey());
-                entry.getValue().close();
-            }
-        }
-
-        for (UUID channel : subscriptions) {
-            if (!channels.containsKey(channel)) {
-                List<Integer> pair = weaverRing.hash(point(channel), 2);
-                if (pair.get(0).equals(id)) {
-                    EventChannel ec = new EventChannel(
-                                                       EventChannel.Role.PRIMARY,
-                                                       channel,
-                                                       root,
-                                                       maxSegmentSize,
-                                                       replicators.get(pair.get(1)).getDuplicator());
-                    channels.put(channel, ec);
-                } else if (pair.get(1).equals(id)) {
-                    EventChannel ec = new EventChannel(
-                                                       EventChannel.Role.MIRROR,
-                                                       channel,
-                                                       root,
-                                                       maxSegmentSize,
-                                                       replicators.get(pair.get(0)).getDuplicator());
-                    channels.put(channel, ec);
-                }
-            }
-        }
-    }
-
     private long point(UUID id) {
         return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
     }
@@ -293,7 +305,7 @@ public class Weaver implements Bundle {
      *            - the other end of the intended connection
      * @return - true if this end initiates the connection, false otherwise
      */
-    private boolean thisEndInitiatesConnectionsTo(int target) {
-        return id < target;
+    private boolean thisEndInitiatesConnectionsTo(Node target) {
+        return id.compareTo(target) < 0;
     }
 }

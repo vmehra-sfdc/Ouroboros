@@ -112,7 +112,7 @@ public class ConsistentHashFunctionTest {
         }
 
         long now = System.currentTimeMillis();
-        int points = 1000000;
+        int points = 10000000;
         for (int i = 0; i < points; i++) {
             ring.hash(r.nextLong());
         }

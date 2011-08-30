@@ -53,6 +53,7 @@ public class TestReplicator {
         Bundle bundle = mock(Bundle.class);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
+        final Node node = new Node(0x1639, 0x1640, 0x1650);
 
         Replicator replicator = new Replicator(bundle);
 
@@ -60,9 +61,9 @@ public class TestReplicator {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                buffer.putLong(Replicator.MAGIC);
-                buffer.putInt(0x1639);
-                return 14;
+                buffer.putInt(Replicator.MAGIC);
+                node.serialize(buffer);
+                return Replicator.HANDSHAKE_SIZE;
             }
         }).when(socketChannel).read(isA(ByteBuffer.class));
 
@@ -71,7 +72,7 @@ public class TestReplicator {
         assertEquals(State.INBOUND_HANDSHAKE, replicator.getState());
         replicator.handleRead(socketChannel);
         assertEquals(State.ESTABLISHED, replicator.getState());
-        verify(bundle).registerReplicator(0x1639, replicator);
+        verify(bundle).registerReplicator(node, replicator);
     }
 
     @Test
@@ -79,6 +80,7 @@ public class TestReplicator {
         Bundle bundle = mock(Bundle.class);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
+        final Node node = new Node(0x1639, 0x1640, 0x1650);
 
         Replicator replicator = new Replicator(bundle);
 
@@ -86,9 +88,9 @@ public class TestReplicator {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                buffer.putLong(Replicator.MAGIC + 1);
-                buffer.putInt(0x1638);
-                return 14;
+                buffer.putInt(Replicator.MAGIC + 1);
+                node.serialize(buffer);
+                return Replicator.HANDSHAKE_SIZE;
             }
         }).when(socketChannel).read(isA(ByteBuffer.class));
 
@@ -106,16 +108,17 @@ public class TestReplicator {
         Bundle bundle = mock(Bundle.class);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
+        final Node node = new Node(0x1639, 0x1640, 0x1650);
 
-        Replicator replicator = new Replicator(0x1639, bundle);
+        Replicator replicator = new Replicator(node, bundle);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                assertEquals(Replicator.MAGIC, buffer.getLong());
-                assertEquals(0x1639, buffer.getInt());
-                return 14;
+                assertEquals(Replicator.MAGIC, buffer.getInt());
+                assertEquals(node, new Node(buffer));
+                return Replicator.HANDSHAKE_SIZE;
             }
         }).when(socketChannel).write(isA(ByteBuffer.class));
 
@@ -124,6 +127,6 @@ public class TestReplicator {
         assertEquals(State.OUTBOUND_HANDSHAKE, replicator.getState());
         replicator.handleWrite(socketChannel);
         assertEquals(State.ESTABLISHED, replicator.getState());
-        verify(bundle).registerReplicator(0x1639, replicator);
+        verify(bundle).registerReplicator(node, replicator);
     }
 }
