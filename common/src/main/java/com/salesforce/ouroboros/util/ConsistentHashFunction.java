@@ -320,7 +320,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>> {
             return Collections.emptyList();
         }
 
-        final ArrayList<T> result = new ArrayList<T>();
+        final ArrayList<T> result = new ArrayList<T>(n);
 
         for (int pass = 1; pass < 3; pass++) {
             Map<Long, Object> map = pass == 1 ? replicae.tailMap(point)
