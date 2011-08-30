@@ -119,11 +119,13 @@ public class EventChannel {
     private volatile long    lastTimestamp;
     private final long       maxSegmentSize;
     private volatile long    nextOffset;
-    private final Duplicator replicator;
+    private final Duplicator duplicator;
+    private Role             role;
     private volatile State   state;
 
-    public EventChannel(final UUID channelId, final File root,
+    public EventChannel(Role role, final UUID channelId, final File root,
                         final long maxSegmentSize, final Duplicator replicator) {
+        this.role = role;
         id = channelId;
         channel = new File(root, id.toString().replace('-', '/'));
         this.maxSegmentSize = maxSegmentSize;
@@ -133,7 +135,7 @@ public class EventChannel {
             log.severe(msg);
             throw new IllegalStateException(msg);
         }
-        this.replicator = replicator;
+        this.duplicator = replicator;
     }
 
     public void append(EventHeader header, long offset) {
@@ -150,7 +152,7 @@ public class EventChannel {
      */
     public void append(EventHeader header, long offset, Segment segment) {
         append(header, offset);
-        replicator.replicate(this, offset, segment, header.totalSize());
+        duplicator.replicate(this, offset, segment, header.totalSize());
     }
 
     /**
@@ -186,6 +188,10 @@ public class EventChannel {
      */
     public UUID getId() {
         return id;
+    }
+
+    public Role getRole() {
+        return role;
     }
 
     /**
@@ -246,6 +252,32 @@ public class EventChannel {
      */
     public boolean isNextAppend(long offset) {
         return nextOffset == offset;
+    }
+
+    /**
+     * The receiver is now the primary replica of the channel. If the receiver
+     * is not already the primary or the indicated replica is not the current
+     * replia of the receiver, then a synchronization must occur between the
+     * pair.
+     * 
+     * @param replica
+     *            - the weaver id of the replica
+     */
+    public void makePrimary(Integer replica) {
+        // TODO Auto-generated method stub
+
+    }
+
+    /**
+     * The receiver is now the replica of the channel. If the receiver is not
+     * already the replica or if the receiver is the primary, then a
+     * synchronization must occur between the pair.
+     * 
+     * @param primary
+     */
+    public void makeSecondary(Integer primary) {
+        // TODO Auto-generated method stub
+
     }
 
     public long nextOffset() {
