@@ -43,10 +43,13 @@ public class WeaverConfigation {
     private InetSocketAddress   replicationAddress;
     private int                 replicationQueueSize     = 100;
     private final SocketOptions replicationSocketOptions = new SocketOptions();
+    private Executor            replicators;
     private File                root;
     private InetSocketAddress   spindleAddress;
     private Executor            spindles;
     private final SocketOptions spindleSocketOptions     = new SocketOptions();
+    private Executor            xeroxes;
+    private final SocketOptions xeroxSocketOptions       = new SocketOptions();
 
     /**
      * @return the id
@@ -84,6 +87,13 @@ public class WeaverConfigation {
     }
 
     /**
+     * @return the replicators
+     */
+    public Executor getReplicators() {
+        return replicators;
+    }
+
+    /**
      * @return the root
      */
     public File getRoot() {
@@ -109,6 +119,20 @@ public class WeaverConfigation {
      */
     public SocketOptions getSpindleSocketOptions() {
         return spindleSocketOptions;
+    }
+
+    /**
+     * @return the xeroxes
+     */
+    public Executor getXeroxes() {
+        return xeroxes;
+    }
+
+    /**
+     * @return the xeroxSocketOptions
+     */
+    public SocketOptions getXeroxSocketOptions() {
+        return xeroxSocketOptions;
     }
 
     /**
@@ -144,6 +168,14 @@ public class WeaverConfigation {
     }
 
     /**
+     * @param replicators
+     *            the replicators to set
+     */
+    public void setReplicators(Executor replicators) {
+        this.replicators = replicators;
+    }
+
+    /**
      * @param root
      *            the root to set
      */
@@ -165,5 +197,13 @@ public class WeaverConfigation {
      */
     public void setSpindles(Executor spindles) {
         this.spindles = spindles;
+    }
+
+    /**
+     * @param xeroxes
+     *            the xeroxes to set
+     */
+    public void setXeroxes(Executor xeroxes) {
+        this.xeroxes = xeroxes;
     }
 }

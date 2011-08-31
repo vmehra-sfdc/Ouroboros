@@ -40,11 +40,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
@@ -93,6 +94,7 @@ public class Weaver implements Bundle {
                                                                                                            State.CREATED);
     private final Set<UUID>                              subscriptions = new HashSet<UUID>();
     private final ConsistentHashFunction<Node>           weaverRing    = new ConsistentHashFunction<Node>();
+    private final ChannelHandler<Xerox>                  xeroxHandler;
     private final Map<Node, ContactInfomation>           yellowPages   = new HashMap<Node, ContactInfomation>();
 
     public Weaver(WeaverConfigation configuration) throws IOException {
@@ -100,11 +102,15 @@ public class Weaver implements Bundle {
         weaverRing.add(id, 1);
         root = configuration.getRoot();
         maxSegmentSize = configuration.getMaxSegmentSize();
+        xeroxHandler = new ChannelHandler<Xerox>(
+                                                 "Weaver Xerox",
+                                                 configuration.getXeroxSocketOptions(),
+                                                 configuration.getXeroxes());
         replicationHandler = new ServerSocketChannelHandler<Replicator>(
                                                                         "Weaver Replicator",
                                                                         configuration.getReplicationSocketOptions(),
                                                                         configuration.getReplicationAddress(),
-                                                                        Executors.newFixedThreadPool(2),
+                                                                        configuration.getReplicators(),
                                                                         new ReplicatorFactory());
         spindleHandler = new ServerSocketChannelHandler<Spinner>(
                                                                  "Weaver Spindle",
@@ -144,8 +150,19 @@ public class Weaver implements Bundle {
         return weaverRing;
     }
 
-    public void partition(Collection<Node> deadMembers,
-                          Map<Node, ContactInfomation> newMembers) {
+    /**
+     * The weaver membership has partitioned. Clear out the dead members,
+     * accomidate the new members and normalize the state
+     * 
+     * @param deadMembers
+     *            - the weaver nodes that have failed and are no longer part of
+     *            the partition
+     * @param newMembers
+     *            - the new weaver nodes that are now part of the partition
+     * @return the previous consistent hash ring for this weaver
+     */
+    public ConsistentHashFunction<Node> partition(Collection<Node> deadMembers,
+                                                  Map<Node, ContactInfomation> newMembers) {
         ConsistentHashFunction<Node> previousRing = weaverRing.clone();
         for (Node node : deadMembers) {
             if (log.isLoggable(Level.INFO)) {
@@ -186,7 +203,7 @@ public class Weaver implements Bundle {
                 }
             }
         }
-        rehashChannels(previousRing);
+        return previousRing;
     }
 
     @Override
@@ -195,18 +212,20 @@ public class Weaver implements Bundle {
     }
 
     /**
-     * Rehash the channel distribution on the weaver partition.
-     * 
-     * @param previousRing
-     *            - the previous weaver ring
+     * Rehash the subscription channel distribution on the weaver partition. Do
+     * not rehash any subscriptions that are already handled by the receiver, as
+     * these will be handled in
+     * {@link #rehashExistingChannels(ConsistentHashFunction)}
      */
-    public void rehashChannels(ConsistentHashFunction<Node> previousRing) {
-        rehashExistingChannels(previousRing);
-        // Now rehash the subscriptions
+    public void rehashSubscriptions() {
         for (UUID channel : subscriptions) {
             if (!channels.containsKey(channel)) {
                 List<Node> pair = weaverRing.hash(point(channel), 2);
                 if (pair.get(0).equals(id)) {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.fine(String.format("Weaver[%s] is now the primary for: %s, waiting for xerox",
+                                               id, channel));
+                    }
                     EventChannel ec = new EventChannel(
                                                        EventChannel.Role.PRIMARY,
                                                        channel,
@@ -215,6 +234,10 @@ public class Weaver implements Bundle {
                                                        replicators.get(pair.get(1)));
                     channels.put(channel, ec);
                 } else if (pair.get(1).equals(id)) {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.fine(String.format("Weaver[%s] is now the secondary for: %s, waiting for xerox",
+                                               id, channel));
+                    }
                     EventChannel ec = new EventChannel(
                                                        EventChannel.Role.MIRROR,
                                                        channel,
@@ -225,6 +248,51 @@ public class Weaver implements Bundle {
                 }
             }
         }
+    }
+
+    /**
+     * Rehash the existing channels that are currently maintained (either
+     * primary or mirror) on the recevier
+     * 
+     * @param previousRing
+     *            the previous weaver ring mapping
+     * @return the CountDownLatch for synchronizing with any state transfer
+     */
+    public CountDownLatch rehashExistingChannels(ConsistentHashFunction<Node> previousRing) {
+        LinkedList<Xerox> xeroxes = new LinkedList<Xerox>();
+        for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
+            final UUID channelId = entry.getKey();
+            final EventChannel channel = entry.getValue();
+            long channelPoint = point(channelId);
+            List<Node> pair = weaverRing.hash(channelPoint, 2);
+            if (pair.get(0).equals(id)) {
+                // This node is the primary for the channel
+                partitionPrimary(channelId, channel, pair, xeroxes);
+            } else if (pair.get(1).equals(id)) {
+                // This node is the mirror for the channel
+                partitionMirror(channelId, channel, pair, xeroxes);
+            } else {
+                // The new partition has a new primary and mirror for the channel
+                partitionNewPrimaryAndMirror(channelId,
+                                             channel,
+                                             previousRing.hash(channelPoint, 2),
+                                             pair, xeroxes);
+            }
+        }
+        CountDownLatch latch = new CountDownLatch(xeroxes.size());
+        for (Xerox xerox : xeroxes) {
+            xerox.setLatch(latch);
+            InetSocketAddress endpoint = yellowPages.get(xerox.getNode()).xerox;
+            try {
+                xeroxHandler.connectTo(endpoint, xerox);
+            } catch (IOException e) {
+                String msg = String.format("Cannot connect from: weaver[%s] to xerox on weaver[%s], endpoint: %s",
+                                           id, xerox.getNode(), endpoint);
+                log.log(Level.SEVERE, msg, e);
+                throw new IllegalStateException(msg, e);
+            }
+        }
+        return latch;
     }
 
     public void start() {
@@ -327,36 +395,6 @@ public class Weaver implements Bundle {
 
     private long point(UUID id) {
         return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
-    }
-
-    /**
-     * Rehash the existing channels that are currently maintained (either
-     * primary or mirror) on the recevier
-     * 
-     * @param previousRing
-     *            the previous weaver ring mapping
-     */
-    private void rehashExistingChannels(ConsistentHashFunction<Node> previousRing) {
-        for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
-            final UUID channelId = entry.getKey();
-            final EventChannel channel = entry.getValue();
-            LinkedList<Xerox> xeroxes = new LinkedList<Xerox>();
-            long channelPoint = point(channelId);
-            List<Node> pair = weaverRing.hash(channelPoint, 2);
-            if (pair.get(0).equals(id)) {
-                // This node is the primary for the channel
-                partitionPrimary(channelId, channel, pair, xeroxes);
-            } else if (pair.get(1).equals(id)) {
-                // This node is the mirror for the channel
-                partitionMirror(channelId, channel, pair, xeroxes);
-            } else {
-                // The new partition has a new primary and mirror for the channel
-                partitionNewPrimaryAndMirror(channelId,
-                                             channel,
-                                             previousRing.hash(channelPoint, 2),
-                                             pair, xeroxes);
-            }
-        }
     }
 
     /**

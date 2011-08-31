@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Deque;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -50,19 +51,20 @@ public class Xerox implements CommunicationsHandler {
 
     public static final long                 MAGIC             = 0x1638L;
     private static final int                 BUFFER_SIZE       = 8 + 8 + 8;
-    private static final Logger              log               = Logger.getLogger(Xerox.class.getCanonicalName());
     private static final int                 DEFAULT_TXFR_SIZE = 16 * 1024;
+    private static final Logger              log               = Logger.getLogger(Xerox.class.getCanonicalName());
 
     private final ByteBuffer                 buffer            = ByteBuffer.allocate(BUFFER_SIZE);
-    private final EventChannel               eventChannel;
     private volatile Segment                 current;
+    private final EventChannel               eventChannel;
     private volatile SocketChannelHandler<?> handler;
+    private CountDownLatch                   latch;
+    private final Node                       node;
     private volatile long                    position;
     private final Deque<Segment>             segments;
     private volatile long                    segmentSize;
     private volatile State                   state;
     private final long                       transferSize;
-    private final Node                       node;
 
     public Xerox(Node toNode, EventChannel channel) {
         this(toNode, channel, DEFAULT_TXFR_SIZE);
@@ -143,6 +145,14 @@ public class Xerox implements CommunicationsHandler {
         }
     }
 
+    /**
+     * @param latch
+     *            the latch to set
+     */
+    public void setLatch(CountDownLatch latch) {
+        this.latch = latch;
+    }
+
     private void copy(SocketChannel channel) {
         long written;
         try {
@@ -206,6 +216,7 @@ public class Xerox implements CommunicationsHandler {
         position = 0;
         if (segments.isEmpty()) {
             state = State.FINISHED;
+            latch.countDown();
             return;
         }
         current = segments.pop();
