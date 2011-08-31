@@ -57,6 +57,8 @@ public class TestXerox {
         Segment segment2 = mock(Segment.class);
         SocketChannel socket = mock(SocketChannel.class);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
+        Node node = new Node(0x1639, 0x1640, 0x1641);
+
         final UUID id = UUID.randomUUID();
         final long prefix1 = 77L;
         final long prefix2 = 1056L;
@@ -108,7 +110,7 @@ public class TestXerox {
         when(segment2.size()).thenReturn(size2);
 
         int transferSize = 1024;
-        Xerox xerox = new Xerox(channel, transferSize);
+        Xerox xerox = new Xerox(node, channel, transferSize);
         assertEquals(State.INITIALIZED, xerox.getState());
         xerox.handleConnect(socket, handler);
         assertEquals(State.HANDSHAKE, xerox.getState());

@@ -29,6 +29,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -42,8 +44,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
@@ -93,6 +93,7 @@ public class Weaver implements Bundle {
                                                                                                            State.CREATED);
     private final Set<UUID>                              subscriptions = new HashSet<UUID>();
     private final ConsistentHashFunction<Node>           weaverRing    = new ConsistentHashFunction<Node>();
+    private final Map<Node, ContactInfomation>           yellowPages   = new HashMap<Node, ContactInfomation>();
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         id = configuration.getId();
@@ -139,28 +140,53 @@ public class Weaver implements Bundle {
         return state.get();
     }
 
-    /**
-     * The system has successfully partitioned. Adjust tracking state of other
-     * weavein
-     * 
-     * @param weavers
-     *            - the mapping between the weaver's id and the socket address
-     *            for this weaver's replication endpoint
-     * @return true, if the partitioning was successful, false if an error
-     *         occured during the adjustment to the partitioning event,
-     *         requiring the partition to be disolved and reestablished
-     */
-    public boolean partition(Map<Node, InetSocketAddress> weavers) {
-        state.set(State.PARTITION);
+    public ConsistentHashFunction<Node> getWeaverRing() {
+        return weaverRing;
+    }
 
-        // Clear out members that are not part of the partition
-        clearDefunctMembers(weavers);
-        // Add the new weavers in the partition
-        if (!establishNewMembers(weavers)) {
-            return false;
+    public void partition(Collection<Node> deadMembers,
+                          Map<Node, ContactInfomation> newMembers) {
+        ConsistentHashFunction<Node> previousRing = weaverRing.clone();
+        for (Node node : deadMembers) {
+            if (log.isLoggable(Level.INFO)) {
+                log.fine(String.format("Removing weaver[%s] from the partition",
+                                       node));
+            }
+            yellowPages.remove(node);
+            Replicator replicator = replicators.remove(node);
+            if (replicators != null) {
+                replicator.close();
+            }
         }
-
-        return true;
+        yellowPages.putAll(newMembers);
+        for (Entry<Node, ContactInfomation> entry : newMembers.entrySet()) {
+            Node node = entry.getKey();
+            weaverRing.add(node, 1);
+            Replicator replicator = new Replicator(node, this);
+            if (thisEndInitiatesConnectionsTo(node)) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.fine(String.format("Initiating connection from weaver[%s] to new weaver[%s]",
+                                           id, node));
+                }
+                try {
+                    replicationHandler.connectTo(entry.getValue().replication,
+                                                 replicator);
+                } catch (IOException e) {
+                    // We be screwed.  Log this #fail and force a repartition event
+                    String msg = String.format("Unable to connect to weaver: %s at replicator port: %s",
+                                               entry.getKey(), entry.getValue());
+                    log.log(Level.SEVERE, msg, e);
+                    throw new IllegalStateException(msg, e);
+                }
+                replicators.put(node, replicator);
+            } else {
+                if (log.isLoggable(Level.INFO)) {
+                    log.fine(String.format("Waiting for connection to weaver[%s] from new weaver[%s]",
+                                           id, node));
+                }
+            }
+        }
+        rehashChannels(previousRing);
     }
 
     @Override
@@ -168,39 +194,15 @@ public class Weaver implements Bundle {
         replicators.put(id, replicator);
     }
 
-    public void rehashChannels(NodeIdSet newMembers,
-                               NodeIdSet survivingMembers, NodeIdSet deadMembers) {
-        if (state.compareAndSet(State.PARTITION, State.REHASHING)) {
-            String msg = String.format("Attempt to rehash when not in the PARTITION state: %s",
-                                       state.get());
-            log.severe(msg);
-            throw new IllegalStateException(msg);
-        }
-
-        List<Xerox> copiers = new LinkedList<Xerox>();
-
-        for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
-            final UUID channelId = entry.getKey();
-            final EventChannel channel = entry.getValue();
-
-            List<Node> pair = weaverRing.hash(point(channelId), 2);
-            Xerox xerox;
-            if (pair.get(0).equals(id)) {
-                xerox = channel.makePrimary(pair.get(1), deadMembers);
-            } else if (pair.get(1).equals(id)) {
-                xerox = channel.makeSecondary(pair.get(0), deadMembers);
-            } else {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine(String.format("Weaver[%s] is no longer the primary or secondary for: %s",
-                                           id, channelId));
-                }
-                xerox = channel.transferControl(pair, deadMembers);
-            }
-            if (xerox != null) {
-                copiers.add(xerox);
-            }
-        }
-
+    /**
+     * Rehash the channel distribution on the weaver partition.
+     * 
+     * @param previousRing
+     *            - the previous weaver ring
+     */
+    public void rehashChannels(ConsistentHashFunction<Node> previousRing) {
+        rehashExistingChannels(previousRing);
+        // Now rehash the subscriptions
         for (UUID channel : subscriptions) {
             if (!channels.containsKey(channel)) {
                 List<Node> pair = weaverRing.hash(point(channel), 2);
@@ -210,7 +212,7 @@ public class Weaver implements Bundle {
                                                        channel,
                                                        root,
                                                        maxSegmentSize,
-                                                       replicators.get(pair.get(1)).getDuplicator());
+                                                       replicators.get(pair.get(1)));
                     channels.put(channel, ec);
                 } else if (pair.get(1).equals(id)) {
                     EventChannel ec = new EventChannel(
@@ -218,7 +220,7 @@ public class Weaver implements Bundle {
                                                        channel,
                                                        root,
                                                        maxSegmentSize,
-                                                       replicators.get(pair.get(0)).getDuplicator());
+                                                       replicators.get(pair.get(0)));
                     channels.put(channel, ec);
                 }
             }
@@ -241,61 +243,120 @@ public class Weaver implements Bundle {
                              id, getSpindleEndpoint(), getReplicatorEndpoint());
     }
 
-    private void clearDefunctMembers(Map<Node, InetSocketAddress> weavers) {
-        for (Entry<Node, Replicator> entry : replicators.entrySet()) {
-            Node weaverId = entry.getKey();
-            if (!weavers.containsKey(weaverId)) {
+    /*
+     * This weaver is the mirror of the channel in the new partition
+     */
+    private void partitionMirror(final UUID channelId,
+                                 final EventChannel channel, List<Node> pair,
+                                 LinkedList<Xerox> xeroxes) {
+        switch (channel.getRole()) {
+            case PRIMARY: {
+                // The circle has a new primary, make this node the mirror and xerox the state
                 if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Weaver[%s] is no longer a member of the partition",
-                                           weaverId));
+                    log.info(String.format("New primary for %s has been determined and is: %s",
+                                           channelId, pair.get(1)));
                 }
-                entry.getValue().close();
-                replicators.remove(weaverId);
-                weaverRing.remove(weaverId);
+                channel.setMirror();
+                xeroxes.add(new Xerox(pair.get(0), channel));
+            }
+            case MIRROR: {
+                if (!channel.getReplicator().getId().equals(pair.get(0))) {
+                    // The primary for this channel has died, xerox state to the new primary
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Mirror for %s has died, new mirror: %s",
+                                               channelId, pair.get(1)));
+                    }
+                    xeroxes.add(new Xerox(pair.get(0), channel));
+                }
             }
         }
     }
 
-    private boolean establishNewMembers(Map<Node, InetSocketAddress> weavers) {
-        for (Entry<Node, InetSocketAddress> entry : weavers.entrySet()) {
-            Node weaverId = entry.getKey();
-            if (!replicators.containsKey(weaverId)) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.fine(String.format("Adding new weaver[%s] to the partition",
-                                           weaverId));
-                }
-                weaverRing.add(weaverId, 1);
-                Replicator replicator = new Replicator(weaverId, this);
-                if (thisEndInitiatesConnectionsTo(weaverId)) {
-                    if (log.isLoggable(Level.INFO)) {
-                        log.fine(String.format("Initiating connection from weaver[%s] to new weaver[%s]",
-                                               id, weaverId));
-                    }
-                    try {
-                        replicationHandler.connectTo(entry.getValue(),
-                                                     replicator);
-                    } catch (IOException e) {
-                        // We screwed.  Log this #fail and force a repartition event
-                        log.log(Level.SEVERE,
-                                String.format("Unable to connect to weaver: %s at replicator port: %s",
-                                              entry.getKey(), entry.getValue()),
-                                e);
-                        return false;
-                    }
-                    replicators.put(weaverId, replicator);
-                } else {
-                    if (log.isLoggable(Level.INFO)) {
-                        log.fine(String.format("Waiting for connection to weaver[%s] from new weaver[%s]",
-                                               id, weaverId));
-                    }
-                }
+    /*
+     * The new partition has created a new primary and mirror for the channel.
+     */
+    private void partitionNewPrimaryAndMirror(UUID channelId,
+                                              EventChannel channel,
+                                              List<Node> oldPair,
+                                              List<Node> newPair,
+                                              LinkedList<Xerox> xeroxes) {
+        if (log.isLoggable(Level.FINE)) {
+            log.fine(String.format("Weaver[%s] is no longer the primary or secondary for: %s",
+                                   id, channelId));
+        }
+        switch (channel.getRole()) {
+            case PRIMARY: {
+
+            }
+            case MIRROR: {
+
             }
         }
-        return true;
+    }
+
+    /*
+     * This weaver is the primary of the channel in the new partition
+     */
+    private void partitionPrimary(final UUID channelId,
+                                  final EventChannel channel, List<Node> pair,
+                                  List<Xerox> xeroxes) {
+        switch (channel.getRole()) {
+            case PRIMARY: {
+                if (!channel.getReplicator().getId().equals(pair.get(1))) {
+                    // The mirror for this channel has died, xerox state to the new mirror
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Mirror for %s has died, new mirror: %s",
+                                               channelId, pair.get(1)));
+                    }
+                    xeroxes.add(new Xerox(pair.get(1), channel));
+                }
+                break;
+            }
+            case MIRROR: {
+                // This node is now the primary for the channel, xerox state to the new mirror
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Weaver[%s] assuming primary role for: %s, mirror is %s",
+                                           id, channelId, pair.get(1)));
+                }
+                channel.setPrimary();
+                xeroxes.add(new Xerox(pair.get(1), channel));
+            }
+                break;
+        }
     }
 
     private long point(UUID id) {
         return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
+    }
+
+    /**
+     * Rehash the existing channels that are currently maintained (either
+     * primary or mirror) on the recevier
+     * 
+     * @param previousRing
+     *            the previous weaver ring mapping
+     */
+    private void rehashExistingChannels(ConsistentHashFunction<Node> previousRing) {
+        for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
+            final UUID channelId = entry.getKey();
+            final EventChannel channel = entry.getValue();
+            LinkedList<Xerox> xeroxes = new LinkedList<Xerox>();
+            long channelPoint = point(channelId);
+            List<Node> pair = weaverRing.hash(channelPoint, 2);
+            if (pair.get(0).equals(id)) {
+                // This node is the primary for the channel
+                partitionPrimary(channelId, channel, pair, xeroxes);
+            } else if (pair.get(1).equals(id)) {
+                // This node is the mirror for the channel
+                partitionMirror(channelId, channel, pair, xeroxes);
+            } else {
+                // The new partition has a new primary and mirror for the channel
+                partitionNewPrimaryAndMirror(channelId,
+                                             channel,
+                                             previousRing.hash(channelPoint, 2),
+                                             pair, xeroxes);
+            }
+        }
     }
 
     /**

@@ -33,12 +33,9 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 
 /**
  * The representation of the event channel. A channel is a logical collection of
@@ -122,12 +119,12 @@ public class EventChannel {
     private volatile long    lastTimestamp;
     private final long       maxSegmentSize;
     private volatile long    nextOffset;
-    private final Duplicator duplicator;
+    private final Replicator replicator;
     private Role             role;
     private volatile State   state;
 
     public EventChannel(Role role, final UUID channelId, final File root,
-                        final long maxSegmentSize, final Duplicator replicator) {
+                        final long maxSegmentSize, final Replicator replicator) {
         this.role = role;
         id = channelId;
         channel = new File(root, id.toString().replace('-', '/'));
@@ -138,7 +135,7 @@ public class EventChannel {
             log.severe(msg);
             throw new IllegalStateException(msg);
         }
-        duplicator = replicator;
+        this.replicator = replicator;
     }
 
     public void append(EventHeader header, long offset) {
@@ -155,7 +152,7 @@ public class EventChannel {
      */
     public void append(EventHeader header, long offset, Segment segment) {
         append(header, offset);
-        duplicator.replicate(this, offset, segment, header.totalSize());
+        replicator.replicate(this, offset, segment, header.totalSize());
     }
 
     /**
@@ -191,6 +188,13 @@ public class EventChannel {
      */
     public UUID getId() {
         return id;
+    }
+
+    /**
+     * @return the replicator
+     */
+    public Replicator getReplicator() {
+        return replicator;
     }
 
     public Role getRole() {
@@ -255,41 +259,6 @@ public class EventChannel {
      */
     public boolean isNextAppend(long offset) {
         return nextOffset == offset;
-    }
-
-    /**
-     * The receiver is now the primary replica of the channel. If the receiver
-     * is not already the primary or the indicated replica is not the current
-     * replia of the receiver, then a synchronization must occur between the
-     * pair.
-     * 
-     * @param replica
-     *            - the weaver id of the replica
-     * @param deadMembers
-     *            - the member set containing the ids of members who are no
-     *            longer part of the partition
-     * @return
-     */
-    public Xerox makePrimary(Node replica, NodeIdSet deadMembers) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    /**
-     * The receiver is now the replica of the channel. If the receiver is not
-     * already the replica or if the receiver is the primary, then a
-     * synchronization must occur between the pair.
-     * 
-     * @param primary
-     *            - the weaver id of the primary
-     * @param deadMembers
-     *            - the member set containing the ids of members who are no
-     *            longer part of the partition
-     * @return
-     */
-    public Xerox makeSecondary(Node primary, NodeIdSet deadMembers) {
-        // TODO Auto-generated method stub
-        return null;
     }
 
     public long nextOffset() {
@@ -357,6 +326,14 @@ public class EventChannel {
         }
     }
 
+    public void setPrimary() {
+        role = Role.PRIMARY;
+    }
+
+    public void setMirror() {
+        role = Role.MIRROR;
+    }
+
     private String appendSegmentNameFor(int eventSize, long maxSegmentSize) {
         return segmentName(segmentFor(nextOffset, eventSize, maxSegmentSize));
     }
@@ -371,10 +348,5 @@ public class EventChannel {
                                           n.getAbsolutePath()));
             }
         }
-    }
-
-    public Xerox transferControl(List<Node> pair, NodeIdSet deadMembers) {
-        // TODO Auto-generated method stub
-        return null;
     }
 }

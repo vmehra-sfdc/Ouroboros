@@ -48,11 +48,12 @@ public class Xerox implements CommunicationsHandler {
         COPY, ERROR, FINISHED, HANDSHAKE, INITIALIZED, SEND_CLOSE, SEND_HEADER;
     }
 
-    public static final long                 MAGIC       = 0x1638L;
-    private static final int                 BUFFER_SIZE = 8 + 8 + 8;
-    private static final Logger              log         = Logger.getLogger(Xerox.class.getCanonicalName()); ;
+    public static final long                 MAGIC             = 0x1638L;
+    private static final int                 BUFFER_SIZE       = 8 + 8 + 8;
+    private static final Logger              log               = Logger.getLogger(Xerox.class.getCanonicalName());
+    private static final int                 DEFAULT_TXFR_SIZE = 16 * 1024;
 
-    private final ByteBuffer                 buffer      = ByteBuffer.allocate(BUFFER_SIZE);
+    private final ByteBuffer                 buffer            = ByteBuffer.allocate(BUFFER_SIZE);
     private final EventChannel               eventChannel;
     private volatile Segment                 current;
     private volatile SocketChannelHandler<?> handler;
@@ -61,8 +62,14 @@ public class Xerox implements CommunicationsHandler {
     private volatile long                    segmentSize;
     private volatile State                   state;
     private final long                       transferSize;
+    private final Node                       node;
 
-    public Xerox(EventChannel channel, int transferSize) {
+    public Xerox(Node toNode, EventChannel channel) {
+        this(toNode, channel, DEFAULT_TXFR_SIZE);
+    }
+
+    public Xerox(Node toNode, EventChannel channel, int transferSize) {
+        node = toNode;
         eventChannel = channel;
         this.transferSize = transferSize;
         segments = channel.getSegmentStack();
@@ -71,6 +78,13 @@ public class Xerox implements CommunicationsHandler {
 
     @Override
     public void closing(SocketChannel channel) {
+    }
+
+    /**
+     * @return the node
+     */
+    public Node getNode() {
+        return node;
     }
 
     public State getState() {

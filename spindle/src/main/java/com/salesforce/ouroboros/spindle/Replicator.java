@@ -245,4 +245,9 @@ public class Replicator implements CommunicationsHandler {
             state = State.ESTABLISHED;
         }
     }
+
+    public void replicate(EventChannel eventChannel, long offset,
+                          Segment segment, int totalSize) {
+        duplicator.replicate(eventChannel, offset, segment, totalSize);
+    }
 }

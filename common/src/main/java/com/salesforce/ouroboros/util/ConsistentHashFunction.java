@@ -287,6 +287,31 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
         return buckets;
     }
 
+    @Override
+    public ConsistentHashFunction<T> clone() {
+        ConsistentHashFunction<T> dupe = new ConsistentHashFunction<T>(
+                                                                       skipStrategy,
+                                                                       replicaePerBucket);
+        for (Entry<T, Integer> entry : sizes.entrySet()) {
+            dupe.add(entry.getKey(), entry.getValue());
+        }
+        return dupe;
+    }
+
+    /**
+     * @return the replicaePerBucket
+     */
+    public int getReplicaePerBucket() {
+        return replicaePerBucket;
+    }
+
+    /**
+     * @return the skipStrategy
+     */
+    public SkipStrategy<T> getSkipStrategy() {
+        return skipStrategy;
+    }
+
     /**
      * Returns the bucket of the replica that is closest to the given point.
      * 
@@ -460,15 +485,5 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
     @Override
     public String toString() {
         return replicae.toString();
-    }
-
-    public ConsistentHashFunction<T> clone() {
-        ConsistentHashFunction<T> dupe = new ConsistentHashFunction<T>(
-                                                                       skipStrategy,
-                                                                       replicaePerBucket);
-        for (Entry<T, Integer> entry : sizes.entrySet()) {
-            dupe.add(entry.getKey(), entry.getValue());
-        }
-        return dupe;
     }
 }
