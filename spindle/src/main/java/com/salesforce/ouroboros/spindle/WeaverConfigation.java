@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.spindle;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 import com.hellblazer.pinkie.SocketOptions;
 
@@ -40,6 +41,8 @@ import com.hellblazer.pinkie.SocketOptions;
 public class WeaverConfigation {
     private Node                id;
     private long                maxSegmentSize;
+    private long                partitionTimeout;
+    private TimeUnit            partitionTimeoutUnit;
     private InetSocketAddress   replicationAddress;
     private int                 replicationQueueSize     = 100;
     private final SocketOptions replicationSocketOptions = new SocketOptions();
@@ -64,6 +67,20 @@ public class WeaverConfigation {
      */
     public long getMaxSegmentSize() {
         return maxSegmentSize;
+    }
+
+    /**
+     * @return the partitionTimeout
+     */
+    public long getPartitionTimeout() {
+        return partitionTimeout;
+    }
+
+    /**
+     * @return the partitionTimeoutUnit
+     */
+    public TimeUnit getPartitionTimeoutUnit() {
+        return partitionTimeoutUnit;
     }
 
     /**
@@ -157,6 +174,22 @@ public class WeaverConfigation {
      */
     public void setMaxSegmentSize(long maxSegmentSize) {
         this.maxSegmentSize = maxSegmentSize;
+    }
+
+    /**
+     * @param partitionTimeout
+     *            the partitionTimeout to set
+     */
+    public void setPartitionTimeout(long partitionTimeout) {
+        this.partitionTimeout = partitionTimeout;
+    }
+
+    /**
+     * @param partitionTimeoutUnit
+     *            the partitionTimeoutUnit to set
+     */
+    public void setPartitionTimeoutUnit(TimeUnit partitionTimeoutUnit) {
+        this.partitionTimeoutUnit = partitionTimeoutUnit;
     }
 
     /**
