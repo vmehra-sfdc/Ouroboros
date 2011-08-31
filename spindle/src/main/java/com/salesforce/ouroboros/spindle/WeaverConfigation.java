@@ -48,6 +48,7 @@ public class WeaverConfigation {
     private InetSocketAddress   spindleAddress;
     private Executor            spindles;
     private final SocketOptions spindleSocketOptions     = new SocketOptions();
+    private String              stateName;
     private Executor            xeroxes;
     private final SocketOptions xeroxSocketOptions       = new SocketOptions();
 
@@ -119,6 +120,13 @@ public class WeaverConfigation {
      */
     public SocketOptions getSpindleSocketOptions() {
         return spindleSocketOptions;
+    }
+
+    /**
+     * @return the stateName
+     */
+    public String getStateName() {
+        return stateName;
     }
 
     /**
@@ -197,6 +205,14 @@ public class WeaverConfigation {
      */
     public void setSpindles(Executor spindles) {
         this.spindles = spindles;
+    }
+
+    /**
+     * @param stateName
+     *            the stateName to set
+     */
+    public void setStateName(String stateName) {
+        this.stateName = stateName;
     }
 
     /**

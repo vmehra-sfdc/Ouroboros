@@ -41,9 +41,14 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.smartfrog.services.anubis.locator.AnubisListener;
+import org.smartfrog.services.anubis.locator.AnubisLocator;
+import org.smartfrog.services.anubis.locator.AnubisProvider;
+import org.smartfrog.services.anubis.locator.AnubisStability;
+import org.smartfrog.services.anubis.locator.AnubisValue;
 
 import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
@@ -59,11 +64,6 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * 
  */
 public class Weaver implements Bundle {
-
-    public enum State {
-        CREATED, INITIALIZED, RECOVERING, PARTITION, REBALANCING, RUNNING,
-        REHASHING;
-    }
 
     private class ReplicatorFactory implements
             CommunicationsHandlerFactory<Replicator> {
@@ -81,23 +81,64 @@ public class Weaver implements Bundle {
         }
     }
 
+    /**
+     * 
+     * Provides the distributed orchestration for the weaver processes
+     * 
+     */
+    class Orchestrator extends AnubisListener {
+        private class Stability extends AnubisStability {
+            @Override
+            public void stability(boolean isStable, long timeRef) {
+            }
+        }
+
+        private final AnubisLocator  locator;
+        private final AnubisProvider stateProvider;
+        private final Stability      stability;
+
+        public Orchestrator(String stateName, AnubisLocator anubisLocator) {
+            super(stateName);
+            locator = anubisLocator;
+            stateProvider = new AnubisProvider(stateName);
+            stability = new Stability();
+            locator.registerStability(stability);
+            locator.registerProvider(stateProvider);
+            locator.registerListener(this);
+        }
+
+        @Override
+        public void newValue(AnubisValue value) {
+            if (value.getValue() == null) {
+                return; // Initial value
+            }
+        }
+
+        @Override
+        public void removeValue(AnubisValue value) {
+            // TODO Auto-generated method stub
+
+        }
+    }
+
     private static final Logger                          log           = Logger.getLogger(Weaver.class.getCanonicalName());
 
+    private final ConcurrentMap<UUID, EventChannel>      channels      = new ConcurrentHashMap<UUID, EventChannel>();
     private final Node                                   id;
     private final long                                   maxSegmentSize;
-    private final ConcurrentMap<UUID, EventChannel>      channels      = new ConcurrentHashMap<UUID, EventChannel>();
-    private final ConcurrentMap<Node, Replicator>        replicators   = new ConcurrentHashMap<Node, Replicator>();
+    private final Orchestrator                           orchestrator;
     private final ServerSocketChannelHandler<Replicator> replicationHandler;
+    private final ConcurrentMap<Node, Replicator>        replicators   = new ConcurrentHashMap<Node, Replicator>();
     private final File                                   root;
     private final ServerSocketChannelHandler<Spinner>    spindleHandler;
-    private final AtomicReference<State>                 state         = new AtomicReference<Weaver.State>(
-                                                                                                           State.CREATED);
     private final Set<UUID>                              subscriptions = new HashSet<UUID>();
     private final ConsistentHashFunction<Node>           weaverRing    = new ConsistentHashFunction<Node>();
     private final ChannelHandler<Xerox>                  xeroxHandler;
     private final Map<Node, ContactInfomation>           yellowPages   = new HashMap<Node, ContactInfomation>();
 
-    public Weaver(WeaverConfigation configuration) throws IOException {
+    public Weaver(WeaverConfigation configuration, AnubisLocator locator)
+                                                                         throws IOException {
+        orchestrator = new Orchestrator(configuration.getStateName(), locator);
         id = configuration.getId();
         weaverRing.add(id, 1);
         root = configuration.getRoot();
@@ -118,7 +159,6 @@ public class Weaver implements Bundle {
                                                                  configuration.getSpindleAddress(),
                                                                  configuration.getSpindles(),
                                                                  new SpindleFactory());
-        state.set(State.INITIALIZED);
     }
 
     public void close(UUID channel) {
@@ -132,22 +172,6 @@ public class Weaver implements Bundle {
     public EventChannel eventChannelFor(EventHeader header) {
         UUID channelTag = header.getChannel();
         return channels.get(channelTag);
-    }
-
-    public InetSocketAddress getReplicatorEndpoint() {
-        return replicationHandler.getLocalAddress();
-    }
-
-    public InetSocketAddress getSpindleEndpoint() {
-        return spindleHandler.getLocalAddress();
-    }
-
-    public State getState() {
-        return state.get();
-    }
-
-    public ConsistentHashFunction<Node> getWeaverRing() {
-        return weaverRing;
     }
 
     /**
@@ -212,45 +236,6 @@ public class Weaver implements Bundle {
     }
 
     /**
-     * Rehash the subscription channel distribution on the weaver partition. Do
-     * not rehash any subscriptions that are already handled by the receiver, as
-     * these will be handled in
-     * {@link #rehashExistingChannels(ConsistentHashFunction)}
-     */
-    public void rehashSubscriptions() {
-        for (UUID channel : subscriptions) {
-            if (!channels.containsKey(channel)) {
-                List<Node> pair = weaverRing.hash(point(channel), 2);
-                if (pair.get(0).equals(id)) {
-                    if (log.isLoggable(Level.INFO)) {
-                        log.fine(String.format("Weaver[%s] is now the primary for: %s, waiting for xerox",
-                                               id, channel));
-                    }
-                    EventChannel ec = new EventChannel(
-                                                       EventChannel.Role.PRIMARY,
-                                                       channel,
-                                                       root,
-                                                       maxSegmentSize,
-                                                       replicators.get(pair.get(1)));
-                    channels.put(channel, ec);
-                } else if (pair.get(1).equals(id)) {
-                    if (log.isLoggable(Level.INFO)) {
-                        log.fine(String.format("Weaver[%s] is now the secondary for: %s, waiting for xerox",
-                                               id, channel));
-                    }
-                    EventChannel ec = new EventChannel(
-                                                       EventChannel.Role.MIRROR,
-                                                       channel,
-                                                       root,
-                                                       maxSegmentSize,
-                                                       replicators.get(pair.get(0)));
-                    channels.put(channel, ec);
-                }
-            }
-        }
-    }
-
-    /**
      * Rehash the existing channels that are currently maintained (either
      * primary or mirror) on the recevier
      * 
@@ -295,6 +280,45 @@ public class Weaver implements Bundle {
         return latch;
     }
 
+    /**
+     * Rehash the subscription channel distribution on the weaver partition. Do
+     * not rehash any subscriptions that are already handled by the receiver, as
+     * these will be handled in
+     * {@link #rehashExistingChannels(ConsistentHashFunction)}
+     */
+    public void rehashSubscriptions() {
+        for (UUID channel : subscriptions) {
+            if (!channels.containsKey(channel)) {
+                List<Node> pair = weaverRing.hash(point(channel), 2);
+                if (pair.get(0).equals(id)) {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.fine(String.format("Weaver[%s] is now the primary for: %s, waiting for xerox",
+                                               id, channel));
+                    }
+                    EventChannel ec = new EventChannel(
+                                                       EventChannel.Role.PRIMARY,
+                                                       channel,
+                                                       root,
+                                                       maxSegmentSize,
+                                                       replicators.get(pair.get(1)));
+                    channels.put(channel, ec);
+                } else if (pair.get(1).equals(id)) {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.fine(String.format("Weaver[%s] is now the secondary for: %s, waiting for xerox",
+                                               id, channel));
+                    }
+                    EventChannel ec = new EventChannel(
+                                                       EventChannel.Role.MIRROR,
+                                                       channel,
+                                                       root,
+                                                       maxSegmentSize,
+                                                       replicators.get(pair.get(0)));
+                    channels.put(channel, ec);
+                }
+            }
+        }
+    }
+
     public void start() {
         spindleHandler.start();
         replicationHandler.start();
@@ -308,7 +332,8 @@ public class Weaver implements Bundle {
     @Override
     public String toString() {
         return String.format("Weaver[%s], spindle endpoint: %s, replicator endpoint: %s",
-                             id, getSpindleEndpoint(), getReplicatorEndpoint());
+                             id, spindleHandler.getLocalAddress(),
+                             replicationHandler.getLocalAddress());
     }
 
     /*
@@ -406,5 +431,14 @@ public class Weaver implements Bundle {
      */
     private boolean thisEndInitiatesConnectionsTo(Node target) {
         return id.compareTo(target) < 0;
+    }
+
+    /**
+     * For test access
+     * 
+     * @return the orchestrator
+     */
+    Orchestrator getOrchestrator() {
+        return orchestrator;
     }
 }
