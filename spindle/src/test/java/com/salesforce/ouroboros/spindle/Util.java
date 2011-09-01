@@ -27,6 +27,11 @@ package com.salesforce.ouroboros.spindle;
 
 import static junit.framework.Assert.fail;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 
  * @author hhildebrand
@@ -35,6 +40,84 @@ import static junit.framework.Assert.fail;
 public class Util {
     public static interface Condition {
         boolean value();
+    }
+
+    public static Object accessField(String fieldName, Object target)
+                                                                     throws SecurityException,
+                                                                     NoSuchFieldException,
+                                                                     IllegalArgumentException,
+                                                                     IllegalAccessException {
+        Field field;
+        try {
+            field = target.getClass().getDeclaredField(fieldName);
+        } catch (NoSuchFieldException e) {
+            Class<?> superClass = target.getClass().getSuperclass();
+            if (superClass == null) {
+                throw e;
+            }
+            return accessField(fieldName, target, superClass);
+        }
+        field.setAccessible(true);
+        return field.get(target);
+    }
+
+    public static Object accessField(String fieldName, Object target,
+                                     Class<?> targetClass)
+                                                          throws SecurityException,
+                                                          NoSuchFieldException,
+                                                          IllegalArgumentException,
+                                                          IllegalAccessException {
+        Field field;
+        try {
+            field = targetClass.getDeclaredField(fieldName);
+        } catch (NoSuchFieldException e) {
+            Class<?> superClass = targetClass.getSuperclass();
+            if (superClass == null) {
+                throw e;
+            }
+            return accessField(fieldName, target, superClass);
+        }
+        field.setAccessible(true);
+        return field.get(target);
+    }
+
+    public static Method accessMethod(String methodName, Object[] arguments,
+                                      Class<?> targetClass)
+                                                           throws SecurityException,
+                                                           NoSuchMethodException {
+        Method method;
+
+        List<Class<?>> argClasses = new ArrayList<Class<?>>();
+        try {
+            method = targetClass.getDeclaredMethod(methodName,
+                                                   argClasses.toArray(new Class<?>[0]));
+        } catch (NoSuchMethodException e) {
+            Class<?> superClass = targetClass.getSuperclass();
+            if (superClass == null) {
+                throw e;
+            }
+            return accessMethod(methodName, arguments, superClass);
+        }
+        return method;
+    }
+
+    public static Method accessMethod(String methodName, Object[] arguments,
+                                      Object target) throws SecurityException,
+                                                    NoSuchMethodException {
+        Method method;
+
+        List<Class<?>> argClasses = new ArrayList<Class<?>>();
+        try {
+            method = target.getClass().getDeclaredMethod(methodName,
+                                                         argClasses.toArray(new Class<?>[0]));
+        } catch (NoSuchMethodException e) {
+            Class<?> superClass = target.getClass().getSuperclass();
+            if (superClass == null) {
+                throw e;
+            }
+            return accessMethod(methodName, arguments, superClass);
+        }
+        return method;
     }
 
     public static void waitFor(String reason, Condition condition,

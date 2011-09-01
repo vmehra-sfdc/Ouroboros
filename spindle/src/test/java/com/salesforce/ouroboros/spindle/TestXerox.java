@@ -35,6 +35,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
@@ -58,6 +59,7 @@ public class TestXerox {
         SocketChannel socket = mock(SocketChannel.class);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         Node node = new Node(0x1639, 0x1640, 0x1641);
+        CountDownLatch latch = mock(CountDownLatch.class);
 
         final UUID id = UUID.randomUUID();
         final long prefix1 = 77L;
@@ -111,6 +113,7 @@ public class TestXerox {
 
         int transferSize = 1024;
         Xerox xerox = new Xerox(node, channel, transferSize);
+        xerox.setLatch(latch);
         assertEquals(State.INITIALIZED, xerox.getState());
         xerox.handleConnect(socket, handler);
         assertEquals(State.HANDSHAKE, xerox.getState());
@@ -125,5 +128,6 @@ public class TestXerox {
         assertEquals(State.COPY, xerox.getState());
         xerox.handleWrite(socket);
         assertEquals(State.FINISHED, xerox.getState());
+        verify(latch).countDown();
     }
 }

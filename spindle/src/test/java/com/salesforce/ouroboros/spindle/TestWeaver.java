@@ -25,7 +25,14 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.nio.channels.ServerSocketChannel;
+
 import org.junit.Test;
+
+import com.hellblazer.pinkie.ServerSocketChannelHandler;
+import com.hellblazer.pinkie.SocketOptions;
 
 /**
  * 
@@ -34,7 +41,10 @@ import org.junit.Test;
  */
 public class TestWeaver {
     @Test
-    public void testGetAppendSegment() {
-
+    public void testGetAppendSegment() throws Exception {
+        ServerSocketChannel channel = ServerSocketChannelHandler.bind(new SocketOptions(),
+                                                                      new InetSocketAddress(
+                                                                                            0));
+        System.out.println("Local address: " + channel.socket().getLocalSocketAddress());
     }
 }

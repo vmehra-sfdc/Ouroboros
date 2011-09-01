@@ -39,21 +39,28 @@ import com.hellblazer.pinkie.SocketOptions;
  * 
  */
 public class WeaverConfigation {
+    public static long          DEFAULT_MAX_SEGMENTSIZE        = 1000 * 1024;
+    public static long          DEFAULT_PARTITION_TIMEOUT      = 60;
+    public static TimeUnit      DEFAULT_PARTITION_TIMEOUT_UNIT = TimeUnit.SECONDS;
+    public static String        DEFAULT_STATE_NAME             = "weavers";
+
     private Node                id;
-    private long                maxSegmentSize;
-    private long                partitionTimeout;
-    private TimeUnit            partitionTimeoutUnit;
-    private InetSocketAddress   replicationAddress;
-    private int                 replicationQueueSize     = 100;
-    private final SocketOptions replicationSocketOptions = new SocketOptions();
+    private long                maxSegmentSize                 = DEFAULT_MAX_SEGMENTSIZE;
+    private long                partitionTimeout               = DEFAULT_PARTITION_TIMEOUT;
+    private TimeUnit            partitionTimeoutUnit           = DEFAULT_PARTITION_TIMEOUT_UNIT;
+    private InetSocketAddress   replicationAddress             = new InetSocketAddress(
+                                                                                       0);
+    private int                 replicationQueueSize           = 100;
+    private final SocketOptions replicationSocketOptions       = new SocketOptions();
     private Executor            replicators;
     private File                root;
-    private InetSocketAddress   spindleAddress;
+    private InetSocketAddress   spindleAddress                 = new InetSocketAddress(
+                                                                                       0);
     private Executor            spindles;
-    private final SocketOptions spindleSocketOptions     = new SocketOptions();
-    private String              stateName;
+    private final SocketOptions spindleSocketOptions           = new SocketOptions();
+    private String              stateName                      = DEFAULT_STATE_NAME;
     private Executor            xeroxes;
-    private final SocketOptions xeroxSocketOptions       = new SocketOptions();
+    private final SocketOptions xeroxSocketOptions             = new SocketOptions();
 
     /**
      * @return the id
