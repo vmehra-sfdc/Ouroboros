@@ -133,13 +133,9 @@ public class BloomFilter<E> implements Serializable {
 
     private BitSet bitset;
     private int    bitSetSize;
-
     private double bitsPerElement;
-
     private int    expectedNumberOfFilterElements; // expected (maximum) number of elements to be added
-
     private int    k;                             // number of hash functions
-
     private int    numberOfAddedElements;         // number of elements actually added to the Bloom filter
 
     /**
