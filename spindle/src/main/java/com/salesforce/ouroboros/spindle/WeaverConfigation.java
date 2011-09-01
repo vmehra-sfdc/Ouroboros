@@ -28,7 +28,10 @@ package com.salesforce.ouroboros.spindle;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.hellblazer.pinkie.SocketOptions;
 
@@ -39,28 +42,45 @@ import com.hellblazer.pinkie.SocketOptions;
  * 
  */
 public class WeaverConfigation {
-    public static long          DEFAULT_MAX_SEGMENTSIZE        = 1000 * 1024;
-    public static long          DEFAULT_PARTITION_TIMEOUT      = 60;
-    public static TimeUnit      DEFAULT_PARTITION_TIMEOUT_UNIT = TimeUnit.SECONDS;
-    public static String        DEFAULT_STATE_NAME             = "weavers";
+    public static final long     DEFAULT_MAX_SEGMENTSIZE        = 1000 * 1024;
+    public static final long     DEFAULT_PARTITION_TIMEOUT      = 60;
+    public static final TimeUnit DEFAULT_PARTITION_TIMEOUT_UNIT = TimeUnit.SECONDS;
+    public static final String   DEFAULT_STATE_NAME             = "weavers";
+    public static final int      DEFAULT_REPLICATION_QUEUE_SIZE = 100;
+
+    public static ThreadFactory threadFactory(String prefix) {
+        return new ThreadFactory() {
+            private AtomicInteger count = new AtomicInteger(0);
+
+            @Override
+            public Thread newThread(Runnable runnable) {
+                Thread thread = new Thread(
+                                           runnable,
+                                           String.format("%s[%s]",
+                                                         count.getAndIncrement()));
+                thread.setDaemon(true);
+                return thread;
+            }
+        };
+    }
 
     private Node                id;
-    private long                maxSegmentSize                 = DEFAULT_MAX_SEGMENTSIZE;
-    private long                partitionTimeout               = DEFAULT_PARTITION_TIMEOUT;
-    private TimeUnit            partitionTimeoutUnit           = DEFAULT_PARTITION_TIMEOUT_UNIT;
-    private InetSocketAddress   replicationAddress             = new InetSocketAddress(
-                                                                                       0);
-    private int                 replicationQueueSize           = 100;
-    private final SocketOptions replicationSocketOptions       = new SocketOptions();
-    private Executor            replicators;
+    private long                maxSegmentSize           = DEFAULT_MAX_SEGMENTSIZE;
+    private long                partitionTimeout         = DEFAULT_PARTITION_TIMEOUT;
+    private TimeUnit            partitionTimeoutUnit     = DEFAULT_PARTITION_TIMEOUT_UNIT;
+    private InetSocketAddress   replicationAddress       = new InetSocketAddress(
+                                                                                 0);
+    private int                 replicationQueueSize     = DEFAULT_REPLICATION_QUEUE_SIZE;
+    private final SocketOptions replicationSocketOptions = new SocketOptions();
+    private Executor            replicators              = Executors.newSingleThreadExecutor(threadFactory("replicator"));
     private File                root;
-    private InetSocketAddress   spindleAddress                 = new InetSocketAddress(
-                                                                                       0);
-    private Executor            spindles;
-    private final SocketOptions spindleSocketOptions           = new SocketOptions();
-    private String              stateName                      = DEFAULT_STATE_NAME;
-    private Executor            xeroxes;
-    private final SocketOptions xeroxSocketOptions             = new SocketOptions();
+    private InetSocketAddress   spindleAddress           = new InetSocketAddress(
+                                                                                 0);
+    private Executor            spindles                 = Executors.newSingleThreadExecutor(threadFactory("spindle"));
+    private final SocketOptions spindleSocketOptions     = new SocketOptions();
+    private String              stateName                = DEFAULT_STATE_NAME;
+    private Executor            xeroxes                  = Executors.newSingleThreadExecutor(threadFactory("xerox"));
+    private final SocketOptions xeroxSocketOptions       = new SocketOptions();
 
     /**
      * @return the id
@@ -261,5 +281,10 @@ public class WeaverConfigation {
      */
     public void setXeroxes(Executor xeroxes) {
         this.xeroxes = xeroxes;
+    }
+
+    public void validate() {
+        assert id != null : "Id must not be null";
+        assert root != null : "Root must not be null";
     }
 }

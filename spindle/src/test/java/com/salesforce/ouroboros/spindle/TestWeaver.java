@@ -25,14 +25,14 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.nio.channels.ServerSocketChannel;
+import java.io.File;
+import java.util.UUID;
 
 import org.junit.Test;
+import org.smartfrog.services.anubis.locator.AnubisLocator;
 
-import com.hellblazer.pinkie.ServerSocketChannelHandler;
-import com.hellblazer.pinkie.SocketOptions;
+import static org.mockito.Mockito.*;
+import static junit.framework.Assert.*;
 
 /**
  * 
@@ -41,10 +41,22 @@ import com.hellblazer.pinkie.SocketOptions;
  */
 public class TestWeaver {
     @Test
-    public void testGetAppendSegment() throws Exception {
-        ServerSocketChannel channel = ServerSocketChannelHandler.bind(new SocketOptions(),
-                                                                      new InetSocketAddress(
-                                                                                            0));
-        System.out.println("Local address: " + channel.socket().getLocalSocketAddress());
+    public void testSteadyState() throws Exception {
+        File root = File.createTempFile("weaver", "root");
+        root.delete();
+        root.deleteOnExit();
+
+        WeaverConfigation config = new WeaverConfigation();
+        Node node = new Node(0x1639, 0x1640, 0x1641);
+        config.setId(node);
+        config.setRoot(root);
+        AnubisLocator locator = mock(AnubisLocator.class);
+        UUID channelId = UUID.randomUUID();
+        EventHeader header = new EventHeader(666, 777, channelId, 888, 555);
+
+        Weaver weaver = new Weaver(config, locator);
+        // weaver.addSubscription(channelId);
+        EventChannel channel = weaver.eventChannelFor(header);
+        assertNull(channel);
     }
 }

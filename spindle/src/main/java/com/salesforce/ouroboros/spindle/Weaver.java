@@ -54,6 +54,7 @@ import org.smartfrog.services.anubis.locator.AnubisValue;
 import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
+import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
@@ -98,8 +99,8 @@ public class Weaver implements Bundle {
         }
 
         private final AnubisLocator  locator;
-        private final AnubisProvider stateProvider;
         private final Stability      stability;
+        private final AnubisProvider stateProvider;
         private final long           timeout;
         private final TimeUnit       unit;
 
@@ -149,8 +150,6 @@ public class Weaver implements Bundle {
     private final ConcurrentMap<UUID, EventChannel>      channels      = new ConcurrentHashMap<UUID, EventChannel>();
     private final Node                                   id;
     private final long                                   maxSegmentSize;
-    @SuppressWarnings("unused")
-    private final Orchestrator                           orchestrator;
     private final ServerSocketChannelHandler<Replicator> replicationHandler;
     private final ConcurrentMap<Node, Replicator>        replicators   = new ConcurrentHashMap<Node, Replicator>();
     private final File                                   root;
@@ -159,9 +158,11 @@ public class Weaver implements Bundle {
     private final ConsistentHashFunction<Node>           weaverRing    = new ConsistentHashFunction<Node>();
     private final ChannelHandler<Xerox>                  xeroxHandler;
     private final Map<Node, ContactInfomation>           yellowPages   = new HashMap<Node, ContactInfomation>();
+    final Orchestrator                                   orchestrator;
 
     public Weaver(WeaverConfigation configuration, AnubisLocator locator)
                                                                          throws IOException {
+        configuration.validate();
         orchestrator = new Orchestrator(configuration.getStateName(), locator,
                                         configuration.getPartitionTimeout(),
                                         configuration.getPartitionTimeoutUnit());
@@ -185,6 +186,19 @@ public class Weaver implements Bundle {
                                                                  configuration.getSpindleAddress(),
                                                                  configuration.getSpindles(),
                                                                  new SpindleFactory());
+
+        if (!root.exists()) {
+            if (!root.mkdirs()) {
+                throw new IllegalStateException(
+                                                String.format("Cannot create root directory: %s",
+                                                              root.getAbsolutePath()));
+            }
+        }
+        if (!root.isDirectory()) {
+            throw new IllegalStateException(
+                                            String.format("Root is not a directory: %s",
+                                                          root.getAbsolutePath()));
+        }
     }
 
     public void close(UUID channel) {
@@ -196,8 +210,7 @@ public class Weaver implements Bundle {
 
     @Override
     public EventChannel eventChannelFor(EventHeader header) {
-        UUID channelTag = header.getChannel();
-        return channels.get(channelTag);
+        return channels.get(header.getChannel());
     }
 
     @Override
@@ -208,11 +221,13 @@ public class Weaver implements Bundle {
     public void start() {
         spindleHandler.start();
         replicationHandler.start();
+        xeroxHandler.start();
     }
 
     public void terminate() {
         spindleHandler.terminate();
         replicationHandler.terminate();
+        xeroxHandler.terminate();
     }
 
     @Override
@@ -220,62 +235,6 @@ public class Weaver implements Bundle {
         return String.format("Weaver[%s], spindle endpoint: %s, replicator endpoint: %s",
                              id, spindleHandler.getLocalAddress(),
                              replicationHandler.getLocalAddress());
-    }
-
-    /**
-     * The weaver membership has partitioned. Clear out the dead members,
-     * accomidate the new members and normalize the state
-     * 
-     * @param deadMembers
-     *            - the weaver nodes that have failed and are no longer part of
-     *            the partition
-     * @param newMembers
-     *            - the new weaver nodes that are now part of the partition
-     * @return the previous consistent hash ring for this weaver
-     */
-    private ConsistentHashFunction<Node> partition(Collection<Node> deadMembers,
-                                                   Map<Node, ContactInfomation> newMembers) {
-        ConsistentHashFunction<Node> previousRing = weaverRing.clone();
-        for (Node node : deadMembers) {
-            if (log.isLoggable(Level.INFO)) {
-                log.fine(String.format("Removing weaver[%s] from the partition",
-                                       node));
-            }
-            yellowPages.remove(node);
-            Replicator replicator = replicators.remove(node);
-            if (replicators != null) {
-                replicator.close();
-            }
-        }
-        yellowPages.putAll(newMembers);
-        for (Entry<Node, ContactInfomation> entry : newMembers.entrySet()) {
-            Node node = entry.getKey();
-            weaverRing.add(node, 1);
-            Replicator replicator = new Replicator(node, this);
-            if (thisEndInitiatesConnectionsTo(node)) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.fine(String.format("Initiating connection from weaver[%s] to new weaver[%s]",
-                                           id, node));
-                }
-                try {
-                    replicationHandler.connectTo(entry.getValue().replication,
-                                                 replicator);
-                } catch (IOException e) {
-                    // We be screwed.  Log this #fail and force a repartition event
-                    String msg = String.format("Unable to connect to weaver: %s at replicator port: %s",
-                                               entry.getKey(), entry.getValue());
-                    log.log(Level.SEVERE, msg, e);
-                    throw new IllegalStateException(msg, e);
-                }
-                replicators.put(node, replicator);
-            } else {
-                if (log.isLoggable(Level.INFO)) {
-                    log.fine(String.format("Waiting for connection to weaver[%s] from new weaver[%s]",
-                                           id, node));
-                }
-            }
-        }
-        return previousRing;
     }
 
     /*
@@ -365,6 +324,98 @@ public class Weaver implements Bundle {
     }
 
     /**
+     * indicates which end initiates a connection
+     * 
+     * @param target
+     *            - the other end of the intended connection
+     * @return - true if this end initiates the connection, false otherwise
+     */
+    private boolean thisEndInitiatesConnectionsTo(Node target) {
+        return id.compareTo(target) < 0;
+    }
+
+    void addSubscription(UUID channel) {
+        List<Node> pair = weaverRing.hash(point(channel), 2);
+        if (pair.get(0).equals(id)) {
+            // This node is the primary for the event channel
+            if (log.isLoggable(Level.INFO)) {
+                log.fine(String.format(" Weaver[%s] is the primary for the new subscription %s",
+                                       id, channel));
+            }
+            EventChannel ec = new EventChannel(Role.PRIMARY, channel, root,
+                                               maxSegmentSize,
+                                               replicators.get(pair.get(1)));
+            channels.put(channel, ec);
+        } else if (pair.get(1).equals(id)) {
+            // This node is the mirror for the event channel
+            if (log.isLoggable(Level.INFO)) {
+                log.fine(String.format(" Weaver[%s] is the mirror for the new subscription %s",
+                                       id, channel));
+            }
+            EventChannel ec = new EventChannel(Role.MIRROR, channel, root,
+                                               maxSegmentSize,
+                                               replicators.get(pair.get(1)));
+            channels.put(channel, ec);
+        }
+    }
+
+    /**
+     * The weaver membership has partitioned. Clear out the dead members,
+     * accomidate the new members and normalize the state
+     * 
+     * @param deadMembers
+     *            - the weaver nodes that have failed and are no longer part of
+     *            the partition
+     * @param newMembers
+     *            - the new weaver nodes that are now part of the partition
+     * @return the previous consistent hash ring for this weaver
+     */
+    ConsistentHashFunction<Node> partition(Collection<Node> deadMembers,
+                                           Map<Node, ContactInfomation> newMembers) {
+        ConsistentHashFunction<Node> previousRing = weaverRing.clone();
+        for (Node node : deadMembers) {
+            if (log.isLoggable(Level.INFO)) {
+                log.fine(String.format("Removing weaver[%s] from the partition",
+                                       node));
+            }
+            yellowPages.remove(node);
+            Replicator replicator = replicators.remove(node);
+            if (replicators != null) {
+                replicator.close();
+            }
+        }
+        yellowPages.putAll(newMembers);
+        for (Entry<Node, ContactInfomation> entry : newMembers.entrySet()) {
+            Node node = entry.getKey();
+            weaverRing.add(node, 1);
+            Replicator replicator = new Replicator(node, this);
+            if (thisEndInitiatesConnectionsTo(node)) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.fine(String.format("Initiating connection from weaver[%s] to new weaver[%s]",
+                                           id, node));
+                }
+                try {
+                    replicationHandler.connectTo(entry.getValue().replication,
+                                                 replicator);
+                } catch (IOException e) {
+                    // We be screwed.  Log this #fail and force a repartition event
+                    String msg = String.format("Unable to connect to weaver: %s at replicator port: %s",
+                                               entry.getKey(), entry.getValue());
+                    log.log(Level.SEVERE, msg, e);
+                    throw new IllegalStateException(msg, e);
+                }
+                replicators.put(node, replicator);
+            } else {
+                if (log.isLoggable(Level.INFO)) {
+                    log.fine(String.format("Waiting for connection to weaver[%s] from new weaver[%s]",
+                                           id, node));
+                }
+            }
+        }
+        return previousRing;
+    }
+
+    /**
      * Rehash the existing channels that are currently maintained (either
      * primary or mirror) on the recevier
      * 
@@ -372,7 +423,7 @@ public class Weaver implements Bundle {
      *            the previous weaver ring mapping
      * @return the CountDownLatch for synchronizing with any state transfer
      */
-    private CountDownLatch rehashExistingChannels(ConsistentHashFunction<Node> previousRing) {
+    CountDownLatch rehashExistingChannels(ConsistentHashFunction<Node> previousRing) {
         LinkedList<Xerox> xeroxes = new LinkedList<Xerox>();
         for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
             final UUID channelId = entry.getKey();
@@ -415,7 +466,7 @@ public class Weaver implements Bundle {
      * these will be handled in
      * {@link #rehashExistingChannels(ConsistentHashFunction)}
      */
-    private void rehashSubscriptions() {
+    void rehashSubscriptions() {
         for (UUID channel : subscriptions) {
             if (!channels.containsKey(channel)) {
                 List<Node> pair = weaverRing.hash(point(channel), 2);
@@ -425,7 +476,7 @@ public class Weaver implements Bundle {
                                                id, channel));
                     }
                     EventChannel ec = new EventChannel(
-                                                       EventChannel.Role.PRIMARY,
+                                                       Role.PRIMARY,
                                                        channel,
                                                        root,
                                                        maxSegmentSize,
@@ -437,7 +488,7 @@ public class Weaver implements Bundle {
                                                id, channel));
                     }
                     EventChannel ec = new EventChannel(
-                                                       EventChannel.Role.MIRROR,
+                                                       Role.MIRROR,
                                                        channel,
                                                        root,
                                                        maxSegmentSize,
@@ -446,16 +497,5 @@ public class Weaver implements Bundle {
                 }
             }
         }
-    }
-
-    /**
-     * indicates which end initiates a connection
-     * 
-     * @param target
-     *            - the other end of the intended connection
-     * @return - true if this end initiates the connection, false otherwise
-     */
-    private boolean thisEndInitiatesConnectionsTo(Node target) {
-        return id.compareTo(target) < 0;
     }
 }
