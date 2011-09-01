@@ -167,7 +167,7 @@ public class Weaver implements Bundle {
                                         configuration.getPartitionTimeout(),
                                         configuration.getPartitionTimeoutUnit());
         id = configuration.getId();
-        weaverRing.add(id, 1);
+        weaverRing.add(id, id.capacity);
         root = configuration.getRoot();
         maxSegmentSize = configuration.getMaxSegmentSize();
         xeroxHandler = new ChannelHandler<Xerox>(
@@ -387,7 +387,7 @@ public class Weaver implements Bundle {
         yellowPages.putAll(newMembers);
         for (Entry<Node, ContactInfomation> entry : newMembers.entrySet()) {
             Node node = entry.getKey();
-            weaverRing.add(node, 1);
+            weaverRing.add(node, node.capacity);
             Replicator replicator = new Replicator(node, this);
             if (thisEndInitiatesConnectionsTo(node)) {
                 if (log.isLoggable(Level.INFO)) {

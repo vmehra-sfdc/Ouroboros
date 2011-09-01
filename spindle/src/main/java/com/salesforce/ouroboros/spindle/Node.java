@@ -60,8 +60,9 @@ public class Node implements Comparable<Node> {
         }
     }
 
-    public static final int BYTE_LENGTH = 4 + 4 + 4;
+    public static final int BYTE_LENGTH = 4 + 4 + 4 + 4;
 
+    public final int        capacity;
     public final int        machineId;
     public final int        processId;
     public final int        rackId;
@@ -70,12 +71,18 @@ public class Node implements Comparable<Node> {
         processId = buffer.getInt();
         machineId = buffer.getInt();
         rackId = buffer.getInt();
+        capacity = buffer.getInt();
     }
 
     public Node(int processId, int machineId, int rackId) {
+        this(processId, machineId, rackId, 1);
+    }
+
+    public Node(int processId, int machineId, int rackId, int capacity) {
         this.processId = processId;
         this.machineId = machineId;
         this.rackId = rackId;
+        this.capacity = capacity;
     }
 
     @Override
@@ -104,7 +111,7 @@ public class Node implements Comparable<Node> {
     }
 
     public void serialize(ByteBuffer buffer) {
-        buffer.putInt(processId).putInt(machineId).putInt(rackId);
+        buffer.putInt(processId).putInt(machineId).putInt(rackId).putInt(capacity);
     }
 
     /* (non-Javadoc)
@@ -113,6 +120,6 @@ public class Node implements Comparable<Node> {
     @Override
     public String toString() {
         return "Node [processId=" + processId + ", machineId=" + machineId
-               + ", rackId=" + rackId + "]";
+               + ", rackId=" + rackId + ", capacity=" + capacity + "]";
     }
 }
