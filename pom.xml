@@ -21,6 +21,7 @@
     <modules>
         <module>common</module>
         <module>spindle</module>
+        <module>producer</module>
     </modules>
 
     <build>

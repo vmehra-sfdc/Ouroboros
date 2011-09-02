@@ -251,7 +251,8 @@ public class Weaver implements Bundle {
                                            channelId, pair.get(1)));
                 }
                 channel.setMirror();
-                xeroxes.add(new Xerox(pair.get(0), channel));
+                xeroxes.add(new Xerox(pair.get(0), channelId,
+                                      channel.getSegmentStack()));
             }
             case MIRROR: {
                 if (!channel.getReplicator().getId().equals(pair.get(0))) {
@@ -260,7 +261,8 @@ public class Weaver implements Bundle {
                         log.info(String.format("Mirror for %s has died, new mirror: %s",
                                                channelId, pair.get(1)));
                     }
-                    xeroxes.add(new Xerox(pair.get(0), channel));
+                    xeroxes.add(new Xerox(pair.get(0), channelId,
+                                          channel.getSegmentStack()));
                 }
             }
         }
@@ -302,7 +304,8 @@ public class Weaver implements Bundle {
                         log.info(String.format("Mirror for %s has died, new mirror: %s",
                                                channelId, pair.get(1)));
                     }
-                    xeroxes.add(new Xerox(pair.get(1), channel));
+                    xeroxes.add(new Xerox(pair.get(1), channelId,
+                                          channel.getSegmentStack()));
                 }
                 break;
             }
@@ -313,7 +316,8 @@ public class Weaver implements Bundle {
                                            id, channelId, pair.get(1)));
                 }
                 channel.setPrimary();
-                xeroxes.add(new Xerox(pair.get(1), channel));
+                xeroxes.add(new Xerox(pair.get(1), channelId,
+                                      channel.getSegmentStack()));
             }
                 break;
         }

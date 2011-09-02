@@ -56,10 +56,6 @@ public class EventChannel {
         MIRROR, PRIMARY;
     }
 
-    public enum State {
-        CLOSED, INITIALIZED, OPEN, RECOVERING, TRANSFERING;
-    }
-
     public static final String          SEGMENT_SUFFIX = ".segment";
 
     private static final Logger         log            = Logger.getLogger(Weaver.class.getCanonicalName());
@@ -115,19 +111,16 @@ public class EventChannel {
 
     private final File       channel;
     private volatile long    commited;
-    private final UUID       id;
     private volatile long    lastTimestamp;
     private final long       maxSegmentSize;
     private volatile long    nextOffset;
     private final Replicator replicator;
     private Role             role;
-    private volatile State   state;
 
     public EventChannel(Role role, final UUID channelId, final File root,
                         final long maxSegmentSize, final Replicator replicator) {
         this.role = role;
-        id = channelId;
-        channel = new File(root, id.toString().replace('-', '/'));
+        channel = new File(root, channelId.toString().replace('-', '/'));
         this.maxSegmentSize = maxSegmentSize;
         if (!channel.mkdirs()) {
             String msg = String.format("Unable to create channel directory for channel: %s",
@@ -184,13 +177,6 @@ public class EventChannel {
     }
 
     /**
-     * @return the id
-     */
-    public UUID getId() {
-        return id;
-    }
-
-    /**
      * @return the replicator
      */
     public Replicator getReplicator() {
@@ -228,10 +214,6 @@ public class EventChannel {
             }
         }
         return segments;
-    }
-
-    public State getState() {
-        return state;
     }
 
     @Override
@@ -326,12 +308,12 @@ public class EventChannel {
         }
     }
 
-    public void setPrimary() {
-        role = Role.PRIMARY;
-    }
-
     public void setMirror() {
         role = Role.MIRROR;
+    }
+
+    public void setPrimary() {
+        role = Role.PRIMARY;
     }
 
     private String appendSegmentNameFor(int eventSize, long maxSegmentSize) {

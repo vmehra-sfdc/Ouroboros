@@ -56,7 +56,7 @@ public class Xerox implements CommunicationsHandler {
 
     private final ByteBuffer                 buffer            = ByteBuffer.allocate(BUFFER_SIZE);
     private volatile Segment                 current;
-    private final EventChannel               eventChannel;
+    private final UUID                       channelId;
     private volatile SocketChannelHandler<?> handler;
     private CountDownLatch                   latch;
     private final Node                       node;
@@ -66,15 +66,16 @@ public class Xerox implements CommunicationsHandler {
     private volatile State                   state;
     private final long                       transferSize;
 
-    public Xerox(Node toNode, EventChannel channel) {
-        this(toNode, channel, DEFAULT_TXFR_SIZE);
+    public Xerox(Node toNode, UUID channel, Deque<Segment> segments) {
+        this(toNode, channel, segments, DEFAULT_TXFR_SIZE);
     }
 
-    public Xerox(Node toNode, EventChannel channel, int transferSize) {
+    public Xerox(Node toNode, UUID channel, Deque<Segment> segments,
+                 int transferSize) {
         node = toNode;
-        eventChannel = channel;
+        channelId = channel;
         this.transferSize = transferSize;
-        segments = channel.getSegmentStack();
+        this.segments = segments;
         state = State.INITIALIZED;
     }
 
@@ -105,7 +106,6 @@ public class Xerox implements CommunicationsHandler {
         switch (state) {
             case INITIALIZED: {
                 state = State.HANDSHAKE;
-                UUID channelId = eventChannel.getId();
                 buffer.putLong(MAGIC);
                 buffer.putLong(channelId.getMostSignificantBits());
                 buffer.putLong(channelId.getLeastSignificantBits());
@@ -182,7 +182,7 @@ public class Xerox implements CommunicationsHandler {
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Error writing handshake for %s on %s",
-                                  eventChannel.getId(), channel), e);
+                                  channelId, channel), e);
             terminate(channel);
             return;
         }

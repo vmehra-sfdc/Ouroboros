@@ -53,7 +53,6 @@ public class TestXerox {
 
     @Test
     public void testCopy() throws Exception {
-        EventChannel channel = mock(EventChannel.class);
         Segment segment1 = mock(Segment.class);
         Segment segment2 = mock(Segment.class);
         SocketChannel socket = mock(SocketChannel.class);
@@ -104,15 +103,13 @@ public class TestXerox {
         LinkedList<Segment> segments = new LinkedList<Segment>();
         segments.push(segment2);
         segments.push(segment1);
-        when(channel.getSegmentStack()).thenReturn(segments);
-        when(channel.getId()).thenReturn(id);
         when(segment1.getPrefix()).thenReturn(prefix1);
         when(segment2.getPrefix()).thenReturn(prefix2);
         when(segment1.size()).thenReturn(size1);
         when(segment2.size()).thenReturn(size2);
 
         int transferSize = 1024;
-        Xerox xerox = new Xerox(node, channel, transferSize);
+        Xerox xerox = new Xerox(node, id, segments, transferSize);
         xerox.setLatch(latch);
         assertEquals(State.INITIALIZED, xerox.getState());
         xerox.handleConnect(socket, handler);
