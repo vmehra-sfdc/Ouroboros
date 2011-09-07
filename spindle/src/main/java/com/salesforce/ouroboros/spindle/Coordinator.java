@@ -107,6 +107,7 @@ public class Coordinator {
     private final Set<UUID>                    subscriptions  = new HashSet<UUID>();
     private final ConsistentHashFunction<Node> weaverRing     = new ConsistentHashFunction<Node>();
     private final Map<Node, ContactInfomation> yellowPages    = new HashMap<Node, ContactInfomation>();
+    private final Map<Integer, Node>           members        = new HashMap<Integer, Node>();
     final Orchestrator                         orchestrator;
 
     public Coordinator(String stateName, AnubisLocator locator) {
@@ -128,8 +129,9 @@ public class Coordinator {
     }
 
     public Node[] getReplicationPair(UUID channelId) {
-        // TODO Auto-generated method stub
-        return null;
+        ReplicationPair pair = channelMapping.get(channelId);
+        return new Node[] { members.get(pair.getPrimary()),
+                members.get(pair.getMirror()) };
     }
 
     public void join(Node id) {
