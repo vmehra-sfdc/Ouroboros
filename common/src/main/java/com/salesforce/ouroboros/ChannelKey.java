@@ -23,40 +23,12 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros;
 
-import java.io.File;
 import java.util.UUID;
 
-import org.junit.Test;
-import org.smartfrog.services.anubis.locator.AnubisLocator;
+public interface ChannelKey {
+    UUID getId();
 
-import static org.mockito.Mockito.*;
-import static junit.framework.Assert.*;
-
-/**
- * 
- * @author hhildebrand
- * 
- */
-public class TestWeaver {
-    @Test
-    public void testSteadyState() throws Exception {
-        File root = File.createTempFile("weaver", "root");
-        root.delete();
-        root.deleteOnExit();
-
-        WeaverConfigation config = new WeaverConfigation();
-        Node node = new Node(0x1639, 0x1640, 0x1641);
-        config.setId(node);
-        config.setRoot(root);
-        AnubisLocator locator = mock(AnubisLocator.class);
-        UUID channelId = UUID.randomUUID();
-        EventHeader header = new EventHeader(666, 777, channelId, 888, 555);
-
-        Weaver weaver = new Weaver(config, locator);
-        // weaver.addSubscription(channelId);
-        EventChannel channel = weaver.eventChannelFor(header);
-        assertNull(channel);
-    }
+    void setId(UUID id);
 }
