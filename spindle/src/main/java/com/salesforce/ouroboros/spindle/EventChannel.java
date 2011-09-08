@@ -232,6 +232,10 @@ public class EventChannel {
         return header.getId() < lastTimestamp;
     }
 
+    public boolean isMirror() {
+        return role == Role.MIRROR;
+    }
+
     /**
      * Answer true if the offset is the next append offset of the channel
      * 
@@ -241,6 +245,10 @@ public class EventChannel {
      */
     public boolean isNextAppend(long offset) {
         return nextOffset == offset;
+    }
+
+    public boolean isPrimary() {
+        return role == Role.PRIMARY;
     }
 
     public long nextOffset() {
