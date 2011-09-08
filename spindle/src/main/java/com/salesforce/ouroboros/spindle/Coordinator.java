@@ -42,27 +42,19 @@ import org.smartfrog.services.anubis.locator.AnubisProvider;
 import org.smartfrog.services.anubis.locator.AnubisStability;
 import org.smartfrog.services.anubis.locator.AnubisValue;
 
-import com.salesforce.ouroboros.ReplicationPair;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
- * The distributed coordinator for the system.
+ * The distributed coordinator for the channel buffer process group.
  * 
  * @author hhildebrand
  * 
  */
 public class Coordinator {
-    public enum Role {
-        MIRROR, PRIMARY
-    }
-
-    public enum State {
-        INITIAL, JOINED, JOINING
-    }
 
     /**
      * 
-     * Provides the distributed orchestration for the weaver processes
+     * Provides the distributed orchestration for the coordinator
      * 
      */
     class Orchestrator extends AnubisListener {
@@ -100,49 +92,116 @@ public class Coordinator {
         }
     }
 
-    private final static Logger                log            = Logger.getLogger(Coordinator.class.getCanonicalName());
+    private final static Logger log = Logger.getLogger(Coordinator.class.getCanonicalName());
 
-    private final Map<UUID, ReplicationPair>   channelMapping = new HashMap<UUID, ReplicationPair>();
+    public static long point(UUID id) {
+        return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
+    }
+
+    private final Set<UUID>                    channels    = new HashSet<UUID>();
     private Weaver                             localWeaver;
-    private final Set<UUID>                    subscriptions  = new HashSet<UUID>();
-    private final ConsistentHashFunction<Node> weaverRing     = new ConsistentHashFunction<Node>();
-    private final Map<Node, ContactInfomation> yellowPages    = new HashMap<Node, ContactInfomation>();
-    private final Map<Integer, Node>           members        = new HashMap<Integer, Node>();
+    private final Map<Integer, Node>           members     = new HashMap<Integer, Node>();
+    private ConsistentHashFunction<Node>       weaverRing  = new ConsistentHashFunction<Node>();
+    private final Map<Node, ContactInfomation> yellowPages = new HashMap<Node, ContactInfomation>();
+
     final Orchestrator                         orchestrator;
 
     public Coordinator(String stateName, AnubisLocator locator) {
         orchestrator = new Orchestrator(stateName, locator);
     }
 
-    public void closeSubscription(UUID id) {
-        ReplicationPair pair = channelMapping.get(id);
+    /**
+     * Add new members of the weaver process group.
+     * 
+     * @param newMembers
+     *            - the members and their contact information
+     * @return the new consistent hash ring
+     */
+    public ConsistentHashFunction<Node> addNewMembers(Map<Node, ContactInfomation> newMembers) {
+        yellowPages.putAll(newMembers);
+        ConsistentHashFunction<Node> newRing = weaverRing.clone();
+        for (Entry<Node, ContactInfomation> entry : newMembers.entrySet()) {
+            Node node = entry.getKey();
+            members.put(node.processId, node);
+            localWeaver.openReplicator(node, entry.getValue());
+            newRing.add(node, node.capacity);
+        }
+
+        return newRing;
+    }
+
+    /**
+     * Close the channel if the node is a primary or mirror of the existing
+     * channel.
+     * 
+     * @param channel
+     *            - the id of the channel to close
+     */
+    public void close(UUID channel) {
+        List<Node> pair = weaverRing.hash(point(channel), 2);
         if (pair != null) {
-            int processId = localWeaver.getId().processId;
-            if (pair.getMirror() == processId || pair.getPrimary() == processId) {
-                localWeaver.close(id);
+            if (pair.get(0).equals(localWeaver.getId())
+                || pair.get(1).equals(localWeaver.getId())) {
+                localWeaver.close(channel);
             }
         }
     }
 
+    /**
+     * The weaver membership has partitioned. Failover any channels the dead
+     * members were serving as primary that the receiver's node is providing
+     * mirrors for
+     * 
+     * @param deadMembers
+     *            - the weaver nodes that have failed and are no longer part of
+     *            the partition
+     */
+    public void failover(Collection<Node> deadMembers) {
+        for (Node node : deadMembers) {
+            if (log.isLoggable(Level.INFO)) {
+                log.fine(String.format("Removing weaver[%s] from the partition",
+                                       node));
+            }
+            members.remove(node.processId);
+            yellowPages.remove(node);
+            localWeaver.closeReplicator(node);
+        }
+        localWeaver.failover(deadMembers);
+    }
+
+    /**
+     * Answer the contact information for the node.
+     * 
+     * @param node
+     *            - the node
+     * @return the ContactInformation for the node
+     */
     public ContactInfomation getContactInformationFor(Node node) {
         return yellowPages.get(node);
     }
 
-    public Node[] getReplicationPair(UUID channelId) {
-        ReplicationPair pair = channelMapping.get(channelId);
-        return new Node[] { members.get(pair.getPrimary()),
-                members.get(pair.getMirror()) };
-    }
-
-    public void join(Node id) {
-        weaverRing.add(id, id.capacity);
-    }
-
-    public void openSubscription(UUID channel) {
-        subscriptions.add(channel);
+    /**
+     * Answer the replication pair of nodes that provide the primary and mirror
+     * for the channel
+     * 
+     * @param channel
+     *            - the id of the channel
+     * @return the tuple of primary and mirror nodes for this channel
+     */
+    public Node[] getReplicationPair(UUID channel) {
         List<Node> pair = weaverRing.hash(point(channel), 2);
-        channelMapping.put(channel, new ReplicationPair(pair.get(0).processId,
-                                                        pair.get(1).processId));
+        return new Node[] { pair.get(0), pair.get(1) };
+    }
+
+    /**
+     * Open the new channel if this node is a primary or mirror of the new
+     * channel.
+     * 
+     * @param channel
+     *            - the id of the channel to open
+     */
+    public void open(UUID channel) {
+        List<Node> pair = weaverRing.hash(point(channel), 2);
         if (pair.get(0).equals(localWeaver.getId())) {
             localWeaver.openPrimary(channel, pair.get(1));
         } else if (pair.get(0).equals(localWeaver.getId())) {
@@ -151,36 +210,35 @@ public class Coordinator {
     }
 
     /**
-     * The weaver membership has partitioned. Clear out the dead members,
-     * accomidate the new members and normalize the state
+     * Set the local weaver
      * 
-     * @param deadMembers
-     *            - the weaver nodes that have failed and are no longer part of
-     *            the partition
-     * @param newMembers
-     *            - the new weaver nodes that are now part of the partition
+     * @param weaver
+     *            - the local weaver for this coordinator
      */
-    public void partition(Collection<Node> deadMembers,
-                          Map<Node, ContactInfomation> newMembers) {
-        for (Node node : deadMembers) {
-            if (log.isLoggable(Level.INFO)) {
-                log.fine(String.format("Removing weaver[%s] from the partition",
-                                       node));
-            }
-            yellowPages.remove(node);
-            localWeaver.closeReplicator(node);
-        }
-        yellowPages.putAll(newMembers);
-        for (Entry<Node, ContactInfomation> entry : newMembers.entrySet()) {
-            localWeaver.openReplicator(entry.getKey(), entry.getValue());
-        }
-    }
-
     public void ready(Weaver weaver) {
         localWeaver = weaver;
     }
 
-    private long point(UUID id) {
-        return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
+    /**
+     * Answer the remapped primary/mirror pairs given the new ring
+     * 
+     * @param newRing
+     *            - the new consistent hash ring of nodes
+     * @return the remapping of channels which have changed their primary or
+     *         mirror in the new hash ring
+     */
+    public Map<UUID, Node[]> remap(ConsistentHashFunction<Node> newRing) {
+        Map<UUID, Node[]> remapped = new HashMap<UUID, Node[]>();
+        for (UUID channel : channels) {
+            long channelPoint = point(channel);
+            List<Node> newPair = newRing.hash(channelPoint, 2);
+            List<Node> oldPair = weaverRing.hash(channelPoint, 2);
+            if (!oldPair.get(0).equals(newPair.get(0))
+                || !oldPair.get(1).equals(newPair.get(1))) {
+                remapped.put(channel,
+                             new Node[] { newPair.get(0), newPair.get(1) });
+            }
+        }
+        return remapped;
     }
 }

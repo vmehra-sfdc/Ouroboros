@@ -234,6 +234,14 @@ public class Weaver implements Bundle {
         channels.put(channel, ec);
     }
 
+    /**
+     * Open a replicator to the node
+     * 
+     * @param node
+     *            - the replication node
+     * @param info
+     *            - the contact information for the node
+     */
     public void openReplicator(Node node, ContactInfomation info) {
         Replicator replicator = new Replicator(node, this);
         if (thisEndInitiatesConnectionsTo(node)) {
@@ -264,12 +272,18 @@ public class Weaver implements Bundle {
         replicators.put(id, replicator);
     }
 
+    /**
+     * Start the weaver
+     */
     public void start() {
         spindleHandler.start();
         replicationHandler.start();
         xeroxHandler.start();
     }
 
+    /**
+     * Terminate the weaver
+     */
     public void terminate() {
         spindleHandler.terminate();
         replicationHandler.terminate();
