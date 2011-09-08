@@ -22,6 +22,7 @@ package com.salesforce.ouroboros.util;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -144,7 +145,7 @@ import java.util.logging.Logger;
  */
 
 public final class ConsistentHashFunction<T extends Comparable<? super T>>
-        implements Cloneable {
+        implements Cloneable, Iterable<T> {
 
     /**
      * Allows to skip suitable items when searching for the closest replica.
@@ -181,21 +182,19 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
         public boolean isSkippable(List<T> previous, T bucket);
     }
 
-    private static int                       DEFAULT_REPLICAS = 200;
-    private static final Logger              log              = Logger.getLogger(ConsistentHashFunction.class.getCanonicalName());
+    private static int                    DEFAULT_REPLICAS = 200;
+    private static final Logger           log              = Logger.getLogger(ConsistentHashFunction.class.getCanonicalName());
 
     /** Each bucket is replicated this number of times. */
-    public final int                         replicaePerBucket;
+    public final int                      replicaePerBucket;
     /** The cached key set of {@link #sizes}. */
-    final protected Set<T>                   buckets;
-    /** The cached key set of {@link #replicae}. */
-    final protected Set<Entry<Long, Object>> entrySet;
+    final private Set<T>                  buckets;
     /** Maps points in the unit interval to buckets. */
-    final protected SortedMap<Long, Object>  replicae         = new TreeMap<Long, Object>();
+    final private SortedMap<Long, Object> replicae         = new TreeMap<Long, Object>();
     /** For each bucket, its size. */
-    final protected Map<T, Integer>          sizes            = new HashMap<T, Integer>();
+    final private Map<T, Integer>         sizes            = new HashMap<T, Integer>();
     /** The optional strategy to skip buckets, or <code>null</code>. */
-    final protected SkipStrategy<T>          skipStrategy;
+    final private SkipStrategy<T>         skipStrategy;
 
     /** Creates a new consistent hash function. */
     public ConsistentHashFunction() {
@@ -222,8 +221,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
                                   int replicas) {
         this.skipStrategy = skipStrategy;
         this.replicaePerBucket = replicas;
-        buckets = sizes.keySet();
-        entrySet = replicae.entrySet();
+        buckets = getSizes().keySet();
     }
 
     /**
@@ -240,10 +238,10 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
     @SuppressWarnings("unchecked")
     public boolean add(final T bucket, final int weight) {
 
-        if (sizes.containsKey(bucket)) {
+        if (getSizes().containsKey(bucket)) {
             return false;
         }
-        sizes.put(bucket, weight);
+        getSizes().put(bucket, weight);
 
         final MersenneTwister twister = new MersenneTwister(bucket.hashCode());
 
@@ -258,10 +256,15 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
             if ((o = replicae.get(point)) != null) {
                 if (o != bucket) { // o == bucket should happen with very low probability.
                     if (o instanceof SortedSet) {
+                        if (log.isLoggable(Level.FINEST)) {
+                            log.finest(String.format("Adding bucket %s to the conflict set",
+                                                     bucket));
+                        }
                         ((SortedSet<T>) o).add(bucket);
                     } else {
                         if (log.isLoggable(Level.FINEST)) {
-                            log.finest("Creating conflict set...");
+                            log.finest(String.format("Creating conflict set for buckets %s and %s",
+                                                     o, bucket));
                         }
                         conflictSet = new TreeSet<T>();
                         conflictSet.add((T) o);
@@ -277,25 +280,25 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
         return true;
     }
 
+    @Override
+    public ConsistentHashFunction<T> clone() {
+        ConsistentHashFunction<T> dupe = new ConsistentHashFunction<T>(
+                                                                       skipStrategy,
+                                                                       replicaePerBucket);
+        for (Entry<T, Integer> entry : getSizes().entrySet()) {
+            dupe.add(entry.getKey(), entry.getValue());
+        }
+        return dupe;
+    }
+
     /**
      * Returns the set of buckets of this consistent hash function.
      * 
      * @return the set of buckets.
      */
 
-    public Set<T> buckets() {
+    public Set<T> getBuckets() {
         return buckets;
-    }
-
-    @Override
-    public ConsistentHashFunction<T> clone() {
-        ConsistentHashFunction<T> dupe = new ConsistentHashFunction<T>(
-                                                                       skipStrategy,
-                                                                       replicaePerBucket);
-        for (Entry<T, Integer> entry : sizes.entrySet()) {
-            dupe.add(entry.getKey(), entry.getValue());
-        }
-        return dupe;
     }
 
     /**
@@ -303,6 +306,10 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
      */
     public int getReplicaePerBucket() {
         return replicaePerBucket;
+    }
+
+    public Map<T, Integer> getSizes() {
+        return sizes;
     }
 
     /**
@@ -432,6 +439,11 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
         return hash((long) key.hashCode() << 32, n);
     }
 
+    @Override
+    public Iterator<T> iterator() {
+        return buckets.iterator();
+    }
+
     /**
      * Removes a bucket.
      * 
@@ -443,12 +455,12 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
     @SuppressWarnings("unchecked")
     public boolean remove(final T bucket) {
 
-        if (!sizes.containsKey(bucket)) {
+        if (!getSizes().containsKey(bucket)) {
             return false;
         }
 
         final MersenneTwister twister = new MersenneTwister(bucket.hashCode());
-        final int size = sizes.remove(bucket);
+        final int size = getSizes().remove(bucket);
 
         long point;
         Object o;
@@ -479,7 +491,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
     }
 
     public int size() {
-        return sizes.size();
+        return buckets.size();
     }
 
     @Override

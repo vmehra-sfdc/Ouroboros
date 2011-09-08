@@ -88,9 +88,9 @@ public class ConsistentHashFunctionTest {
 
         ConsistentHashFunction<String> dupe = chf.clone();
         assertEquals(chf.size(), dupe.size());
-        for (Entry<String, Integer> entry : chf.sizes.entrySet()) {
-            assertEquals(chf.sizes.get(entry.getKey()),
-                         dupe.sizes.get(entry.getKey()));
+        for (Entry<String, Integer> entry : chf.getSizes().entrySet()) {
+            assertEquals(chf.getSizes().get(entry.getKey()),
+                         dupe.getSizes().get(entry.getKey()));
         }
     }
 
@@ -186,10 +186,10 @@ public class ConsistentHashFunctionTest {
         for (int t = 0; t < 500; t++) {
             long sample = r.nextLong();
             List<String> chances = chf.hash(sample,
-                                            Math.min(chf.buckets().size(),
+                                            Math.min(chf.getBuckets().size(),
                                                      r.nextInt(3) + 2));
             System.out.println("Chances for " + sample + " are " + chances
-                               + " out of " + chf.buckets());
+                               + " out of " + chf.getBuckets());
             for (String chance : chances) {
                 assertEquals(chf.hash(sample) + " != " + chance,
                              chf.hash(sample), chance);
@@ -202,7 +202,7 @@ public class ConsistentHashFunctionTest {
 
             assertTrue(sample + ": " + chances + " != "
                                + chf.hash(sample, chances.size()) + " (size="
-                               + chf.buckets().size() + ")",
+                               + chf.getBuckets().size() + ")",
                        Arrays.equals(chances.toArray(),
                                      chf.hash(sample, chances.size()).toArray()));
         }
@@ -271,7 +271,7 @@ public class ConsistentHashFunctionTest {
                 bucket.add(x);
                 chf.add(x, 1);
             }
-            assertEquals(bucket.size(), chf.buckets().size());
+            assertEquals(bucket.size(), chf.getBuckets().size());
         }
     }
 }

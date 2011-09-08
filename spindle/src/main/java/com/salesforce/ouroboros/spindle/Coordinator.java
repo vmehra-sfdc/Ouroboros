@@ -36,12 +36,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.smartfrog.services.anubis.locator.AnubisListener;
-import org.smartfrog.services.anubis.locator.AnubisLocator;
-import org.smartfrog.services.anubis.locator.AnubisProvider;
-import org.smartfrog.services.anubis.locator.AnubisStability;
-import org.smartfrog.services.anubis.locator.AnubisValue;
-
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
@@ -51,46 +46,6 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * 
  */
 public class Coordinator {
-
-    /**
-     * 
-     * Provides the distributed orchestration for the coordinator
-     * 
-     */
-    class Orchestrator extends AnubisListener {
-        private class Stability extends AnubisStability {
-            @Override
-            public void stability(boolean isStable, long timeRef) {
-                // TODO Auto-generated method stub
-            }
-        }
-
-        private final AnubisLocator  locator;
-        private final Stability      stability;
-        private final AnubisProvider stateProvider;
-
-        public Orchestrator(String stateName, AnubisLocator anubisLocator) {
-            super(stateName);
-            locator = anubisLocator;
-            stateProvider = new AnubisProvider(stateName);
-            stability = new Stability();
-            locator.registerStability(stability);
-            locator.registerProvider(stateProvider);
-            locator.registerListener(this);
-        }
-
-        @Override
-        public void newValue(AnubisValue value) {
-            if (value.getValue() == null) {
-                return; // Initial value
-            }
-        }
-
-        @Override
-        public void removeValue(AnubisValue value) {
-            // TODO Auto-generated method stub
-        }
-    }
 
     private final static Logger log = Logger.getLogger(Coordinator.class.getCanonicalName());
 
@@ -102,13 +57,7 @@ public class Coordinator {
     private Weaver                             localWeaver;
     private final Map<Integer, Node>           members     = new HashMap<Integer, Node>();
     private ConsistentHashFunction<Node>       weaverRing  = new ConsistentHashFunction<Node>();
-    private final Map<Node, ContactInfomation> yellowPages = new HashMap<Node, ContactInfomation>();
-
-    final Orchestrator                         orchestrator;
-
-    public Coordinator(String stateName, AnubisLocator locator) {
-        orchestrator = new Orchestrator(stateName, locator);
-    }
+    private final Map<Node, ContactInformation> yellowPages = new HashMap<Node, ContactInformation>();
 
     /**
      * Add new members of the weaver process group.
@@ -117,10 +66,10 @@ public class Coordinator {
      *            - the members and their contact information
      * @return the new consistent hash ring
      */
-    public ConsistentHashFunction<Node> addNewMembers(Map<Node, ContactInfomation> newMembers) {
+    public ConsistentHashFunction<Node> addNewMembers(Map<Node, ContactInformation> newMembers) {
         yellowPages.putAll(newMembers);
         ConsistentHashFunction<Node> newRing = weaverRing.clone();
-        for (Entry<Node, ContactInfomation> entry : newMembers.entrySet()) {
+        for (Entry<Node, ContactInformation> entry : newMembers.entrySet()) {
             Node node = entry.getKey();
             members.put(node.processId, node);
             localWeaver.openReplicator(node, entry.getValue());
@@ -176,7 +125,7 @@ public class Coordinator {
      *            - the node
      * @return the ContactInformation for the node
      */
-    public ContactInfomation getContactInformationFor(Node node) {
+    public ContactInformation getContactInformationFor(Node node) {
         return yellowPages.get(node);
     }
 
@@ -224,8 +173,8 @@ public class Coordinator {
      * 
      * @param newRing
      *            - the new consistent hash ring of nodes
-     * @return the remapping of channels which have changed their primary or
-     *         mirror in the new hash ring
+     * @return the remapping of channels hosted on this node that have changed
+     *         their primary or mirror in the new hash ring
      */
     public Map<UUID, Node[]> remap(ConsistentHashFunction<Node> newRing) {
         Map<UUID, Node[]> remapped = new HashMap<UUID, Node[]>();
@@ -233,10 +182,12 @@ public class Coordinator {
             long channelPoint = point(channel);
             List<Node> newPair = newRing.hash(channelPoint, 2);
             List<Node> oldPair = weaverRing.hash(channelPoint, 2);
-            if (!oldPair.get(0).equals(newPair.get(0))
-                || !oldPair.get(1).equals(newPair.get(1))) {
-                remapped.put(channel,
-                             new Node[] { newPair.get(0), newPair.get(1) });
+            if (oldPair.contains(localWeaver.getId())) {
+                if (!oldPair.get(0).equals(newPair.get(0))
+                    || !oldPair.get(1).equals(newPair.get(1))) {
+                    remapped.put(channel,
+                                 new Node[] { newPair.get(0), newPair.get(1) });
+                }
             }
         }
         return remapped;

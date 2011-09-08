@@ -33,6 +33,7 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.Node;
 
 /**
  * A full duplex replicator of event streams. The replicator provides both

@@ -25,6 +25,8 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import com.salesforce.ouroboros.Node;
+
 /**
  * The interface which provides the segments for appending within a channel,
  * based on the new event's header.

@@ -36,6 +36,7 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.Node;
 
 /**
  * This class duplicates a channel state from the primary to the secondary.

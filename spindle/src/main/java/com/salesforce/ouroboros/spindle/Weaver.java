@@ -41,6 +41,7 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 
 /**
@@ -241,7 +242,7 @@ public class Weaver implements Bundle {
      * @param info
      *            - the contact information for the node
      */
-    public void openReplicator(Node node, ContactInfomation info) {
+    public void openReplicator(Node node, ContactInformation info) {
         Replicator replicator = new Replicator(node, this);
         if (thisEndInitiatesConnectionsTo(node)) {
             if (log.isLoggable(Level.INFO)) {

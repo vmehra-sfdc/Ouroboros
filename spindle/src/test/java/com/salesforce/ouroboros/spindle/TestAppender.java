@@ -54,6 +54,7 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.AbstractAppender.State;
 
 /**

@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.Node;
 
 /**
  * The java bean representation of the configuration of a Weaver.

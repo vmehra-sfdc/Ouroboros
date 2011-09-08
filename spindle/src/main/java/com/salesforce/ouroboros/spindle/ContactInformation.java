@@ -33,12 +33,12 @@ import java.net.InetSocketAddress;
  * @author hhildebrand
  * 
  */
-public class ContactInfomation {
+public class ContactInformation {
     public final InetSocketAddress spindle;
     public final InetSocketAddress replication;
     public final InetSocketAddress xerox;
 
-    public ContactInfomation(InetSocketAddress spindle,
+    public ContactInformation(InetSocketAddress spindle,
                              InetSocketAddress replication,
                              InetSocketAddress xerox) {
         this.spindle = spindle;
