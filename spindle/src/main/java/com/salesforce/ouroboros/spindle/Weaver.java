@@ -156,28 +156,30 @@ public class Weaver implements Bundle {
             UUID channelId = entry.getKey();
             EventChannel channel = entry.getValue();
             Node[] pair = coordinator.getReplicationPair(channelId);
-            switch (channel.getRole()) {
-                case PRIMARY: {
-                    if (!channel.getReplicator().getId().equals(pair[1])) {
-                        // The mirror for this channel has died, xerox state to the new mirror
-                        if (log.isLoggable(Level.INFO)) {
-                            log.info(String.format("Mirror for %s has died, new mirror: %s",
-                                                   channelId, pair[1]));
+            if (pair[0].equals(id)) {
+                switch (channel.getRole()) {
+                    case PRIMARY: {
+                        if (!channel.getReplicator().getId().equals(pair[1])) {
+                            // The mirror for this channel has died, xerox state to the new mirror
+                            if (log.isLoggable(Level.INFO)) {
+                                log.info(String.format("Mirror for %s has died, new mirror: %s",
+                                                       channelId, pair[1]));
+                            }
+                            xeroxes.add(new Xerox(pair[1], channelId,
+                                                  channel.getSegmentStack()));
                         }
+                        break;
+                    }
+                    case MIRROR: {
+                        // This node is now the primary for the channel, xerox state to the new mirror
+                        if (log.isLoggable(Level.INFO)) {
+                            log.info(String.format("Weaver[%s] assuming primary role for: %s, mirror is %s",
+                                                   id, channelId, pair[1]));
+                        }
+                        channel.setPrimary();
                         xeroxes.add(new Xerox(pair[1], channelId,
                                               channel.getSegmentStack()));
                     }
-                    break;
-                }
-                case MIRROR: {
-                    // This node is now the primary for the channel, xerox state to the new mirror
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Weaver[%s] assuming primary role for: %s, mirror is %s",
-                                               id, channelId, pair[1]));
-                    }
-                    channel.setPrimary();
-                    xeroxes.add(new Xerox(pair[1], channelId,
-                                          channel.getSegmentStack()));
                 }
             }
         }
