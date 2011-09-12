@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,10 +54,10 @@ public class Coordinator {
         return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
     }
 
-    private final Set<UUID>                    channels    = new HashSet<UUID>();
-    private Weaver                             localWeaver;
-    private final Map<Integer, Node>           members     = new HashMap<Integer, Node>();
-    private ConsistentHashFunction<Node>       weaverRing  = new ConsistentHashFunction<Node>();
+    private final Set<UUID>                     channels    = new HashSet<UUID>();
+    private Weaver                              localWeaver;
+    private final Map<Integer, Node>            members     = new HashMap<Integer, Node>();
+    private ConsistentHashFunction<Node>        weaverRing  = new ConsistentHashFunction<Node>();
     private final Map<Node, ContactInformation> yellowPages = new HashMap<Node, ContactInformation>();
 
     /**
@@ -87,6 +88,7 @@ public class Coordinator {
      *            - the id of the channel to close
      */
     public void close(UUID channel) {
+        channels.remove(channel);
         List<Node> pair = weaverRing.hash(point(channel), 2);
         if (pair != null) {
             if (pair.get(0).equals(localWeaver.getId())
@@ -150,10 +152,11 @@ public class Coordinator {
      *            - the id of the channel to open
      */
     public void open(UUID channel) {
+        channels.add(channel);
         List<Node> pair = weaverRing.hash(point(channel), 2);
         if (pair.get(0).equals(localWeaver.getId())) {
             localWeaver.openPrimary(channel, pair.get(1));
-        } else if (pair.get(0).equals(localWeaver.getId())) {
+        } else if (pair.get(1).equals(localWeaver.getId())) {
             localWeaver.openMirror(channel, pair.get(0));
         }
     }
@@ -166,6 +169,25 @@ public class Coordinator {
      */
     public void ready(Weaver weaver) {
         localWeaver = weaver;
+    }
+
+    /**
+     * Rebalance the channels which this node has responsibility for
+     * 
+     * @param remapped
+     *            - the mapping of channels to their new primary/mirror pairs
+     * @param deadMembers
+     *            - the weaver nodes that have failed and are no longer part of
+     *            the partition
+     */
+    public List<Xerox> rebalance(Map<UUID, Node[]> remapped,
+                                 Collection<Node> deadMembers) {
+        List<Xerox> xeroxes = new ArrayList<Xerox>();
+        for (Entry<UUID, Node[]> entry : remapped.entrySet()) {
+            xeroxes.addAll(localWeaver.rebalance(entry.getKey(),
+                                                 entry.getValue(), deadMembers));
+        }
+        return xeroxes;
     }
 
     /**
@@ -191,5 +213,15 @@ public class Coordinator {
             }
         }
         return remapped;
+    }
+
+    /**
+     * Update the consistent hash function for the weaver processs ring.
+     * 
+     * @param ring
+     *            - the updated consistent hash function
+     */
+    public void updateRing(ConsistentHashFunction<Node> ring) {
+        weaverRing = ring;
     }
 }

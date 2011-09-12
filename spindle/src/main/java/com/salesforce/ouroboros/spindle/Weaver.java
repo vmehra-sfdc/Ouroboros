@@ -28,8 +28,8 @@ package com.salesforce.ouroboros.spindle;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.UUID;
@@ -148,43 +148,29 @@ public class Weaver implements Bundle {
      * 
      * @param deadMembers
      *            - the weaver nodes that have died
-     * @return the list of Xerox machines that perform any state transfer
-     *         necessary to the new mirrors
      */
-    public List<Xerox> failover(Collection<Node> deadMembers) {
-        LinkedList<Xerox> xeroxes = new LinkedList<Xerox>();
+    public void failover(Collection<Node> deadMembers) {
         for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
             UUID channelId = entry.getKey();
             EventChannel channel = entry.getValue();
             Node[] pair = coordinator.getReplicationPair(channelId);
-            if (pair[0].equals(id)) {
-                switch (channel.getRole()) {
-                    case PRIMARY: {
-                        if (!channel.getReplicator().getId().equals(pair[1])) {
-                            // The mirror for this channel has died, xerox state to the new mirror
-                            if (log.isLoggable(Level.INFO)) {
-                                log.info(String.format("Mirror for %s has died, new mirror: %s",
-                                                       channelId, pair[1]));
-                            }
-                            xeroxes.add(new Xerox(pair[1], channelId,
-                                                  channel.getSegmentStack()));
-                        }
-                        break;
+            if (deadMembers.contains(pair[0]) || deadMembers.contains(pair[1])) {
+                if (channel.isPrimary()) {
+                    // The mirror for this channel has died
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Mirror for %s has died, old mirror: %s",
+                                               channelId, pair[1]));
                     }
-                    case MIRROR: {
-                        // This node is now the primary for the channel, xerox state to the new mirror
-                        if (log.isLoggable(Level.INFO)) {
-                            log.info(String.format("Weaver[%s] assuming primary role for: %s, mirror is %s",
-                                                   id, channelId, pair[1]));
-                        }
-                        channel.setPrimary();
-                        xeroxes.add(new Xerox(pair[1], channelId,
-                                              channel.getSegmentStack()));
+                } else {
+                    // This node is now the primary for the channel, xerox state to the new mirror
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Weaver[%s] assuming primary role for: %s, old primary: %s",
+                                               id, channelId, pair[1]));
                     }
+                    channel.setPrimary();
                 }
             }
         }
-        return xeroxes;
     }
 
     /**
@@ -265,6 +251,46 @@ public class Weaver implements Bundle {
                                        id, node));
             }
         }
+    }
+
+    /**
+     * Rebalance a channel that this node serves as either the primary or
+     * mirror. Answer the list of Xerox machines that will perform the state
+     * transfer, if needed, between this node and other nodes also responsible
+     * for the channel
+     * 
+     * @param channel
+     *            - the id of the channel to rebalance
+     * @param pair
+     *            - the pair of nodes that are the new primary/mirror
+     *            responsible for the channel
+     * @return the list of Xerox machines which will perform any necessary state
+     *         transfer for the channel
+     */
+    public List<Xerox> rebalance(UUID channel, Node[] pair,
+                                 Collection<Node> deadMembers) {
+        EventChannel eventChannel = channels.get(channel);
+        assert eventChannel != null : String.format("The event channel to rebalance does not exist: %s",
+                                                    channel);
+        ArrayList<Xerox> xeroxes = new ArrayList<Xerox>(3);
+        if (pair[0].equals(id)) {
+            // we are the new primary, rebalancing to the mirror
+            log.info(String.format("Rebalancing channel %s on primary: %s to new mirror on: %s",
+                                   channel, id, pair[1]));
+            xeroxes.add(new Xerox(pair[1], channel, eventChannel.getSegmentStack()));
+        } else if (pair[1].equals(id)) {
+            // we are the new secondary, rebalancing to the new primary
+            log.info(String.format("Rebalancing channel %s on mirror: %s to new primary on: %s",
+                                   channel, id, pair[0]));
+            xeroxes.add(new Xerox(pair[0], channel, eventChannel.getSegmentStack()));
+        } else {
+            // we are neither the new primary, or the new secondary
+            log.info(String.format("Rebalancing channel %s on existing primary: %s to new primary %s, new mirror on: %s",
+                                   channel, id, pair[0], pair[1]));
+            xeroxes.add(new Xerox(pair[0], channel, eventChannel.getSegmentStack()));
+            xeroxes.add(new Xerox(pair[1], channel, eventChannel.getSegmentStack()));
+        }
+        return xeroxes;
     }
 
     @Override

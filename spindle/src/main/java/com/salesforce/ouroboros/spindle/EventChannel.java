@@ -111,7 +111,7 @@ public class EventChannel {
 
     private final File       channel;
     private volatile long    commited;
-    private volatile long    lastTimestamp;
+    private volatile long    lastId;
     private final long       maxSegmentSize;
     private volatile long    nextOffset;
     private final Replicator replicator;
@@ -133,7 +133,7 @@ public class EventChannel {
 
     public void append(EventHeader header, long offset) {
         nextOffset = offset + header.totalSize();
-        lastTimestamp = header.getId();
+        lastId = header.getId();
     }
 
     /**
@@ -229,7 +229,7 @@ public class EventChannel {
      * @return true if the header represents a duplicate event.
      */
     public boolean isDuplicate(EventHeader header) {
-        return header.getId() < lastTimestamp;
+        return header.getId() < lastId;
     }
 
     public boolean isMirror() {
