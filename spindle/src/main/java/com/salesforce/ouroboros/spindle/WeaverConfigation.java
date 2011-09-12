@@ -49,7 +49,7 @@ public class WeaverConfigation {
     public static final String   DEFAULT_STATE_NAME             = "weavers";
     public static final int      DEFAULT_REPLICATION_QUEUE_SIZE = 100;
 
-    public static ThreadFactory threadFactory(String prefix) {
+    public static ThreadFactory threadFactory(final String prefix) {
         return new ThreadFactory() {
             private AtomicInteger count = new AtomicInteger(0);
 
@@ -58,6 +58,7 @@ public class WeaverConfigation {
                 Thread thread = new Thread(
                                            runnable,
                                            String.format("%s[%s]",
+                                                         prefix,
                                                          count.getAndIncrement()));
                 thread.setDaemon(true);
                 return thread;

@@ -149,6 +149,7 @@ public class Replicator implements CommunicationsHandler {
     @Override
     public void handleConnect(SocketChannel channel,
                               SocketChannelHandler<?> handler) {
+        this.handler = handler;
         switch (state) {
             case ESTABLISHED: {
                 duplicator.handleConnect(channel, handler);

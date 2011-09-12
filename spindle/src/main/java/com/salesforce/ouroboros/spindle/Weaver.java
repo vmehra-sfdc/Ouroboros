@@ -229,7 +229,7 @@ public class Weaver implements Bundle {
      *            - the contact information for the node
      */
     public void openReplicator(Node node, ContactInformation info) {
-        Replicator replicator = new Replicator(node, this);
+        Replicator replicator = new Replicator(id, this);
         if (thisEndInitiatesConnectionsTo(node)) {
             if (log.isLoggable(Level.INFO)) {
                 log.fine(String.format("Initiating connection from weaver[%s] to new weaver[%s]",
