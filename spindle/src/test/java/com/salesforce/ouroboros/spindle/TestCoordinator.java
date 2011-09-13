@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 import org.junit.Test;
 
@@ -87,7 +88,7 @@ public class TestCoordinator {
         newMembers.put(node1, contactInformation1);
         newMembers.put(node2, contactInformation2);
         newMembers.put(node3, contactInformation3);
-        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers);
+        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers.keySet());
         coordinator.updateRing(ring);
         UUID primary = null;
         while (primary == null) {
@@ -144,7 +145,7 @@ public class TestCoordinator {
         newMembers.put(node1, contactInformation1);
         newMembers.put(node2, contactInformation2);
         newMembers.put(node3, contactInformation3);
-        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers);
+        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers.keySet());
         coordinator.updateRing(ring);
         UUID primary = null;
         while (primary == null) {
@@ -168,6 +169,47 @@ public class TestCoordinator {
         coordinator.close(mirror);
         verify(weaver).close(primary);
         verify(weaver).close(mirror);
+    }
+
+    @Test
+    public void testOpenReplicators() {
+        Weaver weaver = mock(Weaver.class);
+        Coordinator coordinator = new Coordinator();
+        coordinator.ready(weaver);
+        Node node1 = new Node(1, 1, 1);
+        Node node2 = new Node(2, 1, 1);
+        Node node3 = new Node(3, 1, 1);
+
+        InetSocketAddress address = new InetSocketAddress(0);
+        ContactInformation contactInformation1 = new ContactInformation(
+                                                                        address,
+                                                                        address,
+                                                                        address);
+        ContactInformation contactInformation2 = new ContactInformation(
+                                                                        address,
+                                                                        address,
+                                                                        address);
+        ContactInformation contactInformation3 = new ContactInformation(
+                                                                        address,
+                                                                        address,
+                                                                        address);
+        Map<Node, ContactInformation> newMembers = new HashMap<Node, ContactInformation>();
+        newMembers.put(node1, contactInformation1);
+        newMembers.put(node2, contactInformation2);
+        newMembers.put(node3, contactInformation3);
+        CountDownLatch latch = coordinator.openReplicators(newMembers);
+        assertNotNull(latch);
+        assertEquals(3, latch.getCount());
+
+        assertEquals(contactInformation1,
+                     coordinator.getContactInformationFor(node1));
+        assertEquals(contactInformation2,
+                     coordinator.getContactInformationFor(node2));
+        assertEquals(contactInformation3,
+                     coordinator.getContactInformationFor(node3));
+        verify(weaver).openReplicator(node1, contactInformation1, latch);
+        verify(weaver).openReplicator(node2, contactInformation2, latch);
+        verify(weaver).openReplicator(node3, contactInformation3, latch);
     }
 
     @Test
@@ -203,22 +245,13 @@ public class TestCoordinator {
         newMembers.put(node1, contactInformation1);
         newMembers.put(node2, contactInformation2);
         newMembers.put(node3, contactInformation3);
-        ConsistentHashFunction<Node> remapped = coordinator.addNewMembers(newMembers);
+        ConsistentHashFunction<Node> remapped = coordinator.addNewMembers(newMembers.keySet());
         assertNotNull(remapped);
         assertEquals(4, remapped.size());
         assertTrue(remapped.getBuckets().contains(localNode));
         assertTrue(remapped.getBuckets().contains(node1));
         assertTrue(remapped.getBuckets().contains(node2));
         assertTrue(remapped.getBuckets().contains(node3));
-
-        assertEquals(contactInformation,
-                     coordinator.getContactInformationFor(localNode));
-        assertEquals(contactInformation1,
-                     coordinator.getContactInformationFor(node1));
-        assertEquals(contactInformation2,
-                     coordinator.getContactInformationFor(node2));
-        assertEquals(contactInformation3,
-                     coordinator.getContactInformationFor(node3));
     }
 
     @Test
@@ -254,7 +287,7 @@ public class TestCoordinator {
         newMembers.put(node1, contactInformation1);
         newMembers.put(node2, contactInformation2);
         newMembers.put(node3, contactInformation3);
-        coordinator.addNewMembers(newMembers);
+        coordinator.addNewMembers(newMembers.keySet());
         Set<Node> deadMembers = newMembers.keySet();
         coordinator.failover(deadMembers);
 
@@ -303,7 +336,7 @@ public class TestCoordinator {
         newMembers.put(node1, contactInformation1);
         newMembers.put(node2, contactInformation2);
         newMembers.put(node3, contactInformation3);
-        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers);
+        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers.keySet());
         coordinator.updateRing(ring);
         UUID primary = null;
         while (primary == null) {
@@ -366,7 +399,7 @@ public class TestCoordinator {
         newMembers.put(node1, contactInformation1);
         newMembers.put(node2, contactInformation2);
         newMembers.put(node3, contactInformation3);
-        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers);
+        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers.keySet());
         coordinator.updateRing(ring);
         UUID primary = null;
         while (primary == null) {

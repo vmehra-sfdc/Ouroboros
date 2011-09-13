@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -64,20 +65,26 @@ public class Coordinator {
      * Add new members of the weaver process group.
      * 
      * @param newMembers
-     *            - the members and their contact information
+     *            - the new members
      * @return the new consistent hash ring
      */
-    public ConsistentHashFunction<Node> addNewMembers(Map<Node, ContactInformation> newMembers) {
-        yellowPages.putAll(newMembers);
+    public ConsistentHashFunction<Node> addNewMembers(Collection<Node> newMembers) {
         ConsistentHashFunction<Node> newRing = weaverRing.clone();
-        for (Entry<Node, ContactInformation> entry : newMembers.entrySet()) {
-            Node node = entry.getKey();
+        for (Node node : newMembers) {
             members.put(node.processId, node);
-            localWeaver.openReplicator(node, entry.getValue());
             newRing.add(node, node.capacity);
         }
 
         return newRing;
+    }
+
+    public CountDownLatch openReplicators(Map<Node, ContactInformation> newMembers) {
+        CountDownLatch latch = new CountDownLatch(newMembers.size());
+        yellowPages.putAll(newMembers);
+        for (Entry<Node, ContactInformation> entry : newMembers.entrySet()) {
+            localWeaver.openReplicator(entry.getKey(), entry.getValue(), latch);
+        }
+        return latch;
     }
 
     /**

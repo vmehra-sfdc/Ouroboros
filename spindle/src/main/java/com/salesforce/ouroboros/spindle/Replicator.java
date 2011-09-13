@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.spindle;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -59,7 +60,7 @@ import com.salesforce.ouroboros.Node;
  */
 public class Replicator implements CommunicationsHandler {
     public enum State {
-        ERROR, ESTABLISHED, INITIAL, OUTBOUND_HANDSHAKE, INBOUND_HANDSHAKE;
+        ERROR, ESTABLISHED, INITIAL, OUTBOUND_HANDSHAKE;
     }
 
     private static final Logger              log            = Logger.getLogger(Replicator.class.getCanonicalName());
@@ -68,27 +69,25 @@ public class Replicator implements CommunicationsHandler {
     static final int                         MAGIC          = 0x1638;
 
     private final ReplicatingAppender        appender;
-    private final Duplicator                 duplicator;
-    private volatile State                   state          = State.INITIAL;
-    private ByteBuffer                       handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private volatile Node                    id;
     private final Bundle                     bundle;
+    private final Duplicator                 duplicator;
     private volatile SocketChannelHandler<?> handler;
+    private ByteBuffer                       handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private CountDownLatch                   latch;
+    private volatile Node                    partnerId;
+    private volatile State                   state          = State.INITIAL;
 
-    public Replicator(Bundle bundle) {
+    public Replicator(Bundle bundle, Node partner, CountDownLatch latch) {
         duplicator = new Duplicator();
         appender = new ReplicatingAppender(bundle);
         this.bundle = bundle;
+        partnerId = partner;
+        this.latch = latch;
     }
 
-    public Replicator(Node id, Bundle bundle) {
-        duplicator = new Duplicator();
-        appender = new ReplicatingAppender(bundle);
-        this.id = id;
-        this.bundle = bundle;
-        handshake.putInt(MAGIC);
-        id.serialize(handshake);
-        handshake.flip();
+    public void bindTo(Node node) {
+        partnerId = node;
+        state = State.ESTABLISHED;
     }
 
     public void close() {
@@ -114,8 +113,8 @@ public class Replicator implements CommunicationsHandler {
         return duplicator;
     }
 
-    public Node getId() {
-        return id;
+    public Node getPartnerId() {
+        return partnerId;
     }
 
     /**
@@ -133,11 +132,8 @@ public class Replicator implements CommunicationsHandler {
             case ESTABLISHED: {
                 duplicator.handleConnect(channel, handler);
                 appender.handleAccept(channel, handler);
-                break;
-            }
-            case INITIAL: {
-                state = State.INBOUND_HANDSHAKE;
-                readHandshake(channel);
+                handler.selectForRead();
+                latch.countDown();
                 break;
             }
             default: {
@@ -157,6 +153,9 @@ public class Replicator implements CommunicationsHandler {
                 break;
             }
             case INITIAL: {
+                handshake.putInt(MAGIC);
+                bundle.getId().serialize(handshake);
+                handshake.flip();
                 state = State.OUTBOUND_HANDSHAKE;
                 writeHandshake(channel);
                 break;
@@ -172,10 +171,6 @@ public class Replicator implements CommunicationsHandler {
         switch (state) {
             case ESTABLISHED: {
                 appender.handleRead(channel);
-                break;
-            }
-            case INBOUND_HANDSHAKE: {
-                readHandshake(channel);
                 break;
             }
             default: {
@@ -201,33 +196,9 @@ public class Replicator implements CommunicationsHandler {
         }
     }
 
-    private void readHandshake(SocketChannel channel) {
-        try {
-            channel.read(handshake);
-        } catch (IOException e) {
-            log.log(Level.WARNING,
-                    String.format("Unable to read handshake from: %s", channel),
-                    e);
-            state = State.ERROR;
-            handler.close();
-            return;
-        }
-        if (!handshake.hasRemaining()) {
-            handshake.flip();
-            int magic = handshake.getInt();
-            if (MAGIC != magic) {
-                state = State.ERROR;
-                log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
-                                          channel, magic));
-                handler.close();
-                return;
-            }
-            id = new Node(handshake);
-            bundle.registerReplicator(id, this);
-            duplicator.handleConnect(channel, handler);
-            state = State.ESTABLISHED;
-        }
-        handler.selectForRead();
+    public void replicate(EventChannel eventChannel, long offset,
+                          Segment segment, int totalSize) {
+        duplicator.replicate(eventChannel, offset, segment, totalSize);
     }
 
     private void writeHandshake(SocketChannel channel) {
@@ -242,14 +213,9 @@ public class Replicator implements CommunicationsHandler {
             return;
         }
         if (!handshake.hasRemaining()) {
-            bundle.registerReplicator(id, this);
             duplicator.handleConnect(channel, handler);
             state = State.ESTABLISHED;
+            latch.countDown();
         }
-    }
-
-    public void replicate(EventChannel eventChannel, long offset,
-                          Segment segment, int totalSize) {
-        duplicator.replicate(eventChannel, offset, segment, totalSize);
     }
 }

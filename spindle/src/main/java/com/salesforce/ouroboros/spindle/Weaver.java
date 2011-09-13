@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,6 +36,7 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -58,7 +60,50 @@ public class Weaver implements Bundle {
             CommunicationsHandlerFactory<Replicator> {
         @Override
         public Replicator createCommunicationsHandler(SocketChannel channel) {
-            return new Replicator(Weaver.this);
+            try {
+                channel.configureBlocking(true);
+            } catch (IOException e) {
+                String msg = String.format("Unable to configure blocking for socket channel: %s",
+                                           channel);
+                log.log(Level.WARNING, msg, e);
+                throw new IllegalStateException(msg, e);
+            }
+            Node node = readHandshake(channel);
+            if (node == null) {
+                try {
+                    channel.close();
+                } catch (IOException e) {
+                    log.log(Level.FINEST,
+                            String.format("Error closing socket channel: %s",
+                                          channel), e);
+                    throw new IllegalStateException(
+                                                    String.format("Error reading replication handshake from socket channel: %s",
+                                                                  channel));
+                }
+            }
+            Replicator replicator = replicators.get(node);
+            replicator.bindTo(node);
+            return replicator;
+        }
+
+        private Node readHandshake(SocketChannel channel) {
+            ByteBuffer handshake = ByteBuffer.allocate(Replicator.HANDSHAKE_SIZE);
+            try {
+                channel.read(handshake);
+            } catch (IOException e) {
+                log.log(Level.WARNING,
+                        String.format("Unable to read handshake from: %s",
+                                      channel), e);
+                return null;
+            }
+            handshake.flip();
+            int magic = handshake.getInt();
+            if (Replicator.MAGIC != magic) {
+                log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
+                                          channel, magic));
+                return null;
+            }
+            return new Node(handshake);
         }
     }
 
@@ -227,9 +272,13 @@ public class Weaver implements Bundle {
      *            - the replication node
      * @param info
      *            - the contact information for the node
+     * @param latch
+     *            - the count down latch to sychronize connectivity
      */
-    public void openReplicator(Node node, ContactInformation info) {
-        Replicator replicator = new Replicator(id, this);
+    public void openReplicator(Node node, ContactInformation info,
+                               CountDownLatch latch) {
+        Replicator replicator = new Replicator(this, node, latch);
+        replicators.put(node, replicator);
         if (thisEndInitiatesConnectionsTo(node)) {
             if (log.isLoggable(Level.INFO)) {
                 log.fine(String.format("Initiating connection from weaver[%s] to new weaver[%s]",
@@ -244,7 +293,6 @@ public class Weaver implements Bundle {
                 log.log(Level.SEVERE, msg, e);
                 throw new IllegalStateException(msg, e);
             }
-            replicators.put(node, replicator);
         } else {
             if (log.isLoggable(Level.INFO)) {
                 log.fine(String.format("Waiting for connection to weaver[%s] from new weaver[%s]",
@@ -277,25 +325,24 @@ public class Weaver implements Bundle {
             // we are the new primary, rebalancing to the mirror
             log.info(String.format("Rebalancing channel %s on primary: %s to new mirror on: %s",
                                    channel, id, pair[1]));
-            xeroxes.add(new Xerox(pair[1], channel, eventChannel.getSegmentStack()));
+            xeroxes.add(new Xerox(pair[1], channel,
+                                  eventChannel.getSegmentStack()));
         } else if (pair[1].equals(id)) {
             // we are the new secondary, rebalancing to the new primary
             log.info(String.format("Rebalancing channel %s on mirror: %s to new primary on: %s",
                                    channel, id, pair[0]));
-            xeroxes.add(new Xerox(pair[0], channel, eventChannel.getSegmentStack()));
+            xeroxes.add(new Xerox(pair[0], channel,
+                                  eventChannel.getSegmentStack()));
         } else {
             // we are neither the new primary, or the new secondary
             log.info(String.format("Rebalancing channel %s on existing primary: %s to new primary %s, new mirror on: %s",
                                    channel, id, pair[0], pair[1]));
-            xeroxes.add(new Xerox(pair[0], channel, eventChannel.getSegmentStack()));
-            xeroxes.add(new Xerox(pair[1], channel, eventChannel.getSegmentStack()));
+            xeroxes.add(new Xerox(pair[0], channel,
+                                  eventChannel.getSegmentStack()));
+            xeroxes.add(new Xerox(pair[1], channel,
+                                  eventChannel.getSegmentStack()));
         }
         return xeroxes;
-    }
-
-    @Override
-    public void registerReplicator(Node id, Replicator replicator) {
-        replicators.put(id, replicator);
     }
 
     /**

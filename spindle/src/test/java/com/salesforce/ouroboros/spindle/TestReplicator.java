@@ -29,11 +29,11 @@ import static junit.framework.Assert.assertEquals;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.CountDownLatch;
 
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
@@ -54,9 +54,10 @@ public class TestReplicator {
         Bundle bundle = mock(Bundle.class);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
+        CountDownLatch latch = mock(CountDownLatch.class);
         final Node node = new Node(0x1639, 0x1640, 0x1650);
 
-        Replicator replicator = new Replicator(bundle);
+        Replicator replicator = new Replicator(bundle, node, latch);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -69,39 +70,9 @@ public class TestReplicator {
         }).when(socketChannel).read(isA(ByteBuffer.class));
 
         assertEquals(State.INITIAL, replicator.getState());
-        replicator.handleAccept(socketChannel, handler);
-        assertEquals(State.INBOUND_HANDSHAKE, replicator.getState());
-        replicator.handleRead(socketChannel);
+        replicator.bindTo(node);
+        replicator.handleAccept(socketChannel, handler); 
         assertEquals(State.ESTABLISHED, replicator.getState());
-        verify(bundle).registerReplicator(node, replicator);
-    }
-
-    @Test
-    public void testInboundEstablishError() throws Exception {
-        Bundle bundle = mock(Bundle.class);
-        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
-        SocketChannel socketChannel = mock(SocketChannel.class);
-        final Node node = new Node(0x1639, 0x1640, 0x1650);
-
-        Replicator replicator = new Replicator(bundle);
-
-        doReturn(0).doAnswer(new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                buffer.putInt(Replicator.MAGIC + 1);
-                node.serialize(buffer);
-                return Replicator.HANDSHAKE_SIZE;
-            }
-        }).when(socketChannel).read(isA(ByteBuffer.class));
-
-        assertEquals(State.INITIAL, replicator.getState());
-        replicator.handleAccept(socketChannel, handler);
-        assertEquals(State.INBOUND_HANDSHAKE, replicator.getState());
-        replicator.handleRead(socketChannel);
-        assertEquals(State.ERROR, replicator.getState());
-        verify(handler).close();
-        verifyNoMoreInteractions(bundle);
     }
 
     @Test
@@ -110,8 +81,10 @@ public class TestReplicator {
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
         final Node node = new Node(0x1639, 0x1640, 0x1650);
+        CountDownLatch latch = mock(CountDownLatch.class);
+        when(bundle.getId()).thenReturn(node);
 
-        Replicator replicator = new Replicator(node, bundle);
+        Replicator replicator = new Replicator(bundle, node, latch);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -128,6 +101,5 @@ public class TestReplicator {
         assertEquals(State.OUTBOUND_HANDSHAKE, replicator.getState());
         replicator.handleWrite(socketChannel);
         assertEquals(State.ESTABLISHED, replicator.getState());
-        verify(bundle).registerReplicator(node, replicator);
     }
 }

@@ -31,6 +31,7 @@ import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -39,9 +40,11 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 import org.junit.Test;
 
+import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Node;
 
 /**
@@ -128,8 +131,12 @@ public class TestWeaver {
 
     @Test
     public void testOpenReplicator() throws Exception {
+        CountDownLatch latch = mock(CountDownLatch.class);
+        SocketOptions options = new SocketOptions();
+        options.setTimeout(100);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
+        options.configure(server.socket());
         server.socket().bind(new InetSocketAddress(0));
         ContactInformation info = new ContactInformation(
                                                          new InetSocketAddress(
@@ -151,7 +158,7 @@ public class TestWeaver {
         config.setRoot(root);
         Weaver weaver = new Weaver(config, coordinator);
         weaver.start();
-        weaver.openReplicator(mirror, info);
+        weaver.openReplicator(mirror, info, latch);
         SocketChannel connected = server.accept();
         assertNotNull(connected);
         assertTrue(connected.isConnected());
@@ -162,6 +169,8 @@ public class TestWeaver {
         assertEquals(Replicator.MAGIC, buffer.getInt());
         Node handshakeNode = new Node(buffer);
         assertEquals(id, handshakeNode);
+        Thread.sleep(10); // Time for replicator to countdown the latch
+        verify(latch).countDown();
         weaver.terminate();
         connected.close();
         server.close();

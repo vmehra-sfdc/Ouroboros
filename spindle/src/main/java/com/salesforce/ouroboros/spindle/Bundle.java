@@ -35,6 +35,7 @@ import com.salesforce.ouroboros.Node;
  * 
  */
 public interface Bundle {
+
     /**
      * Answer the event channel the event is part of.
      * 
@@ -46,10 +47,7 @@ public interface Bundle {
     EventChannel eventChannelFor(EventHeader header);
 
     /**
-     * Register the inbound replicator with the id
-     * 
-     * @param id
-     * @param replicator
+     * @return the Node id of the bundle
      */
-    void registerReplicator(Node id, Replicator replicator);
+    Node getId();
 }
