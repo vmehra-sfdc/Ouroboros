@@ -137,14 +137,16 @@ public class TestWeaver {
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         options.configure(server.socket());
-        server.socket().bind(new InetSocketAddress(0));
+        server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
         ContactInformation info = new ContactInformation(
-                                                         new InetSocketAddress("127.0.0.1", 
+                                                         new InetSocketAddress(
+                                                                               "127.0.0.1",
                                                                                0),
                                                          new InetSocketAddress(
                                                                                server.socket().getInetAddress(),
                                                                                server.socket().getLocalPort()),
-                                                         new InetSocketAddress("127.0.0.1", 
+                                                         new InetSocketAddress(
+                                                                               "127.0.0.1",
                                                                                0));
         Node id = new Node(0, 0, 0);
         Node mirror = new Node(1, 0, 0);
