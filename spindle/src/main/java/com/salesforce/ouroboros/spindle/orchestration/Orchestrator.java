@@ -23,9 +23,8 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.orchestration;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,99 +43,18 @@ import org.smartfrog.services.anubis.partition.PartitionNotification;
 import org.smartfrog.services.anubis.partition.views.View;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.ContactInformation;
 
 /**
- * The orchestrator for the channel buffer process.
+ * This class is a state machine driven by the partitioning events within the
+ * group membership as well as by messages sent within the group. This class
+ * orchestrates the distributed {@link Coordinator} for the channel buffer
+ * process.
  * 
  * @author hhildebrand
  * 
  */
 public class Orchestrator {
-    public static class Message implements Serializable {
-        private static final long serialVersionUID = 1L;
-        final Serializable        body;
-        final MessageType         type;
-
-        Message(MessageType type, Serializable body) {
-            this.type = type;
-            this.body = body;
-        }
-
-        @Override
-        public String toString() {
-            return "Message [type=" + type + ", body=" + body + "]";
-        }
-    }
-
-    public static enum MessageType {
-        PUBLISH {
-            @Override
-            void process(Serializable body, Orchestrator orchestrator) {
-                Object[] info = (Object[]) body;
-                Node n = (Node) info[0];
-                ContactInformation card = (ContactInformation) info[1];
-                orchestrator.introductionFrom(n, card);
-            }
-        };
-
-        /**
-         * Process the message
-         * 
-         * @param body
-         *            - the body of the message
-         * @param orchestrator
-         *            - the receiver of the message
-         */
-        abstract void process(Serializable body, Orchestrator orchestrator);
-    }
-
-    public enum PartitionState {
-        STABLE {
-            @Override
-            void next(PartitionState next, Orchestrator orchestrator,
-                      View view, int leader) {
-                switch (next) {
-                    case STABLE: {
-                        if (log.isLoggable(Level.INFO)) {
-                            log.info(String.format("Stable view received while in the stable state: %s, leader: %s",
-                                                   view, leader));
-                        }
-                        break;
-                    }
-                    case UNSTABLE: {
-                        orchestrator.destabilize(view, leader);
-                    }
-                }
-            }
-
-        },
-        UNSTABLE {
-            @Override
-            void next(PartitionState next, Orchestrator orchestrator,
-                      View view, int leader) {
-                switch (next) {
-                    case UNSTABLE: {
-                        if (log.isLoggable(Level.FINEST)) {
-                            log.finest(String.format("Untable view received while in the unstable state: %s, leader: %s",
-                                                     view, leader));
-                        }
-                        break;
-                    }
-                    case STABLE: {
-                        orchestrator.stabilize(view, leader);
-                    }
-                }
-            }
-
-        };
-        abstract void next(PartitionState next, Orchestrator orchestrator,
-                           View view, int leader);
-    }
-
-    public enum State {
-        INITIAL, REBALANCING
-    }
-
     class MessageListener extends AnubisListener {
         public MessageListener(String n) {
             super(n);
@@ -168,28 +86,31 @@ public class Orchestrator {
 
     }
 
-    private final static Logger                           log            = Logger.getLogger(Orchestrator.class.getCanonicalName());
+    final static Logger                                   log            = Logger.getLogger(Orchestrator.class.getCanonicalName());
 
+    private volatile int                                  cardinality    = -1;
+    private final Coordinator                             coordinator;
     private final List<Node>                              deadMembers    = new CopyOnWriteArrayList<Node>();
     private final AnubisLocator                           locator;
     private final ConcurrentMap<Node, ContactInformation> members        = new ConcurrentHashMap<Node, ContactInformation>();
+    private final MessageListener                         msgListener;
+    private final AnubisProvider                          msgService;
     private final List<Node>                              newMembers     = new CopyOnWriteArrayList<Node>();
     private final Node                                    node;
     private final PartitionNotification                   notification   = new Notification();
     private final PartitionManager                        partitionManager;
-    private final AtomicReference<PartitionState>         partitionState = new AtomicReference<Orchestrator.PartitionState>(
-                                                                                                                            PartitionState.UNSTABLE);
-    private final AtomicReference<State>                  state          = new AtomicReference<Orchestrator.State>(
-                                                                                                                   State.INITIAL);
-    private final MessageListener                         stateListener;
-    private final AnubisProvider                          stateProvider;
+    private final AtomicReference<PartitionState>         partitionState = new AtomicReference<PartitionState>(
+                                                                                                               PartitionState.UNSTABLE);
+    private final AtomicReference<State>                  state          = new AtomicReference<State>(
+                                                                                                      State.INITIAL);
 
-    public Orchestrator(Node node, String stateName, AnubisLocator lctr,
-                        PartitionManager partitionMgr) {
-        this.node = node;
+    public Orchestrator(Node n, Coordinator coord, String stateName,
+                        AnubisLocator lctr, PartitionManager partitionMgr) {
+        node = n;
+        coordinator = coord;
         locator = lctr;
-        stateProvider = new AnubisProvider(stateName);
-        stateListener = new MessageListener(stateName);
+        msgService = new AnubisProvider(stateName);
+        msgListener = new MessageListener(stateName);
         partitionManager = partitionMgr;
     }
 
@@ -230,6 +151,9 @@ public class Orchestrator {
             assert !newMembers.contains(node) : String.format("Already received contact information for: %s",
                                                               member);
             newMembers.add(node);
+            if (newMembers.size() == cardinality) {
+                transitionTo(State.INTRODUCED);
+            }
         }
     }
 
@@ -288,21 +212,33 @@ public class Orchestrator {
      *            - the leader
      */
     public void stabilize(View view, int leader) {
+        cardinality = view.cardinality();
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Stabilizing partition on: %s, view: %s, leader: %s",
                                    node, view, leader));
         }
+        msgService.setValue(new Message(MessageType.PUBLISH, members.get(node)));
     }
 
     public void start() {
-        locator.registerProvider(stateProvider);
-        locator.registerListener(stateListener);
+        locator.registerProvider(msgService);
+        locator.registerListener(msgListener);
         partitionManager.register(notification);
     }
 
     public void terminate() {
-        locator.deregisterListener(stateListener);
-        locator.deregisterProvider(stateProvider);
+        locator.deregisterListener(msgListener);
+        locator.deregisterProvider(msgService);
         partitionManager.deregister(notification);
+    }
+
+    /**
+     * The state machine driver
+     * 
+     * @param next
+     *            - the next state
+     */
+    private void transitionTo(State next) {
+        state.getAndSet(next).next(next, this);
     }
 }

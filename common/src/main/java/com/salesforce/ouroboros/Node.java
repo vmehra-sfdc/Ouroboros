@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros;
 
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.List;
 
@@ -38,7 +39,7 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * @author hhildebrand
  * 
  */
-public class Node implements Comparable<Node> {
+public class Node implements Comparable<Node>, Serializable {
 
     /**
      * Skip processes that share machines or rack ids
@@ -61,6 +62,7 @@ public class Node implements Comparable<Node> {
     }
 
     public static final int BYTE_LENGTH = 4 + 4 + 4 + 4;
+    private static final long serialVersionUID = 1L;
 
     public final int        capacity;
     public final int        machineId;

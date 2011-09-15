@@ -23,29 +23,35 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
-
-import java.io.Serializable;
-import java.net.InetSocketAddress;
+package com.salesforce.ouroboros.spindle.orchestration;
 
 /**
- * The various endpoints of a Weaver
  * 
  * @author hhildebrand
  * 
  */
-public class ContactInformation implements Serializable {
-    private static final long      serialVersionUID = 1L;
+public enum State {
+    INITIAL {
+        @Override
+        void next(State next, Orchestrator orchestrator) {
+            // TODO Auto-generated method stub
 
-    public final InetSocketAddress replication;
-    public final InetSocketAddress spindle;
-    public final InetSocketAddress xerox;
+        }
+    },
+    INTRODUCED {
+        @Override
+        void next(State next, Orchestrator orchestrator) {
+            // TODO Auto-generated method stub
 
-    public ContactInformation(InetSocketAddress spindle,
-                              InetSocketAddress replication,
-                              InetSocketAddress xerox) {
-        this.spindle = spindle;
-        this.replication = replication;
-        this.xerox = xerox;
-    }
+        }
+    },
+    REBALANCING {
+        @Override
+        void next(State next, Orchestrator orchestrator) {
+            // TODO Auto-generated method stub
+
+        }
+    };
+
+    abstract void next(State next, Orchestrator orchestrator);
 }

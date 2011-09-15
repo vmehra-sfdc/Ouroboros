@@ -23,12 +23,10 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.orchestration;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertNull;
-import static junit.framework.Assert.assertTrue;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
@@ -47,6 +45,9 @@ import java.util.concurrent.CountDownLatch;
 import org.junit.Test;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.ContactInformation;
+import com.salesforce.ouroboros.spindle.Weaver;
+import com.salesforce.ouroboros.spindle.orchestration.Coordinator;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
@@ -55,62 +56,6 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * 
  */
 public class TestCoordinator {
-    @Test
-    public void testOpen() {
-        Weaver weaver = mock(Weaver.class);
-        Coordinator coordinator = new Coordinator();
-        coordinator.ready(weaver);
-        Node localNode = new Node(0, 0, 0);
-        Node node1 = new Node(1, 1, 1);
-        Node node2 = new Node(2, 1, 1);
-        Node node3 = new Node(3, 1, 1);
-
-        when(weaver.getId()).thenReturn(localNode);
-
-        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
-        ContactInformation contactInformation = new ContactInformation(address,
-                                                                       address,
-                                                                       address);
-        ContactInformation contactInformation1 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        ContactInformation contactInformation2 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        ContactInformation contactInformation3 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        Map<Node, ContactInformation> newMembers = new HashMap<Node, ContactInformation>();
-        newMembers.put(localNode, contactInformation);
-        newMembers.put(node1, contactInformation1);
-        newMembers.put(node2, contactInformation2);
-        newMembers.put(node3, contactInformation3);
-        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers.keySet());
-        coordinator.updateRing(ring);
-        UUID primary = null;
-        while (primary == null) {
-            UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Coordinator.point(test), 2);
-            if (pair.get(0).equals(localNode)) {
-                primary = test;
-            }
-        }
-        UUID mirror = null;
-        while (mirror == null) {
-            UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Coordinator.point(test), 2);
-            if (pair.get(1).equals(localNode)) {
-                mirror = test;
-            }
-        }
-        coordinator.open(primary);
-        coordinator.open(mirror);
-        verify(weaver).openPrimary(eq(primary), isA(Node.class));
-        verify(weaver).openMirror(eq(mirror), isA(Node.class));
-    }
 
     @Test
     public void testClose() {
@@ -145,7 +90,11 @@ public class TestCoordinator {
         newMembers.put(node1, contactInformation1);
         newMembers.put(node2, contactInformation2);
         newMembers.put(node3, contactInformation3);
-        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers.keySet());
+        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+        ring.add(localNode, 1);
+        ring.add(node1, 1);
+        ring.add(node2, 1);
+        ring.add(node3, 1);
         coordinator.updateRing(ring);
         UUID primary = null;
         while (primary == null) {
@@ -169,89 +118,6 @@ public class TestCoordinator {
         coordinator.close(mirror);
         verify(weaver).close(primary);
         verify(weaver).close(mirror);
-    }
-
-    @Test
-    public void testOpenReplicators() {
-        Weaver weaver = mock(Weaver.class);
-        Coordinator coordinator = new Coordinator();
-        coordinator.ready(weaver);
-        Node node1 = new Node(1, 1, 1);
-        Node node2 = new Node(2, 1, 1);
-        Node node3 = new Node(3, 1, 1);
-
-        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
-        ContactInformation contactInformation1 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        ContactInformation contactInformation2 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        ContactInformation contactInformation3 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        Map<Node, ContactInformation> newMembers = new HashMap<Node, ContactInformation>();
-        newMembers.put(node1, contactInformation1);
-        newMembers.put(node2, contactInformation2);
-        newMembers.put(node3, contactInformation3);
-        CountDownLatch latch = coordinator.openReplicators(newMembers);
-        assertNotNull(latch);
-        assertEquals(3, latch.getCount());
-
-        assertEquals(contactInformation1,
-                     coordinator.getContactInformationFor(node1));
-        assertEquals(contactInformation2,
-                     coordinator.getContactInformationFor(node2));
-        assertEquals(contactInformation3,
-                     coordinator.getContactInformationFor(node3));
-        verify(weaver).openReplicator(node1, contactInformation1, latch);
-        verify(weaver).openReplicator(node2, contactInformation2, latch);
-        verify(weaver).openReplicator(node3, contactInformation3, latch);
-    }
-
-    @Test
-    public void testAddNewMembers() {
-        Weaver weaver = mock(Weaver.class);
-        Coordinator coordinator = new Coordinator();
-        coordinator.ready(weaver);
-        Node localNode = new Node(0, 0, 0);
-        Node node1 = new Node(1, 1, 1);
-        Node node2 = new Node(2, 1, 1);
-        Node node3 = new Node(3, 1, 1);
-
-        when(weaver.getId()).thenReturn(localNode);
-
-        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
-        ContactInformation contactInformation = new ContactInformation(address,
-                                                                       address,
-                                                                       address);
-        ContactInformation contactInformation1 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        ContactInformation contactInformation2 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        ContactInformation contactInformation3 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        Map<Node, ContactInformation> newMembers = new HashMap<Node, ContactInformation>();
-        newMembers.put(localNode, contactInformation);
-        newMembers.put(node1, contactInformation1);
-        newMembers.put(node2, contactInformation2);
-        newMembers.put(node3, contactInformation3);
-        ConsistentHashFunction<Node> remapped = coordinator.addNewMembers(newMembers.keySet());
-        assertNotNull(remapped);
-        assertEquals(4, remapped.size());
-        assertTrue(remapped.getBuckets().contains(localNode));
-        assertTrue(remapped.getBuckets().contains(node1));
-        assertTrue(remapped.getBuckets().contains(node2));
-        assertTrue(remapped.getBuckets().contains(node3));
     }
 
     @Test
@@ -287,14 +153,8 @@ public class TestCoordinator {
         newMembers.put(node1, contactInformation1);
         newMembers.put(node2, contactInformation2);
         newMembers.put(node3, contactInformation3);
-        coordinator.addNewMembers(newMembers.keySet());
         Set<Node> deadMembers = newMembers.keySet();
         coordinator.failover(deadMembers);
-
-        assertNull(coordinator.getContactInformationFor(localNode));
-        assertNull(coordinator.getContactInformationFor(node1));
-        assertNull(coordinator.getContactInformationFor(node2));
-        assertNull(coordinator.getContactInformationFor(node3));
 
         verify(weaver).failover(deadMembers);
         verify(weaver).closeReplicator(localNode);
@@ -304,7 +164,7 @@ public class TestCoordinator {
     }
 
     @Test
-    public void testRemap() {
+    public void testOpen() {
         Weaver weaver = mock(Weaver.class);
         Coordinator coordinator = new Coordinator();
         coordinator.ready(weaver);
@@ -315,28 +175,11 @@ public class TestCoordinator {
 
         when(weaver.getId()).thenReturn(localNode);
 
-        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
-        ContactInformation contactInformation = new ContactInformation(address,
-                                                                       address,
-                                                                       address);
-        ContactInformation contactInformation1 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        ContactInformation contactInformation2 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        ContactInformation contactInformation3 = new ContactInformation(
-                                                                        address,
-                                                                        address,
-                                                                        address);
-        Map<Node, ContactInformation> newMembers = new HashMap<Node, ContactInformation>();
-        newMembers.put(localNode, contactInformation);
-        newMembers.put(node1, contactInformation1);
-        newMembers.put(node2, contactInformation2);
-        newMembers.put(node3, contactInformation3);
-        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers.keySet());
+        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+        ring.add(localNode, 1);
+        ring.add(node1, 1);
+        ring.add(node2, 1);
+        ring.add(node3, 1);
         coordinator.updateRing(ring);
         UUID primary = null;
         while (primary == null) {
@@ -356,32 +199,20 @@ public class TestCoordinator {
         }
         coordinator.open(primary);
         coordinator.open(mirror);
-        ConsistentHashFunction<Node> newRing = ring.clone();
-        newRing.remove(coordinator.getReplicationPair(primary)[1]);
-        newRing.remove(coordinator.getReplicationPair(mirror)[0]);
-        Map<UUID, Node[]> remapped = coordinator.remap(newRing);
-        assertNotNull(remapped);
-        assertEquals(2, remapped.size());
-        assertNotNull(remapped.get(primary));
-        assertNotNull(remapped.get(mirror));
+        verify(weaver).openPrimary(eq(primary), isA(Node.class));
+        verify(weaver).openMirror(eq(mirror), isA(Node.class));
     }
 
     @Test
-    public void testRebalance() {
+    public void testOpenReplicators() {
         Weaver weaver = mock(Weaver.class);
         Coordinator coordinator = new Coordinator();
         coordinator.ready(weaver);
-        Node localNode = new Node(0, 0, 0);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
 
-        when(weaver.getId()).thenReturn(localNode);
-
         InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
-        ContactInformation contactInformation = new ContactInformation(address,
-                                                                       address,
-                                                                       address);
         ContactInformation contactInformation1 = new ContactInformation(
                                                                         address,
                                                                         address,
@@ -395,11 +226,35 @@ public class TestCoordinator {
                                                                         address,
                                                                         address);
         Map<Node, ContactInformation> newMembers = new HashMap<Node, ContactInformation>();
-        newMembers.put(localNode, contactInformation);
         newMembers.put(node1, contactInformation1);
         newMembers.put(node2, contactInformation2);
         newMembers.put(node3, contactInformation3);
-        ConsistentHashFunction<Node> ring = coordinator.addNewMembers(newMembers.keySet());
+        CountDownLatch latch = coordinator.openReplicators(newMembers.keySet(),
+                                                           newMembers);
+        assertNotNull(latch);
+        assertEquals(3, latch.getCount());
+
+        verify(weaver).openReplicator(node1, contactInformation1, latch);
+        verify(weaver).openReplicator(node2, contactInformation2, latch);
+        verify(weaver).openReplicator(node3, contactInformation3, latch);
+    }
+
+    @Test
+    public void testRebalance() {
+        Weaver weaver = mock(Weaver.class);
+        Coordinator coordinator = new Coordinator();
+        coordinator.ready(weaver);
+        Node localNode = new Node(0, 0, 0);
+        Node node1 = new Node(1, 1, 1);
+        Node node2 = new Node(2, 1, 1);
+        Node node3 = new Node(3, 1, 1);
+
+        when(weaver.getId()).thenReturn(localNode);
+        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+        ring.add(localNode, 1);
+        ring.add(node1, 1);
+        ring.add(node2, 1);
+        ring.add(node3, 1);
         coordinator.updateRing(ring);
         UUID primary = null;
         while (primary == null) {
@@ -430,5 +285,50 @@ public class TestCoordinator {
         coordinator.rebalance(remapped, deadMembers);
         verify(weaver).rebalance(primary, remapped.get(primary), deadMembers);
         verify(weaver).rebalance(mirror, remapped.get(mirror), deadMembers);
+    }
+
+    @Test
+    public void testRemap() {
+        Weaver weaver = mock(Weaver.class);
+        Coordinator coordinator = new Coordinator();
+        coordinator.ready(weaver);
+        Node localNode = new Node(0, 0, 0);
+        Node node1 = new Node(1, 1, 1);
+        Node node2 = new Node(2, 1, 1);
+        Node node3 = new Node(3, 1, 1);
+
+        when(weaver.getId()).thenReturn(localNode);
+        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+        ring.add(localNode, 1);
+        ring.add(node1, 1);
+        ring.add(node2, 1);
+        ring.add(node3, 1);
+        coordinator.updateRing(ring);
+        UUID primary = null;
+        while (primary == null) {
+            UUID test = UUID.randomUUID();
+            List<Node> pair = ring.hash(Coordinator.point(test), 2);
+            if (pair.get(0).equals(localNode)) {
+                primary = test;
+            }
+        }
+        UUID mirror = null;
+        while (mirror == null) {
+            UUID test = UUID.randomUUID();
+            List<Node> pair = ring.hash(Coordinator.point(test), 2);
+            if (pair.get(1).equals(localNode)) {
+                mirror = test;
+            }
+        }
+        coordinator.open(primary);
+        coordinator.open(mirror);
+        ConsistentHashFunction<Node> newRing = ring.clone();
+        newRing.remove(coordinator.getReplicationPair(primary)[1]);
+        newRing.remove(coordinator.getReplicationPair(mirror)[0]);
+        Map<UUID, Node[]> remapped = coordinator.remap(newRing);
+        assertNotNull(remapped);
+        assertEquals(2, remapped.size());
+        assertNotNull(remapped.get(primary));
+        assertNotNull(remapped.get(mirror));
     }
 }

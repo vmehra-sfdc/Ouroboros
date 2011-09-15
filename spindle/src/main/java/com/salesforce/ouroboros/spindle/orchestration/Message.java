@@ -23,29 +23,27 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.orchestration;
 
 import java.io.Serializable;
-import java.net.InetSocketAddress;
 
 /**
- * The various endpoints of a Weaver
  * 
  * @author hhildebrand
  * 
  */
-public class ContactInformation implements Serializable {
-    private static final long      serialVersionUID = 1L;
+public class Message implements Serializable {
+    private static final long serialVersionUID = 1L;
+    final Serializable        body;
+    final MessageType         type;
 
-    public final InetSocketAddress replication;
-    public final InetSocketAddress spindle;
-    public final InetSocketAddress xerox;
+    Message(MessageType type, Serializable body) {
+        this.type = type;
+        this.body = body;
+    }
 
-    public ContactInformation(InetSocketAddress spindle,
-                              InetSocketAddress replication,
-                              InetSocketAddress xerox) {
-        this.spindle = spindle;
-        this.replication = replication;
-        this.xerox = xerox;
+    @Override
+    public String toString() {
+        return "Message [type=" + type + ", body=" + body + "]";
     }
 }

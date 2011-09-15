@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.orchestration;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -39,6 +39,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.ContactInformation;
+import com.salesforce.ouroboros.spindle.Weaver;
+import com.salesforce.ouroboros.spindle.Xerox;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
@@ -55,34 +58,16 @@ public class Coordinator {
         return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
     }
 
-    private final Set<UUID>                     channels    = new HashSet<UUID>();
-    private Weaver                              localWeaver;
-    private final Map<Integer, Node>            members     = new HashMap<Integer, Node>();
-    private ConsistentHashFunction<Node>        weaverRing  = new ConsistentHashFunction<Node>();
-    private final Map<Node, ContactInformation> yellowPages = new HashMap<Node, ContactInformation>();
+    private final Set<UUID>              channels   = new HashSet<UUID>();
+    private Weaver                       localWeaver;
+    private final Map<Integer, Node>     members    = new HashMap<Integer, Node>();
+    private ConsistentHashFunction<Node> weaverRing = new ConsistentHashFunction<Node>();
 
-    /**
-     * Add new members of the weaver process group.
-     * 
-     * @param newMembers
-     *            - the new members
-     * @return the new consistent hash ring
-     */
-    public ConsistentHashFunction<Node> addNewMembers(Collection<Node> newMembers) {
-        ConsistentHashFunction<Node> newRing = weaverRing.clone();
-        for (Node node : newMembers) {
-            members.put(node.processId, node);
-            newRing.add(node, node.capacity);
-        }
-
-        return newRing;
-    }
-
-    public CountDownLatch openReplicators(Map<Node, ContactInformation> newMembers) {
+    public CountDownLatch openReplicators(Collection<Node> newMembers,
+                                          Map<Node, ContactInformation> directory) {
         CountDownLatch latch = new CountDownLatch(newMembers.size());
-        yellowPages.putAll(newMembers);
-        for (Entry<Node, ContactInformation> entry : newMembers.entrySet()) {
-            localWeaver.openReplicator(entry.getKey(), entry.getValue(), latch);
+        for (Node member : newMembers) {
+            localWeaver.openReplicator(member, directory.get(member), latch);
         }
         return latch;
     }
@@ -121,21 +106,9 @@ public class Coordinator {
                                        node));
             }
             members.remove(node.processId);
-            yellowPages.remove(node);
             localWeaver.closeReplicator(node);
         }
         localWeaver.failover(deadMembers);
-    }
-
-    /**
-     * Answer the contact information for the node.
-     * 
-     * @param node
-     *            - the node
-     * @return the ContactInformation for the node
-     */
-    public ContactInformation getContactInformationFor(Node node) {
-        return yellowPages.get(node);
     }
 
     /**
