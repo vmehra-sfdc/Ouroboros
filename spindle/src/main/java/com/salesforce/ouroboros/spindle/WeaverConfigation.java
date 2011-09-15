@@ -70,13 +70,13 @@ public class WeaverConfigation {
     private long                maxSegmentSize           = DEFAULT_MAX_SEGMENTSIZE;
     private long                partitionTimeout         = DEFAULT_PARTITION_TIMEOUT;
     private TimeUnit            partitionTimeoutUnit     = DEFAULT_PARTITION_TIMEOUT_UNIT;
-    private InetSocketAddress   replicationAddress       = new InetSocketAddress(
+    private InetSocketAddress   replicationAddress       = new InetSocketAddress("127.0.0.1", 
                                                                                  0);
     private int                 replicationQueueSize     = DEFAULT_REPLICATION_QUEUE_SIZE;
     private final SocketOptions replicationSocketOptions = new SocketOptions();
     private Executor            replicators              = Executors.newSingleThreadExecutor(threadFactory("replicator"));
     private File                root;
-    private InetSocketAddress   spindleAddress           = new InetSocketAddress(
+    private InetSocketAddress   spindleAddress           = new InetSocketAddress("127.0.0.1", 
                                                                                  0);
     private Executor            spindles                 = Executors.newSingleThreadExecutor(threadFactory("spindle"));
     private final SocketOptions spindleSocketOptions     = new SocketOptions();

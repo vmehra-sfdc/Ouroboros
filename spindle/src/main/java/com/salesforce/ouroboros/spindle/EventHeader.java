@@ -40,13 +40,12 @@ import java.util.UUID;
  *       4 byte size
  *       4 byte magic
  *      16 byte channel
- *       8 byte id
+ *       8 byte timestamp
  *       4 byte CRC32
  * </pre>
  * 
- * The unique identifier of an event is the tuple {tag, id}. Event ids are
- * unique within a millisecond boundary, and god help you if you have to be on
- * edge of the rollover of the epoch.
+ * The unique identifier of an event is the tuple {tag, timestamp}. Timestamps
+ * are used in deduplication logic and have no
  * 
  * @author hhildebrand
  * 
@@ -57,8 +56,8 @@ public class EventHeader implements Cloneable {
     protected static final int MAGIC_OFFSET     = SIZE_OFFSET + 4;
     protected static final int CH1_OFFSET       = MAGIC_OFFSET + 4;
     protected static final int CH2_OFFSET       = CH1_OFFSET + 8;
-    protected static final int ID_OFFSET        = CH2_OFFSET + 8;
-    protected static final int CRC_OFFSET       = ID_OFFSET + 8;
+    protected static final int TIMESTAMP_OFFSET = CH2_OFFSET + 8;
+    protected static final int CRC_OFFSET       = TIMESTAMP_OFFSET + 8;
     protected static final int HEADER_BYTE_SIZE = CRC_OFFSET + 4;
 
     protected final ByteBuffer bytes;
@@ -67,9 +66,10 @@ public class EventHeader implements Cloneable {
         this.bytes = bytes;
     }
 
-    public EventHeader(int size, int magic, UUID channel, long id, int crc32) {
+    public EventHeader(int size, int magic, UUID channel, long timestamp,
+                       int crc32) {
         this(ByteBuffer.allocate(HEADER_BYTE_SIZE));
-        initialize(size, magic, channel, id, crc32);
+        initialize(size, magic, channel, timestamp, crc32);
     }
 
     /**
@@ -95,8 +95,8 @@ public class EventHeader implements Cloneable {
         EventHeader header = (EventHeader) o;
         return header.getMagic() == getMagic()
                && header.getChannel().equals(getChannel())
-               && header.getId() == getId() && header.size() == size()
-               && header.getCrc32() == getCrc32();
+               && header.getTimestamp() == getTimestamp()
+               && header.size() == size() && header.getCrc32() == getCrc32();
     }
 
     /**
@@ -114,10 +114,10 @@ public class EventHeader implements Cloneable {
     }
 
     /**
-     * @return the id of the event
+     * @return the timestamp of the event
      */
-    public long getId() {
-        return bytes.getLong(ID_OFFSET);
+    public long getTimestamp() {
+        return bytes.getLong(TIMESTAMP_OFFSET);
     }
 
     /**
@@ -129,7 +129,7 @@ public class EventHeader implements Cloneable {
 
     @Override
     public int hashCode() {
-        return Long.valueOf(getId()).hashCode();
+        return Long.valueOf(getTimestamp()).hashCode();
     }
 
     /**
@@ -175,7 +175,7 @@ public class EventHeader implements Cloneable {
     @Override
     public String toString() {
         return String.format("EventHeader[channel=%s, id=%s, size=%s, magic=%s, crc=%s",
-                             getChannel(), getId(), size(), getMagic(),
+                             getChannel(), getTimestamp(), size(), getMagic(),
                              getCrc32());
     }
 
@@ -198,13 +198,13 @@ public class EventHeader implements Cloneable {
         return !bytes.hasRemaining();
     }
 
-    protected void initialize(int size, int magic, UUID channel, long id,
-                              int crc32) {
+    protected void initialize(int size, int magic, UUID channel,
+                              long timestamp, int crc32) {
         bytes.putInt(SIZE_OFFSET, size);
         bytes.putInt(MAGIC_OFFSET, magic);
         bytes.putLong(CH1_OFFSET, channel.getMostSignificantBits());
         bytes.putLong(CH2_OFFSET, channel.getLeastSignificantBits());
-        bytes.putLong(ID_OFFSET, id);
+        bytes.putLong(TIMESTAMP_OFFSET, timestamp);
         bytes.putInt(CRC_OFFSET, crc32);
     }
 }

@@ -139,12 +139,12 @@ public class TestWeaver {
         options.configure(server.socket());
         server.socket().bind(new InetSocketAddress(0));
         ContactInformation info = new ContactInformation(
-                                                         new InetSocketAddress(
+                                                         new InetSocketAddress("127.0.0.1", 
                                                                                0),
                                                          new InetSocketAddress(
                                                                                server.socket().getInetAddress(),
                                                                                server.socket().getLocalPort()),
-                                                         new InetSocketAddress(
+                                                         new InetSocketAddress("127.0.0.1", 
                                                                                0));
         Node id = new Node(0, 0, 0);
         Node mirror = new Node(1, 0, 0);

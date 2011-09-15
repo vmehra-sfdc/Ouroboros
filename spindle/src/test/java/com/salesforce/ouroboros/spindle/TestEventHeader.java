@@ -44,7 +44,7 @@ public class TestEventHeader {
         EventHeader header = new EventHeader(25, 777, channel, timestamp, 23456);
         assertEquals(25, header.size());
         assertEquals(channel, header.getChannel());
-        assertEquals(timestamp, header.getId());
+        assertEquals(timestamp, header.getTimestamp());
         assertEquals(777, header.getMagic());
         assertEquals(23456, header.getCrc32());
     }

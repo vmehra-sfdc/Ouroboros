@@ -83,7 +83,7 @@ public class TestReplicatingAppender {
         options.setTimeout(100);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
-        server.socket().bind(new InetSocketAddress(0));
+        server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
         final SocketChannel outbound = SocketChannel.open();
         options.configure(outbound.socket());
         outbound.configureBlocking(true);
@@ -127,7 +127,7 @@ public class TestReplicatingAppender {
         assertEquals(event.size(), replicatedEvent.size());
         assertEquals(event.getMagic(), replicatedEvent.getMagic());
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
-        assertEquals(event.getId(), replicatedEvent.getId());
+        assertEquals(event.getTimestamp(), replicatedEvent.getTimestamp());
         assertTrue(replicatedEvent.validate());
         verify(eventChannel).append(eq(event), eq(0L));
     }

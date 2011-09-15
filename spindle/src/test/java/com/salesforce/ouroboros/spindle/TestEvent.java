@@ -55,7 +55,7 @@ public class TestEvent {
         assertEquals(src.length, event.size());
         assertEquals(channel, event.getChannel());
         assertEquals(777, event.getMagic());
-        assertEquals(timestamp, event.getId());
+        assertEquals(timestamp, event.getTimestamp());
         assertEquals(Event.crc32(src), event.getCrc32());
         assertTrue(event.validate());
     }
@@ -79,7 +79,7 @@ public class TestEvent {
 
         assertEquals(magic, written.getMagic());
         assertEquals(channel, written.getChannel());
-        assertEquals(timestamp, written.getId());
+        assertEquals(timestamp, written.getTimestamp());
         assertEquals(payload.length, written.size());
 
         FileInputStream fis = new FileInputStream(tmpFile);

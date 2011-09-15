@@ -67,7 +67,7 @@ public class TestCoordinator {
 
         when(weaver.getId()).thenReturn(localNode);
 
-        InetSocketAddress address = new InetSocketAddress(0);
+        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
         ContactInformation contactInformation = new ContactInformation(address,
                                                                        address,
                                                                        address);
@@ -124,7 +124,7 @@ public class TestCoordinator {
 
         when(weaver.getId()).thenReturn(localNode);
 
-        InetSocketAddress address = new InetSocketAddress(0);
+        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
         ContactInformation contactInformation = new ContactInformation(address,
                                                                        address,
                                                                        address);
@@ -180,7 +180,7 @@ public class TestCoordinator {
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
 
-        InetSocketAddress address = new InetSocketAddress(0);
+        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
         ContactInformation contactInformation1 = new ContactInformation(
                                                                         address,
                                                                         address,
@@ -224,7 +224,7 @@ public class TestCoordinator {
 
         when(weaver.getId()).thenReturn(localNode);
 
-        InetSocketAddress address = new InetSocketAddress(0);
+        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
         ContactInformation contactInformation = new ContactInformation(address,
                                                                        address,
                                                                        address);
@@ -266,7 +266,7 @@ public class TestCoordinator {
 
         when(weaver.getId()).thenReturn(localNode);
 
-        InetSocketAddress address = new InetSocketAddress(0);
+        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
         ContactInformation contactInformation = new ContactInformation(address,
                                                                        address,
                                                                        address);
@@ -315,7 +315,7 @@ public class TestCoordinator {
 
         when(weaver.getId()).thenReturn(localNode);
 
-        InetSocketAddress address = new InetSocketAddress(0);
+        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
         ContactInformation contactInformation = new ContactInformation(address,
                                                                        address,
                                                                        address);
@@ -378,7 +378,7 @@ public class TestCoordinator {
 
         when(weaver.getId()).thenReturn(localNode);
 
-        InetSocketAddress address = new InetSocketAddress(0);
+        InetSocketAddress address = new InetSocketAddress("127.0.0.1", 0);
         ContactInformation contactInformation = new ContactInformation(address,
                                                                        address,
                                                                        address);

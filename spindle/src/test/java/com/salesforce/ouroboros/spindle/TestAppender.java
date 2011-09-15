@@ -75,7 +75,7 @@ public class TestAppender {
         final AbstractAppender appender = new Appender(bundle);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
-        server.socket().bind(new InetSocketAddress(0));
+        server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
         SocketChannel outbound = SocketChannel.open();
         outbound.configureBlocking(true);
         outbound.connect(server.socket().getLocalSocketAddress());
@@ -129,7 +129,7 @@ public class TestAppender {
         assertTrue(event.validate());
         assertEquals(magic, event.getMagic());
         assertEquals(channel, event.getChannel());
-        assertEquals(timestamp, event.getId());
+        assertEquals(timestamp, event.getTimestamp());
         assertEquals(payload.length, event.size());
         ByteBuffer writtenPayload = event.getPayload();
         for (byte b : payload) {
@@ -156,7 +156,7 @@ public class TestAppender {
         final AbstractAppender appender = new Appender(bundle);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
-        server.socket().bind(new InetSocketAddress(0));
+        server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
         SocketChannel outbound = SocketChannel.open();
         outbound.configureBlocking(true);
         outbound.connect(server.socket().getLocalSocketAddress());
@@ -258,7 +258,7 @@ public class TestAppender {
         socketOptions.setTimeout(100);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
-        server.socket().bind(new InetSocketAddress(0));
+        server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
         SocketChannel outbound = SocketChannel.open();
         outbound.configureBlocking(true);
         outbound.connect(server.socket().getLocalSocketAddress());
@@ -318,7 +318,7 @@ public class TestAppender {
             assertTrue(event.validate());
             assertEquals(i, event.getMagic());
             assertEquals(new UUID(0, i), event.getChannel());
-            assertEquals(i, event.getId());
+            assertEquals(i, event.getTimestamp());
             assertEquals(payload[i].length, event.size());
             ByteBuffer writtenPayload = event.getPayload();
             for (byte b : payload[i]) {
