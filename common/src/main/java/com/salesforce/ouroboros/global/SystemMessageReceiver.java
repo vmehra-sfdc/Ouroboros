@@ -23,9 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.orchestration;
-
-import java.io.Serializable;
+package com.salesforce.ouroboros.global;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
@@ -35,26 +33,8 @@ import com.salesforce.ouroboros.Node;
  * @author hhildebrand
  * 
  */
-public enum MessageType {
-    PUBLISH {
-        @Override
-        void process(Serializable body, int sender, long time, Orchestrator orchestrator) {
-            Object[] info = (Object[]) body;
-            Node n = (Node) info[0];
-            ContactInformation card = (ContactInformation) info[1];
-            orchestrator.introductionFrom(n, card);
-        }
-    };
+public interface SystemMessageReceiver {
 
-    /**
-     * Process the message
-     * 
-     * @param body
-     *            - the body of the message
-     * @param sender TODO
-     * @param time TODO
-     * @param orchestrator
-     *            - the receiver of the message
-     */
-    abstract void process(Serializable body, int sender, long time, Orchestrator orchestrator);
+    void discoverChannelBuffer(Node sender, ContactInformation information,
+                               long time);
 }

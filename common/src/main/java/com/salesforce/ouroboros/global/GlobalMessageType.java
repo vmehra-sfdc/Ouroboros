@@ -23,29 +23,46 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.global;
 
 import java.io.Serializable;
-import java.net.InetSocketAddress;
+
+import com.salesforce.ouroboros.ContactInformation;
+import com.salesforce.ouroboros.Node;
 
 /**
- * The various endpoints of a Weaver
  * 
  * @author hhildebrand
  * 
  */
-public class ContactInformation implements Serializable {
-    private static final long      serialVersionUID = 1L;
+public enum GlobalMessageType {
+    ADVERTISE_CHANNEL_BUFFER {
+        @Override
+        public void dispatch(SystemMessageReceiver receiver, Node from,
+                             long time, Serializable payload) {
+            receiver.discoverChannelBuffer(from, (ContactInformation) payload, time);
+        }
 
-    public final InetSocketAddress replication;
-    public final InetSocketAddress spindle;
-    public final InetSocketAddress xerox;
+    },
+    ADVERTISE_CONSUMER {
+        @Override
+        public void dispatch(SystemMessageReceiver receiver, Node from,
+                             long time, Serializable payload) {
+            // TODO Auto-generated method stub
 
-    public ContactInformation(InetSocketAddress spindle,
-                              InetSocketAddress replication,
-                              InetSocketAddress xerox) {
-        this.spindle = spindle;
-        this.replication = replication;
-        this.xerox = xerox;
-    }
+        }
+
+    },
+    ADVERTISE_PRODUCER {
+        @Override
+        public void dispatch(SystemMessageReceiver receiver, Node from,
+                             long time, Serializable payload) {
+            // TODO Auto-generated method stub
+
+        }
+
+    };
+
+    abstract public void dispatch(SystemMessageReceiver receiver, Node from,
+                                  long time, Serializable payload);
 }

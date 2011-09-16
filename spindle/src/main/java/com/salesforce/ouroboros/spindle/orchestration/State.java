@@ -31,6 +31,13 @@ package com.salesforce.ouroboros.spindle.orchestration;
  * 
  */
 public enum State {
+    TERMINATED {
+        @Override
+        void next(State next, Orchestrator orchestrator) {
+            // TODO Auto-generated method stub
+
+        }
+    },
     INITIAL {
         @Override
         void next(State next, Orchestrator orchestrator) {

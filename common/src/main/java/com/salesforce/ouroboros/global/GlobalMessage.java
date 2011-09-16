@@ -23,11 +23,10 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.orchestration;
+package com.salesforce.ouroboros.global;
 
 import java.io.Serializable;
 
-import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 
 /**
@@ -35,26 +34,16 @@ import com.salesforce.ouroboros.Node;
  * @author hhildebrand
  * 
  */
-public enum MessageType {
-    PUBLISH {
-        @Override
-        void process(Serializable body, int sender, long time, Orchestrator orchestrator) {
-            Object[] info = (Object[]) body;
-            Node n = (Node) info[0];
-            ContactInformation card = (ContactInformation) info[1];
-            orchestrator.introductionFrom(n, card);
-        }
-    };
+public class GlobalMessage implements Serializable {
+    private static final long      serialVersionUID = 1L;
 
-    /**
-     * Process the message
-     * 
-     * @param body
-     *            - the body of the message
-     * @param sender TODO
-     * @param time TODO
-     * @param orchestrator
-     *            - the receiver of the message
-     */
-    abstract void process(Serializable body, int sender, long time, Orchestrator orchestrator);
+    public final GlobalMessageType type;
+    public final Node              sender;
+    public final Serializable      body;
+
+    public GlobalMessage(Node sender, GlobalMessageType type, Serializable body) {
+        this.sender = sender;
+        this.type = type;
+        this.body = body;
+    }
 }

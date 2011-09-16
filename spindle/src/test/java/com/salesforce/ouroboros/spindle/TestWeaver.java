@@ -45,6 +45,7 @@ import java.util.concurrent.CountDownLatch;
 import org.junit.Test;
 
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.orchestration.Coordinator;
 
