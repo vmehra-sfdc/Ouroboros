@@ -23,18 +23,20 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.global;
+package com.salesforce.ouroboros;
 
-import com.salesforce.ouroboros.ContactInformation;
-import com.salesforce.ouroboros.Node;
+import java.io.Serializable;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public interface SystemMessageReceiver {
+public interface Message extends Serializable {
+    
+    Serializable getPayload();
 
-    void discoverChannelBuffer(Node sender, ContactInformation information,
-                               long time);
+    Node getSender();
+
+    MessageType getType();
 }

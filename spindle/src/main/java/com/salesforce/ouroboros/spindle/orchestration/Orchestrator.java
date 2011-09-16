@@ -35,13 +35,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.smartfrog.services.anubis.partition.Partition;
-import org.smartfrog.services.anubis.partition.PartitionNotification;
-import org.smartfrog.services.anubis.partition.comms.MessageConnection;
 import org.smartfrog.services.anubis.partition.views.View;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.global.SystemMessageReceiver;
+import com.salesforce.ouroboros.Switchboard;
 
 /**
  * This class is a state machine driven by the partitioning events within the
@@ -52,40 +50,18 @@ import com.salesforce.ouroboros.global.SystemMessageReceiver;
  * @author hhildebrand
  * 
  */
-public class Orchestrator implements SystemMessageReceiver {
+public class Orchestrator extends Switchboard {
 
-    class Notification implements PartitionNotification {
+    final static Logger                                   log         = Logger.getLogger(Orchestrator.class.getCanonicalName());
 
-        @Override
-        public void objectNotification(Object obj, int sender, long time) {
-            if (obj instanceof Message) {
-                process((Message) obj, sender, time);
-            }
-        }
+    private final List<Node>                              deadMembers = new CopyOnWriteArrayList<Node>();
+    private final ConcurrentMap<Node, ContactInformation> members     = new ConcurrentHashMap<Node, ContactInformation>();
+    private final ConcurrentMap<Node, ContactInformation> newMembers  = new ConcurrentHashMap<Node, ContactInformation>();
+    private final AtomicReference<State>                  state       = new AtomicReference<State>(
+                                                                                                   State.INITIAL);
 
-        @Override
-        public void partitionNotification(View view, int leader) {
-            partitionEvent(view, leader);
-        }
-
-    }
-
-    final static Logger                                   log            = Logger.getLogger(Orchestrator.class.getCanonicalName());
-
-    private final List<Node>                              deadMembers    = new CopyOnWriteArrayList<Node>();
-    private final ConcurrentMap<Node, ContactInformation> members        = new ConcurrentHashMap<Node, ContactInformation>();
-    private final ConcurrentMap<Node, ContactInformation> newMembers     = new ConcurrentHashMap<Node, ContactInformation>();
-    private final Node                                    self;
-    private final PartitionNotification                   notification   = new Notification();
-    private final Partition                               partition;
-    private final AtomicReference<PartitionState>         partitionState = new AtomicReference<PartitionState>(
-                                                                                                               PartitionState.UNSTABLE);
-    private final AtomicReference<State>                  state          = new AtomicReference<State>(
-                                                                                                      State.INITIAL);
-
-    public Orchestrator(Node n, Partition p) {
-        self = n;
-        partition = p;
+    public Orchestrator(Node node, Partition p) {
+        super(node, p);
     }
 
     /**
@@ -121,48 +97,6 @@ public class Orchestrator implements SystemMessageReceiver {
     }
 
     /**
-     * The partition has changed state.
-     * 
-     * @param view
-     *            - the new view of the partition
-     * @param leader
-     *            - the elected leader
-     */
-    public void partitionEvent(View view, int leader) {
-        PartitionState next = view.isStable() ? PartitionState.STABLE
-                                             : PartitionState.UNSTABLE;
-        partitionState.getAndSet(next).next(next, this, view, leader);
-    }
-
-    /**
-     * Process a point to point message
-     * 
-     * @param msg
-     * @param sender
-     * @param time
-     */
-    public void process(Message msg, int sender, long time) {
-        final PartitionState ps = partitionState.get();
-        switch (ps) {
-            case STABLE: {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine(String.format("Processing inbound %s on: %s", msg,
-                                           self));
-                    msg.type.process(msg.body, sender, time, this);
-                }
-                break;
-            }
-            case UNSTABLE: {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Discarding %s from %s received at %s during partition instability on %s",
-                                           msg, sender, time, self));
-                }
-                break;
-            }
-        }
-    }
-
-    /**
      * Stabilize the partition
      * 
      * @param view
@@ -184,57 +118,6 @@ public class Orchestrator implements SystemMessageReceiver {
         }
     }
 
-    public void start() {
-        partition.register(notification);
-    }
-
-    public void terminate() {
-        partition.deregister(notification);
-    }
-
-    /**
-     * Broadcast the message to all the members in our partition
-     * 
-     * @param msg
-     *            - the message to broadcast
-     */
-    void broadcast(Message msg) {
-        for (Node node : members.keySet()) {
-            send(msg, node);
-        }
-    }
-
-    /**
-     * Send a message to a specific node
-     * 
-     * @param msg
-     *            - the message to send
-     * @param node
-     *            - the receiver of the message
-     */
-    void send(Message msg, Node node) {
-        switch (partitionState.get()) {
-            case STABLE: {
-                MessageConnection connection = partition.connect(node.processId);
-                if (connection == null) {
-                    if (log.isLoggable(Level.WARNING)) {
-                        log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
-                                                  msg, node, self));
-                    }
-                } else {
-                    connection.sendObject(msg);
-                }
-                break;
-            }
-            default: {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Unable to send %s to %s from %s as the partition is UNSTABLE",
-                                           msg, node, self));
-                }
-            }
-        }
-    }
-
     /**
      * The state machine driver
      * 
@@ -248,18 +131,5 @@ public class Orchestrator implements SystemMessageReceiver {
     @Override
     public void discoverChannelBuffer(Node sender, ContactInformation info,
                                       long time) {
-        switch (partitionState.get()) {
-            case STABLE:
-
-                break;
-
-            case UNSTABLE: {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Discarding contact information from %s received at %s during partition instability on %s",
-                                           sender, time, self));
-                }
-                break;
-            }
-        }
     }
 }

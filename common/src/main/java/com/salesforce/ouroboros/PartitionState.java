@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.orchestration;
+package com.salesforce.ouroboros;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,7 +38,7 @@ import org.smartfrog.services.anubis.partition.views.View;
 public enum PartitionState {
     STABLE {
         @Override
-        void next(PartitionState next, Orchestrator orchestrator, View view,
+        void next(PartitionState next, Switchboard switchboard, View view,
                   int leader) {
             switch (next) {
                 case STABLE: {
@@ -49,7 +49,7 @@ public enum PartitionState {
                     break;
                 }
                 case UNSTABLE: {
-                    orchestrator.destabilize(view, leader);
+                    switchboard.destabilize(view, leader);
                 }
             }
         }
@@ -57,7 +57,7 @@ public enum PartitionState {
     },
     UNSTABLE {
         @Override
-        void next(PartitionState next, Orchestrator orchestrator, View view,
+        void next(PartitionState next, Switchboard switchboard, View view,
                   int leader) {
             switch (next) {
                 case UNSTABLE: {
@@ -68,7 +68,7 @@ public enum PartitionState {
                     break;
                 }
                 case STABLE: {
-                    orchestrator.stabilize(view, leader);
+                    switchboard.stabilize(view, leader);
                 }
             }
         }
@@ -76,6 +76,6 @@ public enum PartitionState {
     };
     private final static Logger log = Logger.getLogger(PartitionState.class.getCanonicalName());
 
-    abstract void next(PartitionState next, Orchestrator orchestrator,
-                       View view, int leader);
+    abstract void next(PartitionState next, Switchboard switchboard, View view,
+                       int leader);
 }

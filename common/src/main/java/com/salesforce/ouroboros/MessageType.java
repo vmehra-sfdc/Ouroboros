@@ -23,48 +23,18 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.global;
+package com.salesforce.ouroboros;
 
 import java.io.Serializable;
-
-import com.salesforce.ouroboros.ContactInformation;
-import com.salesforce.ouroboros.MessageType;
-import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.Switchboard;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public enum GlobalMessageType implements MessageType {
-    ADVERTISE_CHANNEL_BUFFER {
-        @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable payload, long time) {
-            switchboard.discoverChannelBuffer(sender,
-                                              (ContactInformation) payload,
-                                              time);
+public interface MessageType {
 
-        }
+    void dispatch(Switchboard switchboard, Node sender, Serializable payload,
+                  long time);
 
-    },
-    ADVERTISE_CONSUMER {
-        @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable payload, long time) {
-            // TODO Auto-generated method stub
-
-        }
-
-    },
-    ADVERTISE_PRODUCER {
-        @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable payload, long time) {
-            // TODO Auto-generated method stub
-
-        }
-
-    };
 }

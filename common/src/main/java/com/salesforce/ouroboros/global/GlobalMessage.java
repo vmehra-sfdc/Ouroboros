@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.global;
 
 import java.io.Serializable;
 
+import com.salesforce.ouroboros.Message;
 import com.salesforce.ouroboros.Node;
 
 /**
@@ -34,16 +35,37 @@ import com.salesforce.ouroboros.Node;
  * @author hhildebrand
  * 
  */
-public class GlobalMessage implements Serializable {
-    private static final long      serialVersionUID = 1L;
+public class GlobalMessage implements Message {
+    private static final long       serialVersionUID = 1L;
 
-    public final GlobalMessageType type;
-    public final Node              sender;
-    public final Serializable      body;
+    private final Serializable      payload;
+    private final Node              sender;
+    private final GlobalMessageType type;
 
     public GlobalMessage(Node sender, GlobalMessageType type, Serializable body) {
         this.sender = sender;
         this.type = type;
-        this.body = body;
+        this.payload = body;
+    }
+
+    /**
+     * @return the payload
+     */
+    public Serializable getPayload() {
+        return payload;
+    }
+
+    /**
+     * @return the sender
+     */
+    public Node getSender() {
+        return sender;
+    }
+
+    /**
+     * @return the type
+     */
+    public GlobalMessageType getType() {
+        return type;
     }
 }
