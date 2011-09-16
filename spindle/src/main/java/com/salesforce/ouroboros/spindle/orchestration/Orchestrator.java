@@ -25,19 +25,15 @@
  */
 package com.salesforce.ouroboros.spindle.orchestration;
 
-import java.util.List;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.smartfrog.services.anubis.partition.Partition;
-import org.smartfrog.services.anubis.partition.views.View;
 
 import com.salesforce.ouroboros.ContactInformation;
+import com.salesforce.ouroboros.GlobalMessageType;
+import com.salesforce.ouroboros.Message;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.Switchboard;
 
@@ -51,71 +47,12 @@ import com.salesforce.ouroboros.Switchboard;
  * 
  */
 public class Orchestrator extends Switchboard {
-
-    final static Logger                                   log         = Logger.getLogger(Orchestrator.class.getCanonicalName());
-
-    private final List<Node>                              deadMembers = new CopyOnWriteArrayList<Node>();
-    private final ConcurrentMap<Node, ContactInformation> members     = new ConcurrentHashMap<Node, ContactInformation>();
-    private final ConcurrentMap<Node, ContactInformation> newMembers  = new ConcurrentHashMap<Node, ContactInformation>();
+    private final ConcurrentMap<Node, ContactInformation> yellowPages = new ConcurrentHashMap<Node, ContactInformation>();
     private final AtomicReference<State>                  state       = new AtomicReference<State>(
                                                                                                    State.INITIAL);
 
     public Orchestrator(Node node, Partition p) {
         super(node, p);
-    }
-
-    /**
-     * Destabilize the partition
-     * 
-     * @param view
-     *            - the view
-     * @param leader
-     *            - the leader
-     */
-    public void destabilize(View view, int leader) {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Destabilizing partition on: %s, view: %s, leader: %s",
-                                   self, view, leader));
-        }
-        deadMembers.clear();
-        newMembers.clear();
-    }
-
-    /**
-     * Receive an introduction from the member
-     * 
-     * @param member
-     *            - the introduced member
-     * @param card
-     *            - the contact information for the member
-     */
-    public void introductionFrom(Node member, ContactInformation card) {
-        if (members.containsKey(self)) {
-        } else {
-            newMembers.putIfAbsent(self, card);
-        }
-    }
-
-    /**
-     * Stabilize the partition
-     * 
-     * @param view
-     *            - the stable view of the partition
-     * @param leader
-     *            - the leader
-     */
-    public void stabilize(View view, int leader) {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Stabilizing partition on: %s, view: %s, leader: %s",
-                                   self, view, leader));
-        }
-        for (Entry<Node, ContactInformation> entry : members.entrySet()) {
-            Node member = entry.getKey();
-            if (!view.contains(member.processId)) {
-                deadMembers.add(member);
-                members.remove(member);
-            }
-        }
     }
 
     /**
@@ -131,5 +68,18 @@ public class Orchestrator extends Switchboard {
     @Override
     public void discoverChannelBuffer(Node sender, ContactInformation info,
                                       long time) {
+        yellowPages.put(sender, info);
+    }
+
+    @Override
+    public void advertise() {
+        ringCast(new Message(self, GlobalMessageType.ADVERTISE_CHANNEL_BUFFER,
+                             yellowPages.get(self)));
+    }
+
+    @Override
+    public void destabilize() {
+        // TODO Auto-generated method stub
+
     }
 }

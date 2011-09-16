@@ -32,11 +32,37 @@ import java.io.Serializable;
  * @author hhildebrand
  * 
  */
-public interface Message extends Serializable {
-    
-    Serializable getPayload();
+public class Message implements Serializable {
+    private static final long  serialVersionUID = 1L;
 
-    Node getSender();
+    private final Serializable payload;
+    private final Node         sender;
+    private final MessageType  type;
 
-    MessageType getType();
+    public Message(Node sender, MessageType type, Serializable body) {
+        this.sender = sender;
+        this.type = type;
+        this.payload = body;
+    }
+
+    /**
+     * @return the payload
+     */
+    public Serializable getPayload() {
+        return payload;
+    }
+
+    /**
+     * @return the sender
+     */
+    public Node getSender() {
+        return sender;
+    }
+
+    /**
+     * @return the type
+     */
+    public MessageType getType() {
+        return type;
+    }
 }

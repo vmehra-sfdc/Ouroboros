@@ -23,27 +23,45 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.orchestration;
+package com.salesforce.ouroboros;
 
 import java.io.Serializable;
+
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class Message implements Serializable {
-    private static final long serialVersionUID = 1L;
-    final Serializable        body;
-    final MessageType         type;
+public enum GlobalMessageType implements MessageType {
+    ADVERTISE_CHANNEL_BUFFER {
+        @Override
+        public void dispatch(Switchboard switchboard, Node sender,
+                             Serializable payload, long time) {
+            switchboard.discover(sender);
+            switchboard.discoverChannelBuffer(sender,
+                                              (ContactInformation) payload,
+                                              time);
 
-    Message(MessageType type, Serializable body) {
-        this.type = type;
-        this.body = body;
-    }
+        }
 
-    @Override
-    public String toString() {
-        return "Message [type=" + type + ", body=" + body + "]";
-    }
+    },
+    ADVERTISE_CONSUMER {
+        @Override
+        public void dispatch(Switchboard switchboard, Node sender,
+                             Serializable payload, long time) {
+            // TODO Auto-generated method stub
+
+        }
+
+    },
+    ADVERTISE_PRODUCER {
+        @Override
+        public void dispatch(Switchboard switchboard, Node sender,
+                             Serializable payload, long time) {
+            // TODO Auto-generated method stub
+
+        }
+
+    };
 }
