@@ -29,6 +29,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -106,7 +107,7 @@ public class Switchboard {
             int neighbor = view.leftNeighborOf(self.processId);
             if (neighbor == -1) {
                 if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Unable to ring cast %s from %s on: %s to: %s there is no left neighbor",
+                    log.info(String.format("Unable to ring cast %s from %s on: %s to: %s as there is no left neighbor",
                                            message.wrapped, message.from, self,
                                            neighbor));
                 }
@@ -131,15 +132,23 @@ public class Switchboard {
             }
         }
 
-        private void processMessage(Message message, int sender, long time) {
+        private void processMessage(final Message message, int sender,
+                                    final long time) {
             switch (state.get()) {
                 case STABLE: {
-                    if (log.isLoggable(Level.FINE)) {
-                        log.fine(String.format("Processing inbound %s on: %s",
-                                               message, self));
-                    }
-                    message.type.dispatch(Switchboard.this, member,
-                                          message.sender, message.payload, time);
+                    messageProcessor.execute(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            if (log.isLoggable(Level.FINE)) {
+                                log.fine(String.format("Processing inbound %s on: %s",
+                                                       message, self));
+                            }
+                            message.type.dispatch(Switchboard.this, member,
+                                                  message.sender,
+                                                  message.payload, time);
+                        }
+                    });
                     break;
                 }
                 case UNSTABLE: {
@@ -152,18 +161,25 @@ public class Switchboard {
             }
         }
 
-        private void processRingMessage(RingMessage message, int sender,
-                                        long time) {
-            Message wrapped = message.wrapped;
+        private void processRingMessage(final RingMessage message, int sender,
+                                        final long time) {
+            final Message wrapped = message.wrapped;
             switch (state.get()) {
                 case STABLE: {
-                    if (log.isLoggable(Level.FINE)) {
-                        log.fine(String.format("Processing inbound ring message %s on: %s",
-                                               wrapped, self));
-                    }
-                    forward(message);
-                    wrapped.type.dispatch(Switchboard.this, member,
-                                          wrapped.sender, wrapped.payload, time);
+                    messageProcessor.execute(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            if (log.isLoggable(Level.FINE)) {
+                                log.fine(String.format("Processing inbound ring message %s on: %s",
+                                                       wrapped, self));
+                            }
+                            forward(message);
+                            wrapped.type.dispatch(Switchboard.this, member,
+                                                  wrapped.sender,
+                                                  wrapped.payload, time);
+                        }
+                    });
                     break;
                 }
                 case UNSTABLE: {
@@ -188,13 +204,15 @@ public class Switchboard {
                                                                                      State.UNSTABLE);
     protected NodeIdSet                    view;
     final Member                           member;
+    final Executor                         messageProcessor;
     final Partition                        partition;
 
-    public Switchboard(Member m, Node node, Partition p) {
+    public Switchboard(Member m, Node node, Partition p, Executor executor) {
         self = node;
         partition = p;
         member = m;
         m.setSwitchboard(this);
+        messageProcessor = executor;
     }
 
     public void add(Node node) {
@@ -284,6 +302,10 @@ public class Switchboard {
                 }
             }
         }
+    }
+
+    public Node self() {
+        return self;
     }
 
     /**

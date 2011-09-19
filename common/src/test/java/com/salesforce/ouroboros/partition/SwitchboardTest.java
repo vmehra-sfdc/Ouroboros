@@ -28,6 +28,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.concurrent.Executor;
+
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -51,8 +53,9 @@ public class SwitchboardTest {
         Node node = new Node(0, 0, 0);
         Partition partition = mock(Partition.class);
         Member member = mock(Member.class);
+        Executor exec = mock(Executor.class);
 
-        Switchboard switchboard = new Switchboard(member, node, partition);
+        Switchboard switchboard = new Switchboard(member, node, partition, exec);
         verify(member).setSwitchboard(switchboard);
         switchboard.start();
         verify(partition).register(isA(PartitionNotification.class));
@@ -62,6 +65,7 @@ public class SwitchboardTest {
 
     @Test
     public void testDestabilize() {
+        Executor exec = mock(Executor.class);
         Node node = new Node(0, 0, 0);
         Node testNode = new Node(1, 0, 0);
         Partition partition = mock(Partition.class);
@@ -72,7 +76,7 @@ public class SwitchboardTest {
         view.add(testNode.processId);
         view.stablize();
 
-        Switchboard switchboard = new Switchboard(member, node, partition);
+        Switchboard switchboard = new Switchboard(member, node, partition, exec);
         switchboard.partitionEvent(view, 0);
         switchboard.discover(node);
         switchboard.discover(testNode);
@@ -108,6 +112,7 @@ public class SwitchboardTest {
     public void testDiscovery() {
         Node node = new Node(0, 0, 0);
         Node testNode = new Node(1, 0, 0);
+        Executor exec = mock(Executor.class);
         Partition partition = mock(Partition.class);
         Member member = mock(Member.class);
         MessageConnection connection = mock(MessageConnection.class);
@@ -127,7 +132,7 @@ public class SwitchboardTest {
             }
         }).when(connection).sendObject(isA(RingMessage.class));
 
-        Switchboard switchboard = new Switchboard(member, node, partition);
+        Switchboard switchboard = new Switchboard(member, node, partition, exec);
         switchboard.partitionEvent(view, 0);
         switchboard.discover(node);
         switchboard.discover(testNode);
@@ -142,6 +147,7 @@ public class SwitchboardTest {
 
     @Test
     public void testRingCast() {
+        Executor exec = mock(Executor.class);
         Node node = new Node(0, 0, 0);
         Node testNode = new Node(1, 0, 0);
         Partition partition = mock(Partition.class);
@@ -153,7 +159,7 @@ public class SwitchboardTest {
         view.add(testNode.processId);
         view.stablize();
 
-        Switchboard switchboard = new Switchboard(member, node, partition);
+        Switchboard switchboard = new Switchboard(member, node, partition, exec);
         switchboard.members.add(node);
         switchboard.members.add(testNode);
         switchboard.partitionEvent(view, 0);
@@ -176,6 +182,7 @@ public class SwitchboardTest {
 
     @Test
     public void testBroadcast() {
+        Executor exec = mock(Executor.class);
         Node node = new Node(0, 0, 0);
         Node testNode = new Node(1, 0, 0);
         Partition partition = mock(Partition.class);
@@ -189,7 +196,7 @@ public class SwitchboardTest {
         view.add(testNode.processId);
         view.stablize();
 
-        Switchboard switchboard = new Switchboard(member, node, partition);
+        Switchboard switchboard = new Switchboard(member, node, partition, exec);
         switchboard.partitionEvent(view, 0);
         switchboard.members.add(node);
         switchboard.members.add(testNode);
@@ -214,6 +221,7 @@ public class SwitchboardTest {
 
     @Test
     public void testSend() {
+        Executor exec = mock(Executor.class);
         Node node = new Node(0, 0, 0);
         Node testNode = new Node(1, 0, 0);
         Partition partition = mock(Partition.class);
@@ -221,7 +229,7 @@ public class SwitchboardTest {
         MessageConnection connection = mock(MessageConnection.class);
         when(partition.connect(testNode.processId)).thenReturn(connection);
 
-        Switchboard switchboard = new Switchboard(member, node, partition);
+        Switchboard switchboard = new Switchboard(member, node, partition, exec);
         switchboard.stabilized();
         Message msg = new Message(node, GlobalMessageType.DISCOVERY_COMPLETE);
         switchboard.send(msg, testNode);
@@ -230,6 +238,7 @@ public class SwitchboardTest {
 
     @Test
     public void testStabilize() {
+        Executor exec = mock(Executor.class);
         Node node = new Node(0, 0, 0);
         Node testNode = new Node(1, 0, 0);
         Partition partition = mock(Partition.class);
@@ -241,7 +250,7 @@ public class SwitchboardTest {
         view.add(testNode.processId);
         view.stablize();
 
-        Switchboard switchboard = new Switchboard(member, node, partition);
+        Switchboard switchboard = new Switchboard(member, node, partition, exec);
         switchboard.partitionEvent(view, 0);
         assertEquals(State.STABLE, switchboard.getState());
         verify(member).advertise();
