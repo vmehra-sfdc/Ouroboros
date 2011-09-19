@@ -283,7 +283,7 @@ public class Weaver implements Bundle {
         replicators.put(node, replicator);
         if (thisEndInitiatesConnectionsTo(node)) {
             if (log.isLoggable(Level.INFO)) {
-                log.fine(String.format("Initiating connection from weaver[%s] to new weaver[%s]",
+                log.fine(String.format("Initiating connection from weaver %s to new weaver %s",
                                        id, node));
             }
             try {
@@ -297,7 +297,7 @@ public class Weaver implements Bundle {
             }
         } else {
             if (log.isLoggable(Level.INFO)) {
-                log.fine(String.format("Waiting for connection to weaver[%s] from new weaver[%s]",
+                log.fine(String.format("Waiting for connection to weaver %s from new weaver %s",
                                        id, node));
             }
         }
