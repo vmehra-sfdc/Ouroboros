@@ -23,9 +23,11 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros;
+package com.salesforce.ouroboros.partition;
 
 import java.io.Serializable;
+
+import com.salesforce.ouroboros.Node;
 
 /**
  * 
@@ -35,34 +37,19 @@ import java.io.Serializable;
 public class Message implements Serializable {
     private static final long  serialVersionUID = 1L;
 
-    private final Serializable payload;
-    private final Node         sender;
-    private final MessageType  type;
+    public final Serializable payload;
+    public final Node         sender;
+    public final MessageType  type;
+
+    public Message(Node sender, MessageType type) {
+        this.sender = sender;
+        this.type = type;
+        this.payload = null;
+    }
 
     public Message(Node sender, MessageType type, Serializable body) {
         this.sender = sender;
         this.type = type;
         this.payload = body;
-    }
-
-    /**
-     * @return the payload
-     */
-    public Serializable getPayload() {
-        return payload;
-    }
-
-    /**
-     * @return the sender
-     */
-    public Node getSender() {
-        return sender;
-    }
-
-    /**
-     * @return the type
-     */
-    public MessageType getType() {
-        return type;
     }
 }

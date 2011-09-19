@@ -23,8 +23,10 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros;
+package com.salesforce.ouroboros.partition;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -37,6 +39,9 @@ import org.smartfrog.services.anubis.partition.comms.MessageConnection;
 import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 import org.smartfrog.services.anubis.partition.views.View;
 
+import com.salesforce.ouroboros.ContactInformation;
+import com.salesforce.ouroboros.Node;
+
 /**
  * The common high level distribute coordination logic for Ouroboros group
  * members. Provides the basic handling for handling partitions, maintaining
@@ -46,23 +51,55 @@ import org.smartfrog.services.anubis.partition.views.View;
  * @author hhildebrand
  * 
  */
-abstract public class Switchboard {
+public class Switchboard {
+
+    public interface Member {
+        /**
+         * Advertise the receiver service, by ring casting the service across
+         * the membership ring
+         */
+        void advertise();
+
+        /**
+         * The partition has been destabilized
+         */
+        void destabilize();
+
+        void discoverChannelBuffer(Node from, ContactInformation payload,
+                                   long time);
+
+        void discoverConsumer(Node sender, long time);
+
+        void discoverProducer(Node sender, long time);
+
+        /**
+         * The membership discovery has been completed.
+         * 
+         * @param leader
+         *            - the leader node
+         */
+        void discoveryComplete(Node leader);
+
+        void setSwitchboard(Switchboard switchboard);
+
+        void stabilized();
+
+    }
 
     class Notification implements PartitionNotification {
 
         @Override
         public void objectNotification(Object obj, int sender, long time) {
             if (obj instanceof Message) {
-                Message message = (Message) obj;
-                processMessage(message, sender, time);
+                processMessage((Message) obj, sender, time);
             } else if (obj instanceof RingMessage) {
-                RingMessage message = (RingMessage) obj;
-                processRingMessage(message, sender, time);
+                processRingMessage((RingMessage) obj, sender, time);
             }
         }
 
         @Override
         public void partitionNotification(View view, int leader) {
+            partitionEvent(view, leader);
         }
 
         private void forward(RingMessage message) {
@@ -101,9 +138,8 @@ abstract public class Switchboard {
                         log.fine(String.format("Processing inbound %s on: %s",
                                                message, self));
                     }
-                    message.getType().dispatch(Switchboard.this,
-                                               message.getSender(),
-                                               message.getPayload(), time);
+                    message.type.dispatch(Switchboard.this, member,
+                                          message.sender, message.payload, time);
                     break;
                 }
                 case UNSTABLE: {
@@ -126,9 +162,8 @@ abstract public class Switchboard {
                                                wrapped, self));
                     }
                     forward(message);
-                    wrapped.getType().dispatch(Switchboard.this,
-                                               wrapped.getSender(),
-                                               wrapped.getPayload(), time);
+                    wrapped.type.dispatch(Switchboard.this, member,
+                                          wrapped.sender, wrapped.payload, time);
                     break;
                 }
                 case UNSTABLE: {
@@ -142,33 +177,29 @@ abstract public class Switchboard {
         }
     }
 
-    private final Set<Node>                       deadMembers  = new TreeSet<Node>();
-    private boolean                               leader       = false;
-    private final Set<Node>                       members      = new TreeSet<Node>();
-    private final Set<Node>                       newMembers   = new TreeSet<Node>();
-    private final PartitionNotification           notification = new Notification();
-    private final Partition                       partition;
-    private final AtomicReference<PartitionState> state        = new AtomicReference<PartitionState>(
-                                                                                                     PartitionState.UNSTABLE);
-    private NodeIdSet                             view;
-    protected final Logger                        log;
-    protected final Node                          self;
+    static final Logger                    log          = Logger.getLogger(Switchboard.class.getCanonicalName());
+    private final Set<Node>                deadMembers  = new TreeSet<Node>();
+    private boolean                        leader       = false;
+    private final PartitionNotification    notification = new Notification();
+    private NodeIdSet                      previousView;
+    protected final Set<Node>              members      = new TreeSet<Node>();
+    protected final Node                   self;
+    protected final AtomicReference<State> state        = new AtomicReference<State>(
+                                                                                     State.UNSTABLE);
+    protected NodeIdSet                    view;
+    final Member                           member;
+    final Partition                        partition;
 
-    public Switchboard(Node node, Partition p) {
+    public Switchboard(Member m, Node node, Partition p) {
         self = node;
         partition = p;
-        log = Logger.getLogger(getClass().getCanonicalName());
+        member = m;
+        m.setSwitchboard(this);
     }
 
     public void add(Node node) {
         members.add(node);
     }
-
-    /**
-     * Advertise the receiver service, by ring casting the service across the
-     * membership ring
-     */
-    abstract public void advertise();
 
     /**
      * Broadcast the message to all the members in our partition
@@ -182,39 +213,33 @@ abstract public class Switchboard {
         }
     }
 
-    /**
-     * The partition has been destabilized
-     */
-    abstract public void destabilize();
+    public Collection<Node> getDeadMembers() {
+        return deadMembers;
+    }
 
-    abstract public void discoverChannelBuffer(Node from,
-                                               ContactInformation payload,
-                                               long time);
+    public Collection<Node> getMembers() {
+        return Collections.unmodifiableSet(members);
+    }
 
-    public PartitionState getPartitionState() {
+    public Collection<Node> getNewMembers() {
+        if (previousView == null) {
+            return Collections.unmodifiableSet(members);
+        }
+        TreeSet<Node> newMembers = new TreeSet<Node>();
+        for (Node member : members) {
+            if (!previousView.contains(member.processId)) {
+                newMembers.add(member);
+            }
+        }
+        return newMembers;
+    }
+
+    public State getPartitionState() {
         return state.get();
     }
 
-    /**
-     * Membership discover is now complete
-     */
-    public void membershipComplete() {
-        // TODO Auto-generated method stub
-
-    }
-
-    /**
-     * The partition has changed state.
-     * 
-     * @param view
-     *            - the new view of the partition
-     * @param leader
-     *            - the elected leader
-     */
-    public void partitionEvent(View view, int leader) {
-        PartitionState next = view.isStable() ? PartitionState.STABLE
-                                             : PartitionState.UNSTABLE;
-        state.getAndSet(next).next(next, this, view, leader);
+    public State getState() {
+        return state.get();
     }
 
     public void remove(Node node) {
@@ -242,8 +267,8 @@ abstract public class Switchboard {
                 MessageConnection connection = partition.connect(neighbor);
                 if (connection == null) {
                     if (log.isLoggable(Level.WARNING)) {
-                        log.warning(String.format("Unable to ring cast %s from %s as the partition cannot create a connection",
-                                                  message, self));
+                        log.warning(String.format("Unable to ring cast %s from %s as the partition cannot create a connection to %s",
+                                                  message, self, neighbor));
                     }
                 } else {
                     connection.sendObject(new RingMessage(self.processId,
@@ -313,17 +338,48 @@ abstract public class Switchboard {
             log.info(String.format("Destabilizing partition on: %s, view: %s, leader: %s",
                                    self, view, leader));
         }
-        destabilize();
         deadMembers.clear();
-        newMembers.clear();
+        member.destabilize();
     }
 
     void discover(Node sender) {
+        if (!view.contains(sender.processId)) {
+            if (log.isLoggable(Level.WARNING)) {
+                log.warning(String.format("discovery received from member %s, which is not in the view of %s",
+                                          sender, self));
+            }
+            return;
+        }
         if (members.add(sender)) {
-            if (members.size() + newMembers.size() == view.cardinality()) {
-                membershipComplete();
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("member %s discovered on %s", sender,
+                                       self));
+            }
+            if (leader) {
+                if (members.size() == view.cardinality()) {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("All members discovered on %s",
+                                               self));
+                    }
+                    ringCast(new Message(self,
+                                         GlobalMessageType.DISCOVERY_COMPLETE));
+                }
             }
         }
+    }
+
+    /**
+     * The partition has changed state.
+     * 
+     * @param view
+     *            - the new view of the partition
+     * @param leaderNode
+     *            - the elected leader
+     */
+    void partitionEvent(View view, int leaderNode) {
+        leader = self.processId == leaderNode;
+        State next = view.isStable() ? State.STABLE : State.UNSTABLE;
+        state.getAndSet(next).next(next, this, view, leaderNode);
     }
 
     /**
@@ -335,7 +391,8 @@ abstract public class Switchboard {
      *            - the leader
      */
     void stabilize(View v, int leader) {
-        view = v.toBitSet();
+        previousView = view;
+        view = v.toBitSet().clone();
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Stabilizing partition on: %s, view: %s, leader: %s",
                                    self, view, leader));
@@ -343,9 +400,24 @@ abstract public class Switchboard {
         for (Node member : members) {
             if (!view.contains(member.processId)) {
                 deadMembers.add(member);
-                members.remove(member);
             }
         }
-        advertise();
+        members.clear();
+        member.advertise();
+    }
+
+    void stabilized() {
+        if (state.compareAndSet(State.UNSTABLE, State.STABLE)) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Partition stable and discovery complete on %s",
+                                       self));
+            }
+            member.stabilized();
+        } else {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Partition is already stabilized on %s",
+                                       self));
+            }
+        }
     }
 }

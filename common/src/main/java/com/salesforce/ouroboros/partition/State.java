@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros;
+package com.salesforce.ouroboros.partition;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -35,10 +35,10 @@ import org.smartfrog.services.anubis.partition.views.View;
  * @author hhildebrand
  * 
  */
-public enum PartitionState {
+public enum State {
     STABLE {
         @Override
-        void next(PartitionState next, Switchboard switchboard, View view,
+        void next(State next, Switchboard switchboard, View view,
                   int leader) {
             switch (next) {
                 case STABLE: {
@@ -57,7 +57,7 @@ public enum PartitionState {
     },
     UNSTABLE {
         @Override
-        void next(PartitionState next, Switchboard switchboard, View view,
+        void next(State next, Switchboard switchboard, View view,
                   int leader) {
             switch (next) {
                 case UNSTABLE: {
@@ -74,8 +74,8 @@ public enum PartitionState {
         }
 
     };
-    private final static Logger log = Logger.getLogger(PartitionState.class.getCanonicalName());
+    private final static Logger log = Logger.getLogger(State.class.getCanonicalName());
 
-    abstract void next(PartitionState next, Switchboard switchboard, View view,
+    abstract void next(State next, Switchboard switchboard, View view,
                        int leader);
 }

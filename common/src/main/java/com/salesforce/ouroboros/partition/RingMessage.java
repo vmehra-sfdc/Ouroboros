@@ -1,6 +1,7 @@
-package com.salesforce.ouroboros;
+package com.salesforce.ouroboros.partition;
 
 import java.io.Serializable;
+
 
 public class RingMessage implements Serializable {
     private static final long serialVersionUID = 1L;

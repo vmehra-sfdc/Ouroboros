@@ -23,10 +23,13 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros;
+package com.salesforce.ouroboros.partition;
 
 import java.io.Serializable;
 
+import com.salesforce.ouroboros.ContactInformation;
+import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.Switchboard.Member;
 
 /**
  * 
@@ -36,32 +39,40 @@ import java.io.Serializable;
 public enum GlobalMessageType implements MessageType {
     ADVERTISE_CHANNEL_BUFFER {
         @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable payload, long time) {
+        public void dispatch(Switchboard switchboard, Member member,
+                             Node sender, Serializable payload, long time) {
             switchboard.discover(sender);
-            switchboard.discoverChannelBuffer(sender,
-                                              (ContactInformation) payload,
-                                              time);
+            member.discoverChannelBuffer(sender, (ContactInformation) payload,
+                                         time);
 
         }
 
     },
     ADVERTISE_CONSUMER {
         @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable payload, long time) {
-            // TODO Auto-generated method stub
-
+        public void dispatch(Switchboard switchboard, Member member,
+                             Node sender, Serializable payload, long time) {
+            switchboard.discover(sender);
+            member.discoverConsumer(sender, time);
         }
 
     },
     ADVERTISE_PRODUCER {
         @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable payload, long time) {
-            // TODO Auto-generated method stub
-
+        public void dispatch(Switchboard switchboard, Member member,
+                             Node sender, Serializable payload, long time) {
+            switchboard.discover(sender);
+            member.discoverProducer(sender, time);
         }
 
-    };
+    },
+    DISCOVERY_COMPLETE {
+        @Override
+        public void dispatch(Switchboard switchboard, Member member,
+                             Node sender, Serializable payload, long time) {
+            switchboard.stabilized();
+            member.discoveryComplete(sender);
+        }
+
+    }
 }
