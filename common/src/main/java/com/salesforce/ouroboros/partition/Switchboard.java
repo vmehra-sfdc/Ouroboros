@@ -376,6 +376,12 @@ public class Switchboard {
         member.destabilize();
     }
 
+    /**
+     * Discover the member
+     * 
+     * @param sender
+     *            - the member
+     */
     void discover(Node sender) {
         if (!view.contains(sender.processId)) {
             if (log.isLoggable(Level.WARNING)) {
