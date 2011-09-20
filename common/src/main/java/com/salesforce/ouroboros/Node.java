@@ -50,10 +50,8 @@ public class Node implements Comparable<Node>, Serializable {
         @Override
         public boolean isSkippable(List<Node> previous, Node bucket) {
             for (Node node : previous) {
-                if (node.machineId == machineId) {
-                    return true;
-                }
-                if (node.rackId == rackId) {
+                if (node.machineId == machineId || node.rackId == rackId
+                    || node.releaseGroup == releaseGroup) {
                     return true;
                 }
             }
@@ -61,30 +59,34 @@ public class Node implements Comparable<Node>, Serializable {
         }
     }
 
-    public static final int BYTE_LENGTH = 4 + 4 + 4 + 4;
+    public static final int   BYTE_LENGTH      = 4 + 4 + 4 + 4 + 4;
     private static final long serialVersionUID = 1L;
 
-    public final int        capacity;
-    public final int        machineId;
-    public final int        processId;
-    public final int        rackId;
+    public final int          capacity;
+    public final int          machineId;
+    public final int          processId;
+    public final int          rackId;
+    public final int          releaseGroup;
 
     public Node(ByteBuffer buffer) {
         processId = buffer.getInt();
         machineId = buffer.getInt();
         rackId = buffer.getInt();
         capacity = buffer.getInt();
+        releaseGroup = buffer.getInt();
     }
 
     public Node(int processId, int machineId, int rackId) {
-        this(processId, machineId, rackId, 1);
+        this(processId, machineId, rackId, 1, 0);
     }
 
-    public Node(int processId, int machineId, int rackId, int capacity) {
+    public Node(int processId, int machineId, int rackId, int capacity,
+                int releaseGroup) {
         this.processId = processId;
         this.machineId = machineId;
         this.rackId = rackId;
         this.capacity = capacity;
+        this.releaseGroup = releaseGroup;
     }
 
     @Override
@@ -113,7 +115,7 @@ public class Node implements Comparable<Node>, Serializable {
     }
 
     public void serialize(ByteBuffer buffer) {
-        buffer.putInt(processId).putInt(machineId).putInt(rackId).putInt(capacity);
+        buffer.putInt(processId).putInt(machineId).putInt(rackId).putInt(capacity).putInt(releaseGroup);
     }
 
     /* (non-Javadoc)
