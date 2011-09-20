@@ -36,7 +36,7 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -123,6 +123,8 @@ public class Weaver implements Bundle {
     private static final String                          WEAVER_XEROX      = "Weaver Xerox";
 
     private final ConcurrentMap<UUID, EventChannel>      channels          = new ConcurrentHashMap<UUID, EventChannel>();
+    private final ContactInformation                     contactInfo;
+    private final Coordinator                            coordinator;
     private final Node                                   id;
     private final long                                   maxSegmentSize;
     private final ServerSocketChannelHandler<Replicator> replicationHandler;
@@ -130,7 +132,6 @@ public class Weaver implements Bundle {
     private final File                                   root;
     private final ServerSocketChannelHandler<Spinner>    spindleHandler;
     private final ChannelHandler<Xerox>                  xeroxHandler;
-    private final Coordinator                            coordinator;
 
     public Weaver(WeaverConfigation configuration, Coordinator coordinator)
                                                                            throws IOException {
@@ -155,6 +156,10 @@ public class Weaver implements Bundle {
                                                                  configuration.getSpindleAddress(),
                                                                  configuration.getSpindles(),
                                                                  new SpindleFactory());
+        contactInfo = new ContactInformation(
+                                             spindleHandler.getLocalAddress(),
+                                             replicationHandler.getLocalAddress(),
+                                             null);
 
         if (!root.exists()) {
             if (!root.mkdirs()) {
@@ -168,7 +173,7 @@ public class Weaver implements Bundle {
                                             String.format("Root is not a directory: %s",
                                                           root.getAbsolutePath()));
         }
-        coordinator.ready(this);
+        coordinator.ready(this, contactInfo);
     }
 
     public void close(UUID channel) {
@@ -218,6 +223,10 @@ public class Weaver implements Bundle {
                 }
             }
         }
+    }
+
+    public ContactInformation getContactInformation() {
+        return contactInfo;
     }
 
     /**
@@ -274,12 +283,12 @@ public class Weaver implements Bundle {
      *            - the replication node
      * @param info
      *            - the contact information for the node
-     * @param latch
-     *            - the count down latch to sychronize connectivity
+     * @param barrier
+     *            - the barrier used to sychronize connectivity
      */
     public void openReplicator(Node node, ContactInformation info,
-                               CountDownLatch latch) {
-        Replicator replicator = new Replicator(this, node, latch);
+                               CyclicBarrier barrier) {
+        Replicator replicator = new Replicator(this, node, barrier);
         replicators.put(node, replicator);
         if (thisEndInitiatesConnectionsTo(node)) {
             if (log.isLoggable(Level.INFO)) {

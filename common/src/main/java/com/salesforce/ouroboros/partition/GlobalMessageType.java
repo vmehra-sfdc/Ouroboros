@@ -71,8 +71,6 @@ public enum GlobalMessageType implements MessageType {
         public void dispatch(Switchboard switchboard, Member member,
                              Node sender, Serializable payload, long time) {
             switchboard.stabilized();
-            member.discoveryComplete(sender);
         }
-
     }
 }

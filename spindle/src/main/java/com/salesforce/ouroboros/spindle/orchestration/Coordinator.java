@@ -33,13 +33,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CyclicBarrier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.GlobalMessageType;
+import com.salesforce.ouroboros.partition.Message;
+import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.Xerox;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
@@ -50,7 +58,38 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * @author hhildebrand
  * 
  */
-public class Coordinator {
+public class Coordinator implements Member {
+    public enum Transition {
+        DESTABILIZED, STABILIZED, SYNCHRONIZED;
+    };
+
+    public enum State {
+        STABLIZED {
+            @Override
+            public void transition(Coordinator coordinator, Transition t) {
+                switch (t) {
+                    case DESTABILIZED: {
+                    }
+                }
+            }
+        },
+        SYNCHRONIZED {
+            @Override
+            public void transition(Coordinator coordinator, Transition t) {
+                // TODO Auto-generated method stub
+
+            }
+        },
+        REBALANCED {
+            @Override
+            public void transition(Coordinator coordinator, Transition t) {
+                // TODO Auto-generated method stub
+
+            }
+        };
+
+        public abstract void transition(Coordinator coordinator, Transition t);
+    }
 
     private final static Logger log = Logger.getLogger(Coordinator.class.getCanonicalName());
 
@@ -58,18 +97,24 @@ public class Coordinator {
         return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
     }
 
-    private final Set<UUID>              channels   = new HashSet<UUID>();
-    private Weaver                       localWeaver;
-    private final Map<Integer, Node>     members    = new HashMap<Integer, Node>();
-    private ConsistentHashFunction<Node> weaverRing = new ConsistentHashFunction<Node>();
+    private final Set<UUID>                               channels    = new HashSet<UUID>();
+    private Weaver                                        localWeaver;
+    private final SortedSet<Node>                         newMembers  = new TreeSet<Node>();
+    private volatile CyclicBarrier                        replicatorBarrier;
+    private final SortedSet<Node>                         spindles    = new TreeSet<Node>();
+    private Switchboard                                   switchboard;
+    private ConsistentHashFunction<Node>                  weaverRing  = new ConsistentHashFunction<Node>();
+    private final ConcurrentMap<Node, ContactInformation> yellowPages = new ConcurrentHashMap<Node, ContactInformation>();
 
-    public CountDownLatch openReplicators(Collection<Node> newMembers,
-                                          Map<Node, ContactInformation> directory) {
-        CountDownLatch latch = new CountDownLatch(newMembers.size());
-        for (Node member : newMembers) {
-            localWeaver.openReplicator(member, directory.get(member), latch);
-        }
-        return latch;
+    @Override
+    public void advertise() {
+        assert localWeaver != null : "local weaver has not been initialized";
+        ContactInformation info = yellowPages.get(localWeaver.getId());
+        assert info != null : "local weaver contact information has not been initialized";
+        switchboard.ringCast(new Message(
+                                         localWeaver.getId(),
+                                         GlobalMessageType.ADVERTISE_CHANNEL_BUFFER,
+                                         info));
     }
 
     /**
@@ -90,6 +135,28 @@ public class Coordinator {
         }
     }
 
+    @Override
+    public void destabilize() {
+        replicatorBarrier.reset();
+    }
+
+    @Override
+    public void discoverChannelBuffer(Node node, ContactInformation info,
+                                      long time) {
+        spindles.add(node);
+        yellowPages.putIfAbsent(node, info);
+    }
+
+    @Override
+    public void discoverConsumer(Node sender, long time) {
+        // do nothing
+    }
+
+    @Override
+    public void discoverProducer(Node sender, long time) {
+        // do nothing
+    }
+
     /**
      * The weaver membership has partitioned. Failover any channels the dead
      * members were serving as primary that the receiver's node is providing
@@ -105,7 +172,7 @@ public class Coordinator {
                 log.fine(String.format("Removing weaver[%s] from the partition",
                                        node));
             }
-            members.remove(node.processId);
+            yellowPages.remove(node);
             localWeaver.closeReplicator(node);
         }
         localWeaver.failover(deadMembers);
@@ -142,13 +209,34 @@ public class Coordinator {
     }
 
     /**
+     * Open the replicators to the the new members
+     * 
+     * @param newMembers
+     *            - the new member nodes
+     * @param barrierAction
+     *            - the action to execute when the new replicators are active
+     * @return - the CyclicBarrier used to synchronize with replication
+     *         connections
+     */
+    public CyclicBarrier openReplicators(Collection<Node> newMembers,
+                                         Runnable barrierAction) {
+        CyclicBarrier barrier = new CyclicBarrier(newMembers.size(),
+                                                  barrierAction);
+        for (Node member : newMembers) {
+            localWeaver.openReplicator(member, yellowPages.get(member), barrier);
+        }
+        return barrier;
+    }
+
+    /**
      * Set the local weaver
      * 
      * @param weaver
      *            - the local weaver for this coordinator
      */
-    public void ready(Weaver weaver) {
+    public void ready(Weaver weaver, ContactInformation info) {
         localWeaver = weaver;
+        yellowPages.put(weaver.getId(), info);
     }
 
     /**
@@ -195,6 +283,36 @@ public class Coordinator {
         return remapped;
     }
 
+    @Override
+    public void setSwitchboard(Switchboard switchboard) {
+        this.switchboard = switchboard;
+    }
+
+    @Override
+    public void stabilized() {
+        // Failover
+        failover(switchboard.getDeadMembers());
+
+        // Filter the system membership
+        spindles.removeAll(switchboard.getDeadMembers());
+        newMembers.clear();
+        for (Node node : switchboard.getNewMembers()) {
+            if (spindles.contains(node)) {
+                newMembers.add(node);
+            }
+        }
+        Runnable barrierAction = new Runnable() {
+            @Override
+            public void run() {
+                switchboard.send(new Message(
+                                             localWeaver.getId(),
+                                             SpindleMessage.REPLICATORS_SYNCHRONIZED),
+                                 spindles.first());
+            }
+        };
+        replicatorBarrier = openReplicators(newMembers, barrierAction);
+    }
+
     /**
      * Update the consistent hash function for the weaver processs ring.
      * 
@@ -203,5 +321,10 @@ public class Coordinator {
      */
     public void updateRing(ConsistentHashFunction<Node> ring) {
         weaverRing = ring;
+    }
+
+    public void replicatorsSynchronizedOn(Node sender) {
+        // TODO Auto-generated method stub
+
     }
 }

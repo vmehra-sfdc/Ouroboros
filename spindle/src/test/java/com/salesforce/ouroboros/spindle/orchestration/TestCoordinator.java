@@ -40,14 +40,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 
 import org.junit.Test;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Weaver;
-import com.salesforce.ouroboros.spindle.orchestration.Coordinator;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
@@ -57,12 +56,21 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  */
 public class TestCoordinator {
 
+    private ContactInformation dummyInfo = new ContactInformation(
+                                                                  new InetSocketAddress(
+                                                                                        0),
+                                                                  new InetSocketAddress(
+                                                                                        0),
+                                                                  new InetSocketAddress(
+                                                                                        0));
+
     @Test
     public void testClose() {
         Weaver weaver = mock(Weaver.class);
-        Coordinator coordinator = new Coordinator();
-        coordinator.ready(weaver);
         Node localNode = new Node(0, 0, 0);
+        when(weaver.getId()).thenReturn(localNode);
+        Coordinator coordinator = new Coordinator();
+        coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -123,9 +131,10 @@ public class TestCoordinator {
     @Test
     public void testFailover() {
         Weaver weaver = mock(Weaver.class);
-        Coordinator coordinator = new Coordinator();
-        coordinator.ready(weaver);
         Node localNode = new Node(0, 0, 0);
+        when(weaver.getId()).thenReturn(localNode);
+        Coordinator coordinator = new Coordinator();
+        coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -166,9 +175,10 @@ public class TestCoordinator {
     @Test
     public void testOpen() {
         Weaver weaver = mock(Weaver.class);
-        Coordinator coordinator = new Coordinator();
-        coordinator.ready(weaver);
         Node localNode = new Node(0, 0, 0);
+        when(weaver.getId()).thenReturn(localNode);
+        Coordinator coordinator = new Coordinator();
+        coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -205,9 +215,11 @@ public class TestCoordinator {
 
     @Test
     public void testOpenReplicators() {
+        Runnable barrierAction = mock(Runnable.class);
         Weaver weaver = mock(Weaver.class);
+        when(weaver.getId()).thenReturn(new Node(0, 0, 0));
         Coordinator coordinator = new Coordinator();
-        coordinator.ready(weaver);
+        coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -225,26 +237,28 @@ public class TestCoordinator {
                                                                         address,
                                                                         address,
                                                                         address);
-        Map<Node, ContactInformation> newMembers = new HashMap<Node, ContactInformation>();
-        newMembers.put(node1, contactInformation1);
-        newMembers.put(node2, contactInformation2);
-        newMembers.put(node3, contactInformation3);
-        CountDownLatch latch = coordinator.openReplicators(newMembers.keySet(),
-                                                           newMembers);
-        assertNotNull(latch);
-        assertEquals(3, latch.getCount());
+        coordinator.discoverChannelBuffer(node1, contactInformation1, 0);
+        coordinator.discoverChannelBuffer(node2, contactInformation2, 0);
+        coordinator.discoverChannelBuffer(node3, contactInformation3, 0);
+        CyclicBarrier barrier = coordinator.openReplicators(Arrays.asList(node1,
+                                                                          node2,
+                                                                          node3),
+                                                            barrierAction);
+        assertNotNull(barrier);
+        assertEquals(3, barrier.getParties());
 
-        verify(weaver).openReplicator(node1, contactInformation1, latch);
-        verify(weaver).openReplicator(node2, contactInformation2, latch);
-        verify(weaver).openReplicator(node3, contactInformation3, latch);
+        verify(weaver).openReplicator(node1, contactInformation1, barrier);
+        verify(weaver).openReplicator(node2, contactInformation2, barrier);
+        verify(weaver).openReplicator(node3, contactInformation3, barrier);
     }
 
     @Test
     public void testRebalance() {
         Weaver weaver = mock(Weaver.class);
-        Coordinator coordinator = new Coordinator();
-        coordinator.ready(weaver);
         Node localNode = new Node(0, 0, 0);
+        when(weaver.getId()).thenReturn(localNode);
+        Coordinator coordinator = new Coordinator();
+        coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -291,8 +305,9 @@ public class TestCoordinator {
     public void testRemap() {
         Weaver weaver = mock(Weaver.class);
         Coordinator coordinator = new Coordinator();
-        coordinator.ready(weaver);
         Node localNode = new Node(0, 0, 0);
+        when(weaver.getId()).thenReturn(localNode);
+        coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);

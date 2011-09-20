@@ -27,9 +27,10 @@ package com.salesforce.ouroboros.partition;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -73,14 +74,6 @@ public class Switchboard {
 
         void discoverProducer(Node sender, long time);
 
-        /**
-         * The membership discovery has been completed.
-         * 
-         * @param leader
-         *            - the leader node
-         */
-        void discoveryComplete(Node leader);
-
         void setSwitchboard(Switchboard switchboard);
 
         void stabilized();
@@ -90,16 +83,41 @@ public class Switchboard {
     class Notification implements PartitionNotification {
 
         @Override
-        public void objectNotification(Object obj, int sender, long time) {
+        public void objectNotification(final Object obj, final int sender,
+                                       final long time) {
             if (obj instanceof Message) {
-                processMessage((Message) obj, sender, time);
+                try {
+                    messageProcessor.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            processMessage((Message) obj, sender, time);
+                        }
+                    });
+                } catch (RejectedExecutionException e) {
+                    if (log.isLoggable(Level.FINEST)) {
+                        log.finest(String.format("rejecting message %s due to shutdown on %s",
+                                                 obj, self));
+                    }
+                }
             } else if (obj instanceof RingMessage) {
-                processRingMessage((RingMessage) obj, sender, time);
+                try {
+                    messageProcessor.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            processRingMessage((RingMessage) obj, sender, time);
+                        }
+                    });
+                } catch (RejectedExecutionException e) {
+                    if (log.isLoggable(Level.FINEST)) {
+                        log.finest(String.format("rejecting message %s due to shutdown on %s",
+                                                 obj, self));
+                    }
+                }
             }
         }
 
         @Override
-        public void partitionNotification(View view, int leader) {
+        public void partitionNotification(final View view, final int leader) {
             partitionEvent(view, leader);
         }
 
@@ -136,19 +154,12 @@ public class Switchboard {
                                     final long time) {
             switch (state.get()) {
                 case STABLE: {
-                    messageProcessor.execute(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            if (log.isLoggable(Level.FINE)) {
-                                log.fine(String.format("Processing inbound %s on: %s",
-                                                       message, self));
-                            }
-                            message.type.dispatch(Switchboard.this, member,
-                                                  message.sender,
-                                                  message.payload, time);
-                        }
-                    });
+                    if (log.isLoggable(Level.FINE)) {
+                        log.fine(String.format("Processing inbound %s on: %s",
+                                               message, self));
+                    }
+                    message.type.dispatch(Switchboard.this, member,
+                                          message.sender, message.payload, time);
                     break;
                 }
                 case UNSTABLE: {
@@ -166,20 +177,13 @@ public class Switchboard {
             final Message wrapped = message.wrapped;
             switch (state.get()) {
                 case STABLE: {
-                    messageProcessor.execute(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            if (log.isLoggable(Level.FINE)) {
-                                log.fine(String.format("Processing inbound ring message %s on: %s",
-                                                       wrapped, self));
-                            }
-                            forward(message);
-                            wrapped.type.dispatch(Switchboard.this, member,
-                                                  wrapped.sender,
-                                                  wrapped.payload, time);
-                        }
-                    });
+                    if (log.isLoggable(Level.FINE)) {
+                        log.fine(String.format("Processing inbound ring message %s on: %s",
+                                               wrapped, self));
+                    }
+                    forward(message);
+                    wrapped.type.dispatch(Switchboard.this, member,
+                                          wrapped.sender, wrapped.payload, time);
                     break;
                 }
                 case UNSTABLE: {
@@ -194,11 +198,11 @@ public class Switchboard {
     }
 
     static final Logger                    log          = Logger.getLogger(Switchboard.class.getCanonicalName());
-    private final Set<Node>                deadMembers  = new TreeSet<Node>();
+    private final SortedSet<Node>          deadMembers  = new TreeSet<Node>();
     private boolean                        leader       = false;
     private final PartitionNotification    notification = new Notification();
     private NodeIdSet                      previousView;
-    protected final Set<Node>              members      = new TreeSet<Node>();
+    protected final SortedSet<Node>        members      = new TreeSet<Node>();
     protected final Node                   self;
     protected final AtomicReference<State> state        = new AtomicReference<State>(
                                                                                      State.UNSTABLE);
@@ -226,7 +230,19 @@ public class Switchboard {
      *            - the message to broadcast
      */
     public void broadcast(Message msg) {
-        for (Node node : members) {
+        broadcast(msg, members);
+    }
+
+    /**
+     * Broadcast the message to all the members in the target group
+     * 
+     * @param msg
+     *            - the message to broadcast
+     * @param target
+     *            - the target group of nodes to receive the message
+     */
+    public void broadcast(Message msg, Collection<Node> target) {
+        for (Node node : target) {
             send(msg, node);
         }
     }
@@ -302,10 +318,6 @@ public class Switchboard {
                 }
             }
         }
-    }
-
-    public Node self() {
-        return self;
     }
 
     /**

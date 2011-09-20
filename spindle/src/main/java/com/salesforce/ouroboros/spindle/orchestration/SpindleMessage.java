@@ -25,10 +25,24 @@
  */
 package com.salesforce.ouroboros.spindle.orchestration;
 
+import java.io.Serializable;
+
+import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.MessageType;
+import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.partition.Switchboard.Member;
+
 /**
  * 
  * @author hhildebrand
  * 
  */
-public enum MessageType {
+public enum SpindleMessage implements MessageType {
+    REPLICATORS_SYNCHRONIZED() { 
+        @Override
+        public void dispatch(Switchboard switchboard, Member member,
+                             Node sender, Serializable payload, long time) {
+            ((Coordinator) member).replicatorsSynchronizedOn(sender);
+        }
+    }
 }

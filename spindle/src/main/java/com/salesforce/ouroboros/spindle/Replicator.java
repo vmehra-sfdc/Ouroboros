@@ -28,7 +28,8 @@ package com.salesforce.ouroboros.spindle;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -73,16 +74,16 @@ public class Replicator implements CommunicationsHandler {
     private final Duplicator                 duplicator;
     private volatile SocketChannelHandler<?> handler;
     private ByteBuffer                       handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private CountDownLatch                   latch;
+    private CyclicBarrier                    barrier;
     private volatile Node                    partnerId;
     private volatile State                   state          = State.INITIAL;
 
-    public Replicator(Bundle bundle, Node partner, CountDownLatch latch) {
+    public Replicator(Bundle bundle, Node partner, CyclicBarrier barrier) {
         duplicator = new Duplicator();
         appender = new ReplicatingAppender(bundle);
         this.bundle = bundle;
         partnerId = partner;
-        this.latch = latch;
+        this.barrier = barrier;
     }
 
     public void bindTo(Node node) {
@@ -133,7 +134,16 @@ public class Replicator implements CommunicationsHandler {
                 duplicator.handleConnect(channel, handler);
                 appender.handleAccept(channel, handler);
                 handler.selectForRead();
-                latch.countDown();
+                try {
+                    barrier.await();
+                } catch (InterruptedException e) {
+                    log.log(Level.FINEST, "Replication barrier interrupted", e);
+                    return;
+                } catch (BrokenBarrierException e) {
+                    log.log(Level.WARNING, "Replication barrier broken", e);
+                    handler.close();
+                    return;
+                }
                 break;
             }
             default: {
@@ -215,7 +225,16 @@ public class Replicator implements CommunicationsHandler {
         if (!handshake.hasRemaining()) {
             duplicator.handleConnect(channel, handler);
             state = State.ESTABLISHED;
-            latch.countDown();
+            try {
+                barrier.await();
+            } catch (InterruptedException e) {
+                log.log(Level.FINEST, "Replication barrier interrupted", e);
+                return;
+            } catch (BrokenBarrierException e) {
+                log.log(Level.WARNING, "Replication barrier broken", e);
+                handler.close();
+                return;
+            }
         }
     }
 }

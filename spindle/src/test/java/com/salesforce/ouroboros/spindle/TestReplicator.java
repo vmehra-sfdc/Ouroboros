@@ -33,7 +33,7 @@ import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
@@ -54,10 +54,10 @@ public class TestReplicator {
         Bundle bundle = mock(Bundle.class);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
-        CountDownLatch latch = mock(CountDownLatch.class);
+        CyclicBarrier barrier = mock(CyclicBarrier.class);
         final Node node = new Node(0x1639, 0x1640, 0x1650);
 
-        Replicator replicator = new Replicator(bundle, node, latch);
+        Replicator replicator = new Replicator(bundle, node, barrier);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -81,10 +81,10 @@ public class TestReplicator {
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
         final Node node = new Node(0x1639, 0x1640, 0x1650);
-        CountDownLatch latch = mock(CountDownLatch.class);
+        CyclicBarrier barrier = mock(CyclicBarrier.class);
         when(bundle.getId()).thenReturn(node);
 
-        Replicator replicator = new Replicator(bundle, node, latch);
+        Replicator replicator = new Replicator(bundle, node, barrier);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override

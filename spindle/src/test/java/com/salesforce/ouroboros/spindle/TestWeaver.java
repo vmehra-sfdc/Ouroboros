@@ -40,7 +40,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 
 import org.junit.Test;
 
@@ -133,7 +133,7 @@ public class TestWeaver {
 
     @Test
     public void testOpenReplicator() throws Exception {
-        CountDownLatch latch = mock(CountDownLatch.class);
+        CyclicBarrier barrier = mock(CyclicBarrier.class);
         SocketOptions options = new SocketOptions();
         options.setTimeout(100);
         ServerSocketChannel server = ServerSocketChannel.open();
@@ -162,7 +162,7 @@ public class TestWeaver {
         config.setRoot(root);
         Weaver weaver = new Weaver(config, coordinator);
         weaver.start();
-        weaver.openReplicator(mirror, info, latch);
+        weaver.openReplicator(mirror, info, barrier);
         SocketChannel connected = server.accept();
         assertNotNull(connected);
         assertTrue(connected.isConnected());
@@ -173,8 +173,8 @@ public class TestWeaver {
         assertEquals(Replicator.MAGIC, buffer.getInt());
         Node handshakeNode = new Node(buffer);
         assertEquals(id, handshakeNode);
-        Thread.sleep(10); // Time for replicator to countdown the latch
-        verify(latch).countDown();
+        Thread.sleep(10); // Time for replicator to await at the barrier
+        verify(barrier).await();
         weaver.terminate();
         connected.close();
         server.close();
