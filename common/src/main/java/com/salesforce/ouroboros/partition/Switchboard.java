@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.partition;
 
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.SortedSet;
@@ -41,7 +42,6 @@ import org.smartfrog.services.anubis.partition.comms.MessageConnection;
 import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 import org.smartfrog.services.anubis.partition.views.View;
 
-import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 
 /**
@@ -67,12 +67,8 @@ public class Switchboard {
          */
         void destabilize();
 
-        void discoverChannelBuffer(Node from, ContactInformation payload,
-                                   long time);
-
-        void discoverConsumer(Node sender, long time);
-
-        void discoverProducer(Node sender, long time);
+        void dispatch(GlobalMessageType type, Node sender,
+                      Serializable payload, long time);
 
         void setSwitchboard(Switchboard switchboard);
 
@@ -158,8 +154,8 @@ public class Switchboard {
                         log.fine(String.format("Processing inbound %s on: %s",
                                                message, self));
                     }
-                    message.type.dispatch(Switchboard.this, member,
-                                          message.sender, message.payload, time);
+                    message.type.dispatch(Switchboard.this, message.sender,
+                                          message.payload, time);
                     break;
                 }
                 case UNSTABLE: {
@@ -182,8 +178,8 @@ public class Switchboard {
                                                wrapped, self));
                     }
                     forward(message);
-                    wrapped.type.dispatch(Switchboard.this, member,
-                                          wrapped.sender, wrapped.payload, time);
+                    wrapped.type.dispatch(Switchboard.this, wrapped.sender,
+                                          wrapped.payload, time);
                     break;
                 }
                 case UNSTABLE: {
@@ -245,6 +241,11 @@ public class Switchboard {
         for (Node node : target) {
             send(msg, node);
         }
+    }
+
+    public void dispatchToMember(MemberDispatch type, Node sender,
+                                 Serializable payload, long time) {
+        type.dispatch(member, sender, payload, time);
     }
 
     public Collection<Node> getDeadMembers() {
@@ -406,6 +407,19 @@ public class Switchboard {
                 }
             }
         }
+    }
+
+    /**
+     * The double dispatch of the GlobalMessage
+     * 
+     * @param type
+     * @param sender
+     * @param payload
+     * @param time
+     */
+    void dispatch(GlobalMessageType type, Node sender, Serializable payload,
+                  long time) {
+        type.dispatch(this, sender, payload, time);
     }
 
     /**

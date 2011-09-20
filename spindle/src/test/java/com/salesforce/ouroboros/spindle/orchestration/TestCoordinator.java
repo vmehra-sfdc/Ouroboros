@@ -46,6 +46,7 @@ import org.junit.Test;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
@@ -243,9 +244,12 @@ public class TestCoordinator {
                                                                         address,
                                                                         address,
                                                                         address);
-        coordinator.discoverChannelBuffer(node1, contactInformation1, 0);
-        coordinator.discoverChannelBuffer(node2, contactInformation2, 0);
-        coordinator.discoverChannelBuffer(node3, contactInformation3, 0);
+        coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node1,
+                             contactInformation1, 0);
+        coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node2,
+                             contactInformation2, 0);
+        coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node3,
+                             contactInformation3, 0);
         Rendezvous rendezvous = coordinator.openReplicators(Arrays.asList(node1,
                                                                           node2,
                                                                           node3),

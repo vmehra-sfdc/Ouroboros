@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.partition;
 
 import java.io.Serializable;
 
-import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
 
@@ -36,41 +35,54 @@ import com.salesforce.ouroboros.partition.Switchboard.Member;
  * @author hhildebrand
  * 
  */
-public enum GlobalMessageType implements MessageType {
+public enum GlobalMessageType implements GlobalDispatch {
     ADVERTISE_CHANNEL_BUFFER {
         @Override
-        public void dispatch(Switchboard switchboard, Member member,
-                             Node sender, Serializable payload, long time) {
+        public void transition(Switchboard switchboard, Member member,
+                               Node sender, Serializable payload, long time) {
             switchboard.discover(sender);
-            member.discoverChannelBuffer(sender, (ContactInformation) payload,
-                                         time);
-
+            member.dispatch(this, sender, payload, time);
         }
 
     },
     ADVERTISE_CONSUMER {
+
         @Override
-        public void dispatch(Switchboard switchboard, Member member,
-                             Node sender, Serializable payload, long time) {
+        void transition(Switchboard switchboard, Member member, Node sender,
+                        Serializable payload, long time) {
             switchboard.discover(sender);
-            member.discoverConsumer(sender, time);
+            member.dispatch(this, sender, payload, time);
         }
 
     },
     ADVERTISE_PRODUCER {
+
         @Override
-        public void dispatch(Switchboard switchboard, Member member,
-                             Node sender, Serializable payload, long time) {
+        void transition(Switchboard switchboard, Member member, Node sender,
+                        Serializable payload, long time) {
             switchboard.discover(sender);
-            member.discoverProducer(sender, time);
+            member.dispatch(this, sender, payload, time);
         }
 
     },
     DISCOVERY_COMPLETE {
         @Override
-        public void dispatch(Switchboard switchboard, Member member,
-                             Node sender, Serializable payload, long time) {
-            switchboard.stabilized();
+        public void dispatch(Switchboard switchboard, Node sender,
+                             Serializable payload, long time) {
         }
+
+        @Override
+        void transition(Switchboard switchboard, Member member, Node sender,
+                        Serializable payload, long time) {
+            switchboard.stabilized();
+
+        }
+    };
+    abstract void transition(Switchboard switchboard, Member member,
+                             Node sender, Serializable payload, long time);
+
+    public void dispatch(Switchboard switchboard, Node sender,
+                         Serializable payload, long time) {
+        switchboard.dispatch(this, sender, payload, time);
     }
 }

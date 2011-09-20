@@ -28,16 +28,15 @@ package com.salesforce.ouroboros.partition;
 import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.Switchboard.Member;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public interface MessageType {
+public interface GlobalDispatch {
 
-    void dispatch(Switchboard switchboard, Member member, Node sender,
-                  Serializable payload, long time);
+    void dispatch(Switchboard switchboard, Node sender, Serializable payload,
+                  long time);
 
 }

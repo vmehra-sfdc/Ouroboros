@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.spindle.orchestration;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -129,23 +130,6 @@ public class Coordinator implements Member {
         if (prev != null) {
             prev.cancel();
         }
-    }
-
-    @Override
-    public void discoverChannelBuffer(Node node, ContactInformation info,
-                                      long time) {
-        members.add(node);
-        yellowPages.putIfAbsent(node, info);
-    }
-
-    @Override
-    public void discoverConsumer(Node sender, long time) {
-        // do nothing
-    }
-
-    @Override
-    public void discoverProducer(Node sender, long time) {
-        // do nothing
     }
 
     /**
@@ -316,7 +300,7 @@ public class Coordinator implements Member {
             if (state.compareAndSet(State.SYNCHRONIZING, State.UNSYNCHRONIZED)) {
                 switchboard.broadcast(new Message(
                                                   localWeaver.getId(),
-                                                  SpindleMessage.SYNCHRONIZE_REPLICATORS_FAILED),
+                                                  ReplicatorSynchronization.SYNCHRONIZE_REPLICATORS_FAILED),
                                       members);
             }
         }
@@ -368,7 +352,7 @@ public class Coordinator implements Member {
             // Start the replicator synchronization
             switchboard.broadcast(new Message(
                                               localWeaver.getId(),
-                                              SpindleMessage.SYNCHRONIZE_REPLICATORS),
+                                              ReplicatorSynchronization.SYNCHRONIZE_REPLICATORS),
                                   members);
         }
     }
@@ -388,7 +372,7 @@ public class Coordinator implements Member {
             public void run() {
                 switchboard.send(new Message(
                                              localWeaver.getId(),
-                                             SpindleMessage.REPLICATORS_SYNCHRONIZED),
+                                             ReplicatorSynchronization.REPLICATORS_SYNCHRONIZED),
                                  leader);
             }
         };
@@ -397,7 +381,7 @@ public class Coordinator implements Member {
             public void run() {
                 switchboard.send(new Message(
                                              localWeaver.getId(),
-                                             SpindleMessage.REPLICATOR_SYNCHRONIZATION_FAILED),
+                                             ReplicatorSynchronization.REPLICATOR_SYNCHRONIZATION_FAILED),
                                  leader);
             }
         };
@@ -434,6 +418,19 @@ public class Coordinator implements Member {
             if (members.contains(node)) {
                 newMembers.add(node);
             }
+        }
+    }
+
+    @Override
+    public void dispatch(GlobalMessageType type, Node sender,
+                         Serializable payload, long time) {
+        switch (type) {
+            case ADVERTISE_CHANNEL_BUFFER:
+                members.add(sender);
+                yellowPages.putIfAbsent(sender, (ContactInformation) payload);
+                break;
+            default:
+                break;
         }
     }
 }

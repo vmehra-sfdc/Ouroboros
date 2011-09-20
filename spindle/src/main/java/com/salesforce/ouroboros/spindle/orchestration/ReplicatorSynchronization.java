@@ -28,7 +28,8 @@ package com.salesforce.ouroboros.spindle.orchestration;
 import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.MessageType;
+import com.salesforce.ouroboros.partition.GlobalDispatch;
+import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
 
@@ -37,39 +38,51 @@ import com.salesforce.ouroboros.partition.Switchboard.Member;
  * @author hhildebrand
  * 
  */
-public enum SpindleMessage implements MessageType {
+public enum ReplicatorSynchronization implements GlobalDispatch, MemberDispatch {
     REPLICATORS_SYNCHRONIZED() {
         @Override
-        public void dispatch(Switchboard switchboard, Member member,
-                             Node sender, Serializable payload, long time) {
-            ((Coordinator) member).replicatorsSynchronizedOn(sender);
+        public void dispatch(Coordinator coordinator, Node sender,
+                             Serializable payload, long time) {
+            coordinator.replicatorsSynchronizedOn(sender);
         }
     },
     SYNCHRONIZE_REPLICATORS() {
-
         @Override
-        public void dispatch(Switchboard switchboard, Member member,
-                             Node sender, Serializable payload, long time) {
-            ((Coordinator) member).synchronizeReplicators(sender);
+        public void dispatch(Coordinator coordinator, Node sender,
+                             Serializable payload, long time) {
+            coordinator.synchronizeReplicators(sender);
         }
-
     },
     REPLICATOR_SYNCHRONIZATION_FAILED() {
         @Override
-        public void dispatch(Switchboard switchboard, Member member,
-                             Node sender, Serializable payload, long time) {
-            ((Coordinator) member).replicatorSynchronizeFailed(sender);
+        public void dispatch(Coordinator coordinator, Node sender,
+                             Serializable payload, long time) {
+            coordinator.replicatorSynchronizeFailed(sender);
         }
     },
     SYNCHRONIZE_REPLICATORS_FAILED() {
-
         @Override
-        public void dispatch(Switchboard switchboard, Member member,
-                             Node leader, Serializable payload, long time) { 
-            ((Coordinator) member).synchronizeReplicatorsFailed(leader);
+        public void dispatch(Coordinator coordinator, Node leader,
+                             Serializable payload, long time) {
+            coordinator.synchronizeReplicatorsFailed(leader);
         }
+    };
 
-    },
-    ;
+    abstract public void dispatch(Coordinator coordinator, Node sender,
+                                  Serializable payload, long time);
 
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.partition.MemberDispatch#dispatch(com.salesforce.ouroboros.partition.Switchboard.Member, com.salesforce.ouroboros.Node, java.io.Serializable, long)
+     */
+    @Override
+    public void dispatch(Member member, Node sender, Serializable payload,
+                         long time) {
+        dispatch((Coordinator) member, sender, payload, time);
+    }
+
+    @Override
+    public void dispatch(Switchboard switchboard, Node sender,
+                         Serializable payload, long time) {
+        switchboard.dispatchToMember(this, sender, payload, time);
+    }
 }

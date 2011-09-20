@@ -39,15 +39,15 @@ public class Message implements Serializable {
 
     public final Serializable payload;
     public final Node         sender;
-    public final MessageType  type;
+    public final GlobalDispatch  type;
 
-    public Message(Node sender, MessageType type) {
+    public Message(Node sender, GlobalDispatch type) {
         this.sender = sender;
         this.type = type;
         this.payload = null;
     }
 
-    public Message(Node sender, MessageType type, Serializable body) {
+    public Message(Node sender, GlobalDispatch type, Serializable body) {
         this.sender = sender;
         this.type = type;
         this.payload = body;
