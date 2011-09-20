@@ -32,12 +32,12 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * A simple coordinator for a group of asynchronous systems that need to
- * coordinated. The rendezvous is composed of a required number of participants,
- * an action to run when the required number of participants have met, and an
- * action to run when the rendezvous is cancelled. The rendezvous may optionally
- * be scheduled for cancellation, and the rendezvous instance maintains the
- * scheduled cancellation, clearing it if the rendezvous is met or cancelled
- * through other means.
+ * coordinated. The rendezvous is composed of a required number of participants
+ * and an action to run when the required number of participants have met. The
+ * rendezvous may optionally be scheduled for cancellation, providing a timeout
+ * action to take if the rendezvous is cancelled due to timeout. The rendezvous
+ * instance maintains this scheduled cancellation, clearing it if the rendezvous
+ * is met or cancelled through other means.
  * 
  * @author hhildebrand
  * 
@@ -45,51 +45,36 @@ import java.util.concurrent.TimeUnit;
 public class Rendezvous {
     private final Runnable     action;
     private boolean            cancelled = false;
-    private final Runnable     cancelledAction;
     private int                count;
     private final Object       mutex     = new Object();
     private final int          parties;
     private ScheduledFuture<?> scheduled;
 
-    public Rendezvous(int parties, Runnable action, Runnable cancelledAction) {
+    public Rendezvous(int parties, Runnable action) {
         this.parties = parties;
         this.action = action;
-        this.cancelledAction = cancelledAction;
         count = parties;
-    }
-
-    public boolean cancel() {
-        return cancel(true);
     }
 
     /**
      * Cancel the rendezvous.
      * 
-     * @param runCancelledAction
-     *            - if true, run the cancelled action if this call cancels the
-     *            rendezvous. If false, do not run the cancelled action, but
-     *            still cancel the rendezvous.
-     * 
      * @return true if this call cancelled the rendezvous. Return false if the
      *         rendezvous has already been cancelled, or if the rendezvous has
      *         already been completed.
      */
-    public boolean cancel(boolean runCancelledAction) {
-        boolean run = false;
+    public boolean cancel() {
         synchronized (mutex) {
             if (count != 0 && !cancelled) {
-                run = true;
                 cancelled = true;
                 if (scheduled != null) {
                     scheduled.cancel(true);
                 }
                 scheduled = null;
+                return true;
             }
+            return false;
         }
-        if (runCancelledAction && run) {
-            cancelledAction.run();
-        }
-        return run;
     }
 
     /**
@@ -167,7 +152,8 @@ public class Rendezvous {
      *            - the timer to schedule the cancellation
      */
     public void scheduleCancellation(long timeout, TimeUnit unit,
-                                     ScheduledExecutorService timer) {
+                                     ScheduledExecutorService timer,
+                                     final Runnable timeoutAction) {
         synchronized (mutex) {
             if (scheduled != null) {
                 throw new IllegalStateException(
@@ -183,7 +169,9 @@ public class Rendezvous {
             scheduled = timer.schedule(new Runnable() {
                 @Override
                 public void run() {
-                    cancel();
+                    if (cancel()) {
+                        timeoutAction.run();
+                    }
                 }
             }, timeout, unit);
         }
