@@ -213,20 +213,22 @@ public class Coordinator implements Member {
      *            - the new member nodes
      * @param rendezvousAction
      *            - the action to execute when the rendezvous occurs
-     * @param cancelledAction
-     *            - the action to execute when the rendezvous is cancelled
+     * @param timeoutAction
+     *            - the action to execute when the rendezvous times out
      * @return - the Rendezvous used to synchronize with replication connections
      */
     public Rendezvous openReplicators(Collection<Node> newMembers,
                                       Runnable rendezvousAction,
-                                      Runnable cancelledAction) {
-        Rendezvous barrier = new Rendezvous(newMembers.size(),
-                                            rendezvousAction, cancelledAction);
+                                      Runnable timeoutAction) {
+        Rendezvous rendezvous = new Rendezvous(newMembers.size(),
+                                               rendezvousAction);
         for (Node member : newMembers) {
-            localWeaver.openReplicator(member, yellowPages.get(member), barrier);
+            localWeaver.openReplicator(member, yellowPages.get(member),
+                                       rendezvous);
         }
-        barrier.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer);
-        return barrier;
+        rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer,
+                                        timeoutAction);
+        return rendezvous;
     }
 
     /**
@@ -310,7 +312,7 @@ public class Coordinator implements Member {
      *            - the node where the replicators failed to synchronize
      */
     public void replicatorSynchronizeFailed(Node sender) {
-        if (coordinatorRendevous.get().cancel(false)) {
+        if (coordinatorRendevous.get().cancel()) {
             if (state.compareAndSet(State.SYNCHRONIZING, State.UNSYNCHRONIZED)) {
                 switchboard.broadcast(new Message(
                                                   localWeaver.getId(),
@@ -351,7 +353,7 @@ public class Coordinator implements Member {
                 }
 
             };
-            Runnable cancelledAction = new Runnable() {
+            Runnable timeoutAction = new Runnable() {
 
                 @Override
                 public void run() {
@@ -359,10 +361,9 @@ public class Coordinator implements Member {
                 }
 
             };
-            Rendezvous rendezvous = new Rendezvous(members.size(), action,
-                                                   cancelledAction);
+            Rendezvous rendezvous = new Rendezvous(members.size(), action);
             rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT,
-                                            timer);
+                                            timer, timeoutAction);
             coordinatorRendevous.set(rendezvous);
             // Start the replicator synchronization
             switchboard.broadcast(new Message(
@@ -411,7 +412,7 @@ public class Coordinator implements Member {
      *            - the leader of the spindle group
      */
     public void synchronizeReplicatorsFailed(Node leader) {
-        if (replicatorRendezvous.get().cancel(false)) {
+        if (replicatorRendezvous.get().cancel()) {
             state.compareAndSet(State.SYNCHRONIZING, State.UNSYNCHRONIZED);
         }
     }
