@@ -36,10 +36,12 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -63,7 +65,8 @@ import com.salesforce.ouroboros.util.Rendezvous;
 public class Coordinator implements Member {
 
     public enum State {
-        REBALANCED, STABLIZED, SYNCHRONIZED;
+        REBALANCED, STABLIZED, SYNCHRONIZED, SYNCHRONIZING, UNSTABLE,
+        UNSYNCHRONIZED;
     }
 
     private static final int      DEFAULT_TIMEOUT = 1;
@@ -74,15 +77,18 @@ public class Coordinator implements Member {
         return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
     }
 
-    private final Set<UUID>                               channels    = new HashSet<UUID>();
+    private final Set<UUID>                               channels             = new HashSet<UUID>();
+    private final AtomicReference<Rendezvous>             coordinatorRendevous = new AtomicReference<Rendezvous>();
     private Weaver                                        localWeaver;
-    private final SortedSet<Node>                         newMembers  = new TreeSet<Node>();
-    private volatile Rendezvous                           replicatorRendezvous;
-    private final SortedSet<Node>                         spindles    = new TreeSet<Node>();
+    private final SortedSet<Node>                         members              = new TreeSet<Node>();
+    private final SortedSet<Node>                         newMembers           = new TreeSet<Node>();
+    private final AtomicReference<Rendezvous>             replicatorRendezvous = new AtomicReference<Rendezvous>();
+    private final AtomicReference<State>                  state                = new AtomicReference<State>(
+                                                                                                            State.UNSTABLE);
     private Switchboard                                   switchboard;
     private final ScheduledExecutorService                timer;
-    private ConsistentHashFunction<Node>                  weaverRing  = new ConsistentHashFunction<Node>();
-    private final ConcurrentMap<Node, ContactInformation> yellowPages = new ConcurrentHashMap<Node, ContactInformation>();
+    private ConsistentHashFunction<Node>                  weaverRing           = new ConsistentHashFunction<Node>();
+    private final ConcurrentMap<Node, ContactInformation> yellowPages          = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(ScheduledExecutorService timer) {
         this.timer = timer;
@@ -119,16 +125,16 @@ public class Coordinator implements Member {
 
     @Override
     public void destabilize() {
-        if (replicatorRendezvous != null) {
-            replicatorRendezvous.cancel();
-            replicatorRendezvous = null;
+        Rendezvous prev = replicatorRendezvous.getAndSet(null);
+        if (prev != null) {
+            prev.cancel();
         }
     }
 
     @Override
     public void discoverChannelBuffer(Node node, ContactInformation info,
                                       long time) {
-        spindles.add(node);
+        members.add(node);
         yellowPages.putIfAbsent(node, info);
     }
 
@@ -177,6 +183,13 @@ public class Coordinator implements Member {
     }
 
     /**
+     * @return true if this process is the leader of the group.
+     */
+    public boolean isLeader() {
+        return localWeaver.getId().equals(members.first());
+    }
+
+    /**
      * Open the new channel if this node is a primary or mirror of the new
      * channel.
      * 
@@ -212,6 +225,7 @@ public class Coordinator implements Member {
         for (Node member : newMembers) {
             localWeaver.openReplicator(member, yellowPages.get(member), barrier);
         }
+        barrier.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer);
         return barrier;
     }
 
@@ -270,9 +284,40 @@ public class Coordinator implements Member {
         return remapped;
     }
 
+    /**
+     * The replicators on the node have been synchronized
+     * 
+     * @param sender
+     *            - the node where the replicators have been synchronized
+     */
     public void replicatorsSynchronizedOn(Node sender) {
-        // TODO Auto-generated method stub
+        try {
+            coordinatorRendevous.get().meet();
+        } catch (BrokenBarrierException e) {
+            if (log.isLoggable(Level.FINE)) {
+                log.log(Level.FINE,
+                        String.format("Replicator coordination on leader %s has failed; update from %s",
+                                      localWeaver.getId(), sender), e);
+            }
+        }
+    }
 
+    /**
+     * The replicators on the node have failed to synchronize. Drop back ten and
+     * punt
+     * 
+     * @param sender
+     *            - the node where the replicators failed to synchronize
+     */
+    public void replicatorSynchronizeFailed(Node sender) {
+        if (coordinatorRendevous.get().cancel(false)) {
+            if (state.compareAndSet(State.SYNCHRONIZING, State.UNSYNCHRONIZED)) {
+                switchboard.broadcast(new Message(
+                                                  localWeaver.getId(),
+                                                  SpindleMessage.SYNCHRONIZE_REPLICATORS_FAILED),
+                                      members);
+            }
+        }
     }
 
     @Override
@@ -282,35 +327,93 @@ public class Coordinator implements Member {
 
     @Override
     public void stabilized() {
+        switch (state.get()) {
+            case STABLIZED: {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("%s is already stablized",
+                                           localWeaver.getId()));
+                }
+                return;
+            }
+            default:
+                state.set(State.STABLIZED);
+        }
         // Failover
         failover(switchboard.getDeadMembers());
 
-        // Filter the system membership
-        spindles.removeAll(switchboard.getDeadMembers());
-        newMembers.clear();
-        for (Node node : switchboard.getNewMembers()) {
-            if (spindles.contains(node)) {
-                newMembers.add(node);
-            }
+        filterSystemMembership();
+
+        if (isLeader()) {
+            // Schedule the coordination rendezvous to synchronize the group members
+            Runnable action = new Runnable() {
+                @Override
+                public void run() {
+                }
+
+            };
+            Runnable cancelledAction = new Runnable() {
+
+                @Override
+                public void run() {
+
+                }
+
+            };
+            Rendezvous rendezvous = new Rendezvous(members.size(), action,
+                                                   cancelledAction);
+            rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT,
+                                            timer);
+            coordinatorRendevous.set(rendezvous);
+            // Start the replicator synchronization
+            switchboard.broadcast(new Message(
+                                              localWeaver.getId(),
+                                              SpindleMessage.SYNCHRONIZE_REPLICATORS),
+                                  members);
         }
-        Runnable barrierAction = new Runnable() {
+    }
+
+    /**
+     * Synchronize the replicators on this node. Set up the replicator
+     * rendezvous for local replicators, notifying the group leader when the
+     * replicators have been synchronized or whether the synchronization has
+     * failed.
+     * 
+     * @param leader
+     *            - the group leader
+     */
+    public void synchronizeReplicators(final Node leader) {
+        Runnable action = new Runnable() {
             @Override
             public void run() {
                 switchboard.send(new Message(
                                              localWeaver.getId(),
                                              SpindleMessage.REPLICATORS_SYNCHRONIZED),
-                                 spindles.first());
+                                 leader);
             }
         };
         Runnable cancelledAction = new Runnable() {
             @Override
             public void run() {
+                switchboard.send(new Message(
+                                             localWeaver.getId(),
+                                             SpindleMessage.REPLICATOR_SYNCHRONIZATION_FAILED),
+                                 leader);
             }
         };
-        replicatorRendezvous = openReplicators(newMembers, barrierAction,
-                                               cancelledAction);
-        replicatorRendezvous.scheduleCancellation(DEFAULT_TIMEOUT,
-                                                  TIMEOUT_UNIT, timer);
+        replicatorRendezvous.set(openReplicators(newMembers, action,
+                                                 cancelledAction));
+    }
+
+    /**
+     * The synchronization of the replicators in the group failed.
+     * 
+     * @param leader
+     *            - the leader of the spindle group
+     */
+    public void synchronizeReplicatorsFailed(Node leader) {
+        if (replicatorRendezvous.get().cancel(false)) {
+            state.compareAndSet(State.SYNCHRONIZING, State.UNSYNCHRONIZED);
+        }
     }
 
     /**
@@ -321,5 +424,15 @@ public class Coordinator implements Member {
      */
     public void updateRing(ConsistentHashFunction<Node> ring) {
         weaverRing = ring;
+    }
+
+    private void filterSystemMembership() {
+        members.removeAll(switchboard.getDeadMembers());
+        newMembers.clear();
+        for (Node node : switchboard.getNewMembers()) {
+            if (members.contains(node)) {
+                newMembers.add(node);
+            }
+        }
     }
 }

@@ -38,11 +38,38 @@ import com.salesforce.ouroboros.partition.Switchboard.Member;
  * 
  */
 public enum SpindleMessage implements MessageType {
-    REPLICATORS_SYNCHRONIZED() { 
+    REPLICATORS_SYNCHRONIZED() {
         @Override
         public void dispatch(Switchboard switchboard, Member member,
                              Node sender, Serializable payload, long time) {
             ((Coordinator) member).replicatorsSynchronizedOn(sender);
         }
-    }
+    },
+    SYNCHRONIZE_REPLICATORS() {
+
+        @Override
+        public void dispatch(Switchboard switchboard, Member member,
+                             Node sender, Serializable payload, long time) {
+            ((Coordinator) member).synchronizeReplicators(sender);
+        }
+
+    },
+    REPLICATOR_SYNCHRONIZATION_FAILED() {
+        @Override
+        public void dispatch(Switchboard switchboard, Member member,
+                             Node sender, Serializable payload, long time) {
+            ((Coordinator) member).replicatorSynchronizeFailed(sender);
+        }
+    },
+    SYNCHRONIZE_REPLICATORS_FAILED() {
+
+        @Override
+        public void dispatch(Switchboard switchboard, Member member,
+                             Node leader, Serializable payload, long time) { 
+            ((Coordinator) member).synchronizeReplicatorsFailed(leader);
+        }
+
+    },
+    ;
+
 }
