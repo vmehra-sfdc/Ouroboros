@@ -58,14 +58,23 @@ public class Rendezvous {
         count = parties;
     }
 
+    public boolean cancel() {
+        return cancel(true);
+    }
+
     /**
      * Cancel the rendezvous.
+     * 
+     * @param runCancelledAction
+     *            - if true, run the cancelled action if this call cancels the
+     *            rendezvous. If false, do not run the cancelled action, but
+     *            still cancel the rendezvous.
      * 
      * @return true if this call cancelled the rendezvous. Return false if the
      *         rendezvous has already been cancelled, or if the rendezvous has
      *         already been completed.
      */
-    public boolean cancel() {
+    public boolean cancel(boolean runCancelledAction) {
         boolean run = false;
         synchronized (mutex) {
             if (count != 0 && !cancelled) {
@@ -77,7 +86,7 @@ public class Rendezvous {
                 scheduled = null;
             }
         }
-        if (run) {
+        if (runCancelledAction && run) {
             cancelledAction.run();
         }
         return run;
