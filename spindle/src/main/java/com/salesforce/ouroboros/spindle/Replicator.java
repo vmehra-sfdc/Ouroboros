@@ -29,13 +29,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
  * A full duplex replicator of event streams. The replicator provides both
@@ -74,16 +74,16 @@ public class Replicator implements CommunicationsHandler {
     private final Duplicator                 duplicator;
     private volatile SocketChannelHandler<?> handler;
     private ByteBuffer                       handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private CyclicBarrier                    barrier;
     private volatile Node                    partnerId;
+    private Rendezvous                       rendezvous;
     private volatile State                   state          = State.INITIAL;
 
-    public Replicator(Bundle bundle, Node partner, CyclicBarrier barrier) {
+    public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
         duplicator = new Duplicator();
         appender = new ReplicatingAppender(bundle);
         this.bundle = bundle;
         partnerId = partner;
-        this.barrier = barrier;
+        this.rendezvous = rendezvous;
     }
 
     public void bindTo(Node node) {
@@ -135,12 +135,10 @@ public class Replicator implements CommunicationsHandler {
                 appender.handleAccept(channel, handler);
                 handler.selectForRead();
                 try {
-                    barrier.await();
-                } catch (InterruptedException e) {
-                    log.log(Level.FINEST, "Replication barrier interrupted", e);
-                    return;
+                    rendezvous.meet();
                 } catch (BrokenBarrierException e) {
-                    log.log(Level.WARNING, "Replication barrier broken", e);
+                    log.log(Level.WARNING, "Replication rendezvous cancelled",
+                            e);
                     handler.close();
                     return;
                 }
@@ -226,12 +224,9 @@ public class Replicator implements CommunicationsHandler {
             duplicator.handleConnect(channel, handler);
             state = State.ESTABLISHED;
             try {
-                barrier.await();
-            } catch (InterruptedException e) {
-                log.log(Level.FINEST, "Replication barrier interrupted", e);
-                return;
+                rendezvous.meet();
             } catch (BrokenBarrierException e) {
-                log.log(Level.WARNING, "Replication barrier broken", e);
+                log.log(Level.WARNING, "Replication rendezvous cancelled", e);
                 handler.close();
                 return;
             }

@@ -40,7 +40,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
-import java.util.concurrent.CyclicBarrier;
 
 import org.junit.Test;
 
@@ -48,6 +47,7 @@ import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.orchestration.Coordinator;
+import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
  * 
@@ -133,7 +133,7 @@ public class TestWeaver {
 
     @Test
     public void testOpenReplicator() throws Exception {
-        CyclicBarrier barrier = mock(CyclicBarrier.class);
+        Rendezvous rendezvous = mock(Rendezvous.class);
         SocketOptions options = new SocketOptions();
         options.setTimeout(100);
         ServerSocketChannel server = ServerSocketChannel.open();
@@ -162,7 +162,7 @@ public class TestWeaver {
         config.setRoot(root);
         Weaver weaver = new Weaver(config, coordinator);
         weaver.start();
-        weaver.openReplicator(mirror, info, barrier);
+        weaver.openReplicator(mirror, info, rendezvous);
         SocketChannel connected = server.accept();
         assertNotNull(connected);
         assertTrue(connected.isConnected());
@@ -174,7 +174,7 @@ public class TestWeaver {
         Node handshakeNode = new Node(buffer);
         assertEquals(id, handshakeNode);
         Thread.sleep(10); // Time for replicator to await at the barrier
-        verify(barrier).await();
+        verify(rendezvous).meet();
         weaver.terminate();
         connected.close();
         server.close();

@@ -38,7 +38,8 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -51,6 +52,7 @@ import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.Xerox;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
+import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
  * The distributed coordinator for the channel buffer process group.
@@ -59,39 +61,14 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * 
  */
 public class Coordinator implements Member {
-    public enum Transition {
-        DESTABILIZED, STABILIZED, SYNCHRONIZED;
-    };
 
     public enum State {
-        STABLIZED {
-            @Override
-            public void transition(Coordinator coordinator, Transition t) {
-                switch (t) {
-                    case DESTABILIZED: {
-                    }
-                }
-            }
-        },
-        SYNCHRONIZED {
-            @Override
-            public void transition(Coordinator coordinator, Transition t) {
-                // TODO Auto-generated method stub
-
-            }
-        },
-        REBALANCED {
-            @Override
-            public void transition(Coordinator coordinator, Transition t) {
-                // TODO Auto-generated method stub
-
-            }
-        };
-
-        public abstract void transition(Coordinator coordinator, Transition t);
+        REBALANCED, STABLIZED, SYNCHRONIZED;
     }
 
-    private final static Logger log = Logger.getLogger(Coordinator.class.getCanonicalName());
+    private static final int      DEFAULT_TIMEOUT = 1;
+    private final static Logger   log             = Logger.getLogger(Coordinator.class.getCanonicalName());
+    private static final TimeUnit TIMEOUT_UNIT    = TimeUnit.MINUTES;
 
     public static long point(UUID id) {
         return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
@@ -100,11 +77,16 @@ public class Coordinator implements Member {
     private final Set<UUID>                               channels    = new HashSet<UUID>();
     private Weaver                                        localWeaver;
     private final SortedSet<Node>                         newMembers  = new TreeSet<Node>();
-    private volatile CyclicBarrier                        replicatorBarrier;
+    private volatile Rendezvous                           replicatorRendezvous;
     private final SortedSet<Node>                         spindles    = new TreeSet<Node>();
     private Switchboard                                   switchboard;
+    private final ScheduledExecutorService                timer;
     private ConsistentHashFunction<Node>                  weaverRing  = new ConsistentHashFunction<Node>();
     private final ConcurrentMap<Node, ContactInformation> yellowPages = new ConcurrentHashMap<Node, ContactInformation>();
+
+    public Coordinator(ScheduledExecutorService timer) {
+        this.timer = timer;
+    }
 
     @Override
     public void advertise() {
@@ -137,7 +119,10 @@ public class Coordinator implements Member {
 
     @Override
     public void destabilize() {
-        replicatorBarrier.reset();
+        if (replicatorRendezvous != null) {
+            replicatorRendezvous.cancel();
+            replicatorRendezvous = null;
+        }
     }
 
     @Override
@@ -213,15 +198,17 @@ public class Coordinator implements Member {
      * 
      * @param newMembers
      *            - the new member nodes
-     * @param barrierAction
-     *            - the action to execute when the new replicators are active
-     * @return - the CyclicBarrier used to synchronize with replication
-     *         connections
+     * @param rendezvousAction
+     *            - the action to execute when the rendezvous occurs
+     * @param cancelledAction
+     *            - the action to execute when the rendezvous is cancelled
+     * @return - the Rendezvous used to synchronize with replication connections
      */
-    public CyclicBarrier openReplicators(Collection<Node> newMembers,
-                                         Runnable barrierAction) {
-        CyclicBarrier barrier = new CyclicBarrier(newMembers.size(),
-                                                  barrierAction);
+    public Rendezvous openReplicators(Collection<Node> newMembers,
+                                      Runnable rendezvousAction,
+                                      Runnable cancelledAction) {
+        Rendezvous barrier = new Rendezvous(newMembers.size(),
+                                            rendezvousAction, cancelledAction);
         for (Node member : newMembers) {
             localWeaver.openReplicator(member, yellowPages.get(member), barrier);
         }
@@ -283,6 +270,11 @@ public class Coordinator implements Member {
         return remapped;
     }
 
+    public void replicatorsSynchronizedOn(Node sender) {
+        // TODO Auto-generated method stub
+
+    }
+
     @Override
     public void setSwitchboard(Switchboard switchboard) {
         this.switchboard = switchboard;
@@ -310,7 +302,15 @@ public class Coordinator implements Member {
                                  spindles.first());
             }
         };
-        replicatorBarrier = openReplicators(newMembers, barrierAction);
+        Runnable cancelledAction = new Runnable() {
+            @Override
+            public void run() {
+            }
+        };
+        replicatorRendezvous = openReplicators(newMembers, barrierAction,
+                                               cancelledAction);
+        replicatorRendezvous.scheduleCancellation(DEFAULT_TIMEOUT,
+                                                  TIMEOUT_UNIT, timer);
     }
 
     /**
@@ -321,10 +321,5 @@ public class Coordinator implements Member {
      */
     public void updateRing(ConsistentHashFunction<Node> ring) {
         weaverRing = ring;
-    }
-
-    public void replicatorsSynchronizedOn(Node sender) {
-        // TODO Auto-generated method stub
-
     }
 }

@@ -40,7 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.junit.Test;
 
@@ -48,6 +48,7 @@ import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
+import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
  * 
@@ -66,10 +67,11 @@ public class TestCoordinator {
 
     @Test
     public void testClose() {
+        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
-        Coordinator coordinator = new Coordinator();
+        Coordinator coordinator = new Coordinator(timer);
         coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -130,10 +132,11 @@ public class TestCoordinator {
 
     @Test
     public void testFailover() {
+        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
-        Coordinator coordinator = new Coordinator();
+        Coordinator coordinator = new Coordinator(timer);
         coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -174,10 +177,11 @@ public class TestCoordinator {
 
     @Test
     public void testOpen() {
+        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
-        Coordinator coordinator = new Coordinator();
+        Coordinator coordinator = new Coordinator(timer);
         coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -215,10 +219,12 @@ public class TestCoordinator {
 
     @Test
     public void testOpenReplicators() {
-        Runnable barrierAction = mock(Runnable.class);
+        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
+        Runnable rendezvousAction = mock(Runnable.class);
+        Runnable cancelledAction = mock(Runnable.class);
         Weaver weaver = mock(Weaver.class);
         when(weaver.getId()).thenReturn(new Node(0, 0, 0));
-        Coordinator coordinator = new Coordinator();
+        Coordinator coordinator = new Coordinator(timer);
         coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -240,24 +246,26 @@ public class TestCoordinator {
         coordinator.discoverChannelBuffer(node1, contactInformation1, 0);
         coordinator.discoverChannelBuffer(node2, contactInformation2, 0);
         coordinator.discoverChannelBuffer(node3, contactInformation3, 0);
-        CyclicBarrier barrier = coordinator.openReplicators(Arrays.asList(node1,
+        Rendezvous rendezvous = coordinator.openReplicators(Arrays.asList(node1,
                                                                           node2,
                                                                           node3),
-                                                            barrierAction);
-        assertNotNull(barrier);
-        assertEquals(3, barrier.getParties());
+                                                            rendezvousAction,
+                                                            cancelledAction);
+        assertNotNull(rendezvous);
+        assertEquals(3, rendezvous.getParties());
 
-        verify(weaver).openReplicator(node1, contactInformation1, barrier);
-        verify(weaver).openReplicator(node2, contactInformation2, barrier);
-        verify(weaver).openReplicator(node3, contactInformation3, barrier);
+        verify(weaver).openReplicator(node1, contactInformation1, rendezvous);
+        verify(weaver).openReplicator(node2, contactInformation2, rendezvous);
+        verify(weaver).openReplicator(node3, contactInformation3, rendezvous);
     }
 
     @Test
     public void testRebalance() {
+        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
-        Coordinator coordinator = new Coordinator();
+        Coordinator coordinator = new Coordinator(timer);
         coordinator.ready(weaver, dummyInfo);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -303,8 +311,9 @@ public class TestCoordinator {
 
     @Test
     public void testRemap() {
+        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
-        Coordinator coordinator = new Coordinator();
+        Coordinator coordinator = new Coordinator(timer);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         coordinator.ready(weaver, dummyInfo);

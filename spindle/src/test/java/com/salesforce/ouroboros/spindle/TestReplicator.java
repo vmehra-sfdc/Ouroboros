@@ -33,7 +33,6 @@ import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.CyclicBarrier;
 
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
@@ -42,6 +41,7 @@ import org.mockito.stubbing.Answer;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Replicator.State;
+import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
  * 
@@ -54,10 +54,10 @@ public class TestReplicator {
         Bundle bundle = mock(Bundle.class);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
-        CyclicBarrier barrier = mock(CyclicBarrier.class);
+        Rendezvous rendezvous = mock(Rendezvous.class);
         final Node node = new Node(0x1639, 0x1640, 0x1650);
 
-        Replicator replicator = new Replicator(bundle, node, barrier);
+        Replicator replicator = new Replicator(bundle, node, rendezvous);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -71,7 +71,7 @@ public class TestReplicator {
 
         assertEquals(State.INITIAL, replicator.getState());
         replicator.bindTo(node);
-        replicator.handleAccept(socketChannel, handler); 
+        replicator.handleAccept(socketChannel, handler);
         assertEquals(State.ESTABLISHED, replicator.getState());
     }
 
@@ -81,10 +81,10 @@ public class TestReplicator {
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
         final Node node = new Node(0x1639, 0x1640, 0x1650);
-        CyclicBarrier barrier = mock(CyclicBarrier.class);
+        Rendezvous rendezvous = mock(Rendezvous.class);
         when(bundle.getId()).thenReturn(node);
 
-        Replicator replicator = new Replicator(bundle, node, barrier);
+        Replicator replicator = new Replicator(bundle, node, rendezvous);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override

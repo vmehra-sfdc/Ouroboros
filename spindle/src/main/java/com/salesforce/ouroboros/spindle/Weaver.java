@@ -36,7 +36,6 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CyclicBarrier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -47,6 +46,7 @@ import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.orchestration.Coordinator;
+import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
  * The Weaver represents the channel buffer process that provides persistent,
@@ -283,12 +283,12 @@ public class Weaver implements Bundle {
      *            - the replication node
      * @param info
      *            - the contact information for the node
-     * @param barrier
-     *            - the barrier used to sychronize connectivity
+     * @param rendezvous
+     *            - the rendezvous used to sychronize connectivity
      */
     public void openReplicator(Node node, ContactInformation info,
-                               CyclicBarrier barrier) {
-        Replicator replicator = new Replicator(this, node, barrier);
+                               Rendezvous rendezvous) {
+        Replicator replicator = new Replicator(this, node, rendezvous);
         replicators.put(node, replicator);
         if (thisEndInitiatesConnectionsTo(node)) {
             if (log.isLoggable(Level.INFO)) {
