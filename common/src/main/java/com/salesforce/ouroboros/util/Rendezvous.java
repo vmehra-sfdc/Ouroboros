@@ -170,7 +170,9 @@ public class Rendezvous {
                 @Override
                 public void run() {
                     if (cancel()) {
-                        timeoutAction.run();
+                        if (timeoutAction != null) {
+                            timeoutAction.run();
+                        }
                     }
                 }
             }, timeout, unit);
