@@ -56,8 +56,8 @@ public class Xerox implements CommunicationsHandler {
     private static final Logger              log               = Logger.getLogger(Xerox.class.getCanonicalName());
 
     private final ByteBuffer                 buffer            = ByteBuffer.allocate(BUFFER_SIZE);
-    private volatile Segment                 current;
     private final UUID                       channelId;
+    private volatile Segment                 current;
     private volatile SocketChannelHandler<?> handler;
     private CountDownLatch                   latch;
     private final Node                       node;

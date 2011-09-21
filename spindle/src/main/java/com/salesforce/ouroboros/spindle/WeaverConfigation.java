@@ -46,8 +46,8 @@ public class WeaverConfigation {
     public static final long     DEFAULT_MAX_SEGMENTSIZE        = 1000 * 1024;
     public static final long     DEFAULT_PARTITION_TIMEOUT      = 60;
     public static final TimeUnit DEFAULT_PARTITION_TIMEOUT_UNIT = TimeUnit.SECONDS;
-    public static final String   DEFAULT_STATE_NAME             = "weavers";
     public static final int      DEFAULT_REPLICATION_QUEUE_SIZE = 100;
+    public static final String   DEFAULT_STATE_NAME             = "weavers";
 
     public static ThreadFactory threadFactory(final String prefix) {
         return new ThreadFactory() {

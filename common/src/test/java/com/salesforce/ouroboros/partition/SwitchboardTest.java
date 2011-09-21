@@ -160,8 +160,8 @@ public class SwitchboardTest {
         view.stablize();
 
         Switchboard switchboard = new Switchboard(member, node, partition, exec);
-        switchboard.members.add(node);
-        switchboard.members.add(testNode);
+        switchboard.add(node);
+        switchboard.add(testNode);
         switchboard.partitionEvent(view, 0);
 
         doAnswer(new Answer<Void>() {
@@ -198,8 +198,8 @@ public class SwitchboardTest {
 
         Switchboard switchboard = new Switchboard(member, node, partition, exec);
         switchboard.partitionEvent(view, 0);
-        switchboard.members.add(node);
-        switchboard.members.add(testNode);
+        switchboard.add(node);
+        switchboard.add(testNode);
 
         Answer<Void> answer = new Answer<Void>() {
             @Override

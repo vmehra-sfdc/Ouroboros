@@ -114,17 +114,17 @@ public class EventHeader implements Cloneable {
     }
 
     /**
-     * @return the timestamp of the event
-     */
-    public long getTimestamp() {
-        return bytes.getLong(TIMESTAMP_OFFSET);
-    }
-
-    /**
      * @return the magic value of the header
      */
     public int getMagic() {
         return bytes.getInt(MAGIC_OFFSET);
+    }
+
+    /**
+     * @return the timestamp of the event
+     */
+    public long getTimestamp() {
+        return bytes.getLong(TIMESTAMP_OFFSET);
     }
 
     @Override

@@ -56,16 +56,12 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class TestWeaver {
     @Test
-    public void testOpenPrimary() throws Exception {
+    public void testClose() throws Exception {
         UUID channel = UUID.randomUUID();
-        UUID channel2 = UUID.randomUUID();
-        assertFalse(channel.equals(channel2));
         Node id = new Node(0, 0, 0);
         Node mirror = new Node(1, 0, 0);
         EventHeader header = mock(EventHeader.class);
         when(header.getChannel()).thenReturn(channel);
-        EventHeader header2 = mock(EventHeader.class);
-        when(header2.getChannel()).thenReturn(channel2);
         File root = File.createTempFile("weaver", ".root");
         root.delete();
         assertTrue(root.mkdirs());
@@ -76,10 +72,9 @@ public class TestWeaver {
         config.setRoot(root);
         Weaver weaver = new Weaver(config, coordinator);
         weaver.openPrimary(channel, mirror);
-        EventChannel eventChannel = weaver.eventChannelFor(header);
-        assertNotNull(eventChannel);
-        assertTrue(eventChannel.isPrimary());
-        assertNull(weaver.eventChannelFor(header2));
+        assertNotNull(weaver.eventChannelFor(header));
+        weaver.close(channel);
+        assertNull(weaver.eventChannelFor(header));
     }
 
     @Test
@@ -110,12 +105,16 @@ public class TestWeaver {
     }
 
     @Test
-    public void testClose() throws Exception {
+    public void testOpenPrimary() throws Exception {
         UUID channel = UUID.randomUUID();
+        UUID channel2 = UUID.randomUUID();
+        assertFalse(channel.equals(channel2));
         Node id = new Node(0, 0, 0);
         Node mirror = new Node(1, 0, 0);
         EventHeader header = mock(EventHeader.class);
         when(header.getChannel()).thenReturn(channel);
+        EventHeader header2 = mock(EventHeader.class);
+        when(header2.getChannel()).thenReturn(channel2);
         File root = File.createTempFile("weaver", ".root");
         root.delete();
         assertTrue(root.mkdirs());
@@ -126,9 +125,10 @@ public class TestWeaver {
         config.setRoot(root);
         Weaver weaver = new Weaver(config, coordinator);
         weaver.openPrimary(channel, mirror);
-        assertNotNull(weaver.eventChannelFor(header));
-        weaver.close(channel);
-        assertNull(weaver.eventChannelFor(header));
+        EventChannel eventChannel = weaver.eventChannelFor(header);
+        assertNotNull(eventChannel);
+        assertTrue(eventChannel.isPrimary());
+        assertNull(weaver.eventChannelFor(header2));
     }
 
     @Test

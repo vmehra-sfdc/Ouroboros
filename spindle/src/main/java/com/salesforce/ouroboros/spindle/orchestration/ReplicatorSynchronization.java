@@ -28,7 +28,6 @@ package com.salesforce.ouroboros.spindle.orchestration;
 import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.GlobalDispatch;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
@@ -38,38 +37,47 @@ import com.salesforce.ouroboros.partition.Switchboard.Member;
  * @author hhildebrand
  * 
  */
-public enum ReplicatorSynchronization implements GlobalDispatch, MemberDispatch {
+public enum ReplicatorSynchronization implements MemberDispatch {
+    REPLICATOR_SYNCHRONIZATION_FAILED() {
+        @Override
+        public void dispatch(ReplicationCoordinatorStateMachine sm,
+                             Node sender, Serializable payload, long time) {
+            sm.replicatorSynchronizeFailed(sender);
+        }
+
+        @Override
+        void dispatch(ReplicatorStateMachine sm, Node sender,
+                      Serializable payload, long time) {
+            throw new UnsupportedOperationException();
+        }
+    },
     REPLICATORS_SYNCHRONIZED() {
         @Override
-        public void dispatch(Coordinator coordinator, Node sender,
-                             Serializable payload, long time) {
-            coordinator.replicatorsSynchronizedOn(sender);
+        public void dispatch(ReplicationCoordinatorStateMachine sm,
+                             Node sender, Serializable payload, long time) {
+            sm.replicatorsSynchronizedOn(sender);
+        }
+
+        @Override
+        void dispatch(ReplicatorStateMachine sm, Node sender,
+                      Serializable payload, long time) {
+            throw new UnsupportedOperationException();
         }
     },
     SYNCHRONIZE_REPLICATORS() {
         @Override
-        public void dispatch(Coordinator coordinator, Node sender,
+        public void dispatch(ReplicatorStateMachine sm, Node sender,
                              Serializable payload, long time) {
-            coordinator.synchronizeReplicators(sender);
-        }
-    },
-    REPLICATOR_SYNCHRONIZATION_FAILED() {
-        @Override
-        public void dispatch(Coordinator coordinator, Node sender,
-                             Serializable payload, long time) {
-            coordinator.replicatorSynchronizeFailed(sender);
+            sm.synchronizeReplicators(sender);
         }
     },
     SYNCHRONIZE_REPLICATORS_FAILED() {
         @Override
-        public void dispatch(Coordinator coordinator, Node leader,
+        public void dispatch(ReplicatorStateMachine sm, Node leader,
                              Serializable payload, long time) {
-            coordinator.synchronizeReplicatorsFailed(leader);
+            sm.synchronizeReplicatorsFailed(leader);
         }
     };
-
-    abstract public void dispatch(Coordinator coordinator, Node sender,
-                                  Serializable payload, long time);
 
     /* (non-Javadoc)
      * @see com.salesforce.ouroboros.partition.MemberDispatch#dispatch(com.salesforce.ouroboros.partition.Switchboard.Member, com.salesforce.ouroboros.Node, java.io.Serializable, long)
@@ -77,7 +85,7 @@ public enum ReplicatorSynchronization implements GlobalDispatch, MemberDispatch 
     @Override
     public void dispatch(Member member, Node sender, Serializable payload,
                          long time) {
-        dispatch((Coordinator) member, sender, payload, time);
+        ((Coordinator) member).transition(this, sender, payload, time);
     }
 
     @Override
@@ -85,4 +93,12 @@ public enum ReplicatorSynchronization implements GlobalDispatch, MemberDispatch 
                          Serializable payload, long time) {
         switchboard.dispatchToMember(this, sender, payload, time);
     }
+
+    void dispatch(ReplicationCoordinatorStateMachine sm, Node sender,
+                  Serializable payload, long time) {
+        dispatch((ReplicatorStateMachine) sm, sender, payload, time);
+    }
+
+    abstract void dispatch(ReplicatorStateMachine sm, Node sender,
+                           Serializable payload, long time);
 }

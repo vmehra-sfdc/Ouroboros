@@ -54,10 +54,10 @@ import com.salesforce.ouroboros.spindle.Duplicator.State;
 public class TestDuplicator {
 
     private class Reader implements Runnable {
-        long                        offset       = -1;
         private final SocketChannel inbound;
-        final ByteBuffer            replicated;
         private final ByteBuffer    offsetBuffer = ByteBuffer.allocate(8);
+        long                        offset       = -1;
+        final ByteBuffer            replicated;
 
         public Reader(final SocketChannel inbound, final int payloadLength) {
             super();

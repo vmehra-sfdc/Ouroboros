@@ -193,19 +193,19 @@ public class Switchboard {
         }
     }
 
-    static final Logger                    log          = Logger.getLogger(Switchboard.class.getCanonicalName());
-    private final SortedSet<Node>          deadMembers  = new TreeSet<Node>();
-    private boolean                        leader       = false;
-    private final PartitionNotification    notification = new Notification();
-    private NodeIdSet                      previousView;
-    protected final SortedSet<Node>        members      = new TreeSet<Node>();
-    protected final Node                   self;
-    protected final AtomicReference<State> state        = new AtomicReference<State>(
-                                                                                     State.UNSTABLE);
-    protected NodeIdSet                    view;
-    final Member                           member;
-    final Executor                         messageProcessor;
-    final Partition                        partition;
+    static final Logger                  log          = Logger.getLogger(Switchboard.class.getCanonicalName());
+    private final SortedSet<Node>        deadMembers  = new TreeSet<Node>();
+    private boolean                      leader       = false;
+    private final Member                 member;
+    private final SortedSet<Node>        members      = new TreeSet<Node>();
+    private final Executor               messageProcessor;
+    private final PartitionNotification  notification = new Notification();
+    private final Partition              partition;
+    private NodeIdSet                    previousView;
+    private final Node                   self;
+    private final AtomicReference<State> state        = new AtomicReference<State>(
+                                                                                   State.UNSTABLE);
+    protected NodeIdSet                  view;
 
     public Switchboard(Member m, Node node, Partition p, Executor executor) {
         self = node;
@@ -213,10 +213,6 @@ public class Switchboard {
         member = m;
         m.setSwitchboard(this);
         messageProcessor = executor;
-    }
-
-    public void add(Node node) {
-        members.add(node);
     }
 
     /**
@@ -358,6 +354,11 @@ public class Switchboard {
 
     public void terminate() {
         partition.deregister(notification);
+    }
+
+    // test access
+    void add(Node node) {
+        members.add(node);
     }
 
     /**
