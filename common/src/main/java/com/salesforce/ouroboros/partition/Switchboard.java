@@ -193,18 +193,19 @@ public class Switchboard {
         }
     }
 
-    static final Logger                  log          = Logger.getLogger(Switchboard.class.getCanonicalName());
-    private final SortedSet<Node>        deadMembers  = new TreeSet<Node>();
-    private boolean                      leader       = false;
+    static final Logger                  log             = Logger.getLogger(Switchboard.class.getCanonicalName());
+    private final SortedSet<Node>        deadMembers     = new TreeSet<Node>();
+    private boolean                      leader          = false;
     private final Member                 member;
-    private final SortedSet<Node>        members      = new TreeSet<Node>();
+    private SortedSet<Node>              previousMembers = new TreeSet<Node>();
+    private SortedSet<Node>              members         = new TreeSet<Node>();
     private final Executor               messageProcessor;
-    private final PartitionNotification  notification = new Notification();
+    private final PartitionNotification  notification    = new Notification();
     private final Partition              partition;
     private NodeIdSet                    previousView;
     private final Node                   self;
-    private final AtomicReference<State> state        = new AtomicReference<State>(
-                                                                                   State.UNSTABLE);
+    private final AtomicReference<State> state           = new AtomicReference<State>(
+                                                                                      State.UNSTABLE);
     protected NodeIdSet                  view;
 
     public Switchboard(Member m, Node node, Partition p, Executor executor) {
@@ -271,10 +272,6 @@ public class Switchboard {
 
     public State getState() {
         return state.get();
-    }
-
-    public void remove(Node node) {
-        members.remove(node);
     }
 
     /**
@@ -374,7 +371,9 @@ public class Switchboard {
             log.info(String.format("Destabilizing partition on: %s, view: %s, leader: %s",
                                    self, view, leader));
         }
+        previousMembers.addAll(members);
         deadMembers.clear();
+        members.clear();
         member.destabilize();
     }
 
@@ -392,19 +391,22 @@ public class Switchboard {
             }
             return;
         }
-        if (members.add(sender)) {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("member %s discovered on %s", sender,
-                                       self));
-            }
-            if (leader) {
-                if (members.size() == view.cardinality()) {
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("All members discovered on %s",
-                                               self));
+        synchronized (members) {
+            if (members.add(sender)) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("member %s discovered on %s",
+                                           sender, self));
+                }
+                if (leader) {
+                    if (members.size() == view.cardinality()) {
+                        if (log.isLoggable(Level.INFO)) {
+                            log.info(String.format("All members discovered on %s",
+                                                   self));
+                        }
+                        ringCast(new Message(
+                                             self,
+                                             GlobalMessageType.DISCOVERY_COMPLETE));
                     }
-                    ringCast(new Message(self,
-                                         GlobalMessageType.DISCOVERY_COMPLETE));
                 }
             }
         }
@@ -452,12 +454,12 @@ public class Switchboard {
             log.info(String.format("Stabilizing partition on: %s, view: %s, leader: %s",
                                    self, view, leader));
         }
-        for (Node member : members) {
+        for (Node member : previousMembers) {
             if (!view.contains(member.processId)) {
                 deadMembers.add(member);
             }
         }
-        members.clear();
+        previousMembers.clear();
         member.advertise();
     }
 
