@@ -155,11 +155,6 @@ public class Replicator implements CommunicationsHandler {
                               SocketChannelHandler<?> handler) {
         this.handler = handler;
         switch (state) {
-            case ESTABLISHED: {
-                duplicator.handleConnect(channel, handler);
-                appender.handleAccept(channel, handler);
-                break;
-            }
             case INITIAL: {
                 handshake.putInt(MAGIC);
                 bundle.getId().serialize(handshake);
@@ -220,8 +215,11 @@ public class Replicator implements CommunicationsHandler {
             handler.close();
             return;
         }
-        if (!handshake.hasRemaining()) {
+        if (handshake.hasRemaining()) {
+            handler.selectForWrite();
+        } else {
             duplicator.handleConnect(channel, handler);
+            appender.handleAccept(channel, handler);
             state = State.ESTABLISHED;
             try {
                 rendezvous.meet();
@@ -230,6 +228,7 @@ public class Replicator implements CommunicationsHandler {
                 handler.close();
                 return;
             }
+            handler.selectForRead();
         }
     }
 }
