@@ -30,38 +30,26 @@ import java.io.Serializable;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.partition.Switchboard.Member;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public enum ReplicatorSynchronization implements MemberDispatch {
+public enum ReplicatorSynchronization implements MemberDispatch,
+                                     StateMachineDispatch {
     REPLICATOR_SYNCHRONIZATION_FAILED() {
         @Override
-        public void dispatch(ReplicationCoordinatorStateMachine sm,
-                             Node sender, Serializable payload, long time) {
+        public void dispatch(ReplicatorStateMachine sm, Node sender,
+                             Serializable payload, long time) {
             sm.replicatorSynchronizeFailed(sender);
-        }
-
-        @Override
-        void dispatch(ReplicatorStateMachine sm, Node sender,
-                      Serializable payload, long time) {
-            throw new UnsupportedOperationException();
         }
     },
     REPLICATORS_SYNCHRONIZED() {
         @Override
-        public void dispatch(ReplicationCoordinatorStateMachine sm,
-                             Node sender, Serializable payload, long time) {
+        public void dispatch(ReplicatorStateMachine sm, Node sender,
+                             Serializable payload, long time) {
             sm.replicatorsSynchronizedOn(sender);
-        }
-
-        @Override
-        void dispatch(ReplicatorStateMachine sm, Node sender,
-                      Serializable payload, long time) {
-            throw new UnsupportedOperationException();
         }
     },
     SYNCHRONIZE_REPLICATORS() {
@@ -77,26 +65,29 @@ public enum ReplicatorSynchronization implements MemberDispatch {
                              Serializable payload, long time) {
             sm.synchronizeReplicatorsFailed(leader);
         }
+    },
+    PARTITION_SYNCHRONIZED() {
+        @Override
+        void dispatch(ReplicatorStateMachine sm, Node leader,
+                      Serializable payload, long time) {
+
+            sm.partitionSynchronized(leader);
+        }
     };
 
     /* (non-Javadoc)
      * @see com.salesforce.ouroboros.partition.MemberDispatch#dispatch(com.salesforce.ouroboros.partition.Switchboard.Member, com.salesforce.ouroboros.Node, java.io.Serializable, long)
      */
     @Override
-    public void dispatch(Member member, Node sender, Serializable payload,
+    public void dispatch(StateMachine sm, Node sender, Serializable payload,
                          long time) {
-        ((Coordinator) member).transition(this, sender, payload, time);
+        sm.transition(this, sender, payload, time);
     }
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable payload, long time) {
         switchboard.dispatchToMember(this, sender, payload, time);
-    }
-
-    void dispatch(ReplicationCoordinatorStateMachine sm, Node sender,
-                  Serializable payload, long time) {
-        dispatch((ReplicatorStateMachine) sm, sender, payload, time);
     }
 
     abstract void dispatch(ReplicatorStateMachine sm, Node sender,

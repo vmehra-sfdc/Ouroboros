@@ -34,14 +34,6 @@ import com.salesforce.ouroboros.Node;
  * @author hhildebrand
  * 
  */
-public interface StateMachine {
-    void destabilize();
-
-    void stabilized();
-
-    void transition(StateMachineDispatch type, Node sender,
-                    Serializable payload, long time);
-
-    void transition(ReplicatorSynchronization type, Node sender,
-                    Serializable payload, long time);
+public interface StateMachineDispatch {
+    void dispatch(StateMachine sm, Node sender, Serializable payload, long time);
 }
