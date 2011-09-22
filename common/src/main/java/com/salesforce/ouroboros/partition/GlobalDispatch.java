@@ -34,7 +34,7 @@ import com.salesforce.ouroboros.Node;
  * @author hhildebrand
  * 
  */
-public interface SwitchboardDispatch {
+public interface GlobalDispatch {
 
     void dispatch(Switchboard switchboard, Node sender, Serializable payload,
                   long time);

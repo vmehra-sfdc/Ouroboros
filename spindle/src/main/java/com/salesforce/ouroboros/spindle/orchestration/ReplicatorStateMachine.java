@@ -27,11 +27,11 @@ package com.salesforce.ouroboros.spindle.orchestration;
 
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Message;
+import com.salesforce.ouroboros.spindle.orchestration.Coordinator.State;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
@@ -39,22 +39,13 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * @author hhildebrand
  * 
  */
-public class ReplicatorStateMachine implements StateMachine {
-
-    public enum State {
-        REBALANCED, STABLIZED, SYNCHRONIZED, SYNCHRONIZING, UNSTABLE,
-        UNSYNCHRONIZED, ERROR;
-    }
-
-    protected static final Logger             log                  = Logger.getLogger(ReplicatorStateMachine.class.getCanonicalName());
-
+public class ReplicatorStateMachine extends StateMachine {
     private final AtomicReference<Rendezvous> replicatorRendezvous = new AtomicReference<Rendezvous>();
-    protected final Coordinator               coordinator;
-    protected final AtomicReference<State>    state                = new AtomicReference<State>(
-                                                                                                State.UNSTABLE);
+    protected final Logger                    log                  = Logger.getLogger(ReplicatorStateMachine.class.getCanonicalName());
+    protected final AtomicReference<State>    state                = new AtomicReference<State>();
 
     public ReplicatorStateMachine(Coordinator coordinator) {
-        this.coordinator = coordinator;
+        super(coordinator);
     }
 
     @Override
@@ -62,25 +53,11 @@ public class ReplicatorStateMachine implements StateMachine {
     }
 
     public void replicatorsSynchronizedOn(Node sender) {
-        state.set(State.ERROR);
-        throw new IllegalStateException(
-                                        "Transition handled by coordinator only");
     }
 
     public void replicatorSynchronizeFailed(Node sender) {
-        state.set(State.ERROR);
-        throw new IllegalStateException(
-                                        "Transition handled by coordinator only");
-    }
+        // TODO Auto-generated method stub
 
-    @Override
-    public void stabilized() {
-        if (!state.compareAndSet(State.UNSTABLE, State.STABLIZED)) {
-            state.set(State.ERROR);
-            throw new IllegalStateException(
-                                            String.format("Can only stabilize in the unstable state: %s",
-                                                          state.get()));
-        }
     }
 
     /**
@@ -93,12 +70,6 @@ public class ReplicatorStateMachine implements StateMachine {
      *            - the group leader
      */
     public void synchronizeReplicators(final Node leader) {
-        if (!state.compareAndSet(State.STABLIZED, State.SYNCHRONIZING)) {
-            state.set(State.ERROR);
-            throw new IllegalStateException(
-                                            String.format("Can only transition to synchronizing in state STABILIZED: ",
-                                                          state.get()));
-        }
         Runnable action = new Runnable() {
             @Override
             public void run() {
@@ -108,25 +79,18 @@ public class ReplicatorStateMachine implements StateMachine {
                                                   leader);
             }
         };
-        Runnable timeoutAction = new Runnable() {
+        Runnable cancelledAction = new Runnable() {
             @Override
             public void run() {
-                try {
-                    coordinator.getSwitchboard().send(new Message(
-                                                                  coordinator.getId(),
-                                                                  ReplicatorSynchronization.REPLICATOR_SYNCHRONIZATION_FAILED),
-                                                      leader);
-                } catch (Throwable e) {
-                    state.set(State.ERROR);
-                    log.log(Level.SEVERE,
-                            "Timeout action for replication synchronization rendezvous failed",
-                            e);
-                }
+                coordinator.getSwitchboard().send(new Message(
+                                                              coordinator.getId(),
+                                                              ReplicatorSynchronization.REPLICATOR_SYNCHRONIZATION_FAILED),
+                                                  leader);
             }
         };
         replicatorRendezvous.set(coordinator.openReplicators(coordinator.getNewMembers(),
                                                              action,
-                                                             timeoutAction));
+                                                             cancelledAction));
     }
 
     /**
@@ -142,31 +106,8 @@ public class ReplicatorStateMachine implements StateMachine {
     }
 
     @Override
-    public void transition(StateMachineDispatch type, Node sender,
-                           Serializable payload, long time) {
-        type.dispatch(this, sender, payload, time);
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.spindle.orchestration.StateMachine#transition(com.salesforce.ouroboros.spindle.orchestration.ReplicatorSynchronization, com.salesforce.ouroboros.Node, java.io.Serializable, long)
-     */
-    @Override
     public void transition(ReplicatorSynchronization type, Node sender,
                            Serializable payload, long time) {
         type.dispatch(this, sender, payload, time);
-    }
-
-    public State getState() {
-        return state.get();
-    }
-
-    public void partitionSynchronized(Node leader) {
-        if (!state.compareAndSet(State.SYNCHRONIZING, State.SYNCHRONIZED)) {
-            state.set(State.ERROR);
-            throw new IllegalStateException(
-                                            String.format("Can only transition to SYNCHRONIZED from the SYNCHRONIZING state: %s",
-                                                          state.get()));
-        }
-        replicatorRendezvous.getAndSet(null).cancel();
     }
 }

@@ -35,7 +35,7 @@ import com.salesforce.ouroboros.partition.Switchboard.Member;
  * @author hhildebrand
  * 
  */
-public enum GlobalMessageType implements SwitchboardDispatch {
+public enum GlobalMessageType implements GlobalDispatch {
     ADVERTISE_CHANNEL_BUFFER {
         @Override
         public void transition(Switchboard switchboard, Member member,

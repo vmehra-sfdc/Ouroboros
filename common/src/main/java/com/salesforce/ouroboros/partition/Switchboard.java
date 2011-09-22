@@ -74,9 +74,6 @@ public class Switchboard {
 
         void stabilized();
 
-        void dispatch(MemberDispatch type, Node sender, Serializable payload,
-                      long time);
-
     }
 
     class Notification implements PartitionNotification {
@@ -245,7 +242,7 @@ public class Switchboard {
 
     public void dispatchToMember(MemberDispatch type, Node sender,
                                  Serializable payload, long time) {
-        member.dispatch(type, sender, payload, time);
+        type.dispatch(member, sender, payload, time);
     }
 
     public Collection<Node> getDeadMembers() {

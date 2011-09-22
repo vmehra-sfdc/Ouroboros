@@ -48,7 +48,6 @@ import java.util.logging.Logger;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
-import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
@@ -65,6 +64,11 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class Coordinator implements Member {
 
+    public enum State {
+        REBALANCED, STABLIZED, SYNCHRONIZED, SYNCHRONIZING, UNSTABLE,
+        UNSYNCHRONIZED;
+    }
+
     private final static Logger log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     static final int            DEFAULT_TIMEOUT = 1;
     static final TimeUnit       TIMEOUT_UNIT    = TimeUnit.MINUTES;
@@ -78,6 +82,8 @@ public class Coordinator implements Member {
     private Weaver                                        localWeaver;
     private final SortedSet<Node>                         members     = new TreeSet<Node>();
     private final SortedSet<Node>                         newMembers  = new TreeSet<Node>();
+    private final AtomicReference<State>                  state       = new AtomicReference<State>(
+                                                                                                   State.UNSTABLE);
     private Switchboard                                   switchboard;
     private final ScheduledExecutorService                timer;
     private ConsistentHashFunction<Node>                  weaverRing  = new ConsistentHashFunction<Node>();
@@ -118,7 +124,6 @@ public class Coordinator implements Member {
 
     @Override
     public void destabilize() {
-        current.get().destabilize();
     }
 
     @Override
@@ -132,16 +137,6 @@ public class Coordinator implements Member {
             default:
                 break;
         }
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.partition.Switchboard.Member#dispatch(com.salesforce.ouroboros.partition.MemberDispatch, com.salesforce.ouroboros.Node, java.io.Serializable, long)
-     */
-    @Override
-    public void dispatch(MemberDispatch type, Node sender,
-                         Serializable payload, long time) {
-        current.get().transition((StateMachineDispatch) type, sender, payload,
-                                 time);
     }
 
     /**
@@ -309,9 +304,26 @@ public class Coordinator implements Member {
 
     @Override
     public void stabilized() {
+        switch (state.get()) {
+            case STABLIZED: {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("%s is already stablized",
+                                           localWeaver.getId()));
+                }
+                return;
+            }
+            default:
+                state.set(State.STABLIZED);
+        }
+        // Failover
         failover(switchboard.getDeadMembers());
+
         filterSystemMembership();
-        current.get().stabilized();
+    }
+
+    public void transition(ReplicatorSynchronization type, Node sender,
+                           Serializable payload, long time) {
+        current.get().transition(type, sender, payload, time);
     }
 
     /**
