@@ -74,7 +74,7 @@ public class Coordinator implements Member {
     }
 
     private final Set<UUID>                               channels    = new HashSet<UUID>();
-    private AtomicReference<StateMachine>                 current;
+    private final AtomicReference<StateMachine>           current;
     private Weaver                                        localWeaver;
     private final SortedSet<Node>                         members     = new TreeSet<Node>();
     private final SortedSet<Node>                         newMembers  = new TreeSet<Node>();
@@ -85,6 +85,9 @@ public class Coordinator implements Member {
 
     public Coordinator(ScheduledExecutorService timer) {
         this.timer = timer;
+        current = new AtomicReference<StateMachine>(
+                                                    new ReplicationCoordinatorStateMachine(
+                                                                                           this));
     }
 
     @Override

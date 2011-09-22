@@ -42,8 +42,8 @@ import com.salesforce.ouroboros.util.Rendezvous;
 public class ReplicatorStateMachine implements StateMachine {
 
     public enum State {
-        REBALANCED, STABLIZED, SYNCHRONIZED, SYNCHRONIZING, UNSTABLE,
-        UNSYNCHRONIZED, ERROR;
+        ERROR, REBALANCED, STABLIZED, SYNCHRONIZED, SYNCHRONIZING, UNSTABLE,
+        UNSYNCHRONIZED;
     }
 
     protected static final Logger             log                  = Logger.getLogger(ReplicatorStateMachine.class.getCanonicalName());
@@ -59,6 +59,28 @@ public class ReplicatorStateMachine implements StateMachine {
 
     @Override
     public void destabilize() {
+        State prev = state.getAndSet(State.UNSTABLE);
+        switch (prev) {
+            default:
+        }
+    }
+
+    public State getState() {
+        return state.get();
+    }
+
+    public void partitionSynchronized(Node leader) {
+        if (!state.compareAndSet(State.SYNCHRONIZING, State.SYNCHRONIZED)) {
+            state.set(State.ERROR);
+            throw new IllegalStateException(
+                                            String.format("Can only transition to SYNCHRONIZED from the SYNCHRONIZING state: %s",
+                                                          state.get()));
+        }
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Partition replicator synchronization achieved on %s",
+                                   coordinator.getId()));
+        }
+        replicatorRendezvous.getAndSet(null).cancel();
     }
 
     public void replicatorsSynchronizedOn(Node sender) {
@@ -99,9 +121,17 @@ public class ReplicatorStateMachine implements StateMachine {
                                             String.format("Can only transition to synchronizing in state STABILIZED: ",
                                                           state.get()));
         }
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Starting replicator synchronization on %s",
+                                   coordinator.getId()));
+        }
         Runnable action = new Runnable() {
             @Override
             public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Replicators synchronization achieved on %s",
+                                           coordinator.getId()));
+                }
                 coordinator.getSwitchboard().send(new Message(
                                                               coordinator.getId(),
                                                               ReplicatorSynchronization.REPLICATORS_SYNCHRONIZED),
@@ -112,6 +142,10 @@ public class ReplicatorStateMachine implements StateMachine {
             @Override
             public void run() {
                 try {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Replicators synchronization timed out on %s",
+                                               coordinator.getId()));
+                    }
                     coordinator.getSwitchboard().send(new Message(
                                                                   coordinator.getId(),
                                                                   ReplicatorSynchronization.REPLICATOR_SYNCHRONIZATION_FAILED),
@@ -119,11 +153,15 @@ public class ReplicatorStateMachine implements StateMachine {
                 } catch (Throwable e) {
                     state.set(State.ERROR);
                     log.log(Level.SEVERE,
-                            "Timeout action for replication synchronization rendezvous failed",
+                            "Timeout action for replicator synchronization rendezvous failed",
                             e);
                 }
             }
         };
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Synchronization of replicators initiated on %s",
+                                   coordinator.getId()));
+        }
         replicatorRendezvous.set(coordinator.openReplicators(coordinator.getNewMembers(),
                                                              action,
                                                              timeoutAction));
@@ -137,14 +175,12 @@ public class ReplicatorStateMachine implements StateMachine {
      */
     public void synchronizeReplicatorsFailed(Node leader) {
         if (replicatorRendezvous.get().cancel()) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Partition Replicator synchronization failed on %s",
+                                       coordinator.getId()));
+            }
             state.compareAndSet(State.SYNCHRONIZING, State.UNSYNCHRONIZED);
         }
-    }
-
-    @Override
-    public void transition(StateMachineDispatch type, Node sender,
-                           Serializable payload, long time) {
-        type.dispatch(this, sender, payload, time);
     }
 
     /* (non-Javadoc)
@@ -156,17 +192,13 @@ public class ReplicatorStateMachine implements StateMachine {
         type.dispatch(this, sender, payload, time);
     }
 
-    public State getState() {
-        return state.get();
-    }
-
-    public void partitionSynchronized(Node leader) {
-        if (!state.compareAndSet(State.SYNCHRONIZING, State.SYNCHRONIZED)) {
-            state.set(State.ERROR);
-            throw new IllegalStateException(
-                                            String.format("Can only transition to SYNCHRONIZED from the SYNCHRONIZING state: %s",
-                                                          state.get()));
+    @Override
+    public void transition(StateMachineDispatch type, Node sender,
+                           Serializable payload, long time) {
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("transitioning %s node %s payload %s @ %s",
+                                    type, sender, payload, time));
         }
-        replicatorRendezvous.getAndSet(null).cancel();
+        type.dispatch(this, sender, payload, time);
     }
 }

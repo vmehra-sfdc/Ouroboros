@@ -57,6 +57,10 @@ public class ReplicationCoordinatorStateMachine extends ReplicatorStateMachine {
      */
     @Override
     public void replicatorsSynchronizedOn(Node sender) {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Replicator synchronization achieved %s discoved by coordinator %s",
+                                   sender, coordinator.getId()));
+        }
         try {
             coordinatorRendevous.get().meet();
         } catch (BrokenBarrierException e) {
@@ -68,7 +72,7 @@ public class ReplicationCoordinatorStateMachine extends ReplicatorStateMachine {
         } catch (Throwable e) {
             state.set(State.ERROR);
             log.log(Level.SEVERE,
-                    "Replication synchronization coordinator action failed", e);
+                    "Replicator synchronization coordinator action failed", e);
         }
     }
 
@@ -82,6 +86,10 @@ public class ReplicationCoordinatorStateMachine extends ReplicatorStateMachine {
     @Override
     public void replicatorSynchronizeFailed(Node sender) {
         if (coordinatorRendevous.get().cancel()) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Replicator synchronization failure of %s discoverd on coordinator %s",
+                                       sender, coordinator.getId()));
+            }
             if (state.compareAndSet(State.SYNCHRONIZING, State.UNSYNCHRONIZED)) {
                 coordinator.getSwitchboard().broadcast(new Message(
                                                                    coordinator.getId(),
@@ -102,6 +110,10 @@ public class ReplicationCoordinatorStateMachine extends ReplicatorStateMachine {
         Runnable action = new Runnable() {
             @Override
             public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Partition replicator synchronization achieved on coordinator %s",
+                                           coordinator.getId()));
+                }
                 coordinator.getSwitchboard().broadcast(new Message(
                                                                    coordinator.getId(),
                                                                    ReplicatorSynchronization.PARTITION_SYNCHRONIZED),
@@ -113,6 +125,10 @@ public class ReplicationCoordinatorStateMachine extends ReplicatorStateMachine {
             @Override
             public void run() {
                 try {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Partition replicator synchronization timeout on coordinator %s",
+                                               coordinator.getId()));
+                    }
                     coordinator.getSwitchboard().broadcast(new Message(
                                                                        coordinator.getId(),
                                                                        ReplicatorSynchronization.SYNCHRONIZE_REPLICATORS_FAILED),
@@ -136,6 +152,10 @@ public class ReplicationCoordinatorStateMachine extends ReplicatorStateMachine {
                                                         Coordinator.TIMEOUT_UNIT,
                                                         coordinator.getTimer(),
                                                         timeoutAction);
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Partition replicator synchronization initiated on coordinator %s",
+                                   coordinator.getId()));
+        }
         // Start the replicator synchronization
         coordinator.getSwitchboard().broadcast(new Message(
                                                            coordinator.getId(),
