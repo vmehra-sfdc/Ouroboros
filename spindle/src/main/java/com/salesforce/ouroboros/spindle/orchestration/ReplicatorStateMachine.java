@@ -31,7 +31,6 @@ import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Message;
-import com.salesforce.ouroboros.spindle.orchestration.Coordinator.State;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
@@ -39,13 +38,22 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * @author hhildebrand
  * 
  */
-public class ReplicatorStateMachine extends StateMachine {
+public class ReplicatorStateMachine implements StateMachine {
+
+    public enum State {
+        REBALANCED, STABLIZED, SYNCHRONIZED, SYNCHRONIZING, UNSTABLE,
+        UNSYNCHRONIZED;
+    }
+
+    protected static final Logger             log                  = Logger.getLogger(ReplicatorStateMachine.class.getCanonicalName());
+
     private final AtomicReference<Rendezvous> replicatorRendezvous = new AtomicReference<Rendezvous>();
-    protected final Logger                    log                  = Logger.getLogger(ReplicatorStateMachine.class.getCanonicalName());
-    protected final AtomicReference<State>    state                = new AtomicReference<State>();
+    protected final Coordinator               coordinator;
+    protected final AtomicReference<State>    state                = new AtomicReference<State>(
+                                                                                                State.UNSTABLE);
 
     public ReplicatorStateMachine(Coordinator coordinator) {
-        super(coordinator);
+        this.coordinator = coordinator;
     }
 
     @Override
@@ -53,11 +61,22 @@ public class ReplicatorStateMachine extends StateMachine {
     }
 
     public void replicatorsSynchronizedOn(Node sender) {
+        throw new IllegalStateException(
+                                        "Transition handled by coordinator only");
     }
 
     public void replicatorSynchronizeFailed(Node sender) {
-        // TODO Auto-generated method stub
+        throw new IllegalStateException(
+                                        "Transition handled by coordinator only");
+    }
 
+    @Override
+    public void stabilized() {
+        if (!state.compareAndSet(State.UNSTABLE, State.STABLIZED)) {
+            throw new IllegalStateException(
+                                            String.format("Can only stabilize in the unstable state: %s",
+                                                          state.get()));
+        }
     }
 
     /**
@@ -70,6 +89,11 @@ public class ReplicatorStateMachine extends StateMachine {
      *            - the group leader
      */
     public void synchronizeReplicators(final Node leader) {
+        if (!state.compareAndSet(State.STABLIZED, State.SYNCHRONIZING)) {
+            throw new IllegalStateException(
+                                            String.format("Can only transition to synchronizing in state STABILIZED: ",
+                                                          state.get()));
+        }
         Runnable action = new Runnable() {
             @Override
             public void run() {
@@ -79,7 +103,7 @@ public class ReplicatorStateMachine extends StateMachine {
                                                   leader);
             }
         };
-        Runnable cancelledAction = new Runnable() {
+        Runnable timeoutAction = new Runnable() {
             @Override
             public void run() {
                 coordinator.getSwitchboard().send(new Message(
@@ -90,7 +114,7 @@ public class ReplicatorStateMachine extends StateMachine {
         };
         replicatorRendezvous.set(coordinator.openReplicators(coordinator.getNewMembers(),
                                                              action,
-                                                             cancelledAction));
+                                                             timeoutAction));
     }
 
     /**
@@ -106,8 +130,29 @@ public class ReplicatorStateMachine extends StateMachine {
     }
 
     @Override
+    public void transition(StateMachineDispatch type, Node sender,
+                           Serializable payload, long time) {
+        type.dispatch(this, sender, payload, time);
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.orchestration.StateMachine#transition(com.salesforce.ouroboros.spindle.orchestration.ReplicatorSynchronization, com.salesforce.ouroboros.Node, java.io.Serializable, long)
+     */
+    @Override
     public void transition(ReplicatorSynchronization type, Node sender,
                            Serializable payload, long time) {
         type.dispatch(this, sender, payload, time);
+    }
+
+    public State getState() {
+        return state.get();
+    }
+
+    public void partitionSynchronized(Node leader) {
+        if (!state.compareAndSet(State.SYNCHRONIZING, State.SYNCHRONIZED)) {
+            throw new IllegalStateException(
+                                            String.format("Can only transition to SYNCHRONIZED from the SYNCHRONIZING state: %s",
+                                                          state.get()));
+        }
     }
 }
