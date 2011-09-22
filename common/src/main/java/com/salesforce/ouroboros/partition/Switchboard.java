@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -200,8 +201,8 @@ public class Switchboard {
     private final SortedSet<Node>        deadMembers     = new TreeSet<Node>();
     private boolean                      leader          = false;
     private final Member                 member;
-    private SortedSet<Node>              previousMembers = new TreeSet<Node>();
-    private SortedSet<Node>              members         = new TreeSet<Node>();
+    private SortedSet<Node>              previousMembers = new ConcurrentSkipListSet<Node>();
+    private SortedSet<Node>              members         = new ConcurrentSkipListSet<Node>();
     private final Executor               messageProcessor;
     private final PartitionNotification  notification    = new Notification();
     private final Partition              partition;
