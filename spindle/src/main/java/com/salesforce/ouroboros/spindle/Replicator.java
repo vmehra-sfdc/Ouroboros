@@ -133,7 +133,6 @@ public class Replicator implements CommunicationsHandler {
             case ESTABLISHED: {
                 duplicator.handleConnect(channel, handler);
                 appender.handleAccept(channel, handler);
-                handler.selectForRead();
                 try {
                     rendezvous.meet();
                 } catch (BrokenBarrierException e) {
@@ -228,7 +227,6 @@ public class Replicator implements CommunicationsHandler {
                 handler.close();
                 return;
             }
-            handler.selectForRead();
         }
     }
 }

@@ -29,7 +29,7 @@ import static junit.framework.Assert.assertEquals;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -73,6 +73,7 @@ public class TestReplicator {
         replicator.bindTo(node);
         replicator.handleAccept(socketChannel, handler);
         assertEquals(State.ESTABLISHED, replicator.getState());
+        verify(handler).selectForRead();
     }
 
     @Test
@@ -99,7 +100,9 @@ public class TestReplicator {
         assertEquals(State.INITIAL, replicator.getState());
         replicator.handleConnect(socketChannel, handler);
         assertEquals(State.OUTBOUND_HANDSHAKE, replicator.getState());
+        verify(handler).selectForWrite();
         replicator.handleWrite(socketChannel);
         assertEquals(State.ESTABLISHED, replicator.getState());
+        verify(handler).selectForRead();
     }
 }
