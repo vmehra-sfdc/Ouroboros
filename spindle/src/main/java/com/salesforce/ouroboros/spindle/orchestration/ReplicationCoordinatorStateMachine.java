@@ -65,6 +65,10 @@ public class ReplicationCoordinatorStateMachine extends ReplicatorStateMachine {
                         String.format("Replicator coordination on leader %s has failed; update from %s",
                                       coordinator.getId(), sender), e);
             }
+        } catch (Throwable e) {
+            state.set(State.ERROR);
+            log.log(Level.SEVERE,
+                    "Replication synchronization coordinator action failed", e);
         }
     }
 
@@ -93,27 +97,45 @@ public class ReplicationCoordinatorStateMachine extends ReplicatorStateMachine {
     @Override
     public void stabilized() {
         super.stabilized();
+        final SortedSet<Node> members = coordinator.getMembers();
         // Schedule the coordination rendezvous to synchronize the group members
         Runnable action = new Runnable() {
             @Override
             public void run() {
+                coordinator.getSwitchboard().broadcast(new Message(
+                                                                   coordinator.getId(),
+                                                                   ReplicatorSynchronization.PARTITION_SYNCHRONIZED),
+                                                       members);
             }
 
         };
         Runnable timeoutAction = new Runnable() {
-
             @Override
             public void run() {
-
+                try {
+                    coordinator.getSwitchboard().broadcast(new Message(
+                                                                       coordinator.getId(),
+                                                                       ReplicatorSynchronization.SYNCHRONIZE_REPLICATORS_FAILED),
+                                                           members);
+                } catch (Throwable e) {
+                    state.set(State.ERROR);
+                    log.log(Level.WARNING,
+                            "Timeout action for coordinator rendevous failed",
+                            e);
+                }
             }
-
         };
-        SortedSet<Node> members = coordinator.getMembers();
-        Rendezvous rendezvous = new Rendezvous(members.size(), action);
-        rendezvous.scheduleCancellation(Coordinator.DEFAULT_TIMEOUT,
-                                        Coordinator.TIMEOUT_UNIT,
-                                        coordinator.getTimer(), timeoutAction);
-        coordinatorRendevous.set(rendezvous);
+        if (!coordinatorRendevous.compareAndSet(null,
+                                                new Rendezvous(members.size(),
+                                                               action))) {
+            state.set(State.ERROR);
+            throw new IllegalStateException(
+                                            "Previous coordinator rendezvous is not null");
+        }
+        coordinatorRendevous.get().scheduleCancellation(Coordinator.DEFAULT_TIMEOUT,
+                                                        Coordinator.TIMEOUT_UNIT,
+                                                        coordinator.getTimer(),
+                                                        timeoutAction);
         // Start the replicator synchronization
         coordinator.getSwitchboard().broadcast(new Message(
                                                            coordinator.getId(),

@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle.orchestration;
 
 import static junit.framework.Assert.assertEquals;
 import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,8 +35,12 @@ import static org.mockito.Mockito.when;
 import java.util.Collection;
 
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.Message;
+import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.spindle.orchestration.ReplicatorStateMachine.State;
 import com.salesforce.ouroboros.util.Rendezvous;
 
@@ -44,14 +49,30 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * @author hhildebrand
  * 
  */
-public class TestReplicatorStateMachine {
+public class TestReplicationCoordinatorStateMachine {
 
+    @SuppressWarnings("unchecked")
     @Test
     public void testStabilized() {
         Coordinator coordinator = mock(Coordinator.class);
-        ReplicatorStateMachine sm = new ReplicatorStateMachine(coordinator);
+        Switchboard switchboard = mock(Switchboard.class);
+        when(coordinator.getSwitchboard()).thenReturn(switchboard);
+        ReplicationCoordinatorStateMachine sm = new ReplicationCoordinatorStateMachine(
+                                                                                       coordinator);
+        doAnswer(new Answer<Void>() {
+
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                Message message = (Message) invocation.getArguments()[0];
+                assertEquals(ReplicatorSynchronization.SYNCHRONIZE_REPLICATORS,
+                             message.type);
+                return null;
+            }
+        }).when(switchboard).broadcast(isA(Message.class),
+                                       isA(Collection.class));
         assertEquals(State.UNSTABLE, sm.getState());
         sm.stabilized();
+        verify(switchboard).broadcast(isA(Message.class), isA(Collection.class));
         assertEquals(State.STABLIZED, sm.getState());
     }
 
@@ -60,7 +81,10 @@ public class TestReplicatorStateMachine {
     public void testSynchronize() {
         Node node = new Node(0, 0, 0);
         Coordinator coordinator = mock(Coordinator.class);
-        ReplicatorStateMachine sm = new ReplicatorStateMachine(coordinator);
+        Switchboard switchboard = mock(Switchboard.class);
+        when(coordinator.getSwitchboard()).thenReturn(switchboard);
+        ReplicationCoordinatorStateMachine sm = new ReplicationCoordinatorStateMachine(
+                                                                                       coordinator);
         assertEquals(State.UNSTABLE, sm.getState());
         sm.stabilized();
         assertEquals(State.STABLIZED, sm.getState());
@@ -96,23 +120,37 @@ public class TestReplicatorStateMachine {
 
     @SuppressWarnings("unchecked")
     @Test
-    public void testFailSynchronization() {
+    public void testSynchronizeFailed() {
         Node node = new Node(0, 0, 0);
         Coordinator coordinator = mock(Coordinator.class);
+        Switchboard switchboard = mock(Switchboard.class);
+        when(coordinator.getSwitchboard()).thenReturn(switchboard);
         Rendezvous rendezvous = mock(Rendezvous.class);
         when(
              coordinator.openReplicators(isA(Collection.class),
                                          isA(Runnable.class),
                                          isA(Runnable.class))).thenReturn(rendezvous);
-        ReplicatorStateMachine sm = new ReplicatorStateMachine(coordinator);
+        ReplicationCoordinatorStateMachine sm = new ReplicationCoordinatorStateMachine(
+                                                                                       coordinator);
         assertEquals(State.UNSTABLE, sm.getState());
         sm.stabilized();
         assertEquals(State.STABLIZED, sm.getState());
         sm.transition(ReplicatorSynchronization.SYNCHRONIZE_REPLICATORS, node,
                       null, 1);
         assertEquals(State.SYNCHRONIZING, sm.getState());
-        sm.transition(ReplicatorSynchronization.SYNCHRONIZE_REPLICATORS_FAILED,
+        doAnswer(new Answer<Void>() {
+
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                Message message = (Message) invocation.getArguments()[0];
+                assertEquals(ReplicatorSynchronization.SYNCHRONIZE_REPLICATORS_FAILED,
+                             message.type);
+                return null;
+            }
+        }).when(switchboard).broadcast(isA(Message.class),
+                                       isA(Collection.class));
+        sm.transition(ReplicatorSynchronization.REPLICATOR_SYNCHRONIZATION_FAILED,
                       node, null, 0);
-        verify(rendezvous).cancel();
+        verify(switchboard).broadcast(isA(Message.class), isA(Collection.class));
     }
 }

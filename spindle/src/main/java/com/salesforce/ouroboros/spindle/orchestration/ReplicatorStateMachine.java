@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle.orchestration;
 
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.Node;
@@ -42,7 +43,7 @@ public class ReplicatorStateMachine implements StateMachine {
 
     public enum State {
         REBALANCED, STABLIZED, SYNCHRONIZED, SYNCHRONIZING, UNSTABLE,
-        UNSYNCHRONIZED;
+        UNSYNCHRONIZED, ERROR;
     }
 
     protected static final Logger             log                  = Logger.getLogger(ReplicatorStateMachine.class.getCanonicalName());
@@ -61,11 +62,13 @@ public class ReplicatorStateMachine implements StateMachine {
     }
 
     public void replicatorsSynchronizedOn(Node sender) {
+        state.set(State.ERROR);
         throw new IllegalStateException(
                                         "Transition handled by coordinator only");
     }
 
     public void replicatorSynchronizeFailed(Node sender) {
+        state.set(State.ERROR);
         throw new IllegalStateException(
                                         "Transition handled by coordinator only");
     }
@@ -73,6 +76,7 @@ public class ReplicatorStateMachine implements StateMachine {
     @Override
     public void stabilized() {
         if (!state.compareAndSet(State.UNSTABLE, State.STABLIZED)) {
+            state.set(State.ERROR);
             throw new IllegalStateException(
                                             String.format("Can only stabilize in the unstable state: %s",
                                                           state.get()));
@@ -90,6 +94,7 @@ public class ReplicatorStateMachine implements StateMachine {
      */
     public void synchronizeReplicators(final Node leader) {
         if (!state.compareAndSet(State.STABLIZED, State.SYNCHRONIZING)) {
+            state.set(State.ERROR);
             throw new IllegalStateException(
                                             String.format("Can only transition to synchronizing in state STABILIZED: ",
                                                           state.get()));
@@ -106,10 +111,17 @@ public class ReplicatorStateMachine implements StateMachine {
         Runnable timeoutAction = new Runnable() {
             @Override
             public void run() {
-                coordinator.getSwitchboard().send(new Message(
-                                                              coordinator.getId(),
-                                                              ReplicatorSynchronization.REPLICATOR_SYNCHRONIZATION_FAILED),
-                                                  leader);
+                try {
+                    coordinator.getSwitchboard().send(new Message(
+                                                                  coordinator.getId(),
+                                                                  ReplicatorSynchronization.REPLICATOR_SYNCHRONIZATION_FAILED),
+                                                      leader);
+                } catch (Throwable e) {
+                    state.set(State.ERROR);
+                    log.log(Level.SEVERE,
+                            "Timeout action for replication synchronization rendezvous failed",
+                            e);
+                }
             }
         };
         replicatorRendezvous.set(coordinator.openReplicators(coordinator.getNewMembers(),
@@ -150,9 +162,11 @@ public class ReplicatorStateMachine implements StateMachine {
 
     public void partitionSynchronized(Node leader) {
         if (!state.compareAndSet(State.SYNCHRONIZING, State.SYNCHRONIZED)) {
+            state.set(State.ERROR);
             throw new IllegalStateException(
                                             String.format("Can only transition to SYNCHRONIZED from the SYNCHRONIZING state: %s",
                                                           state.get()));
         }
+        replicatorRendezvous.getAndSet(null).cancel();
     }
 }
