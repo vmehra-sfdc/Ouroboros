@@ -36,6 +36,8 @@ import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
+ * The state machine that coordinates the establishment of the replicators
+ * between the members of the partition.
  * 
  * @author hhildebrand
  * 

@@ -35,6 +35,8 @@ import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
+ * This state machine controls the establishment of the required replicators
+ * between the channel buffer processes.
  * 
  * @author hhildebrand
  * 

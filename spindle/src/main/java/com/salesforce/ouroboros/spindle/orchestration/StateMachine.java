@@ -30,6 +30,7 @@ import java.io.Serializable;
 import com.salesforce.ouroboros.Node;
 
 /**
+ * The abstract state machine used to drive the coordinator.
  * 
  * @author hhildebrand
  * 

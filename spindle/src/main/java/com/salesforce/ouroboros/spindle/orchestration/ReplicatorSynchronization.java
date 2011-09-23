@@ -32,6 +32,7 @@ import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Switchboard;
 
 /**
+ * The state transitions for the replicator synchronization
  * 
  * @author hhildebrand
  * 

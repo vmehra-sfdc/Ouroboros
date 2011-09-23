@@ -30,6 +30,7 @@ import java.io.Serializable;
 import com.salesforce.ouroboros.Node;
 
 /**
+ * The double dispatch interface for the state machine transitions.
  * 
  * @author hhildebrand
  * 
