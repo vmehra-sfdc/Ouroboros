@@ -95,7 +95,7 @@ public class SwitchboardTest {
         switchboard.discover(node);
         switchboard.discover(testNode2);
 
-        verify(connection).sendObject(isA(RingMessage.class));
+        verify(connection).sendObject(isA(Message.class));
         assertEquals(2, switchboard.getMembers().size());
         assertTrue(switchboard.getMembers().contains(node));
         assertTrue(switchboard.getMembers().contains(testNode2));
@@ -125,18 +125,17 @@ public class SwitchboardTest {
         doAnswer(new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
-                RingMessage message = (RingMessage) invocation.getArguments()[0];
-                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE,
-                             message.wrapped.type);
+                Message message = (Message) invocation.getArguments()[0];
+                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE, message.type);
                 return null;
             }
-        }).when(connection).sendObject(isA(RingMessage.class));
+        }).when(connection).sendObject(isA(Message.class));
 
         Switchboard switchboard = new Switchboard(member, node, partition, exec);
         switchboard.partitionEvent(view, 0);
         switchboard.discover(node);
         switchboard.discover(testNode);
-        verify(connection).sendObject(isA(RingMessage.class));
+        verify(connection).sendObject(isA(Message.class));
         assertEquals(2, switchboard.getMembers().size());
         assertTrue(switchboard.getMembers().contains(node));
         assertTrue(switchboard.getMembers().contains(testNode));
@@ -167,16 +166,15 @@ public class SwitchboardTest {
         doAnswer(new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
-                RingMessage message = (RingMessage) invocation.getArguments()[0];
-                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE,
-                             message.wrapped.type);
+                Message message = (Message) invocation.getArguments()[0];
+                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE, message.type);
                 return null;
             }
-        }).when(connection).sendObject(isA(RingMessage.class));
+        }).when(connection).sendObject(isA(Message.class));
 
         switchboard.ringCast(new Message(node,
                                          GlobalMessageType.DISCOVERY_COMPLETE));
-        verify(connection).sendObject(isA(RingMessage.class));
+        verify(connection).sendObject(isA(Message.class));
 
     }
 
@@ -209,8 +207,8 @@ public class SwitchboardTest {
                 return null;
             }
         };
-        doAnswer(answer).when(connection1).sendObject(isA(RingMessage.class));
-        doAnswer(answer).when(connection2).sendObject(isA(RingMessage.class));
+        doAnswer(answer).when(connection1).sendObject(isA(Message.class));
+        doAnswer(answer).when(connection2).sendObject(isA(Message.class));
 
         switchboard.broadcast(new Message(node,
                                           GlobalMessageType.DISCOVERY_COMPLETE));

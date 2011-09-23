@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.partition;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -99,55 +100,12 @@ public class Switchboard {
                                                  obj, self));
                     }
                 }
-            } else if (obj instanceof RingMessage) {
-                try {
-                    messageProcessor.execute(new Runnable() {
-                        @Override
-                        public void run() {
-                            processRingMessage((RingMessage) obj, sender, time);
-                        }
-                    });
-                } catch (RejectedExecutionException e) {
-                    if (log.isLoggable(Level.FINEST)) {
-                        log.finest(String.format("rejecting message %s due to shutdown on %s",
-                                                 obj, self));
-                    }
-                }
             }
         }
 
         @Override
         public void partitionNotification(final View view, final int leader) {
             partitionEvent(view, leader);
-        }
-
-        private void forward(RingMessage message) {
-            int neighbor = view.leftNeighborOf(self.processId);
-            if (neighbor == -1) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Unable to ring cast %s from %s on: %s to: %s as there is no left neighbor",
-                                           message.wrapped, message.from, self,
-                                           neighbor));
-                }
-                return;
-            }
-            if (neighbor == message.from) {
-                if (log.isLoggable(Level.FINEST)) {
-                    log.fine(String.format("Ring message %s completed traversal from %s",
-                                           message.wrapped, self));
-                }
-                return;
-            }
-            MessageConnection connection = partition.connect(neighbor);
-            if (connection == null) {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.warning(String.format("Unable to ring cast %s from %s on: %s to %s as the partition cannot create a connection",
-                                              message.wrapped, message.from,
-                                              self, neighbor));
-                }
-            } else {
-                connection.sendObject(message);
-            }
         }
 
         private void processMessage(final Message message, int sender,
@@ -166,30 +124,6 @@ public class Switchboard {
                     if (log.isLoggable(Level.INFO)) {
                         log.info(String.format("Discarding %s from %s received at %s during partition instability on %s",
                                                message, sender, time, self));
-                    }
-                    break;
-                }
-            }
-        }
-
-        private void processRingMessage(final RingMessage message, int sender,
-                                        final long time) {
-            final Message wrapped = message.wrapped;
-            switch (state.get()) {
-                case STABLE: {
-                    if (log.isLoggable(Level.FINE)) {
-                        log.fine(String.format("Processing inbound ring message %s on: %s",
-                                               wrapped, self));
-                    }
-                    forward(message);
-                    wrapped.type.dispatch(Switchboard.this, wrapped.sender,
-                                          wrapped.payload, time);
-                    break;
-                }
-                case UNSTABLE: {
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Discarding %s from %s received at %s during partition instability on %s",
-                                               wrapped, sender, time, self));
                     }
                     break;
                 }
@@ -286,36 +220,36 @@ public class Switchboard {
      *            - the message to pass
      */
     public void ringCast(Message message) {
-        switch (state.get()) {
-            case STABLE: {
-                int neighbor = view.leftNeighborOf(self.processId);
-                if (neighbor == -1) {
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Unable to ring cast %s from %s as there is no left neighbor",
-                                               message, self));
-                    }
-                    return;
-                }
-                MessageConnection connection = partition.connect(neighbor);
-                if (connection == null) {
-                    if (log.isLoggable(Level.WARNING)) {
-                        log.warning(String.format("Unable to ring cast %s from %s as the partition cannot create a connection to %s",
-                                                  message, self, neighbor));
-                    }
-                } else {
-                    connection.sendObject(new RingMessage(self.processId,
-                                                          message));
-                }
+        assert message != null : "Message must not be null";
 
-                break;
-            }
-            case UNSTABLE: {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Unable to ring cast %s from %s as the partition is UNSTABLE",
-                                           message, self));
-                }
+        ringCast(message, members);
+    }
+
+    /**
+     * Broadcast a message by passing it around the ring formed by the member
+     * set
+     * 
+     * @param message
+     *            - the message to pass
+     * @param ring
+     *            - the ring of members receiving the message
+     */
+    public void ringCast(Message message, SortedSet<Node> ring) {
+        assert ring != null : "Ring must not be null";
+
+        if (ring.size() <= 1) {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Ring does not have right neighbor of %s",
+                                       self));
             }
         }
+        send(message, getRightNeighbor(ring));
+    }
+
+    private Node getRightNeighbor(SortedSet<Node> ring) {
+        Iterator<Node> tail = ring.tailSet(self).iterator();
+        tail.next();
+        return tail.hasNext() ? tail.next() : ring.first();
     }
 
     /**
