@@ -360,7 +360,19 @@ public class Switchboard {
      */
     void dispatch(GlobalMessageType type, Node sender, Serializable payload,
                   long time) {
-        type.dispatch(this, sender, payload, time);
+        if (self.equals(sender)) {
+            return; // ringcast wrap around - we originated the message
+        }
+        ringCast(new Message(sender, type, payload));
+        switch (type) {
+            case DISCOVERY_COMPLETE:
+                stabilized();
+                break;
+            default:
+                discover(sender);
+                member.dispatch(type, sender, payload, time);
+                break;
+        }
     }
 
     /**

@@ -28,7 +28,6 @@ package com.salesforce.ouroboros.partition;
 import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.Switchboard.Member;
 
 /**
  * 
@@ -36,50 +35,8 @@ import com.salesforce.ouroboros.partition.Switchboard.Member;
  * 
  */
 public enum GlobalMessageType implements SwitchboardDispatch {
-    ADVERTISE_CHANNEL_BUFFER {
-        @Override
-        public void transition(Switchboard switchboard, Member member,
-                               Node sender, Serializable payload, long time) {
-            switchboard.discover(sender);
-            member.dispatch(this, sender, payload, time);
-        }
-
-    },
-    ADVERTISE_CONSUMER {
-
-        @Override
-        void transition(Switchboard switchboard, Member member, Node sender,
-                        Serializable payload, long time) {
-            switchboard.discover(sender);
-            member.dispatch(this, sender, payload, time);
-        }
-
-    },
-    ADVERTISE_PRODUCER {
-
-        @Override
-        void transition(Switchboard switchboard, Member member, Node sender,
-                        Serializable payload, long time) {
-            switchboard.discover(sender);
-            member.dispatch(this, sender, payload, time);
-        }
-
-    },
-    DISCOVERY_COMPLETE {
-        @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable payload, long time) {
-        }
-
-        @Override
-        void transition(Switchboard switchboard, Member member, Node sender,
-                        Serializable payload, long time) {
-            switchboard.stabilized();
-
-        }
-    };
-    abstract void transition(Switchboard switchboard, Member member,
-                             Node sender, Serializable payload, long time);
+    ADVERTISE_CHANNEL_BUFFER, ADVERTISE_CONSUMER, ADVERTISE_PRODUCER,
+    DISCOVERY_COMPLETE;
 
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable payload, long time) {
