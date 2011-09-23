@@ -73,21 +73,18 @@ public class Coordinator implements Member {
         return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
     }
 
-    private final Set<UUID>                               channels    = new HashSet<UUID>();
-    private final AtomicReference<StateMachine>           current;
+    private final Set<UUID>                               channels             = new HashSet<UUID>();
     private Weaver                                        localWeaver;
-    private final SortedSet<Node>                         members     = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>                         newMembers  = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>                         members              = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>                         newMembers           = new ConcurrentSkipListSet<Node>();
+    private final AtomicReference<Rendezvous>             replicatorRendezvous = new AtomicReference<Rendezvous>();
     private Switchboard                                   switchboard;
     private final ScheduledExecutorService                timer;
-    private ConsistentHashFunction<Node>                  weaverRing  = new ConsistentHashFunction<Node>();
-    private final ConcurrentMap<Node, ContactInformation> yellowPages = new ConcurrentHashMap<Node, ContactInformation>();
+    private ConsistentHashFunction<Node>                  weaverRing           = new ConsistentHashFunction<Node>();
+    private final ConcurrentMap<Node, ContactInformation> yellowPages          = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(ScheduledExecutorService timer) {
         this.timer = timer;
-        current = new AtomicReference<StateMachine>(
-                                                    new ReplicationCoordinatorStateMachine(
-                                                                                           this));
     }
 
     @Override
@@ -121,7 +118,6 @@ public class Coordinator implements Member {
 
     @Override
     public void destabilize() {
-        current.get().destabilize();
     }
 
     @Override
@@ -143,8 +139,6 @@ public class Coordinator implements Member {
     @Override
     public void dispatch(MemberDispatch type, Node sender,
                          Serializable payload, long time) {
-        current.get().transition((StateMachineDispatch) type, sender, payload,
-                                 time);
     }
 
     /**
@@ -314,7 +308,30 @@ public class Coordinator implements Member {
     public void stabilized() {
         failover(switchboard.getDeadMembers());
         filterSystemMembership();
-        current.get().stabilized();
+        Runnable action = new Runnable() {
+            @Override
+            public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Replicators synchronization achieved on %s",
+                                           getId()));
+                }
+            }
+        };
+        Runnable timeoutAction = new Runnable() {
+            @Override
+            public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Replicators synchronization timed out on %s",
+                                           getId()));
+                }
+            }
+        };
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Synchronization of replicators initiated on %s",
+                                   getId()));
+        }
+        replicatorRendezvous.set(openReplicators(getNewMembers(), action,
+                                                 timeoutAction));
     }
 
     /**
