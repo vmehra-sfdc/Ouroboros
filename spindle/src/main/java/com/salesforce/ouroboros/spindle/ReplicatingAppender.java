@@ -107,6 +107,7 @@ public class ReplicatingAppender extends AbstractAppender {
             channel.read(offsetBuffer);
         } catch (IOException e) {
             log.log(Level.WARNING, "Exception during offset read", e);
+            error();
             return;
         }
         if (!offsetBuffer.hasRemaining()) {

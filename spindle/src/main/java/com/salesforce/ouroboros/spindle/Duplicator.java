@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 
 /**
@@ -46,7 +47,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
  */
 public final class Duplicator {
     public enum State {
-        INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_OFFSET;
+        INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_OFFSET, ERROR;
     }
 
     static final Logger                      log          = Logger.getLogger(Duplicator.class.getCanonicalName());
@@ -70,7 +71,7 @@ public final class Duplicator {
     }
 
     public void handleConnect(SocketChannel channel,
-                              final SocketChannelHandler<?> handler) {
+                              final SocketChannelHandler<? extends CommunicationsHandler> handler) {
         this.handler = handler;
     }
 
@@ -122,17 +123,36 @@ public final class Duplicator {
                 process();
             }
         } catch (IOException e) {
+            error();
             log.log(Level.WARNING,
                     String.format("Unable to replicate payload for event: %s from: %s",
                                   offset, segment), e);
         }
     }
 
+    private void error() {
+        state.set(State.ERROR);
+        if (segment != null) {
+            try {
+                segment.close();
+            } catch (IOException e1) {
+                log.log(Level.FINEST,
+                        String.format("Error closing segment %s", segment),
+                        e1);
+            }
+        }
+        segment = null;
+        eventChannel = null;
+        pending.clear();
+    }
+
     private void writeOffset(SocketChannel channel) {
         try {
             channel.write(offsetBuffer);
         } catch (IOException e) {
+            error();
             log.log(Level.WARNING, "Error writing offset", e);
+            return;
         }
         if (!offsetBuffer.hasRemaining()) {
             state.set(State.WRITE);

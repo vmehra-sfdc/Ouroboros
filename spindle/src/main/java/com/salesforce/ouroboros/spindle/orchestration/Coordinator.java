@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -82,6 +83,7 @@ public class Coordinator implements Member {
     private final ScheduledExecutorService                timer;
     private ConsistentHashFunction<Node>                  weaverRing           = new ConsistentHashFunction<Node>();
     private final ConcurrentMap<Node, ContactInformation> yellowPages          = new ConcurrentHashMap<Node, ContactInformation>();
+    private final AtomicBoolean                           stable               = new AtomicBoolean();
 
     public Coordinator(ScheduledExecutorService timer) {
         this.timer = timer;
@@ -118,6 +120,7 @@ public class Coordinator implements Member {
 
     @Override
     public void destabilize() {
+        stable.set(false);
     }
 
     @Override
@@ -199,7 +202,7 @@ public class Coordinator implements Member {
      * @return true if this process is the leader of the group.
      */
     public boolean isLeader() {
-        return localWeaver.getId().equals(members.first());
+        return localWeaver.getId().equals(members.last());
     }
 
     /**
@@ -306,6 +309,9 @@ public class Coordinator implements Member {
 
     @Override
     public void stabilized() {
+        if (stable.get()) {
+            return;
+        }
         failover(switchboard.getDeadMembers());
         filterSystemMembership();
         Runnable action = new Runnable() {
@@ -332,6 +338,7 @@ public class Coordinator implements Member {
         }
         replicatorRendezvous.set(openReplicators(getNewMembers(), action,
                                                  timeoutAction));
+        stable.set(true);
     }
 
     /**

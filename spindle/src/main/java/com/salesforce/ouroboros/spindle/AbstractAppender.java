@@ -31,6 +31,7 @@ import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 
 /**
@@ -43,7 +44,8 @@ import com.hellblazer.pinkie.SocketChannelHandler;
  */
 abstract public class AbstractAppender {
     public enum State {
-        ACCEPTED, APPEND, DEV_NULL, INITIALIZED, READ_HEADER, READ_OFFSET;
+        ACCEPTED, APPEND, DEV_NULL, INITIALIZED, READ_HEADER, READ_OFFSET,
+        ERROR;
     }
 
     private static final Logger                log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
@@ -70,7 +72,7 @@ abstract public class AbstractAppender {
     }
 
     public void handleAccept(SocketChannel channel,
-                             SocketChannelHandler<?> handler) {
+                             SocketChannelHandler<? extends CommunicationsHandler> handler) {
         assert state == State.INITIALIZED;
         if (log.isLoggable(Level.FINER)) {
             log.finer("ACCEPT");
@@ -105,8 +107,14 @@ abstract public class AbstractAppender {
                 append(channel);
                 break;
             }
+            case ERROR: {
+                log.info("Read encountered in ERROR state");
+                return;
+            }
             default: {
                 log.severe(String.format("Invalid read state: %s", state));
+                error();
+                return;
             }
         }
         handler.selectForRead();
@@ -124,6 +132,7 @@ abstract public class AbstractAppender {
             written = segment.transferFrom(channel, position, remaining);
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during append", e);
+            error();
             return;
         }
         position += written;
@@ -139,6 +148,8 @@ abstract public class AbstractAppender {
                 log.log(Level.SEVERE,
                         String.format("Cannot determine position in segment: %s",
                                       segment), e);
+                error();
+                return;
             }
             commit();
             segment = null;
@@ -154,6 +165,7 @@ abstract public class AbstractAppender {
             read = channel.read(devNull);
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during append", e);
+            error();
             return;
         }
         position += read;
@@ -162,6 +174,21 @@ abstract public class AbstractAppender {
             devNull = null;
             state = State.ACCEPTED;
         }
+    }
+
+    protected void error() {
+        state = State.ERROR;
+        handler.close();
+        if (segment != null) {
+            try {
+                segment.close();
+            } catch (IOException e) {
+                log.finest(String.format("Error closing segment %s", segment));
+            }
+        }
+        segment = null;
+        eventChannel = null;
+        devNull = null;
     }
 
     abstract protected void headerRead(SocketChannel channel);
@@ -178,6 +205,7 @@ abstract public class AbstractAppender {
             read = header.read(channel);
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during header read", e);
+            error();
             return;
         }
         if (read) {
@@ -192,13 +220,23 @@ abstract public class AbstractAppender {
     protected void writeHeader() {
         header.rewind();
         try {
-            if (!header.write(segment)) {
+            boolean written = false;
+            for (int attempt = 0; attempt < 5; attempt++) {
+                if (header.write(segment)) {
+                    written = true;
+                    break;
+                }
+            }
+            if (!written) {
                 log.log(Level.SEVERE,
-                        String.format("Unable to write complete header on: %s",
+                        String.format("Unable to write complete header on: %s after 5 attempts",
                                       segment));
+                error();
+                return;
             }
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during header read", e);
+            error();
             return;
         }
         position += EventHeader.HEADER_BYTE_SIZE;

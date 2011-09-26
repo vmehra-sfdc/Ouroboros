@@ -110,10 +110,10 @@ public class Weaver implements Bundle {
     }
 
     private class SpindleFactory implements
-            CommunicationsHandlerFactory<Spinner> {
+            CommunicationsHandlerFactory<Appender> {
         @Override
-        public Spinner createCommunicationsHandler(SocketChannel channel) {
-            return new Spinner(Weaver.this);
+        public Appender createCommunicationsHandler(SocketChannel channel) {
+            return new Appender(Weaver.this);
         }
     }
 
@@ -130,7 +130,7 @@ public class Weaver implements Bundle {
     private final ServerSocketChannelHandler<Replicator> replicationHandler;
     private final ConcurrentMap<Node, Replicator>        replicators       = new ConcurrentHashMap<Node, Replicator>();
     private final File                                   root;
-    private final ServerSocketChannelHandler<Spinner>    spindleHandler;
+    private final ServerSocketChannelHandler<Appender>   spindleHandler;
     private final ChannelHandler<Xerox>                  xeroxHandler;
 
     public Weaver(WeaverConfigation configuration, Coordinator coordinator)
@@ -150,12 +150,12 @@ public class Weaver implements Bundle {
                                                                         configuration.getReplicationAddress(),
                                                                         configuration.getReplicators(),
                                                                         new ReplicatorFactory());
-        spindleHandler = new ServerSocketChannelHandler<Spinner>(
-                                                                 WEAVER_SPINDLE,
-                                                                 configuration.getSpindleSocketOptions(),
-                                                                 configuration.getSpindleAddress(),
-                                                                 configuration.getSpindles(),
-                                                                 new SpindleFactory());
+        spindleHandler = new ServerSocketChannelHandler<Appender>(
+                                                                  WEAVER_SPINDLE,
+                                                                  configuration.getSpindleSocketOptions(),
+                                                                  configuration.getSpindleAddress(),
+                                                                  configuration.getSpindles(),
+                                                                  new SpindleFactory());
         contactInfo = new ContactInformation(
                                              spindleHandler.getLocalAddress(),
                                              replicationHandler.getLocalAddress(),

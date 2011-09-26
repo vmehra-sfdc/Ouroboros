@@ -97,12 +97,12 @@ public class Xerox implements CommunicationsHandler {
 
     @Override
     public void handleAccept(SocketChannel channel,
-                             SocketChannelHandler<?> handler) {
+                             SocketChannelHandler<? extends CommunicationsHandler> handler) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void handleConnect(SocketChannel channel, SocketChannelHandler<?> h) {
+    public void handleConnect(SocketChannel channel, SocketChannelHandler<? extends CommunicationsHandler> h) {
         handler = h;
         switch (state) {
             case INITIALIZED: {

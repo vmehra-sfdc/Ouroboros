@@ -30,17 +30,36 @@ import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.hellblazer.pinkie.CommunicationsHandler;
+import com.hellblazer.pinkie.SocketChannelHandler;
+
 /**
  * The concrete appender used to append events from producers.
  * 
  * @author hhildebrand
  * 
  */
-public class Appender extends AbstractAppender {
+public class Appender extends AbstractAppender implements CommunicationsHandler {
     private static final Logger log = Logger.getLogger(Appender.class.getCanonicalName());
 
     public Appender(Bundle bundle) {
         super(bundle);
+    }
+
+    @Override
+    public void closing(SocketChannel channel) {
+        log.fine(String.format("Closing appender for %s", bundle));
+    }
+
+    @Override
+    public void handleConnect(SocketChannel channel,
+                              SocketChannelHandler<? extends CommunicationsHandler> handler) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void handleWrite(SocketChannel channel) {
+        throw new UnsupportedOperationException();
     }
 
     @Override

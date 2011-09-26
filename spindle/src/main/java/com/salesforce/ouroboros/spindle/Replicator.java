@@ -127,7 +127,7 @@ public class Replicator implements CommunicationsHandler {
 
     @Override
     public void handleAccept(SocketChannel channel,
-                             SocketChannelHandler<?> handler) {
+                             SocketChannelHandler<? extends CommunicationsHandler> handler) {
         this.handler = handler;
         switch (state) {
             case ESTABLISHED: {
@@ -151,7 +151,7 @@ public class Replicator implements CommunicationsHandler {
 
     @Override
     public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler<?> handler) {
+                              SocketChannelHandler<? extends CommunicationsHandler> handler) {
         this.handler = handler;
         switch (state) {
             case INITIAL: {
