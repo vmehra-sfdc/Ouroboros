@@ -26,6 +26,7 @@
 package com.salesforce.ouroboros.partition;
 
 import java.io.Serializable;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -33,7 +34,9 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -45,6 +48,8 @@ import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 import org.smartfrog.services.anubis.partition.views.View;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.channel.ChannelHandler;
+import com.salesforce.ouroboros.channel.ChannelMessage;
 
 /**
  * The common high level distribute coordination logic for Ouroboros group
@@ -146,12 +151,30 @@ public class Switchboard {
                                                                                       State.UNSTABLE);
     protected NodeIdSet                  view;
 
-    public Switchboard(Member m, Node node, Partition p, Executor executor) {
+    public Switchboard(Member m, Node node, Partition p) {
         self = node;
         partition = p;
         member = m;
         m.setSwitchboard(this);
-        messageProcessor = executor;
+        messageProcessor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread daemon = new Thread(
+                                           r,
+                                           String.format("Message processor for <%s>",
+                                                         member));
+                daemon.setDaemon(true);
+                daemon.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+                    @Override
+                    public void uncaughtException(Thread t, Throwable e) {
+                        log.log(Level.SEVERE,
+                                "Uncaught exception on message processing thread",
+                                e);
+                    }
+                });
+                return daemon;
+            }
+        });
     }
 
     /**
@@ -181,6 +204,18 @@ public class Switchboard {
     public void dispatchToMember(MemberDispatch type, Node sender,
                                  Serializable payload, long time) {
         member.dispatch(type, sender, payload, time);
+    }
+
+    public void dispatchToMember(ChannelMessage type, Node sender,
+                                 Serializable payload, long time) {
+        if (member instanceof ChannelHandler) {
+            type.dispatch((ChannelHandler) member, sender, payload, time);
+        } else {
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("Member ignoring channel message %s [%s]",
+                                        type, payload));
+            }
+        }
     }
 
     public Collection<Node> getDeadMembers() {
@@ -221,8 +256,33 @@ public class Switchboard {
      */
     public void ringCast(Message message) {
         assert message != null : "Message must not be null";
-
-        ringCast(message, members);
+        int neighbor = view.rightNeighborOf(self.processId);
+        if (neighbor == -1) {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Ring does not have right neighbor of %s",
+                                       self));
+            }
+        }
+        switch (state.get()) {
+            case STABLE: {
+                MessageConnection connection = partition.connect(neighbor);
+                if (connection == null) {
+                    if (log.isLoggable(Level.WARNING)) {
+                        log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
+                                                  message, neighbor, self));
+                    }
+                } else {
+                    connection.sendObject(message);
+                }
+                break;
+            }
+            case UNSTABLE: {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Unable to send %s to %s from %s as the partition is UNSTABLE",
+                                           message, neighbor, self));
+                }
+            }
+        }
     }
 
     /**
@@ -242,6 +302,7 @@ public class Switchboard {
                 log.fine(String.format("Ring does not have right neighbor of %s",
                                        self));
             }
+            return;
         }
         send(message, getRightNeighbor(ring));
     }
@@ -361,14 +422,25 @@ public class Switchboard {
     void dispatch(GlobalMessageType type, Node sender, Serializable payload,
                   long time) {
         if (self.equals(sender)) {
-            return; // ringcast wrap around - we originated the message
+            if (log.isLoggable(Level.FINER)) {
+                log.fine(String.format("Complete ring traversal of %s from %s",
+                                       type, self));
+            }
+        } else {
+            ringCast(new Message(sender, type, payload));
         }
-        ringCast(new Message(sender, type, payload));
         switch (type) {
             case DISCOVERY_COMPLETE:
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Discovery complete on %s", self));
+                }
                 stabilized();
                 break;
             default:
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Discovery of node %s = %s", self,
+                                           type));
+                }
                 discover(sender);
                 member.dispatch(type, sender, payload, time);
                 break;
@@ -414,17 +486,10 @@ public class Switchboard {
     }
 
     void stabilized() {
-        if (state.compareAndSet(State.UNSTABLE, State.STABLE)) {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Partition stable and discovery complete on %s",
-                                       self));
-            }
-            member.stabilized();
-        } else {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Partition is already stabilized on %s",
-                                       self));
-            }
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Partition stable and discovery complete on %s",
+                                   self));
         }
+        member.stabilized();
     }
 }

@@ -47,6 +47,7 @@ import org.junit.Test;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
+import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
@@ -74,6 +75,8 @@ public class TestCoordinator {
         when(weaver.getId()).thenReturn(localNode);
         Coordinator coordinator = new Coordinator(timer);
         coordinator.ready(weaver, dummyInfo);
+        Switchboard switchboard = mock(Switchboard.class);
+        coordinator.setSwitchboard(switchboard);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -184,6 +187,8 @@ public class TestCoordinator {
         when(weaver.getId()).thenReturn(localNode);
         Coordinator coordinator = new Coordinator(timer);
         coordinator.ready(weaver, dummyInfo);
+        Switchboard switchboard = mock(Switchboard.class);
+        coordinator.setSwitchboard(switchboard);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -271,6 +276,8 @@ public class TestCoordinator {
         when(weaver.getId()).thenReturn(localNode);
         Coordinator coordinator = new Coordinator(timer);
         coordinator.ready(weaver, dummyInfo);
+        Switchboard switchboard = mock(Switchboard.class);
+        coordinator.setSwitchboard(switchboard);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -321,6 +328,8 @@ public class TestCoordinator {
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         coordinator.ready(weaver, dummyInfo);
+        Switchboard switchboard = mock(Switchboard.class);
+        coordinator.setSwitchboard(switchboard);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);

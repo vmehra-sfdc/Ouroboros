@@ -41,13 +41,14 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.channel.ChannelHandler;
+import com.salesforce.ouroboros.channel.ChannelMessage;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
@@ -64,7 +65,7 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * @author hhildebrand
  * 
  */
-public class Coordinator implements Member {
+public class Coordinator implements Member, ChannelHandler {
 
     private final static Logger log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     static final int            DEFAULT_TIMEOUT = 1;
@@ -83,7 +84,6 @@ public class Coordinator implements Member {
     private final ScheduledExecutorService                timer;
     private ConsistentHashFunction<Node>                  weaverRing           = new ConsistentHashFunction<Node>();
     private final ConcurrentMap<Node, ContactInformation> yellowPages          = new ConcurrentHashMap<Node, ContactInformation>();
-    private final AtomicBoolean                           stable               = new AtomicBoolean();
 
     public Coordinator(ScheduledExecutorService timer) {
         this.timer = timer;
@@ -120,7 +120,6 @@ public class Coordinator implements Member {
 
     @Override
     public void destabilize() {
-        stable.set(false);
     }
 
     @Override
@@ -213,12 +212,31 @@ public class Coordinator implements Member {
      *            - the id of the channel to open
      */
     public void open(UUID channel) {
-        channels.add(channel);
+        if (!channels.add(channel)) {
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("Channel is already opened %s", channel));
+            }
+            return;
+        }
         List<Node> pair = weaverRing.hash(point(channel), 2);
         if (pair.get(0).equals(localWeaver.getId())) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Opening primary for channel %s on %s",
+                                       channel, getId()));
+            }
             localWeaver.openPrimary(channel, pair.get(1));
+            switchboard.ringCast(new Message(getId(),
+                                             ChannelMessage.PRIMARY_OPENED,
+                                             channel));
         } else if (pair.get(1).equals(localWeaver.getId())) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Opening mirror for channel %s on %s",
+                                       channel, getId()));
+            }
             localWeaver.openMirror(channel, pair.get(0));
+            switchboard.ringCast(new Message(getId(),
+                                             ChannelMessage.MIRROR_OPENED,
+                                             channel));
         }
     }
 
@@ -309,9 +327,6 @@ public class Coordinator implements Member {
 
     @Override
     public void stabilized() {
-        if (stable.get()) {
-            return;
-        }
         failover(switchboard.getDeadMembers());
         filterSystemMembership();
         Runnable action = new Runnable() {
@@ -338,7 +353,6 @@ public class Coordinator implements Member {
         }
         replicatorRendezvous.set(openReplicators(getNewMembers(), action,
                                                  timeoutAction));
-        stable.set(true);
     }
 
     /**
@@ -359,5 +373,29 @@ public class Coordinator implements Member {
                 newMembers.add(node);
             }
         }
+    }
+
+    @Override
+    public void mirrorClosed(UUID channel) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void mirrorOpened(UUID channel) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void primaryClosed(UUID channel) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void primaryOpened(UUID channel) {
+        // TODO Auto-generated method stub
+
     }
 }
