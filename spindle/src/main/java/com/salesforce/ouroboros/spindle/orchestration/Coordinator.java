@@ -107,12 +107,20 @@ public class Coordinator implements Member, ChannelHandler {
      * @param channel
      *            - the id of the channel to close
      */
-    public void close(UUID channel) {
+    @Override
+    public void close(UUID channel, Node requester) {
         channels.remove(channel);
         List<Node> pair = weaverRing.hash(point(channel), 2);
         if (pair != null) {
-            if (pair.get(0).equals(localWeaver.getId())
-                || pair.get(1).equals(localWeaver.getId())) {
+            if (pair.get(0).equals(localWeaver.getId())) {
+                switchboard.send(new Message(getId(),
+                                             ChannelMessage.PRIMARY_CLOSED,
+                                             channel), requester);
+                localWeaver.close(channel);
+            } else if (pair.get(1).equals(localWeaver.getId())) {
+                switchboard.send(new Message(getId(),
+                                             ChannelMessage.MIRROR_CLOSED,
+                                             channel), requester);
                 localWeaver.close(channel);
             }
         }
@@ -204,6 +212,18 @@ public class Coordinator implements Member, ChannelHandler {
         return localWeaver.getId().equals(members.last());
     }
 
+    @Override
+    public void mirrorClosed(UUID channel, Node mirror) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void mirrorOpened(UUID channel, Node mirror) {
+        // TODO Auto-generated method stub
+
+    }
+
     /**
      * Open the new channel if this node is a primary or mirror of the new
      * channel.
@@ -211,7 +231,8 @@ public class Coordinator implements Member, ChannelHandler {
      * @param channel
      *            - the id of the channel to open
      */
-    public void open(UUID channel) {
+    @Override
+    public void open(UUID channel, Node requester) {
         if (!channels.add(channel)) {
             if (log.isLoggable(Level.FINER)) {
                 log.finer(String.format("Channel is already opened %s", channel));
@@ -225,18 +246,22 @@ public class Coordinator implements Member, ChannelHandler {
                                        channel, getId()));
             }
             localWeaver.openPrimary(channel, pair.get(1));
-            switchboard.ringCast(new Message(getId(),
-                                             ChannelMessage.PRIMARY_OPENED,
-                                             channel));
+            switchboard.send(new Message(getId(),
+                                         ChannelMessage.PRIMARY_OPENED, channel),
+                             requester);
         } else if (pair.get(1).equals(localWeaver.getId())) {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Opening mirror for channel %s on %s",
                                        channel, getId()));
             }
             localWeaver.openMirror(channel, pair.get(0));
-            switchboard.ringCast(new Message(getId(),
-                                             ChannelMessage.MIRROR_OPENED,
-                                             channel));
+            switchboard.send(new Message(getId(), ChannelMessage.MIRROR_OPENED,
+                                         channel), requester);
+        } else {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("%s is neither the primary or secondary of %s, yet received request to open",
+                                       getId(), channel));
+            }
         }
     }
 
@@ -263,6 +288,18 @@ public class Coordinator implements Member, ChannelHandler {
         rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer,
                                         timeoutAction);
         return rendezvous;
+    }
+
+    @Override
+    public void primaryClosed(UUID channel, Node primary) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void primaryOpened(UUID channel, Node primary) {
+        // TODO Auto-generated method stub
+
     }
 
     /**
@@ -373,29 +410,5 @@ public class Coordinator implements Member, ChannelHandler {
                 newMembers.add(node);
             }
         }
-    }
-
-    @Override
-    public void mirrorClosed(UUID channel) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void mirrorOpened(UUID channel) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void primaryClosed(UUID channel) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void primaryOpened(UUID channel) {
-        // TODO Auto-generated method stub
-
     }
 }

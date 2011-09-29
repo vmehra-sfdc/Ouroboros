@@ -23,27 +23,13 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.channel;
-
-import java.util.UUID;
-
-import com.salesforce.ouroboros.Node;
+package com.salesforce.ouroboros.producer;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public interface ChannelHandler {
-    void close(UUID channel, Node requester);
+public class Producer {
 
-    void mirrorClosed(UUID channel, Node mirror);
-
-    void mirrorOpened(UUID channel, Node mirror);
-
-    void open(UUID channel, Node requester);
-
-    void primaryClosed(UUID channel, Node primary);
-
-    void primaryOpened(UUID channel, Node primary);
 }

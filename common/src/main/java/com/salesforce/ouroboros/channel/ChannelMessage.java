@@ -42,35 +42,35 @@ public enum ChannelMessage implements MemberDispatch {
         @Override
         public void dispatch(ChannelHandler handler, Node sender,
                              Serializable payload, long time) {
-            handler.close((UUID) payload);
+            handler.close((UUID) payload, sender);
         }
     },
     MIRROR_CLOSED {
         @Override
         public void dispatch(ChannelHandler handler, Node sender,
                              Serializable payload, long time) {
-            handler.mirrorClosed((UUID) payload);
+            handler.mirrorClosed((UUID) payload, sender);
         }
     },
     MIRROR_OPENED {
         @Override
         public void dispatch(ChannelHandler handler, Node sender,
                              Serializable payload, long time) {
-            handler.mirrorOpened((UUID) payload);
+            handler.mirrorOpened((UUID) payload, sender);
         }
     },
     OPEN {
         @Override
         public void dispatch(ChannelHandler handler, Node sender,
                              Serializable payload, long time) {
-            handler.open((UUID) payload);
+            handler.open((UUID) payload, sender);
         }
     },
     PRIMARY_CLOSED {
         @Override
         public void dispatch(ChannelHandler handler, Node sender,
                              Serializable payload, long time) {
-            handler.primaryClosed((UUID) payload);
+            handler.primaryClosed((UUID) payload, sender);
         }
     },
     PRIMARY_OPENED {
@@ -78,7 +78,7 @@ public enum ChannelMessage implements MemberDispatch {
         public void dispatch(ChannelHandler handler, Node sender,
                              Serializable payload, long time) {
 
-            handler.primaryOpened((UUID) payload);
+            handler.primaryOpened((UUID) payload, sender);
         }
     };
 

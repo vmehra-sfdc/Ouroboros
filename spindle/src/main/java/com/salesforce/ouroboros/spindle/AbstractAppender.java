@@ -33,6 +33,7 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.EventHeader;
 
 /**
  * The abstract appender of events. Instances of this class are responsible for

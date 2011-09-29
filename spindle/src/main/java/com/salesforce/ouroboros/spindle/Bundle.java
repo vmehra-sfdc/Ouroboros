@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
 
 /**

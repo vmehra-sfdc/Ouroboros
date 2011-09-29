@@ -43,6 +43,8 @@ import org.junit.Test;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.Event;
+import com.salesforce.ouroboros.EventHeader;
 
 /**
  * 

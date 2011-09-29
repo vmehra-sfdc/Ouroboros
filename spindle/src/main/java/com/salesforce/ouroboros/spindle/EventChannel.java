@@ -37,6 +37,8 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.salesforce.ouroboros.EventHeader;
+
 /**
  * The representation of the event channel. A channel is a logical collection of
  * segments, identified by a UUID. Events published to the channel are only

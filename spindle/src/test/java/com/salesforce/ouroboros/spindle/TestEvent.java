@@ -38,6 +38,8 @@ import java.util.UUID;
 
 import org.junit.Test;
 
+import com.salesforce.ouroboros.Event;
+
 /**
  * 
  * @author hhildebrand

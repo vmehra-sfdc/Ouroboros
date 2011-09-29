@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -58,7 +58,7 @@ public class EventHeader implements Cloneable {
     protected static final int CH2_OFFSET       = CH1_OFFSET + 8;
     protected static final int TIMESTAMP_OFFSET = CH2_OFFSET + 8;
     protected static final int CRC_OFFSET       = TIMESTAMP_OFFSET + 8;
-    protected static final int HEADER_BYTE_SIZE = CRC_OFFSET + 4;
+    public static final int    HEADER_BYTE_SIZE = CRC_OFFSET + 4;
 
     protected final ByteBuffer bytes;
 
@@ -150,19 +150,6 @@ public class EventHeader implements Cloneable {
      */
     public void rewind() {
         bytes.rewind();
-    }
-
-    /**
-     * Position the channel at the start of the event's payload
-     * 
-     * @param offset
-     *            - the offset of the event in the channel
-     * @param segment
-     *            - the source
-     * @throws IOException
-     */
-    public void seekToPayload(long offset, Segment segment) throws IOException {
-        segment.position(offset + HEADER_BYTE_SIZE);
     }
 
     /**

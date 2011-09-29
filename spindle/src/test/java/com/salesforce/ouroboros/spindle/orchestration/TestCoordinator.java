@@ -43,10 +43,12 @@ import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 
 import org.junit.Test;
+import org.mockito.internal.verification.Times;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
+import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
@@ -77,6 +79,7 @@ public class TestCoordinator {
         coordinator.ready(weaver, dummyInfo);
         Switchboard switchboard = mock(Switchboard.class);
         coordinator.setSwitchboard(switchboard);
+        Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -126,12 +129,14 @@ public class TestCoordinator {
                 mirror = test;
             }
         }
-        coordinator.open(primary);
-        coordinator.open(mirror);
-        coordinator.close(primary);
-        coordinator.close(mirror);
+        coordinator.open(primary, requester);
+        coordinator.open(mirror, requester);
+        coordinator.close(primary, requester);
+        coordinator.close(mirror, requester);
         verify(weaver).close(primary);
         verify(weaver).close(mirror);
+        verify(switchboard, new Times(4)).send(isA(Message.class),
+                                               eq(requester));
     }
 
     @Test
@@ -189,6 +194,7 @@ public class TestCoordinator {
         coordinator.ready(weaver, dummyInfo);
         Switchboard switchboard = mock(Switchboard.class);
         coordinator.setSwitchboard(switchboard);
+        Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -217,8 +223,8 @@ public class TestCoordinator {
                 mirror = test;
             }
         }
-        coordinator.open(primary);
-        coordinator.open(mirror);
+        coordinator.open(primary, requester);
+        coordinator.open(mirror, requester);
         verify(weaver).openPrimary(eq(primary), isA(Node.class));
         verify(weaver).openMirror(eq(mirror), isA(Node.class));
     }
@@ -278,6 +284,7 @@ public class TestCoordinator {
         coordinator.ready(weaver, dummyInfo);
         Switchboard switchboard = mock(Switchboard.class);
         coordinator.setSwitchboard(switchboard);
+        Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -305,8 +312,8 @@ public class TestCoordinator {
                 mirror = test;
             }
         }
-        coordinator.open(primary);
-        coordinator.open(mirror);
+        coordinator.open(primary, requester);
+        coordinator.open(mirror, requester);
         Node removedMirror = coordinator.getReplicationPair(primary)[1];
         Node removedPrimary = coordinator.getReplicationPair(mirror)[0];
 
@@ -330,6 +337,7 @@ public class TestCoordinator {
         coordinator.ready(weaver, dummyInfo);
         Switchboard switchboard = mock(Switchboard.class);
         coordinator.setSwitchboard(switchboard);
+        Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -357,8 +365,8 @@ public class TestCoordinator {
                 mirror = test;
             }
         }
-        coordinator.open(primary);
-        coordinator.open(mirror);
+        coordinator.open(primary, requester);
+        coordinator.open(mirror, requester);
         ConsistentHashFunction<Node> newRing = ring.clone();
         newRing.remove(coordinator.getReplicationPair(primary)[1]);
         newRing.remove(coordinator.getReplicationPair(mirror)[0]);
