@@ -25,11 +25,8 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 
 /**
  * The appender for receiving duplicated events from the primary.
@@ -38,9 +35,6 @@ import java.util.logging.Logger;
  * 
  */
 public class ReplicatingAppender extends AbstractAppender {
-    private static final Logger log          = Logger.getLogger(ReplicatingAppender.class.getCanonicalName());
-
-    private final ByteBuffer    offsetBuffer = ByteBuffer.allocate(8);
 
     public ReplicatingAppender(final Bundle bundle) {
         super(bundle);
@@ -51,73 +45,19 @@ public class ReplicatingAppender extends AbstractAppender {
      */
     @Override
     protected void commit() {
-        eventChannel.append(header, offset);
+        eventChannel.append(batchHeader, offset);
     }
 
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.spindle.AbstractAppender#headerRead(java.nio.channels.SocketChannel)
-     */
     @Override
-    protected void headerRead(SocketChannel channel) {
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Header read, header=%s", header));
-        }
-        eventChannel = bundle.eventChannelFor(header);
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Header read, header=%s", header));
-        }
-        if (eventChannel == null) {
-            log.warning(String.format("No existing event channel for: %s",
-                                      header));
-            state = State.DEV_NULL;
-            segment = null;
-            devNull = ByteBuffer.allocate(header.size());
-            devNull(channel);
-            return;
-        }
-        segment = eventChannel.segmentFor(offset);
-        remaining = header.size();
-        if (!eventChannel.isNextAppend(offset)) {
-            state = State.DEV_NULL;
-            segment = null;
-            devNull = ByteBuffer.allocate(header.size());
-            devNull(channel);
-        } else {
-            writeHeader();
-            append(channel);
-        }
+    protected BatchHeader createBatchHeader() {
+        return new ReplicatedBatchHeader();
     }
 
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.spindle.Appender#initialRead(java.nio.channels.SocketChannel)
-     */
     @Override
-    protected void initialRead(SocketChannel channel) {
-        state = State.READ_OFFSET;
-        offsetBuffer.clear();
-        readOffset(channel);
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.spindle.Appender#readOffset(java.nio.channels.SocketChannel)
-     */
-    @Override
-    protected void readOffset(SocketChannel channel) {
-        try {
-            channel.read(offsetBuffer);
-        } catch (IOException e) {
-            log.log(Level.WARNING, "Exception during offset read", e);
-            error();
-            return;
-        }
-        if (!offsetBuffer.hasRemaining()) {
-            offsetBuffer.flip();
-            offset = position = offsetBuffer.getLong();
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Offset read, offset=%s", offset));
-            }
-            state = State.READ_HEADER;
-            readHeader(channel);
-        }
+    protected AppendSegment getLogicalSegment() {
+        ReplicatedBatchHeader replicatedBatchHeader = (ReplicatedBatchHeader) batchHeader;
+        return new AppendSegment(
+                                 eventChannel.segmentFor(replicatedBatchHeader.getOffset()),
+                                 replicatedBatchHeader.getOffset());
     }
 }

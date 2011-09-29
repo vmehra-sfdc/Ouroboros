@@ -29,69 +29,65 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.UUID;
 
 /**
- * The header containing the metadata of an Event.
- * 
- * An event header comprised of:
+ * The header for a batch of events.
+ * <p>
+ * The header is comprised of:
  * 
  * <pre>
- *       4 byte size
+ *       4 byte byte length of the batch
  *       4 byte magic
- *       4 byte CRC32
+ *      16 byte channel
+ *       4 byte last event offset
+ *       8 byte last event timestamp
  * </pre>
  * 
  * @author hhildebrand
  * 
  */
-public class EventHeader implements Cloneable {
-
-    protected static final int SIZE_OFFSET      = 0;
-    protected static final int MAGIC_OFFSET     = SIZE_OFFSET + 4;
-    protected static final int CRC_OFFSET       = MAGIC_OFFSET + 8;
-    public static final int    HEADER_BYTE_SIZE = CRC_OFFSET + 4;
+public class BatchHeader {
+    protected static final int BATCH_BYTE_LENGTH_OFFSET = 0;
+    protected static final int MAGIC_OFFSET             = BATCH_BYTE_LENGTH_OFFSET + 4;
+    protected static final int CH_MSB_OFFSET            = MAGIC_OFFSET + 4;
+    protected static final int CH_LSB_OFFSET            = CH_MSB_OFFSET + 8;
+    protected static final int TIMESTAMP_OFFSET         = CH_LSB_OFFSET + 8;
+    public static final int    HEADER_SIZE              = TIMESTAMP_OFFSET + 8;
 
     protected final ByteBuffer bytes;
 
-    public EventHeader(ByteBuffer bytes) {
-        this.bytes = bytes;
+    public BatchHeader() {
+        bytes = ByteBuffer.allocate(getHeaderSize());
     }
 
-    public EventHeader(int size, int magic, int crc32) {
-        this(ByteBuffer.allocate(HEADER_BYTE_SIZE));
-        initialize(size, magic, crc32);
+    public BatchHeader(ByteBuffer b) {
+        bytes = b;
     }
 
-    /**
-     * Clear the bytes
-     */
-    public void clear() {
-        bytes.clear();
-    }
-
-    @Override
-    public EventHeader clone() {
-        ByteBuffer duplicateBytes = ByteBuffer.allocate(HEADER_BYTE_SIZE);
-        bytes.rewind();
-        duplicateBytes.put(bytes);
-        return new EventHeader(duplicateBytes);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (!(o instanceof EventHeader)) {
-            return false;
-        }
-        EventHeader header = (EventHeader) o;
-        return header.getMagic() == getMagic() && header.size() == size()
-               && header.getCrc32() == getCrc32();
+    public BatchHeader(int batchByteLength, int magic, UUID channel,
+                       long timestamp) {
+        this();
+        bytes.putInt(BATCH_BYTE_LENGTH_OFFSET, batchByteLength);
+        bytes.putInt(MAGIC_OFFSET, magic);
+        bytes.putLong(CH_MSB_OFFSET, channel.getMostSignificantBits());
+        bytes.putLong(CH_LSB_OFFSET, channel.getLeastSignificantBits());
+        bytes.putLong(TIMESTAMP_OFFSET, timestamp);
     }
 
     /**
-     * @return the CRC32 value of the payload
+     * @return the batch byte length of the header
      */
-    public int getCrc32() {
-        return bytes.getInt(CRC_OFFSET);
+    public int getBatchByteLength() {
+        return bytes.getInt(BATCH_BYTE_LENGTH_OFFSET);
+    }
+
+    /**
+     * @return the channel identifier for the event
+     */
+    public UUID getChannel() {
+        return new UUID(bytes.getLong(CH_MSB_OFFSET),
+                        bytes.getLong(CH_LSB_OFFSET));
     }
 
     /**
@@ -99,11 +95,6 @@ public class EventHeader implements Cloneable {
      */
     public int getMagic() {
         return bytes.getInt(MAGIC_OFFSET);
-    }
-
-    @Override
-    public int hashCode() {
-        return getCrc32();
     }
 
     /**
@@ -126,21 +117,8 @@ public class EventHeader implements Cloneable {
         bytes.rewind();
     }
 
-    /**
-     * @return the size of the payload
-     */
-    public int size() {
-        return bytes.getInt(SIZE_OFFSET);
-    }
-
-    @Override
-    public String toString() {
-        return String.format("EventHeader[size=%s, magic=%s, crc=%s", size(),
-                             getMagic(), getCrc32());
-    }
-
-    public int totalSize() {
-        return HEADER_BYTE_SIZE + size();
+    public long getTimestamp() {
+        return bytes.getLong(TIMESTAMP_OFFSET);
     }
 
     /**
@@ -158,9 +136,7 @@ public class EventHeader implements Cloneable {
         return !bytes.hasRemaining();
     }
 
-    protected void initialize(int size, int magic, int crc32) {
-        bytes.putInt(SIZE_OFFSET, size);
-        bytes.putInt(MAGIC_OFFSET, magic);
-        bytes.putInt(CRC_OFFSET, crc32);
+    protected int getHeaderSize() {
+        return HEADER_SIZE;
     }
 }

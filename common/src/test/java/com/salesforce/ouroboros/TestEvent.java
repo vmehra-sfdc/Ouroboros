@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -34,11 +34,8 @@ import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
-import java.util.UUID;
 
 import org.junit.Test;
-
-import com.salesforce.ouroboros.Event;
 
 /**
  * 
@@ -51,13 +48,9 @@ public class TestEvent {
         byte[] src = new byte[23];
         Arrays.fill(src, (byte) 7);
         ByteBuffer payload = ByteBuffer.wrap(src);
-        UUID channel = UUID.randomUUID();
-        long timestamp = System.currentTimeMillis();
-        Event event = new Event(777, channel, timestamp, payload);
+        Event event = new Event(777, payload);
         assertEquals(src.length, event.size());
-        assertEquals(channel, event.getChannel());
         assertEquals(777, event.getMagic());
-        assertEquals(timestamp, event.getTimestamp());
         assertEquals(Event.crc32(src), event.getCrc32());
         assertTrue(event.validate());
     }
@@ -65,11 +58,9 @@ public class TestEvent {
     @Test
     public void testReadWrite() throws Exception {
         int magic = 666;
-        UUID channel = UUID.randomUUID();
-        long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        Event written = new Event(magic, channel, timestamp, payloadBuffer);
+        Event written = new Event(magic, payloadBuffer);
 
         File tmpFile = File.createTempFile("read-write", ".tst");
         tmpFile.deleteOnExit();
@@ -80,16 +71,12 @@ public class TestEvent {
         segment.close();
 
         assertEquals(magic, written.getMagic());
-        assertEquals(channel, written.getChannel());
-        assertEquals(timestamp, written.getTimestamp());
         assertEquals(payload.length, written.size());
 
         FileInputStream fis = new FileInputStream(tmpFile);
         segment = fis.getChannel();
         Event read = new Event(segment);
         segment.close();
-        assertEquals(written.getChannel(), read.getChannel());
-        assertEquals(written.getChannel(), read.getChannel());
         assertEquals(written.size(), read.size());
     }
 }

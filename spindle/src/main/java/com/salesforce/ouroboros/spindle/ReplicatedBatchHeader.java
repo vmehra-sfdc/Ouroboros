@@ -25,31 +25,43 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import java.nio.ByteBuffer;
 import java.util.UUID;
 
-import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.BatchHeader;
 
 /**
- * The interface which provides the segments for appending within a channel,
- * based on the new event's header.
  * 
  * @author hhildebrand
  * 
  */
-public interface Bundle {
+public class ReplicatedBatchHeader extends BatchHeader {
+    private static final int BATCH_OFFSET_OFFSET = BatchHeader.HEADER_SIZE;
+    public static final int  HEADER_SIZE         = BATCH_OFFSET_OFFSET + 4;
 
-    /**
-     * @return the Node id of the bundle
-     */
-    Node getId();
+    public ReplicatedBatchHeader() {
+        super();
+    }
 
-    /**
-     * Answer the event channel the event is part of.
-     * 
-     * @param channelId
-     *            - the id of the channel
-     * @return the EventChannel for this event, or null if no such channel
-     *         exists.
+    public ReplicatedBatchHeader(ByteBuffer b) {
+        super(b);
+    }
+
+    public ReplicatedBatchHeader(int batchByteLength, int magic, UUID channel,
+                                 long timestamp, long batchOffset) {
+        super(batchByteLength, magic, channel, timestamp);
+        bytes.putLong(BATCH_OFFSET_OFFSET, batchOffset);
+    }
+
+    public long getOffset() {
+        return bytes.getLong(BATCH_OFFSET_OFFSET);
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.BatchHeader#getHeaderSize()
      */
-    public abstract EventChannel eventChannelFor(UUID channelId);
+    @Override
+    protected int getHeaderSize() {
+        return HEADER_SIZE;
+    }
 }

@@ -25,13 +25,13 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 
 /**
  * The concrete appender used to append events from producers.
@@ -64,35 +64,16 @@ public class Appender extends AbstractAppender implements CommunicationsHandler 
 
     @Override
     protected void commit() {
-        eventChannel.append(header, offset, segment);
+        eventChannel.append(batchHeader, offset, segment);
     }
 
     @Override
-    protected void headerRead(SocketChannel channel) {
-        eventChannel = bundle.eventChannelFor(header);
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Header read, header=%s", header));
-        }
-        if (eventChannel == null) {
-            log.warning(String.format("No existing event channel for: %s",
-                                      header));
-            state = State.DEV_NULL;
-            segment = null;
-            devNull = ByteBuffer.allocate(header.size());
-            devNull(channel);
-            return;
-        }
-        segment = eventChannel.segmentFor(header);
-        offset = position = eventChannel.nextOffset();
-        remaining = header.size();
-        if (eventChannel.isDuplicate(header)) {
-            state = State.DEV_NULL;
-            segment = null;
-            devNull = ByteBuffer.allocate(header.size());
-            devNull(channel);
-        } else {
-            writeHeader();
-            append(channel);
-        }
+    protected BatchHeader createBatchHeader() {
+        return new BatchHeader();
+    }
+
+    @Override
+    protected AppendSegment getLogicalSegment() {
+        return eventChannel.segmentFor(batchHeader);
     }
 }

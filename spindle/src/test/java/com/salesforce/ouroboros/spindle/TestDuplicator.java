@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,6 +43,7 @@ import org.junit.Test;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.spindle.Duplicator.State;
@@ -114,17 +114,17 @@ public class TestDuplicator {
         long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        EventHeader event = new EventHeader(payload.length, magic, channel,
-                                            timestamp, Event.crc32(payload));
+        BatchHeader batchHeader = new BatchHeader(payload.length, magic,
+                                                  channel, timestamp);
         EventChannel eventChannel = mock(EventChannel.class);
 
-        event.rewind();
-        event.write(segment);
+        batchHeader.rewind();
+        batchHeader.write(segment);
         segment.write(payloadBuffer);
         segment.force(false);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
 
-        when(bundle.eventChannelFor(eq(event))).thenReturn(eventChannel);
+        when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         final Duplicator replicator = new Duplicator();
         assertEquals(State.WAITING, replicator.getState());
         SocketOptions options = new SocketOptions();
@@ -156,7 +156,8 @@ public class TestDuplicator {
                 return State.WAITING == replicator.getState();
             }
         }, 1000L, 100L);
-        replicator.replicate(eventChannel, 0, segment, event.totalSize());
+        replicator.replicate(eventChannel, 0, segment,
+                             batchHeader.getBatchByteLength());
         assertEquals(State.WRITE_OFFSET, replicator.getState());
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
 
@@ -170,10 +171,8 @@ public class TestDuplicator {
         assertTrue(reader.replicated.hasRemaining());
         assertEquals(0, reader.offset);
         Event replicatedEvent = new Event(reader.replicated);
-        assertEquals(event.size(), replicatedEvent.size());
-        assertEquals(event.getMagic(), replicatedEvent.getMagic());
-        assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
-        assertEquals(event.getTimestamp(), replicatedEvent.getTimestamp());
+        assertEquals(batchHeader.getBatchByteLength(), replicatedEvent.size());
+        assertEquals(batchHeader.getMagic(), replicatedEvent.getMagic());
         assertTrue(replicatedEvent.validate());
         verify(eventChannel).commit(0);
     }
@@ -189,7 +188,7 @@ public class TestDuplicator {
         Bundle inboundBundle = mock(Bundle.class);
         final ReplicatingAppender inboundReplicator = new ReplicatingAppender(
                                                                               inboundBundle);
-        EventChannel outboundEventChannel = mock(EventChannel.class);
+        EventChannel eventChannel = mock(EventChannel.class);
 
         File tmpOutboundFile = File.createTempFile("outbound", ".tst");
         tmpOutboundFile.deleteOnExit();
@@ -200,17 +199,16 @@ public class TestDuplicator {
         long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        EventHeader outboundEvent = new EventHeader(payload.length, magic,
-                                                    channel, timestamp,
-                                                    Event.crc32(payload));
+        BatchHeader batchHeader = new BatchHeader(payload.length, magic,
+                                                  channel, timestamp);
 
-        outboundEvent.rewind();
-        outboundEvent.write(outboundSegment);
+        batchHeader.rewind();
+        batchHeader.write(outboundSegment);
         outboundSegment.write(payloadBuffer);
         outboundSegment.force(false);
         long offset = 0L;
 
-        when(inboundBundle.eventChannelFor(eq(outboundEvent))).thenReturn(inboundEventChannel);
+        when(inboundBundle.eventChannelFor(channel)).thenReturn(inboundEventChannel);
         when(inboundEventChannel.segmentFor(offset)).thenReturn(inboundSegment);
         when(inboundEventChannel.isNextAppend(offset)).thenReturn(true);
 
@@ -236,7 +234,7 @@ public class TestDuplicator {
 
         inboundReplicator.handleAccept(inbound, handler);
         inboundReplicator.handleRead(inbound);
-        assertEquals(AbstractAppender.State.READ_OFFSET,
+        assertEquals(AbstractAppender.State.APPEND,
                      inboundReplicator.getState());
 
         Runnable reader = new Runnable() {
@@ -256,8 +254,8 @@ public class TestDuplicator {
         inboundRead.start();
 
         outboundDuplicator.handleConnect(outbound, handler);
-        outboundDuplicator.replicate(outboundEventChannel, 0, outboundSegment,
-                                     outboundEvent.totalSize());
+        outboundDuplicator.replicate(eventChannel, 0, outboundSegment,
+                                     batchHeader.getBatchByteLength());
         assertEquals(State.WRITE_OFFSET, outboundDuplicator.getState());
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
@@ -277,10 +275,8 @@ public class TestDuplicator {
         Segment segment = new Segment(inboundTmpFile);
         assertTrue("Nothing written to inbound segment", segment.size() > 0);
         Event replicatedEvent = new Event(segment);
-        assertEquals(outboundEvent.size(), replicatedEvent.size());
-        assertEquals(outboundEvent.getMagic(), replicatedEvent.getMagic());
-        assertEquals(outboundEvent.getCrc32(), replicatedEvent.getCrc32());
-        assertEquals(outboundEvent.getTimestamp(), replicatedEvent.getTimestamp());
+        assertEquals(batchHeader.getBatchByteLength(), replicatedEvent.size());
+        assertEquals(batchHeader.getMagic(), replicatedEvent.getMagic());
         assertTrue(replicatedEvent.validate());
     }
 }

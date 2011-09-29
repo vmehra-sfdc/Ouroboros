@@ -33,7 +33,8 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.EventHeader;
+import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 
 /**
  * The abstract appender of events. Instances of this class are responsible for
@@ -45,19 +46,17 @@ import com.salesforce.ouroboros.EventHeader;
  */
 abstract public class AbstractAppender {
     public enum State {
-        ACCEPTED, APPEND, DEV_NULL, INITIALIZED, READ_HEADER, READ_OFFSET,
-        ERROR;
+        ACCEPTED, APPEND, DEV_NULL, ERROR, INITIALIZED, READ_BATCH_HEADER;
     }
 
     private static final Logger                log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
 
+    protected final BatchHeader                batchHeader;
     protected final Bundle                     bundle;
     protected volatile ByteBuffer              devNull;
     protected volatile EventChannel            eventChannel;
     protected volatile SocketChannelHandler<?> handler;
-    protected final EventHeader                header   = new EventHeader(
-                                                                          ByteBuffer.allocate(EventHeader.HEADER_BYTE_SIZE));
-    protected volatile long                    offset;
+    protected volatile long                    offset   = -1L;
     protected volatile long                    position = -1L;
     protected volatile long                    remaining;
     protected volatile Segment                 segment;
@@ -66,6 +65,7 @@ abstract public class AbstractAppender {
     public AbstractAppender(Bundle bundle) {
         super();
         this.bundle = bundle;
+        batchHeader = createBatchHeader();
     }
 
     public State getState() {
@@ -96,12 +96,8 @@ abstract public class AbstractAppender {
                 devNull(channel);
                 break;
             }
-            case READ_OFFSET: {
-                readOffset(channel);
-                break;
-            }
-            case READ_HEADER: {
-                readHeader(channel);
+            case READ_BATCH_HEADER: {
+                readBatchHeader(channel);
                 break;
             }
             case APPEND: {
@@ -125,6 +121,13 @@ abstract public class AbstractAppender {
     public String toString() {
         return "Appender [state=" + state + ", segment=" + segment
                + ", remaining=" + remaining + ", position=" + position + "]";
+    }
+
+    private void drain(SocketChannel channel) {
+        state = State.DEV_NULL;
+        segment = null;
+        devNull = ByteBuffer.allocate(batchHeader.getBatchByteLength());
+        devNull(channel);
     }
 
     protected void append(SocketChannel channel) {
@@ -160,6 +163,8 @@ abstract public class AbstractAppender {
 
     abstract protected void commit();
 
+    abstract protected BatchHeader createBatchHeader();
+
     protected void devNull(SocketChannel channel) {
         long read;
         try {
@@ -192,55 +197,47 @@ abstract public class AbstractAppender {
         devNull = null;
     }
 
-    abstract protected void headerRead(SocketChannel channel);
-
     protected void initialRead(SocketChannel channel) {
-        header.clear();
-        state = State.READ_HEADER;
-        readHeader(channel);
+        batchHeader.rewind();
+        state = State.READ_BATCH_HEADER;
+        readBatchHeader(channel);
     }
 
-    protected void readHeader(SocketChannel channel) {
+    protected void readBatchHeader(SocketChannel channel) {
         boolean read;
         try {
-            read = header.read(channel);
+            read = batchHeader.read(channel);
         } catch (IOException e) {
-            log.log(Level.SEVERE, "Exception during header read", e);
+            log.log(Level.SEVERE, "Exception during batch header read", e);
             error();
             return;
         }
         if (read) {
-            headerRead(channel);
-        }
-    }
-
-    protected void readOffset(SocketChannel channel) {
-        // Default is to do nothing
-    }
-
-    protected void writeHeader() {
-        header.rewind();
-        try {
-            boolean written = false;
-            for (int attempt = 0; attempt < 5; attempt++) {
-                if (header.write(segment)) {
-                    written = true;
-                    break;
-                }
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("Batch header read, header=%s",
+                                        batchHeader));
             }
-            if (!written) {
-                log.log(Level.SEVERE,
-                        String.format("Unable to write complete header on: %s after 5 attempts",
-                                      segment));
-                error();
+            eventChannel = bundle.eventChannelFor(batchHeader.getChannel());
+            if (eventChannel == null) {
+                log.warning(String.format("No existing event channel for: %s",
+                                          batchHeader));
+                drain(channel);
                 return;
             }
-        } catch (IOException e) {
-            log.log(Level.SEVERE, "Exception during header read", e);
-            error();
-            return;
+            AppendSegment logicalSegment = getLogicalSegment();
+            segment = logicalSegment.segment;
+            position = logicalSegment.offset;
+            remaining = batchHeader.getBatchByteLength();
+            if (eventChannel.isDuplicate(batchHeader)) {
+                log.warning(String.format("Duplicate event batch %s",
+                                          batchHeader));
+                drain(channel);
+                return;
+            }
+            append(channel);
+            state = State.APPEND;
         }
-        position += EventHeader.HEADER_BYTE_SIZE;
-        state = State.APPEND;
     }
+
+    abstract protected AppendSegment getLogicalSegment();
 }

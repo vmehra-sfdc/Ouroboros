@@ -28,8 +28,6 @@ package com.salesforce.ouroboros.spindle;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Matchers.isA;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -43,9 +41,6 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 import org.mockito.internal.verification.Times;
@@ -53,11 +48,10 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
-import com.salesforce.ouroboros.EventHeader;
-import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.AbstractAppender.State;
+import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 
 /**
  * 
@@ -92,10 +86,12 @@ public class TestAppender {
         long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        EventHeader header = new EventHeader(payload.length, magic, channel,
-                                             timestamp, Event.crc32(payload));
-        when(bundle.eventChannelFor(eq(header))).thenReturn(eventChannel);
-        when(eventChannel.segmentFor(eq(header))).thenReturn(writeSegment);
+        BatchHeader header = new BatchHeader(payload.length, magic, channel,
+                                             timestamp);
+        when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
+        when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
+                                                                               writeSegment,
+                                                                               0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(false);
         long offset = 0L;
         when(eventChannel.nextOffset()).thenReturn(offset);
@@ -130,8 +126,6 @@ public class TestAppender {
         readSegment.close();
         assertTrue(event.validate());
         assertEquals(magic, event.getMagic());
-        assertEquals(channel, event.getChannel());
-        assertEquals(timestamp, event.getTimestamp());
         assertEquals(payload.length, event.size());
         ByteBuffer writtenPayload = event.getPayload();
         for (byte b : payload) {
@@ -139,7 +133,7 @@ public class TestAppender {
         }
 
         verify(handler, new Times(3)).selectForRead();
-        verify(bundle).eventChannelFor(eq(header));
+        verify(bundle).eventChannelFor(channel);
         verify(eventChannel).append(header, offset, writeSegment);
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
@@ -173,10 +167,12 @@ public class TestAppender {
         long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        EventHeader header = new EventHeader(payload.length, magic, channel,
-                                             timestamp, Event.crc32(payload));
-        when(bundle.eventChannelFor(eq(header))).thenReturn(eventChannel);
-        when(eventChannel.segmentFor(eq(header))).thenReturn(writeSegment);
+        BatchHeader header = new BatchHeader(payload.length, magic, channel,
+                                             timestamp);
+        when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
+        when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
+                                                                               writeSegment,
+                                                                               0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(true);
         when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
             @Override
@@ -211,122 +207,10 @@ public class TestAppender {
 
         assertEquals(0L, tmpFile.length());
         verify(handler, new Times(3)).selectForRead();
-        verify(bundle).eventChannelFor(eq(header));
+        verify(bundle).eventChannelFor(channel);
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
         verify(eventChannel).nextOffset();
         verifyNoMoreInteractions(handler, bundle, eventChannel);
     };
-
-    @Test
-    public void testMultiAppend() throws Exception {
-        final File tmpFile = File.createTempFile("multi-append", ".tst");
-        tmpFile.deleteOnExit();
-        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
-        final EventChannel eventChannel = mock(EventChannel.class);
-        final Segment segment = new Segment(tmpFile);
-        when(eventChannel.segmentFor(isA(EventHeader.class))).thenReturn(segment);
-        when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
-            @Override
-            public Long answer(InvocationOnMock invocation) throws Throwable {
-                return segment.size();
-            }
-        });
-        final AtomicInteger counter = new AtomicInteger();
-        doAnswer(new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                counter.incrementAndGet();
-                return null;
-            }
-        }).when(eventChannel).append(isA(EventHeader.class), isA(Long.class),
-                                     eq(segment));
-        Bundle bundle = new Bundle() {
-            @Override
-            public EventChannel eventChannelFor(EventHeader header) {
-                return eventChannel;
-            }
-
-            @Override
-            public Node getId() {
-                throw new UnsupportedOperationException();
-            }
-        };
-
-        final AbstractAppender appender = new Appender(bundle);
-        SocketOptions socketOptions = new SocketOptions();
-        socketOptions.setSend_buffer_size(8);
-        socketOptions.setReceive_buffer_size(8);
-        socketOptions.setTimeout(100);
-        ServerSocketChannel server = ServerSocketChannel.open();
-        server.configureBlocking(true);
-        server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
-        SocketChannel outbound = SocketChannel.open();
-        outbound.configureBlocking(true);
-        outbound.connect(server.socket().getLocalSocketAddress());
-        final SocketChannel inbound = server.accept();
-        inbound.configureBlocking(false);
-        appender.handleAccept(inbound, handler);
-
-        final int msgCount = 666;
-        final CyclicBarrier barrier = new CyclicBarrier(2);
-
-        Thread appenderThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                while (msgCount != counter.get()) {
-                    appender.handleRead(inbound);
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        return;
-                    }
-                }
-                try {
-                    barrier.await();
-                } catch (Exception e) {
-                    return;
-                }
-            }
-        }, "Appender driver");
-        appenderThread.start();
-
-        byte[][] payload = new byte[msgCount][];
-
-        for (int i = 0; i < msgCount; i++) {
-            int magic = i;
-            UUID channelTag = new UUID(0, i);
-            long timestamp = i;
-            payload[i] = ("Give me Slack, or give me Food, or Kill me #" + i).getBytes();
-            ByteBuffer payloadBuffer = ByteBuffer.wrap(payload[i]);
-            EventHeader header = new EventHeader(payload[i].length, magic,
-                                                 channelTag, timestamp,
-                                                 Event.crc32(payload[i]));
-            header.rewind();
-            header.write(outbound);
-            outbound.write(payloadBuffer);
-        }
-
-        barrier.await(30, TimeUnit.SECONDS);
-
-        outbound.close();
-        segment.close();
-
-        FileInputStream fis = new FileInputStream(tmpFile);
-        FileChannel readSegment = fis.getChannel();
-
-        for (int i = 0; i < msgCount; i++) {
-            Event event = new Event(readSegment);
-            assertTrue(event.validate());
-            assertEquals(i, event.getMagic());
-            assertEquals(new UUID(0, i), event.getChannel());
-            assertEquals(i, event.getTimestamp());
-            assertEquals(payload[i].length, event.size());
-            ByteBuffer writtenPayload = event.getPayload();
-            for (byte b : payload[i]) {
-                assertEquals(b, writtenPayload.get());
-            }
-        }
-        readSegment.close();
-    }
 }

@@ -43,7 +43,6 @@ import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.salesforce.ouroboros.ContactInformation;
-import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.orchestration.Coordinator;
@@ -192,8 +191,8 @@ public class Weaver implements Bundle {
     }
 
     @Override
-    public EventChannel eventChannelFor(EventHeader header) {
-        return channels.get(header.getChannel());
+    public EventChannel eventChannelFor(UUID channelId) {
+        return channels.get(channelId);
     }
 
     /**

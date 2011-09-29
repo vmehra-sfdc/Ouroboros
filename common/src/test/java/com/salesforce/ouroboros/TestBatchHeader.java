@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros;
 
 import static org.junit.Assert.assertEquals;
 
@@ -31,23 +31,23 @@ import java.util.UUID;
 
 import org.junit.Test;
 
-import com.salesforce.ouroboros.EventHeader;
-
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class TestEventHeader {
+public class TestBatchHeader {
     @Test
     public void testOffsets() {
         UUID channel = UUID.randomUUID();
+        int batchByteLength = 25;
+        int magic = 777;
         long timestamp = System.currentTimeMillis();
-        EventHeader header = new EventHeader(25, 777, channel, timestamp, 23456);
-        assertEquals(25, header.size());
+        BatchHeader header = new BatchHeader(batchByteLength, magic, channel,
+                                             timestamp);
+        assertEquals(batchByteLength, header.getBatchByteLength());
         assertEquals(channel, header.getChannel());
+        assertEquals(magic, header.getMagic());
         assertEquals(timestamp, header.getTimestamp());
-        assertEquals(777, header.getMagic());
-        assertEquals(23456, header.getCrc32());
     }
 }

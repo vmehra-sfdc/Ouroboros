@@ -23,33 +23,23 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros;
 
-import java.util.UUID;
+import static org.junit.Assert.assertEquals;
 
-import com.salesforce.ouroboros.Node;
+import org.junit.Test;
 
 /**
- * The interface which provides the segments for appending within a channel,
- * based on the new event's header.
  * 
  * @author hhildebrand
  * 
  */
-public interface Bundle {
-
-    /**
-     * @return the Node id of the bundle
-     */
-    Node getId();
-
-    /**
-     * Answer the event channel the event is part of.
-     * 
-     * @param channelId
-     *            - the id of the channel
-     * @return the EventChannel for this event, or null if no such channel
-     *         exists.
-     */
-    public abstract EventChannel eventChannelFor(UUID channelId);
+public class TestEventHeader {
+    @Test
+    public void testOffsets() {
+        EventHeader header = new EventHeader(25, 777, 23456);
+        assertEquals(25, header.size());
+        assertEquals(777, header.getMagic());
+        assertEquals(23456, header.getCrc32());
+    }
 }

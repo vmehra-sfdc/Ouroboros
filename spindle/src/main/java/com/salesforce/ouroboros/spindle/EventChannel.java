@@ -37,7 +37,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.salesforce.ouroboros.EventHeader;
+import com.salesforce.ouroboros.BatchHeader;
 
 /**
  * The representation of the event channel. A channel is a logical collection of
@@ -54,8 +54,28 @@ import com.salesforce.ouroboros.EventHeader;
  */
 public class EventChannel {
 
+    public static class AppendSegment {
+        public final long    offset;
+        public final Segment segment;
+
+        public AppendSegment(Segment segment, long offset) {
+            this.segment = segment;
+            this.offset = offset;
+        }
+    }
+
     public enum Role {
         MIRROR, PRIMARY;
+    }
+
+    private static class AppendSegmentName {
+        public final long   offset;
+        public final String segment;
+
+        public AppendSegmentName(String segment, long offset) {
+            this.segment = segment;
+            this.offset = offset;
+        }
     }
 
     public static final String          SEGMENT_SUFFIX = ".segment";
@@ -70,6 +90,26 @@ public class EventChannel {
                                                        };
 
     /**
+     * Answer the logical segment to which the segment belongs
+     * 
+     * @param offset
+     *            - the proposed offset of the event
+     * @param eventSize
+     *            - the total size of the event(s)
+     * @param maxSegmentSize
+     *            - the maximum segment size
+     * @return
+     */
+    public static long[] mappedSegmentFor(long offset, int eventSize,
+                                          long maxSegmentSize) {
+        long homeSegment = prefixFor(offset, maxSegmentSize);
+        long endSegment = prefixFor(offset + eventSize, maxSegmentSize);
+        boolean overflow = homeSegment != endSegment;
+        return overflow ? new long[] { endSegment, endSegment * maxSegmentSize }
+                       : new long[] { homeSegment, offset };
+    }
+
+    /**
      * Answer the logical segment prefix for the event offset and given maximum
      * segment size
      * 
@@ -81,24 +121,6 @@ public class EventChannel {
      */
     public static long prefixFor(long offset, long maxSegmentSize) {
         return (long) Math.floor(offset / maxSegmentSize) * maxSegmentSize;
-    }
-
-    /**
-     * Answer the logical segment two which the segment belongs
-     * 
-     * @param offset
-     *            - the proposed offset of the event
-     * @param eventSize
-     *            - the total size of the event
-     * @param maxSegmentSize
-     *            - the maximum segment size
-     * @return
-     */
-    public static long segmentFor(long offset, int eventSize,
-                                  long maxSegmentSize) {
-        long homeSegment = prefixFor(offset, maxSegmentSize);
-        long endSegment = prefixFor(offset + eventSize, maxSegmentSize);
-        return homeSegment != endSegment ? endSegment : homeSegment;
     }
 
     /**
@@ -133,21 +155,30 @@ public class EventChannel {
         this.replicator = replicator;
     }
 
-    public void append(EventHeader header, long offset) {
-        nextOffset = offset + header.totalSize();
-        lastTimestamp = header.getTimestamp();
-    }
-
     /**
      * Mark the appending of the event at the offset in the channel
      * 
-     * @param header
+     * @param batchHeader
      * @param offset
      * @param segment
      */
-    public void append(EventHeader header, long offset, Segment segment) {
-        append(header, offset);
-        replicator.replicate(this, offset, segment, header.totalSize());
+    public void append(BatchHeader batchHeader, long offset) {
+        nextOffset = offset + batchHeader.getBatchByteLength();
+        lastTimestamp = batchHeader.getTimestamp();
+    }
+
+    /**
+     * Mark the appending of the event at the offset in the channel, replicating
+     * the event batch
+     * 
+     * @param batchHeader
+     * @param offset
+     * @param segment
+     */
+    public void append(BatchHeader batchHeader, long offset, Segment segment) {
+        append(batchHeader, offset);
+        replicator.replicate(this, offset, segment,
+                             batchHeader.getBatchByteLength());
     }
 
     /**
@@ -224,14 +255,15 @@ public class EventChannel {
     }
 
     /**
-     * Answer true if the header represents a duplicate event in the channel
+     * Answer true if the batch header represents a duplicate series of events
+     * in the channel
      * 
-     * @param header
-     *            - the event header to test
-     * @return true if the header represents a duplicate event.
+     * @param batchHeader
+     *            - the batch header to test
+     * @return true if the header represents a duplicate series of events.
      */
-    public boolean isDuplicate(EventHeader header) {
-        return header.getTimestamp() < lastTimestamp;
+    public boolean isDuplicate(BatchHeader batchHeader) {
+        return batchHeader.getTimestamp() < lastTimestamp;
     }
 
     public boolean isMirror() {
@@ -257,32 +289,26 @@ public class EventChannel {
         return nextOffset;
     }
 
-    /**
-     * Answer the segment that the event can be appended to.
-     * 
-     * @param header
-     *            - the event header
-     * @return the Segment to append the event
-     */
-    public Segment segmentFor(EventHeader header) {
-        File segment = new File(channel,
-                                appendSegmentNameFor(header.totalSize(),
-                                                     maxSegmentSize));
-        if (!segment.exists()) {
+    public AppendSegment segmentFor(BatchHeader batchHeader) {
+        AppendSegmentName logicalSegment = appendSegmentNameFor(batchHeader.getBatchByteLength(),
+                                                                maxSegmentSize);
+        File segmentFile = new File(channel, logicalSegment.segment);
+        if (!segmentFile.exists()) {
             try {
-                segment.createNewFile();
+                segmentFile.createNewFile();
             } catch (IOException e) {
                 String msg = String.format("Cannot create the new segment file: %s",
-                                           segment.getAbsolutePath());
+                                           segmentFile.getAbsolutePath());
                 log.log(Level.WARNING, msg, e);
                 throw new IllegalStateException(msg);
             }
         }
         try {
-            return new Segment(segment);
+            return new AppendSegment(new Segment(segmentFile),
+                                     logicalSegment.offset);
         } catch (FileNotFoundException e) {
             String msg = String.format("The segment file cannot be found, yet was created: %s",
-                                       segment.getAbsolutePath());
+                                       segmentFile.getAbsolutePath());
             log.log(Level.WARNING, msg, e);
             throw new IllegalStateException(msg);
         }
@@ -326,8 +352,12 @@ public class EventChannel {
         role = Role.PRIMARY;
     }
 
-    private String appendSegmentNameFor(int eventSize, long maxSegmentSize) {
-        return segmentName(segmentFor(nextOffset, eventSize, maxSegmentSize));
+    private AppendSegmentName appendSegmentNameFor(int eventSize,
+                                                   long maxSegmentSize) {
+        long[] logicalSegment = mappedSegmentFor(nextOffset, eventSize,
+                                                 maxSegmentSize);
+        return new AppendSegmentName(segmentName(logicalSegment[0]),
+                                     logicalSegment[1]);
     }
 
     private void deleteDirectory(File directory) {

@@ -32,7 +32,6 @@ import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.net.InetSocketAddress;
@@ -45,7 +44,6 @@ import org.junit.Test;
 
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.ContactInformation;
-import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.orchestration.Coordinator;
 import com.salesforce.ouroboros.util.Rendezvous;
@@ -61,8 +59,6 @@ public class TestWeaver {
         UUID channel = UUID.randomUUID();
         Node id = new Node(0, 0, 0);
         Node mirror = new Node(1, 0, 0);
-        EventHeader header = mock(EventHeader.class);
-        when(header.getChannel()).thenReturn(channel);
         File root = File.createTempFile("weaver", ".root");
         root.delete();
         assertTrue(root.mkdirs());
@@ -73,9 +69,9 @@ public class TestWeaver {
         config.setRoot(root);
         Weaver weaver = new Weaver(config, coordinator);
         weaver.openPrimary(channel, mirror);
-        assertNotNull(weaver.eventChannelFor(header));
+        assertNotNull(weaver.eventChannelFor(channel));
         weaver.close(channel);
-        assertNull(weaver.eventChannelFor(header));
+        assertNull(weaver.eventChannelFor(channel));
     }
 
     @Test
@@ -85,10 +81,6 @@ public class TestWeaver {
         assertFalse(channel.equals(channel2));
         Node id = new Node(0, 0, 0);
         Node primary = new Node(1, 0, 0);
-        EventHeader header = mock(EventHeader.class);
-        when(header.getChannel()).thenReturn(channel);
-        EventHeader header2 = mock(EventHeader.class);
-        when(header2.getChannel()).thenReturn(channel2);
         File root = File.createTempFile("weaver", ".root");
         root.delete();
         assertTrue(root.mkdirs());
@@ -99,10 +91,10 @@ public class TestWeaver {
         config.setRoot(root);
         Weaver weaver = new Weaver(config, coordinator);
         weaver.openMirror(channel, primary);
-        EventChannel eventChannel = weaver.eventChannelFor(header);
+        EventChannel eventChannel = weaver.eventChannelFor(channel);
         assertNotNull(eventChannel);
         assertTrue(eventChannel.isMirror());
-        assertNull(weaver.eventChannelFor(header2));
+        assertNull(weaver.eventChannelFor(channel2));
     }
 
     @Test
@@ -112,10 +104,6 @@ public class TestWeaver {
         assertFalse(channel.equals(channel2));
         Node id = new Node(0, 0, 0);
         Node mirror = new Node(1, 0, 0);
-        EventHeader header = mock(EventHeader.class);
-        when(header.getChannel()).thenReturn(channel);
-        EventHeader header2 = mock(EventHeader.class);
-        when(header2.getChannel()).thenReturn(channel2);
         File root = File.createTempFile("weaver", ".root");
         root.delete();
         assertTrue(root.mkdirs());
@@ -126,10 +114,10 @@ public class TestWeaver {
         config.setRoot(root);
         Weaver weaver = new Weaver(config, coordinator);
         weaver.openPrimary(channel, mirror);
-        EventChannel eventChannel = weaver.eventChannelFor(header);
+        EventChannel eventChannel = weaver.eventChannelFor(channel);
         assertNotNull(eventChannel);
         assertTrue(eventChannel.isPrimary());
-        assertNull(weaver.eventChannelFor(header2));
+        assertNull(weaver.eventChannelFor(channel2));
     }
 
     @Test
