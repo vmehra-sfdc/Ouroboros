@@ -51,7 +51,35 @@ public class EventHeader implements Cloneable {
     protected static final int CRC_OFFSET       = MAGIC_OFFSET + 8;
     public static final int    HEADER_BYTE_SIZE = CRC_OFFSET + 4;
 
+    /**
+     * Append an event to the destination buffer at the current position of the
+     * destination. The destination buffer's new position is the next byte after
+     * the appended header. The effective EventHeader for the given magic and
+     * payload is written out, followed by the event payload. The bu
+     * 
+     * @param magic
+     *            - the magic value of the effective header
+     * @param payload
+     *            - the payload of the event
+     * @param destination
+     *            - the destination buffer
+     */
+    public static void append(int magic, ByteBuffer payload,
+                              ByteBuffer destination) {
+        int position = destination.position();
+        destination.putInt(position + SIZE_OFFSET, payload.remaining());
+        destination.putInt(position + MAGIC_OFFSET, magic);
+        destination.putInt(position + CRC_OFFSET, Event.crc32(payload, 0));
+        payload.rewind();
+        destination.position(position + HEADER_BYTE_SIZE);
+        destination.put(payload);
+    }
+
     protected final ByteBuffer bytes;
+
+    public EventHeader() {
+        this(ByteBuffer.allocate(HEADER_BYTE_SIZE));
+    }
 
     public EventHeader(ByteBuffer bytes) {
         this.bytes = bytes;
@@ -104,6 +132,15 @@ public class EventHeader implements Cloneable {
     @Override
     public int hashCode() {
         return getCrc32();
+    }
+
+    public boolean hasRemaining() {
+        return bytes.hasRemaining();
+    }
+
+    public void initialize(int magic, ByteBuffer payload) {
+        initialize(payload.remaining(), magic, Event.crc32(payload, 0));
+        payload.rewind();
     }
 
     /**

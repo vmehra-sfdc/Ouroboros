@@ -140,7 +140,7 @@ public class Event extends EventHeader {
 
     public Event(int magic, ByteBuffer payload) {
         this(ByteBuffer.allocate(HEADER_BYTE_SIZE + payload.remaining()));
-        initialize(payload.remaining(), magic, payload);
+        initialize(magic, payload);
     }
 
     public Event(ReadableByteChannel channel) throws IOException {
@@ -164,17 +164,14 @@ public class Event extends EventHeader {
         return bytes.slice().asReadOnlyBuffer();
     }
 
+    public void transferTo(ByteBuffer buffer) {
+        buffer.put(bytes);
+    }
+
     /**
      * @return true if the payload's CRC matches the CRC in the header
      */
     public boolean validate() {
         return getCrc32() == crc32(bytes, HEADER_BYTE_SIZE);
-    }
-
-    protected void initialize(int size, int magic, ByteBuffer payload) {
-        initialize(payload.remaining(), magic, crc32(payload, 0));
-        payload.rewind();
-        bytes.position(HEADER_BYTE_SIZE);
-        bytes.put(payload);
     }
 }

@@ -55,7 +55,7 @@ public class BatchHeader {
     protected static final int TIMESTAMP_OFFSET         = CH_LSB_OFFSET + 8;
     public static final int    HEADER_SIZE              = TIMESTAMP_OFFSET + 8;
 
-    private final ByteBuffer bytes;
+    private final ByteBuffer   bytes;
 
     public BatchHeader() {
         bytes = ByteBuffer.allocate(getHeaderSize());
@@ -68,11 +68,7 @@ public class BatchHeader {
     public BatchHeader(int batchByteLength, int magic, UUID channel,
                        long timestamp) {
         this();
-        bytes.putInt(BATCH_BYTE_LENGTH_OFFSET, batchByteLength);
-        bytes.putInt(MAGIC_OFFSET, magic);
-        bytes.putLong(CH_MSB_OFFSET, channel.getMostSignificantBits());
-        bytes.putLong(CH_LSB_OFFSET, channel.getLeastSignificantBits());
-        bytes.putLong(TIMESTAMP_OFFSET, timestamp);
+        initialize(batchByteLength, magic, channel, timestamp);
     }
 
     @Override
@@ -92,6 +88,10 @@ public class BatchHeader {
      */
     public int getBatchByteLength() {
         return bytes.getInt(BATCH_BYTE_LENGTH_OFFSET);
+    }
+
+    public ByteBuffer getBytes() {
+        return bytes;
     }
 
     /**
@@ -116,6 +116,19 @@ public class BatchHeader {
     @Override
     public int hashCode() {
         return getBatchByteLength();
+    }
+
+    public boolean hasRemaining() {
+        return bytes.hasRemaining();
+    }
+
+    public void initialize(int batchByteLength, int magic, UUID channel,
+                           long timestamp) {
+        bytes.putInt(BATCH_BYTE_LENGTH_OFFSET, batchByteLength);
+        bytes.putInt(MAGIC_OFFSET, magic);
+        bytes.putLong(CH_MSB_OFFSET, channel.getMostSignificantBits());
+        bytes.putLong(CH_LSB_OFFSET, channel.getLeastSignificantBits());
+        bytes.putLong(TIMESTAMP_OFFSET, timestamp);
     }
 
     /**
@@ -162,9 +175,5 @@ public class BatchHeader {
 
     protected int getHeaderSize() {
         return HEADER_SIZE;
-    }
-
-    public ByteBuffer getBytes() {
-        return bytes;
     }
 }
