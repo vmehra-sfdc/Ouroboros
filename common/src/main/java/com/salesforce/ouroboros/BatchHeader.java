@@ -55,7 +55,7 @@ public class BatchHeader {
     protected static final int TIMESTAMP_OFFSET         = CH_LSB_OFFSET + 8;
     public static final int    HEADER_SIZE              = TIMESTAMP_OFFSET + 8;
 
-    protected final ByteBuffer bytes;
+    private final ByteBuffer bytes;
 
     public BatchHeader() {
         bytes = ByteBuffer.allocate(getHeaderSize());
@@ -73,6 +73,18 @@ public class BatchHeader {
         bytes.putLong(CH_MSB_OFFSET, channel.getMostSignificantBits());
         bytes.putLong(CH_LSB_OFFSET, channel.getLeastSignificantBits());
         bytes.putLong(TIMESTAMP_OFFSET, timestamp);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof BatchHeader) {
+            BatchHeader b = (BatchHeader) o;
+            return b.getMagic() == getMagic()
+                   && b.getBatchByteLength() == getBatchByteLength()
+                   && b.getTimestamp() == b.getTimestamp()
+                   && b.getChannel().equals(getChannel());
+        }
+        return false;
     }
 
     /**
@@ -97,6 +109,15 @@ public class BatchHeader {
         return bytes.getInt(MAGIC_OFFSET);
     }
 
+    public long getTimestamp() {
+        return bytes.getLong(TIMESTAMP_OFFSET);
+    }
+
+    @Override
+    public int hashCode() {
+        return getBatchByteLength();
+    }
+
     /**
      * Read the header from the channel
      * 
@@ -117,8 +138,11 @@ public class BatchHeader {
         bytes.rewind();
     }
 
-    public long getTimestamp() {
-        return bytes.getLong(TIMESTAMP_OFFSET);
+    @Override
+    public String toString() {
+        return String.format("BatchHeader[magic=%s, timestamp=%s, length=%s, channel=%s]",
+                             getMagic(), getTimestamp(), getBatchByteLength(),
+                             getChannel());
     }
 
     /**
@@ -138,5 +162,9 @@ public class BatchHeader {
 
     protected int getHeaderSize() {
         return HEADER_SIZE;
+    }
+
+    public ByteBuffer getBytes() {
+        return bytes;
     }
 }

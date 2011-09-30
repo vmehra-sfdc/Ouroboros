@@ -32,17 +32,15 @@ package com.salesforce.ouroboros.spindle;
  * 
  */
 public class EventEntry {
-    public final EventChannel eventChannel;
-    public final long         offset;
-    public final Segment      segment;
-    public final int          size;
+    public final EventChannel          eventChannel;
+    public final ReplicatedBatchHeader header;
+    public final Segment               segment;
 
-    public EventEntry(EventChannel eventChannel, long offset, Segment segment,
-                      int size) {
+    public EventEntry(ReplicatedBatchHeader header, EventChannel eventChannel,
+                      Segment segment) {
+        this.header = header;
         this.eventChannel = eventChannel;
-        this.offset = offset;
         this.segment = segment;
-        this.size = size;
     }
 
 }

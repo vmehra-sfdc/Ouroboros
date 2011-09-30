@@ -26,7 +26,6 @@
 package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -47,21 +46,18 @@ import com.hellblazer.pinkie.SocketChannelHandler;
  */
 public final class Duplicator {
     public enum State {
-        INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_OFFSET, ERROR;
+        INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_HEADER, ERROR;
     }
 
-    static final Logger                      log          = Logger.getLogger(Duplicator.class.getCanonicalName());
+    static final Logger                      log     = Logger.getLogger(Duplicator.class.getCanonicalName());
 
-    private volatile EventChannel            eventChannel;
     private volatile SocketChannelHandler<?> handler;
-    private volatile long                    offset;
-    private final ByteBuffer                 offsetBuffer = ByteBuffer.allocate(8);
-    private final BlockingQueue<EventEntry>  pending      = new LinkedBlockingQueue<EventEntry>();
+    private volatile EventEntry              current;
+    private final BlockingQueue<EventEntry>  pending = new LinkedBlockingQueue<EventEntry>();
     private volatile long                    position;
     private volatile int                     remaining;
-    private volatile Segment                 segment;
-    private final AtomicReference<State>     state        = new AtomicReference<State>(
-                                                                                       State.WAITING);
+    private final AtomicReference<State>     state   = new AtomicReference<State>(
+                                                                                  State.WAITING);
 
     /**
      * @return the state of the outbound replicator
@@ -77,16 +73,34 @@ public final class Duplicator {
 
     public void handleWrite(SocketChannel channel) {
         switch (state.get()) {
-            case WRITE_OFFSET: {
-                writeOffset(channel);
+            case WRITE_HEADER: {
+                writeHeader(channel);
                 break;
             }
             case WRITE: {
-                writeEvent(channel);
+                writeBatch(channel);
                 break;
             }
             default:
                 log.warning(String.format("Illegal write state: %s", state));
+        }
+    }
+
+    private void writeHeader(SocketChannel channel) {
+        boolean written = false;
+        try {
+            written = current.header.write(channel);
+        } catch (IOException e) {
+            log.log(Level.WARNING,
+                    String.format("Unable to write batch header: %s",
+                                  current.header), e);
+            error();
+        }
+        if (written) {
+            state.set(State.WRITE);
+            writeBatch(channel);
+        } else {
+            handler.selectForWrite();
         }
     }
 
@@ -98,15 +112,15 @@ public final class Duplicator {
      * @param segment
      * @param size
      */
-    public void replicate(EventChannel eventChannel, long offset,
-                          Segment segment, int size) {
-        pending.add(new EventEntry(eventChannel, offset, segment, size));
+    public void replicate(ReplicatedBatchHeader header,
+                          EventChannel eventChannel, Segment segment) {
+        pending.add(new EventEntry(header, eventChannel, segment));
         process();
     }
 
     private boolean transferTo(SocketChannel channel) throws IOException {
         long p = position;
-        int written = (int) segment.transferTo(p, remaining, channel);
+        int written = (int) current.segment.transferTo(p, remaining, channel);
         remaining = remaining - written;
         position = p + written;
         if (remaining == 0) {
@@ -115,49 +129,34 @@ public final class Duplicator {
         return false;
     }
 
-    private void writeEvent(SocketChannel channel) {
+    private void writeBatch(SocketChannel channel) {
         try {
             if (transferTo(channel)) {
                 state.set(State.WAITING);
-                eventChannel.commit(offset);
+                current.eventChannel.commit(current.header.getOffset());
                 process();
             }
         } catch (IOException e) {
             error();
             log.log(Level.WARNING,
                     String.format("Unable to replicate payload for event: %s from: %s",
-                                  offset, segment), e);
+                                  current.header.getOffset(), current.segment),
+                    e);
         }
     }
 
     private void error() {
         state.set(State.ERROR);
-        if (segment != null) {
+        if (current != null) {
             try {
-                segment.close();
+                current.segment.close();
             } catch (IOException e1) {
-                log.log(Level.FINEST,
-                        String.format("Error closing segment %s", segment),
-                        e1);
+                log.log(Level.FINEST, String.format("Error closing segment %s",
+                                                    current.segment), e1);
             }
         }
-        segment = null;
-        eventChannel = null;
+        current = null;
         pending.clear();
-    }
-
-    private void writeOffset(SocketChannel channel) {
-        try {
-            channel.write(offsetBuffer);
-        } catch (IOException e) {
-            error();
-            log.log(Level.WARNING, "Error writing offset", e);
-            return;
-        }
-        if (!offsetBuffer.hasRemaining()) {
-            state.set(State.WRITE);
-            writeEvent(channel);
-        }
     }
 
     protected void process() {
@@ -179,17 +178,13 @@ public final class Duplicator {
     }
 
     protected void process(EventEntry entry) {
-        if (!state.compareAndSet(State.PROCESSING, State.WRITE_OFFSET)) {
+        if (!state.compareAndSet(State.PROCESSING, State.WRITE_HEADER)) {
             return;
         }
-        eventChannel = entry.eventChannel;
-        offset = entry.offset;
-        segment = entry.segment;
-        remaining = entry.size;
-        position = offset;
-        offsetBuffer.clear();
-        offsetBuffer.putLong(offset);
-        offsetBuffer.flip();
+        current = entry;
+        remaining = entry.header.getBatchByteLength();
+        position = entry.header.getOffset();
+        entry.header.rewind();
         handler.selectForWrite();
     }
 }

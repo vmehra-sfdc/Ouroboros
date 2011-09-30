@@ -43,7 +43,6 @@ import org.junit.Test;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
-import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.spindle.Duplicator.State;
@@ -56,10 +55,9 @@ import com.salesforce.ouroboros.spindle.Duplicator.State;
 public class TestDuplicator {
 
     private class Reader implements Runnable {
-        private final SocketChannel inbound;
-        private final ByteBuffer    offsetBuffer = ByteBuffer.allocate(8);
-        long                        offset       = -1;
-        final ByteBuffer            replicated;
+        private final SocketChannel         inbound;
+        private final ReplicatedBatchHeader header = new ReplicatedBatchHeader();
+        final ByteBuffer                    replicated;
 
         public Reader(final SocketChannel inbound, final int payloadLength) {
             super();
@@ -71,7 +69,7 @@ public class TestDuplicator {
         @Override
         public void run() {
             try {
-                readOffset();
+                readHeader();
                 for (inbound.read(replicated); replicated.hasRemaining(); inbound.read(replicated)) {
                     try {
                         Thread.sleep(10);
@@ -85,17 +83,15 @@ public class TestDuplicator {
             replicated.flip();
         }
 
-        private void readOffset() {
+        private void readHeader() {
             try {
-                for (inbound.read(offsetBuffer); offsetBuffer.hasRemaining(); inbound.read(offsetBuffer)) {
+                for (boolean read = header.read(inbound); !read; read = header.read(inbound)) {
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {
                         return;
                     }
                 }
-                offsetBuffer.flip();
-                offset = offsetBuffer.getLong();
             } catch (IOException e) {
                 throw new IllegalStateException(e);
             }
@@ -111,15 +107,13 @@ public class TestDuplicator {
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
-        long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        BatchHeader batchHeader = new BatchHeader(payload.length, magic,
-                                                  channel, timestamp);
+        Event event = new Event(magic, payloadBuffer);
         EventChannel eventChannel = mock(EventChannel.class);
 
-        batchHeader.rewind();
-        batchHeader.write(segment);
+        event.rewind();
+        event.write(segment);
         segment.write(payloadBuffer);
         segment.force(false);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
@@ -156,9 +150,14 @@ public class TestDuplicator {
                 return State.WAITING == replicator.getState();
             }
         }, 1000L, 100L);
-        replicator.replicate(eventChannel, 0, segment,
-                             batchHeader.getBatchByteLength());
-        assertEquals(State.WRITE_OFFSET, replicator.getState());
+        replicator.replicate(new ReplicatedBatchHeader(
+                                                       event.totalSize(),
+                                                       magic,
+                                                       channel,
+                                                       System.currentTimeMillis(),
+                                                       0), eventChannel,
+                             segment);
+        assertEquals(State.WRITE_HEADER, replicator.getState());
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
 
             @Override
@@ -169,10 +168,11 @@ public class TestDuplicator {
         }, 1000L, 100L);
         inboundRead.join(4000);
         assertTrue(reader.replicated.hasRemaining());
-        assertEquals(0, reader.offset);
+        assertEquals(0, reader.header.getOffset());
         Event replicatedEvent = new Event(reader.replicated);
-        assertEquals(batchHeader.getBatchByteLength(), replicatedEvent.size());
-        assertEquals(batchHeader.getMagic(), replicatedEvent.getMagic());
+        assertEquals(event.size(), replicatedEvent.size());
+        assertEquals(event.getMagic(), replicatedEvent.getMagic());
+        assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
         verify(eventChannel).commit(0);
     }
@@ -199,18 +199,21 @@ public class TestDuplicator {
         long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        BatchHeader batchHeader = new BatchHeader(payload.length, magic,
-                                                  channel, timestamp);
+        Event event = new Event(magic, payloadBuffer);
+        ReplicatedBatchHeader batchHeader = new ReplicatedBatchHeader(
+                                                                      event.totalSize(),
+                                                                      magic,
+                                                                      channel,
+                                                                      timestamp,
+                                                                      0);
 
-        batchHeader.rewind();
-        batchHeader.write(outboundSegment);
-        outboundSegment.write(payloadBuffer);
+        event.rewind();
+        event.write(outboundSegment);
         outboundSegment.force(false);
         long offset = 0L;
 
         when(inboundBundle.eventChannelFor(channel)).thenReturn(inboundEventChannel);
         when(inboundEventChannel.segmentFor(offset)).thenReturn(inboundSegment);
-        when(inboundEventChannel.isNextAppend(offset)).thenReturn(true);
 
         final Duplicator outboundDuplicator = new Duplicator();
         assertEquals(State.WAITING, outboundDuplicator.getState());
@@ -234,13 +237,13 @@ public class TestDuplicator {
 
         inboundReplicator.handleAccept(inbound, handler);
         inboundReplicator.handleRead(inbound);
-        assertEquals(AbstractAppender.State.APPEND,
+        assertEquals(AbstractAppender.State.READ_BATCH_HEADER,
                      inboundReplicator.getState());
 
         Runnable reader = new Runnable() {
             @Override
             public void run() {
-                while (AbstractAppender.State.ACCEPTED != inboundReplicator.getState()) {
+                while (AbstractAppender.State.READY != inboundReplicator.getState()) {
                     inboundReplicator.handleRead(inbound);
                     try {
                         Thread.sleep(1);
@@ -254,9 +257,9 @@ public class TestDuplicator {
         inboundRead.start();
 
         outboundDuplicator.handleConnect(outbound, handler);
-        outboundDuplicator.replicate(eventChannel, 0, outboundSegment,
-                                     batchHeader.getBatchByteLength());
-        assertEquals(State.WRITE_OFFSET, outboundDuplicator.getState());
+        outboundDuplicator.replicate(new ReplicatedBatchHeader(batchHeader, 0),
+                                     eventChannel, outboundSegment);
+        assertEquals(State.WRITE_HEADER, outboundDuplicator.getState());
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
             public boolean value() {
@@ -266,8 +269,7 @@ public class TestDuplicator {
         }, 1000L, 100L);
         inboundRead.join(4000);
 
-        assertEquals(AbstractAppender.State.ACCEPTED,
-                     inboundReplicator.getState());
+        assertEquals(AbstractAppender.State.READY, inboundReplicator.getState());
 
         inboundSegment.close();
         outboundSegment.close();
@@ -275,8 +277,9 @@ public class TestDuplicator {
         Segment segment = new Segment(inboundTmpFile);
         assertTrue("Nothing written to inbound segment", segment.size() > 0);
         Event replicatedEvent = new Event(segment);
-        assertEquals(batchHeader.getBatchByteLength(), replicatedEvent.size());
-        assertEquals(batchHeader.getMagic(), replicatedEvent.getMagic());
+        assertEquals(event.size(), replicatedEvent.size());
+        assertEquals(event.getMagic(), replicatedEvent.getMagic());
+        assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
     }
 }

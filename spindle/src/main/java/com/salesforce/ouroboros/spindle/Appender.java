@@ -64,7 +64,8 @@ public class Appender extends AbstractAppender implements CommunicationsHandler 
 
     @Override
     protected void commit() {
-        eventChannel.append(batchHeader, offset, segment);
+        eventChannel.append(new ReplicatedBatchHeader(batchHeader, offset),
+                            segment);
     }
 
     @Override

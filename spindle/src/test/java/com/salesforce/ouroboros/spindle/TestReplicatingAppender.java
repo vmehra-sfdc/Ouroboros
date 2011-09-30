@@ -43,7 +43,6 @@ import org.junit.Test;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
-import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 
 /**
@@ -63,19 +62,18 @@ public class TestReplicatingAppender {
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
-        ByteBuffer offsetBuffer = ByteBuffer.allocate(8);
-        long offset = 0L;
-        offsetBuffer.putLong(offset);
-        offsetBuffer.flip();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        BatchHeader header = new BatchHeader(payload.length, magic, channel,
-                                             timestamp);
+        Event event = new Event(magic, payloadBuffer);
+        ReplicatedBatchHeader header = new ReplicatedBatchHeader(
+                                                                 event.totalSize(),
+                                                                 magic,
+                                                                 channel,
+                                                                 timestamp, 0);
         payloadBuffer.clear();
         EventChannel eventChannel = mock(EventChannel.class);
         Bundle bundle = mock(Bundle.class);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
-        when(eventChannel.segmentFor(offset)).thenReturn(segment);
-        when(eventChannel.isNextAppend(offset)).thenReturn(true);
+        when(eventChannel.segmentFor(header.getOffset())).thenReturn(segment);
         SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
 
         final ReplicatingAppender replicator = new ReplicatingAppender(bundle);
@@ -99,14 +97,15 @@ public class TestReplicatingAppender {
         inbound.configureBlocking(false);
 
         replicator.handleAccept(inbound, handler);
-        assertEquals(AbstractAppender.State.ACCEPTED, replicator.getState());
+        assertEquals(AbstractAppender.State.READY, replicator.getState());
         replicator.handleRead(inbound);
-        assertEquals(AbstractAppender.State.APPEND, replicator.getState());
+        assertEquals(AbstractAppender.State.READ_BATCH_HEADER,
+                     replicator.getState());
 
         Runnable reader = new Runnable() {
             @Override
             public void run() {
-                while (AbstractAppender.State.ACCEPTED != replicator.getState()) {
+                while (AbstractAppender.State.READY != replicator.getState()) {
                     replicator.handleRead(inbound);
                     try {
                         Thread.sleep(10);
@@ -118,16 +117,18 @@ public class TestReplicatingAppender {
         };
         Thread inboundRead = new Thread(reader, "Inbound read thread");
         inboundRead.start();
-        outbound.write(offsetBuffer);
+        header.rewind();
         header.write(outbound);
-        outbound.write(payloadBuffer);
+        event.rewind();
+        event.write(outbound);
         inboundRead.join(4000);
-        assertEquals(AbstractAppender.State.ACCEPTED, replicator.getState());
+        assertEquals(AbstractAppender.State.READY, replicator.getState());
 
         segment = new Segment(tmpFile);
         Event replicatedEvent = new Event(segment);
-        assertEquals(header.getBatchByteLength(), replicatedEvent.size());
-        assertEquals(header.getMagic(), replicatedEvent.getMagic());
+        assertEquals(event.size(), replicatedEvent.size());
+        assertEquals(event.getMagic(), replicatedEvent.getMagic());
+        assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
         verify(eventChannel).append(eq(header), eq(0L));
     }

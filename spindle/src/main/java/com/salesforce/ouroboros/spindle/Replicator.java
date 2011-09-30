@@ -198,9 +198,9 @@ public class Replicator implements CommunicationsHandler {
         }
     }
 
-    public void replicate(EventChannel eventChannel, long offset,
-                          Segment segment, int totalSize) {
-        duplicator.replicate(eventChannel, offset, segment, totalSize);
+    public void replicate(ReplicatedBatchHeader header, EventChannel channel,
+                          Segment segment) {
+        duplicator.replicate(header, channel, segment);
     }
 
     private void writeHandshake(SocketChannel channel) {

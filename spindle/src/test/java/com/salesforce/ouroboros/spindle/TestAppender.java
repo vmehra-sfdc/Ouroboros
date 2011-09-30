@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.spindle;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -44,8 +45,6 @@ import java.util.UUID;
 
 import org.junit.Test;
 import org.mockito.internal.verification.Times;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
@@ -79,22 +78,21 @@ public class TestAppender {
         inbound.configureBlocking(false);
 
         appender.handleAccept(inbound, handler);
-        assertEquals(State.ACCEPTED, appender.getState());
+        assertEquals(State.READY, appender.getState());
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        BatchHeader header = new BatchHeader(payload.length, magic, channel,
+        Event event = new Event(magic, payloadBuffer);
+        BatchHeader header = new BatchHeader(event.totalSize(), magic, channel,
                                              timestamp);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,
                                                                                0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(false);
-        long offset = 0L;
-        when(eventChannel.nextOffset()).thenReturn(offset);
         header.rewind();
         header.write(outbound);
 
@@ -106,13 +104,14 @@ public class TestAppender {
             }
         }, 1000, 100);
 
-        outbound.write(payloadBuffer);
+        event.rewind();
+        event.write(outbound);
 
         Util.waitFor("Payload has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
                 appender.handleRead(inbound);
-                return appender.getState() == State.ACCEPTED;
+                return appender.getState() == State.READY;
             }
         }, 1000, 100);
 
@@ -122,22 +121,22 @@ public class TestAppender {
 
         FileInputStream fis = new FileInputStream(tmpFile);
         FileChannel readSegment = fis.getChannel();
-        Event event = new Event(readSegment);
+        Event inboundEvent = new Event(readSegment);
         readSegment.close();
-        assertTrue(event.validate());
-        assertEquals(magic, event.getMagic());
-        assertEquals(payload.length, event.size());
-        ByteBuffer writtenPayload = event.getPayload();
+        assertTrue(inboundEvent.validate());
+        assertEquals(magic, inboundEvent.getMagic());
+        assertEquals(payload.length, inboundEvent.size());
+        ByteBuffer writtenPayload = inboundEvent.getPayload();
         for (byte b : payload) {
             assertEquals(b, writtenPayload.get());
         }
 
         verify(handler, new Times(3)).selectForRead();
         verify(bundle).eventChannelFor(channel);
-        verify(eventChannel).append(header, offset, writeSegment);
+        verify(eventChannel).append(isA(ReplicatedBatchHeader.class),
+                                    eq(writeSegment));
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
-        verify(eventChannel).nextOffset();
         verifyNoMoreInteractions(handler, bundle, eventChannel);
     }
 
@@ -160,26 +159,21 @@ public class TestAppender {
         inbound.configureBlocking(false);
 
         appender.handleAccept(inbound, handler);
-        assertEquals(State.ACCEPTED, appender.getState());
+        assertEquals(State.READY, appender.getState());
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        BatchHeader header = new BatchHeader(payload.length, magic, channel,
+        Event event = new Event(magic, payloadBuffer);
+        BatchHeader header = new BatchHeader(event.totalSize(), magic, channel,
                                              timestamp);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,
                                                                                0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(true);
-        when(eventChannel.nextOffset()).thenAnswer(new Answer<Long>() {
-            @Override
-            public Long answer(InvocationOnMock invocation) throws Throwable {
-                return writeSegment.size();
-            }
-        });
         header.rewind();
         header.write(outbound);
 
@@ -191,13 +185,14 @@ public class TestAppender {
             }
         }, 1000, 100);
 
-        outbound.write(payloadBuffer);
+        event.rewind();
+        event.write(outbound);
 
         Util.waitFor("Payload has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
                 appender.handleRead(inbound);
-                return appender.getState() == State.ACCEPTED;
+                return appender.getState() == State.READY;
             }
         }, 1000, 100);
 
@@ -210,7 +205,6 @@ public class TestAppender {
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
-        verify(eventChannel).nextOffset();
         verifyNoMoreInteractions(handler, bundle, eventChannel);
     };
 }

@@ -46,7 +46,7 @@ import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
  */
 abstract public class AbstractAppender {
     public enum State {
-        ACCEPTED, APPEND, DEV_NULL, ERROR, INITIALIZED, READ_BATCH_HEADER;
+        APPEND, DEV_NULL, ERROR, INITIALIZED, READ_BATCH_HEADER, READY;
     }
 
     private static final Logger                log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
@@ -78,7 +78,7 @@ abstract public class AbstractAppender {
         if (log.isLoggable(Level.FINER)) {
             log.finer("ACCEPT");
         }
-        state = State.ACCEPTED;
+        state = State.READY;
         this.handler = handler;
         this.handler.selectForRead();
     }
@@ -88,7 +88,7 @@ abstract public class AbstractAppender {
             log.finer(String.format("READ, state=%s", state));
         }
         switch (state) {
-            case ACCEPTED: {
+            case READY: {
                 initialRead(channel);
                 break;
             }
@@ -157,7 +157,7 @@ abstract public class AbstractAppender {
             }
             commit();
             segment = null;
-            state = State.ACCEPTED;
+            state = State.READY;
         }
     }
 
@@ -178,7 +178,7 @@ abstract public class AbstractAppender {
         remaining -= read;
         if (remaining == 0) {
             devNull = null;
-            state = State.ACCEPTED;
+            state = State.READY;
         }
     }
 
@@ -196,6 +196,8 @@ abstract public class AbstractAppender {
         eventChannel = null;
         devNull = null;
     }
+
+    abstract protected AppendSegment getLogicalSegment();
 
     protected void initialRead(SocketChannel channel) {
         batchHeader.rewind();
@@ -226,7 +228,7 @@ abstract public class AbstractAppender {
             }
             AppendSegment logicalSegment = getLogicalSegment();
             segment = logicalSegment.segment;
-            position = logicalSegment.offset;
+            offset = position = logicalSegment.offset;
             remaining = batchHeader.getBatchByteLength();
             if (eventChannel.isDuplicate(batchHeader)) {
                 log.warning(String.format("Duplicate event batch %s",
@@ -234,10 +236,8 @@ abstract public class AbstractAppender {
                 drain(channel);
                 return;
             }
-            append(channel);
             state = State.APPEND;
+            append(channel);
         }
     }
-
-    abstract protected AppendSegment getLogicalSegment();
 }

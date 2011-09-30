@@ -37,7 +37,11 @@ import com.salesforce.ouroboros.BatchHeader;
  */
 public class ReplicatedBatchHeader extends BatchHeader {
     private static final int BATCH_OFFSET_OFFSET = BatchHeader.HEADER_SIZE;
-    public static final int  HEADER_SIZE         = BATCH_OFFSET_OFFSET + 4;
+    public static final int  HEADER_SIZE         = BATCH_OFFSET_OFFSET + 8;
+
+    public ReplicatedBatchHeader(BatchHeader header, long offset) {
+        this(fromBatchHeader(header.getBytes(), offset));
+    }
 
     public ReplicatedBatchHeader() {
         super();
@@ -50,11 +54,21 @@ public class ReplicatedBatchHeader extends BatchHeader {
     public ReplicatedBatchHeader(int batchByteLength, int magic, UUID channel,
                                  long timestamp, long batchOffset) {
         super(batchByteLength, magic, channel, timestamp);
-        bytes.putLong(BATCH_OFFSET_OFFSET, batchOffset);
+        getBytes().putLong(BATCH_OFFSET_OFFSET, batchOffset);
+    }
+
+    private static ByteBuffer fromBatchHeader(ByteBuffer headerBytes,
+                                              long offset) {
+        headerBytes.rewind();
+        ByteBuffer replicatedHeader = ByteBuffer.allocate(HEADER_SIZE);
+        replicatedHeader.put(headerBytes);
+        replicatedHeader.putLong(BATCH_OFFSET_OFFSET, offset);
+        replicatedHeader.rewind();
+        return replicatedHeader;
     }
 
     public long getOffset() {
-        return bytes.getLong(BATCH_OFFSET_OFFSET);
+        return getBytes().getLong(BATCH_OFFSET_OFFSET);
     }
 
     /* (non-Javadoc)
@@ -63,5 +77,21 @@ public class ReplicatedBatchHeader extends BatchHeader {
     @Override
     protected int getHeaderSize() {
         return HEADER_SIZE;
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.BatchHeader#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof ReplicatedBatchHeader) {
+            ReplicatedBatchHeader b = (ReplicatedBatchHeader) o;
+            return b.getMagic() == getMagic()
+                   && b.getBatchByteLength() == getBatchByteLength()
+                   && b.getTimestamp() == b.getTimestamp()
+                   && b.getOffset() == getOffset()
+                   && b.getChannel().equals(getChannel());
+        }
+        return false;
     }
 }

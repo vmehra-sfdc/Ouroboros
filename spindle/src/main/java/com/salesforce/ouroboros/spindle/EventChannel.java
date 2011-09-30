@@ -175,10 +175,9 @@ public class EventChannel {
      * @param offset
      * @param segment
      */
-    public void append(BatchHeader batchHeader, long offset, Segment segment) {
-        append(batchHeader, offset);
-        replicator.replicate(this, offset, segment,
-                             batchHeader.getBatchByteLength());
+    public void append(ReplicatedBatchHeader batchHeader, Segment segment) {
+        append(batchHeader, batchHeader.getOffset());
+        replicator.replicate(batchHeader, this, segment);
     }
 
     /**
@@ -270,23 +269,8 @@ public class EventChannel {
         return role == Role.MIRROR;
     }
 
-    /**
-     * Answer true if the offset is the next append offset of the channel
-     * 
-     * @param offset
-     *            - the event offset
-     * @return true if the event channel's append offset is equal to the offset
-     */
-    public boolean isNextAppend(long offset) {
-        return nextOffset == offset;
-    }
-
     public boolean isPrimary() {
         return role == Role.PRIMARY;
-    }
-
-    public long nextOffset() {
-        return nextOffset;
     }
 
     public AppendSegment segmentFor(BatchHeader batchHeader) {
