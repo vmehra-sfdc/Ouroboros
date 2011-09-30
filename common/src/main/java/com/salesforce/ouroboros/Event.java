@@ -164,6 +164,14 @@ public class Event extends EventHeader {
         return bytes.slice().asReadOnlyBuffer();
     }
 
+    @Override
+    public void initialize(int magic, ByteBuffer payload) {
+        initialize(payload.remaining(), magic, crc32(payload, 0));
+        payload.rewind();
+        bytes.position(HEADER_BYTE_SIZE);
+        bytes.put(payload);
+    }
+
     public void transferTo(ByteBuffer buffer) {
         buffer.put(bytes);
     }
