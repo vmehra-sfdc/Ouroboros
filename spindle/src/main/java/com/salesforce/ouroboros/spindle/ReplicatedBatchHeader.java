@@ -36,7 +36,7 @@ import com.salesforce.ouroboros.BatchHeader;
  * 
  */
 public class ReplicatedBatchHeader extends BatchHeader {
-    private static final int BATCH_OFFSET_OFFSET = BatchHeader.HEADER_SIZE;
+    private static final int BATCH_OFFSET_OFFSET = BatchHeader.HEADER_BYTE_SIZE;
     public static final int  HEADER_SIZE         = BATCH_OFFSET_OFFSET + 8;
 
     public ReplicatedBatchHeader(BatchHeader header, long offset) {

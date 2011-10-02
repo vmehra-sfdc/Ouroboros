@@ -53,7 +53,7 @@ public class BatchHeader {
     protected static final int CH_MSB_OFFSET            = MAGIC_OFFSET + 4;
     protected static final int CH_LSB_OFFSET            = CH_MSB_OFFSET + 8;
     protected static final int TIMESTAMP_OFFSET         = CH_LSB_OFFSET + 8;
-    public static final int    HEADER_SIZE              = TIMESTAMP_OFFSET + 8;
+    public static final int    HEADER_BYTE_SIZE              = TIMESTAMP_OFFSET + 8;
 
     private final ByteBuffer   bytes;
 
@@ -174,6 +174,6 @@ public class BatchHeader {
     }
 
     protected int getHeaderSize() {
-        return HEADER_SIZE;
+        return HEADER_BYTE_SIZE;
     }
 }

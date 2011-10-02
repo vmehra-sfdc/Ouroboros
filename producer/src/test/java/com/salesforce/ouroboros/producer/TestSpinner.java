@@ -25,9 +25,27 @@
  */
 package com.salesforce.ouroboros.producer;
 
+import static junit.framework.Assert.assertEquals;
+import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import java.util.Arrays;
+import java.util.UUID;
+
 import org.junit.Test;
-import static junit.framework.Assert.*;
-import static org.mockito.Mockito.*;
+import org.mockito.internal.verification.Times;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+
+import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.Event;
+import com.salesforce.ouroboros.EventHeader;
+import com.salesforce.ouroboros.producer.Spinner.State;
 
 /**
  * 
@@ -37,7 +55,98 @@ import static org.mockito.Mockito.*;
 public class TestSpinner {
 
     @Test
-    public void testBatching() {
+    public void testBatching() throws Exception {
+        final String[] events = new String[] { "Give me Slack",
+                "or give me food", "or kill me" };
+        ByteBuffer[] payloads = new ByteBuffer[] {
+                ByteBuffer.wrap(events[0].getBytes()),
+                ByteBuffer.wrap(events[1].getBytes()),
+                ByteBuffer.wrap(events[2].getBytes()) };
+        final int[] crc32 = new int[] { Event.crc32(events[0].getBytes()),
+                Event.crc32(events[1].getBytes()),
+                Event.crc32(events[2].getBytes()) };
+        long timestamp = System.currentTimeMillis();
+        final UUID channel = UUID.randomUUID();
+        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
+        SocketChannel outbound = mock(SocketChannel.class);
+
         Spinner spinner = new Spinner();
+        assertEquals(State.INITIALIZED, spinner.getState());
+        spinner.handleConnect(outbound, handler);
+        assertEquals(State.WAITING, spinner.getState());
+        spinner.push(new Batch(channel, timestamp, Arrays.asList(payloads)));
+        assertEquals(State.WRITE_BATCH_HEADER, spinner.getState());
+        Answer<Integer> readBatchHeader = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                BatchHeader header = new BatchHeader(buffer);
+                assertEquals(channel, header.getChannel());
+                return BatchHeader.HEADER_BYTE_SIZE;
+            }
+        };
+        Answer<Integer> readEventHeader0 = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                EventHeader header = new EventHeader(buffer);
+                assertEquals(events[0].getBytes(), header.size());
+                assertEquals(crc32[0], header.getCrc32());
+                return EventHeader.HEADER_BYTE_SIZE;
+            }
+        };
+        Answer<Integer> readPayload0 = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                byte[] b = new byte[events[0].getBytes().length];
+                assertEquals(b.length, buffer.get(b, 0, b.length));
+                assertEquals(events[0], new String(b));
+                return b.length;
+            }
+        };
+        Answer<Integer> readEventHeader1 = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                EventHeader header = new EventHeader(buffer);
+                assertEquals(events[1].getBytes(), header.size());
+                assertEquals(crc32[1], header.getCrc32());
+                return EventHeader.HEADER_BYTE_SIZE;
+            }
+        };
+        Answer<Integer> readPayload1 = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                byte[] b = new byte[events[1].getBytes().length];
+                assertEquals(b.length, buffer.get(b, 1, b.length));
+                assertEquals(events[1], new String(b));
+                return b.length;
+            }
+        };
+        Answer<Integer> readEventHeader2 = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                EventHeader header = new EventHeader(buffer);
+                assertEquals(events[2].getBytes(), header.size());
+                assertEquals(crc32[2], header.getCrc32());
+                return EventHeader.HEADER_BYTE_SIZE;
+            }
+        };
+        Answer<Integer> readPayload2 = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                byte[] b = new byte[events[2].getBytes().length];
+                assertEquals(b.length, buffer.get(b, 2, b.length));
+                assertEquals(events[2], new String(b));
+                return b.length;
+            }
+        };
+        when(outbound.write(isA(ByteBuffer.class))).thenAnswer(readBatchHeader).thenAnswer(readEventHeader0).thenAnswer(readPayload0).thenAnswer(readEventHeader1).thenAnswer(readPayload1).thenAnswer(readEventHeader2).thenAnswer(readPayload2);
+        spinner.handleWrite(outbound);
+        verify(outbound, new Times(7)).write(isA(ByteBuffer.class));
     }
 }

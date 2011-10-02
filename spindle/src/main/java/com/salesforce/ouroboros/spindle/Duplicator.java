@@ -46,18 +46,22 @@ import com.hellblazer.pinkie.SocketChannelHandler;
  */
 public final class Duplicator {
     public enum State {
-        INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_HEADER, ERROR;
+        ERROR, INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_HEADER;
     }
 
-    static final Logger                      log     = Logger.getLogger(Duplicator.class.getCanonicalName());
+    static final Logger                      log          = Logger.getLogger(Duplicator.class.getCanonicalName());
 
-    private volatile SocketChannelHandler<?> handler;
+    private static final int                 POLL_TIMEOUT = 10;
+
+    private static final TimeUnit            POLL_UNIT    = TimeUnit.MILLISECONDS;
+
     private volatile EventEntry              current;
-    private final BlockingQueue<EventEntry>  pending = new LinkedBlockingQueue<EventEntry>();
+    private volatile SocketChannelHandler<?> handler;
+    private final BlockingQueue<EventEntry>  pending      = new LinkedBlockingQueue<EventEntry>();
     private volatile long                    position;
     private volatile int                     remaining;
-    private final AtomicReference<State>     state   = new AtomicReference<State>(
-                                                                                  State.WAITING);
+    private final AtomicReference<State>     state        = new AtomicReference<State>(
+                                                                                       State.WAITING);
 
     /**
      * @return the state of the outbound replicator
@@ -86,24 +90,6 @@ public final class Duplicator {
         }
     }
 
-    private void writeHeader(SocketChannel channel) {
-        boolean written = false;
-        try {
-            written = current.header.write(channel);
-        } catch (IOException e) {
-            log.log(Level.WARNING,
-                    String.format("Unable to write batch header: %s",
-                                  current.header), e);
-            error();
-        }
-        if (written) {
-            state.set(State.WRITE);
-            writeBatch(channel);
-        } else {
-            handler.selectForWrite();
-        }
-    }
-
     /**
      * Replicate the event to the mirror
      * 
@@ -116,6 +102,49 @@ public final class Duplicator {
                           EventChannel eventChannel, Segment segment) {
         pending.add(new EventEntry(header, eventChannel, segment));
         process();
+    }
+
+    private void error() {
+        state.set(State.ERROR);
+        if (current != null) {
+            try {
+                current.segment.close();
+            } catch (IOException e1) {
+                log.log(Level.FINEST, String.format("Error closing segment %s",
+                                                    current.segment), e1);
+            }
+        }
+        current = null;
+        pending.clear();
+    }
+
+    private void process() {
+        if (!state.compareAndSet(State.WAITING, State.PROCESSING)) {
+            return;
+        }
+        EventEntry entry;
+        try {
+            entry = pending.poll(POLL_TIMEOUT, POLL_UNIT);
+        } catch (InterruptedException e) {
+            state.set(State.INTERRUPTED);
+            return;
+        }
+        if (entry == null) {
+            state.compareAndSet(State.PROCESSING, State.WAITING);
+            return;
+        }
+        process(entry);
+    }
+
+    private void process(EventEntry entry) {
+        if (!state.compareAndSet(State.PROCESSING, State.WRITE_HEADER)) {
+            return;
+        }
+        current = entry;
+        remaining = entry.header.getBatchByteLength();
+        position = entry.header.getOffset();
+        entry.header.rewind();
+        handler.selectForWrite();
     }
 
     private boolean transferTo(SocketChannel channel) throws IOException {
@@ -145,46 +174,21 @@ public final class Duplicator {
         }
     }
 
-    private void error() {
-        state.set(State.ERROR);
-        if (current != null) {
-            try {
-                current.segment.close();
-            } catch (IOException e1) {
-                log.log(Level.FINEST, String.format("Error closing segment %s",
-                                                    current.segment), e1);
-            }
-        }
-        current = null;
-        pending.clear();
-    }
-
-    protected void process() {
-        if (!state.compareAndSet(State.WAITING, State.PROCESSING)) {
-            return;
-        }
-        EventEntry entry;
+    private void writeHeader(SocketChannel channel) {
+        boolean written = false;
         try {
-            entry = pending.poll(10, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            state.set(State.INTERRUPTED);
-            return;
+            written = current.header.write(channel);
+        } catch (IOException e) {
+            log.log(Level.WARNING,
+                    String.format("Unable to write batch header: %s",
+                                  current.header), e);
+            error();
         }
-        if (entry == null) {
-            state.compareAndSet(State.PROCESSING, State.WAITING);
-            return;
+        if (written) {
+            state.set(State.WRITE);
+            writeBatch(channel);
+        } else {
+            handler.selectForWrite();
         }
-        process(entry);
-    }
-
-    protected void process(EventEntry entry) {
-        if (!state.compareAndSet(State.PROCESSING, State.WRITE_HEADER)) {
-            return;
-        }
-        current = entry;
-        remaining = entry.header.getBatchByteLength();
-        position = entry.header.getOffset();
-        entry.header.rewind();
-        handler.selectForWrite();
     }
 }

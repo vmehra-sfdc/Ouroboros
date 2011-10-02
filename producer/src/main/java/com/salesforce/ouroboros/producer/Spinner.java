@@ -30,8 +30,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Deque;
 import java.util.LinkedList;
-import java.util.List;
-import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -49,23 +50,29 @@ import com.salesforce.ouroboros.EventHeader;
  */
 public class Spinner {
     public enum State {
-        CLOSED, ERROR, READY, WRITE_PAYLOAD, WRITE_BATCH_HEADER,
-        WRITE_EVENT_HEADER;
+        CLOSED, ERROR, INTERRUPTED, PROCESSING, WAITING, WRITE_BATCH_HEADER,
+        WRITE_EVENT_HEADER, WRITE_PAYLOAD, INITIALIZED;
     }
 
-    private static final Logger                                            log         = Logger.getLogger(Spinner.class.getCanonicalName());
-    private static final int                                               MAGIC       = 0x1638;
+    private static final Logger                                            log          = Logger.getLogger(Spinner.class.getCanonicalName());
+    private static final int                                               MAGIC        = 0x1638;
+    private static final int                                               POLL_TIMEOUT = 10;
+    private static final TimeUnit                                          POLL_UNIT    = TimeUnit.MILLISECONDS;
 
-    private final Deque<ByteBuffer>                                        batch       = new LinkedList<ByteBuffer>();
+    private final Deque<ByteBuffer>                                        batch        = new LinkedList<ByteBuffer>();
+    private final BatchHeader                                              batchHeader  = new BatchHeader();
     private volatile SocketChannelHandler<? extends CommunicationsHandler> handler;
-    private final BatchHeader                                              batchHeader = new BatchHeader();
-    private final EventHeader                                              header      = new EventHeader();
-    private final AtomicReference<State>                                   state       = new AtomicReference<State>();
+    private final EventHeader                                              header       = new EventHeader();
+    private final BlockingQueue<Batch>                                     pending      = new LinkedBlockingQueue<Batch>();
+    private final AtomicReference<State>                                   state        = new AtomicReference<State>(
+                                                                                                                     State.INITIALIZED);
 
     public void closing(SocketChannel channel) {
         if (state.get() != State.ERROR) {
             state.set(State.CLOSED);
         }
+        pending.clear();
+        batch.clear();
     }
 
     public State getState() {
@@ -75,6 +82,8 @@ public class Spinner {
     public void handleConnect(SocketChannel channel,
                               SocketChannelHandler<? extends CommunicationsHandler> handler) {
         this.handler = handler;
+        state.set(State.WAITING);
+        process();
     }
 
     public void handleWrite(SocketChannel channel) {
@@ -97,10 +106,63 @@ public class Spinner {
         }
     }
 
+    public void push(Batch events) {
+        pending.add(events);
+        process();
+    }
+
+    /**
+     * Batch the events to the channel buffer
+     * 
+     * @param channel
+     *            - the unique id of the channel
+     * @param timestamp
+     *            - the timestamp used for dedup
+     * @param events
+     *            - the event payloads to batch
+     */
+    private void batch(Batch entry) {
+        if (!state.compareAndSet(State.PROCESSING, State.WRITE_BATCH_HEADER)) {
+            throw new IllegalStateException(
+                                            String.format("Cannot batch events in state %s",
+                                                          state.get()));
+        }
+        int totalSize = 0;
+        for (ByteBuffer event : entry.events) {
+            totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
+            batch.add(event);
+        }
+        batchHeader.initialize(totalSize, MAGIC, entry.channel, entry.timestamp);
+        batchHeader.rewind();
+        handler.selectForWrite();
+    }
+
     private void error() {
         handler.close();
         state.set(State.ERROR);
         batch.clear();
+        pending.clear();
+    }
+
+    /**
+     * Process a pending event batch, if available
+     */
+    private void process() {
+        if (!state.compareAndSet(State.WAITING, State.PROCESSING)) {
+            return;
+        }
+        Batch entry;
+        try {
+            entry = pending.poll(POLL_TIMEOUT, POLL_UNIT);
+        } catch (InterruptedException e) {
+            state.set(State.INTERRUPTED);
+            return;
+        }
+        if (entry == null) {
+            state.compareAndSet(State.PROCESSING, State.WAITING);
+            return;
+        }
+        batch(entry);
     }
 
     private void writeBatchHeader(SocketChannel channel) {
@@ -164,38 +226,13 @@ public class Spinner {
         if (!batch.peekFirst().hasRemaining()) {
             batch.pop();
             if (batch.isEmpty()) {
-                state.set(State.READY);
+                state.set(State.WAITING);
+                process();
             } else {
                 writeNextEventHeader(channel);
             }
         } else {
             handler.selectForWrite();
         }
-    }
-
-    /**
-     * Batch the events to the channel buffer
-     * 
-     * @param channel
-     *            - the unique id of the channel
-     * @param timestamp
-     *            - the timestamp used for dedup
-     * @param events
-     *            - the event payloads to batch
-     */
-    protected void batch(UUID channel, long timestamp, List<ByteBuffer> events) {
-        if (!state.compareAndSet(State.READY, State.WRITE_BATCH_HEADER)) {
-            throw new IllegalStateException(
-                                            String.format("Cannot batch events in state %s",
-                                                          state.get()));
-        }
-        int totalSize = 0;
-        for (ByteBuffer event : events) {
-            totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
-            batch.add(event);
-        }
-        batchHeader.initialize(totalSize, MAGIC, channel, timestamp);
-        batchHeader.rewind();
-        handler.selectForWrite();
     }
 }
