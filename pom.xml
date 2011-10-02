@@ -22,6 +22,7 @@
         <module>common</module>
         <module>spindle</module>
         <module>producer</module>
+        <module>integration-testing</module>
     </modules>
 
     <build>
