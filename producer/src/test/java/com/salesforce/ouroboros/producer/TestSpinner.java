@@ -151,6 +151,7 @@ public class TestSpinner {
         };
         when(outbound.write(isA(ByteBuffer.class))).thenAnswer(readBatchHeader).thenAnswer(readEventHeader0).thenAnswer(readPayload0).thenAnswer(readEventHeader1).thenAnswer(readPayload1).thenAnswer(readEventHeader2).thenAnswer(readPayload2);
         spinner.handleWrite(outbound);
+        assertEquals(State.WAITING, spinner.getState());
         verify(outbound, new Times(7)).write(isA(ByteBuffer.class));
     }
 }
