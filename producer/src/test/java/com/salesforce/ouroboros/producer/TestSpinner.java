@@ -82,6 +82,7 @@ public class TestSpinner {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 BatchHeader header = new BatchHeader(buffer);
                 assertEquals(channel, header.getChannel());
+                buffer.position(buffer.limit());
                 return BatchHeader.HEADER_BYTE_SIZE;
             }
         };
@@ -90,8 +91,9 @@ public class TestSpinner {
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 EventHeader header = new EventHeader(buffer);
-                assertEquals(events[0].getBytes(), header.size());
+                assertEquals(events[0].getBytes().length, header.size());
                 assertEquals(crc32[0], header.getCrc32());
+                buffer.position(buffer.limit());
                 return EventHeader.HEADER_BYTE_SIZE;
             }
         };
@@ -100,7 +102,7 @@ public class TestSpinner {
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 byte[] b = new byte[events[0].getBytes().length];
-                assertEquals(b.length, buffer.get(b, 0, b.length));
+                buffer.get(b, 0, b.length);
                 assertEquals(events[0], new String(b));
                 return b.length;
             }
@@ -110,8 +112,9 @@ public class TestSpinner {
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 EventHeader header = new EventHeader(buffer);
-                assertEquals(events[1].getBytes(), header.size());
+                assertEquals(events[1].getBytes().length, header.size());
                 assertEquals(crc32[1], header.getCrc32());
+                buffer.position(buffer.limit());
                 return EventHeader.HEADER_BYTE_SIZE;
             }
         };
@@ -120,7 +123,7 @@ public class TestSpinner {
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 byte[] b = new byte[events[1].getBytes().length];
-                assertEquals(b.length, buffer.get(b, 1, b.length));
+                buffer.get(b, 0, b.length);
                 assertEquals(events[1], new String(b));
                 return b.length;
             }
@@ -130,8 +133,9 @@ public class TestSpinner {
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 EventHeader header = new EventHeader(buffer);
-                assertEquals(events[2].getBytes(), header.size());
+                assertEquals(events[2].getBytes().length, header.size());
                 assertEquals(crc32[2], header.getCrc32());
+                buffer.position(buffer.limit());
                 return EventHeader.HEADER_BYTE_SIZE;
             }
         };
@@ -140,7 +144,7 @@ public class TestSpinner {
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 byte[] b = new byte[events[2].getBytes().length];
-                assertEquals(b.length, buffer.get(b, 2, b.length));
+                buffer.get(b, 0, b.length);
                 assertEquals(events[2], new String(b));
                 return b.length;
             }
