@@ -47,12 +47,12 @@ public class Producer {
     public Producer(ProducerConfiguration configuration) {
         controller = new RateController(
                                         new RateLimiter(
-                                                        configuration.getTargetRate(),
+                                                        configuration.getTargetEventRate(),
                                                         configuration.getTokenLimit(),
-                                                        configuration.getMinRegenerationTime()),
-                                        configuration.getMinimumRate(),
-                                        configuration.getMaximumRate(),
-                                        configuration.getWindowSize());
+                                                        configuration.getMinimumTokenRegenerationTime()),
+                                        configuration.getMinimumEventRate(),
+                                        configuration.getMaximumEventRate(),
+                                        configuration.getSampleWindowSize());
     }
 
     /**

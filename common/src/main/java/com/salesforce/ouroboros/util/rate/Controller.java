@@ -26,6 +26,8 @@
 package com.salesforce.ouroboros.util.rate;
 
 /**
+ * A controller that dynamically controls the input rate in order to meet a
+ * target throughput.
  * 
  * @author hhildebrand
  * 

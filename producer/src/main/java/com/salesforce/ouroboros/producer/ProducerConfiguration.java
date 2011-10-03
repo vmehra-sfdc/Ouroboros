@@ -31,39 +31,46 @@ package com.salesforce.ouroboros.producer;
  * 
  */
 public class ProducerConfiguration {
-    private double maximumRate;
-    private double minimumRate;
-    private int    minRegenerationTime;
-    private double targetRate;
+    private double maximumEventRate;
+    private double minimumEventRate;
+    private int    minimumTokenRegenerationTime;
+    private int    sampleWindowSize;
+    private double targetEventRate;
     private int    tokenLimit;
-    private int    windowSize;
 
     /**
-     * @return the maximumRate
+     * @return the maximumEventRate
      */
-    public double getMaximumRate() {
-        return maximumRate;
+    public double getMaximumEventRate() {
+        return maximumEventRate;
     }
 
     /**
-     * @return the minimumRate
+     * @return the minimumEventRate
      */
-    public double getMinimumRate() {
-        return minimumRate;
+    public double getMinimumEventRate() {
+        return minimumEventRate;
     }
 
     /**
-     * @return the minRegenerationTime
+     * @return the minimumTokenRegenerationTime
      */
-    public int getMinRegenerationTime() {
-        return minRegenerationTime;
+    public int getMinimumTokenRegenerationTime() {
+        return minimumTokenRegenerationTime;
     }
 
     /**
-     * @return the targetRate
+     * @return the sampleWindowSize
      */
-    public double getTargetRate() {
-        return targetRate;
+    public int getSampleWindowSize() {
+        return sampleWindowSize;
+    }
+
+    /**
+     * @return the targetEventRate
+     */
+    public double getTargetEventRate() {
+        return targetEventRate;
     }
 
     /**
@@ -74,42 +81,43 @@ public class ProducerConfiguration {
     }
 
     /**
-     * @return the windowSize
+     * @param maximumEventRate
+     *            the maximumEventRate to set
      */
-    public int getWindowSize() {
-        return windowSize;
+    public void setMaximumEventRate(double maximumEventRate) {
+        this.maximumEventRate = maximumEventRate;
     }
 
     /**
-     * @param maximumRate
-     *            the maximumRate to set
+     * @param minimumEventRate
+     *            the minimumEventRate to set
      */
-    public void setMaximumRate(double maximumRate) {
-        this.maximumRate = maximumRate;
+    public void setMinimumEventRate(double minimumEventRate) {
+        this.minimumEventRate = minimumEventRate;
     }
 
     /**
-     * @param minimumRate
-     *            the minimumRate to set
+     * @param minimumTokenRegenerationTime
+     *            the minimumTokenRegenerationTime to set
      */
-    public void setMinimumRate(double minimumRate) {
-        this.minimumRate = minimumRate;
+    public void setMinimumTokenRegenerationTime(int minimumTokenRegenerationTime) {
+        this.minimumTokenRegenerationTime = minimumTokenRegenerationTime;
     }
 
     /**
-     * @param minRegenerationTime
-     *            the minRegenerationTime to set
+     * @param sampleWindowSize
+     *            the sampleWindowSize to set
      */
-    public void setMinRegenerationTime(int minRegenerationTime) {
-        this.minRegenerationTime = minRegenerationTime;
+    public void setSampleWindowSize(int sampleWindowSize) {
+        this.sampleWindowSize = sampleWindowSize;
     }
 
     /**
-     * @param targetRate
-     *            the targetRate to set
+     * @param targetEventRate
+     *            the targetEventRate to set
      */
-    public void setTargetRate(double targetRate) {
-        this.targetRate = targetRate;
+    public void setTargetEventRate(double targetEventRate) {
+        this.targetEventRate = targetEventRate;
     }
 
     /**
@@ -118,13 +126,5 @@ public class ProducerConfiguration {
      */
     public void setTokenLimit(int tokenLimit) {
         this.tokenLimit = tokenLimit;
-    }
-
-    /**
-     * @param windowSize
-     *            the windowSize to set
-     */
-    public void setWindowSize(int windowSize) {
-        this.windowSize = windowSize;
     }
 }
