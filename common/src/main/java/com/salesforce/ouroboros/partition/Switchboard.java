@@ -48,7 +48,7 @@ import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 import org.smartfrog.services.anubis.partition.views.View;
 
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.channel.ChannelHandler;
+import com.salesforce.ouroboros.channel.ChannelMessageHandler;
 import com.salesforce.ouroboros.channel.ChannelMessage;
 
 /**
@@ -208,8 +208,8 @@ public class Switchboard {
 
     public void dispatchToMember(ChannelMessage type, Node sender,
                                  Serializable payload, long time) {
-        if (member instanceof ChannelHandler) {
-            type.dispatch((ChannelHandler) member, sender, payload, time);
+        if (member instanceof ChannelMessageHandler) {
+            type.dispatch((ChannelMessageHandler) member, sender, payload, time);
         } else {
             if (log.isLoggable(Level.FINER)) {
                 log.finer(String.format("Member ignoring channel message %s [%s]",

@@ -23,27 +23,34 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.channel;
+package com.salesforce.ouroboros.integration;
 
-import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
-import com.salesforce.ouroboros.Node;
+import org.junit.Test;
+
+import com.hellblazer.pinkie.ChannelHandler;
+import com.hellblazer.pinkie.SocketOptions;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public interface ChannelHandler {
-    void close(UUID channel, Node requester);
+public class TestSpinnerSpindle {
 
-    void mirrorClosed(UUID channel, Node mirror);
-
-    void mirrorOpened(UUID channel, Node mirror);
-
-    void open(UUID channel, Node requester);
-
-    void primaryClosed(UUID channel, Node primary);
-
-    void primaryOpened(UUID channel, Node primary);
+    @Test
+    public void testSimpleAppend() throws Exception {
+        Executor spindelExec = Executors.newSingleThreadExecutor();
+        SocketOptions socketOptions = new SocketOptions();
+        @SuppressWarnings("rawtypes")
+        ChannelHandler<?> spinnerHandler = new ChannelHandler(
+                                                              "Spinner Handler",
+                                                              socketOptions,
+                                                              spindelExec);
+        spinnerHandler.start();
+        
+        
+    }
 }

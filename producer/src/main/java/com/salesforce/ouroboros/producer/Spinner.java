@@ -50,8 +50,8 @@ import com.salesforce.ouroboros.EventHeader;
  */
 public class Spinner {
     public enum State {
-        CLOSED, ERROR, INTERRUPTED, PROCESSING, WAITING, WRITE_BATCH_HEADER,
-        WRITE_EVENT_HEADER, WRITE_PAYLOAD, INITIALIZED;
+        CLOSED, ERROR, INITIALIZED, INTERRUPTED, PROCESSING, WAITING,
+        WRITE_BATCH_HEADER, WRITE_EVENT_HEADER, WRITE_PAYLOAD;
     }
 
     private static final Logger                                            log          = Logger.getLogger(Spinner.class.getCanonicalName());
@@ -63,7 +63,7 @@ public class Spinner {
     private final BatchHeader                                              batchHeader  = new BatchHeader();
     private volatile SocketChannelHandler<? extends CommunicationsHandler> handler;
     private final EventHeader                                              header       = new EventHeader();
-    private final BlockingQueue<Batch>                                     pending      = new LinkedBlockingQueue<Batch>();
+    private final BlockingQueue<Batch>                                     queued      = new LinkedBlockingQueue<Batch>();
     private final AtomicReference<State>                                   state        = new AtomicReference<State>(
                                                                                                                      State.INITIALIZED);
 
@@ -71,7 +71,7 @@ public class Spinner {
         if (state.get() != State.ERROR) {
             state.set(State.CLOSED);
         }
-        pending.clear();
+        queued.clear();
         batch.clear();
     }
 
@@ -107,7 +107,7 @@ public class Spinner {
     }
 
     public void push(Batch events) {
-        pending.add(events);
+        queued.add(events);
         process();
     }
 
@@ -141,7 +141,7 @@ public class Spinner {
         handler.close();
         state.set(State.ERROR);
         batch.clear();
-        pending.clear();
+        queued.clear();
     }
 
     /**
@@ -153,7 +153,7 @@ public class Spinner {
         }
         Batch entry;
         try {
-            entry = pending.poll(POLL_TIMEOUT, POLL_UNIT);
+            entry = queued.poll(POLL_TIMEOUT, POLL_UNIT);
         } catch (InterruptedException e) {
             state.set(State.INTERRUPTED);
             return;

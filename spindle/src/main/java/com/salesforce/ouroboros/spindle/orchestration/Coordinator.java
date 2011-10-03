@@ -47,7 +47,7 @@ import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.channel.ChannelHandler;
+import com.salesforce.ouroboros.channel.ChannelMessageHandler;
 import com.salesforce.ouroboros.channel.ChannelMessage;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.MemberDispatch;
@@ -65,7 +65,7 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * @author hhildebrand
  * 
  */
-public class Coordinator implements Member, ChannelHandler {
+public class Coordinator implements Member, ChannelMessageHandler {
 
     private final static Logger log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     static final int            DEFAULT_TIMEOUT = 1;

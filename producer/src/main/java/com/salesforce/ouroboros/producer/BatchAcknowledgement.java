@@ -25,20 +25,28 @@
  */
 package com.salesforce.ouroboros.producer;
 
-import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.UUID;
+import java.util.SortedSet;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
+ * The state machine implementing the batch event acknowledgement protocol
  * 
  * @author hhildebrand
  * 
  */
-public class Batch extends BatchIdentity {
-    public final Collection<ByteBuffer> events;
+public class BatchAcknowledgement {
+    public enum State {
+    };
 
-    public Batch(UUID channel, long timestamp, Collection<ByteBuffer> events) {
-        super(channel, timestamp);
-        this.events = events;
+    private final SortedSet<Batch>       pending = new ConcurrentSkipListSet<Batch>();
+    private final AtomicReference<State> state   = new AtomicReference<State>();
+
+    public State getState() {
+        return state.get();
+    }
+
+    public void waitFor(Batch events) {
+        pending.add(events);
     }
 }

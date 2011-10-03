@@ -40,49 +40,49 @@ import com.salesforce.ouroboros.partition.Switchboard;
 public enum ChannelMessage implements MemberDispatch {
     CLOSE {
         @Override
-        public void dispatch(ChannelHandler handler, Node sender,
+        public void dispatch(ChannelMessageHandler handler, Node sender,
                              Serializable payload, long time) {
             handler.close((UUID) payload, sender);
         }
     },
     MIRROR_CLOSED {
         @Override
-        public void dispatch(ChannelHandler handler, Node sender,
+        public void dispatch(ChannelMessageHandler handler, Node sender,
                              Serializable payload, long time) {
             handler.mirrorClosed((UUID) payload, sender);
         }
     },
     MIRROR_OPENED {
         @Override
-        public void dispatch(ChannelHandler handler, Node sender,
+        public void dispatch(ChannelMessageHandler handler, Node sender,
                              Serializable payload, long time) {
             handler.mirrorOpened((UUID) payload, sender);
         }
     },
     OPEN {
         @Override
-        public void dispatch(ChannelHandler handler, Node sender,
+        public void dispatch(ChannelMessageHandler handler, Node sender,
                              Serializable payload, long time) {
             handler.open((UUID) payload, sender);
         }
     },
     PRIMARY_CLOSED {
         @Override
-        public void dispatch(ChannelHandler handler, Node sender,
+        public void dispatch(ChannelMessageHandler handler, Node sender,
                              Serializable payload, long time) {
             handler.primaryClosed((UUID) payload, sender);
         }
     },
     PRIMARY_OPENED {
         @Override
-        public void dispatch(ChannelHandler handler, Node sender,
+        public void dispatch(ChannelMessageHandler handler, Node sender,
                              Serializable payload, long time) {
 
             handler.primaryOpened((UUID) payload, sender);
         }
     };
 
-    abstract public void dispatch(ChannelHandler handler, Node sender,
+    abstract public void dispatch(ChannelMessageHandler handler, Node sender,
                                   Serializable payload, long time);
 
     @Override
