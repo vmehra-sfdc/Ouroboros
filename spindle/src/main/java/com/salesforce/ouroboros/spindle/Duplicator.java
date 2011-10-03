@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 
 /**
@@ -49,19 +48,19 @@ public final class Duplicator {
         ERROR, INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_HEADER;
     }
 
-    static final Logger                      log          = Logger.getLogger(Duplicator.class.getCanonicalName());
+    static final Logger                     log          = Logger.getLogger(Duplicator.class.getCanonicalName());
 
-    private static final int                 POLL_TIMEOUT = 10;
+    private static final int                POLL_TIMEOUT = 10;
 
-    private static final TimeUnit            POLL_UNIT    = TimeUnit.MILLISECONDS;
+    private static final TimeUnit           POLL_UNIT    = TimeUnit.MILLISECONDS;
 
-    private volatile EventEntry              current;
-    private volatile SocketChannelHandler<?> handler;
-    private final BlockingQueue<EventEntry>  pending      = new LinkedBlockingQueue<EventEntry>();
-    private volatile long                    position;
-    private volatile int                     remaining;
-    private final AtomicReference<State>     state        = new AtomicReference<State>(
-                                                                                       State.WAITING);
+    private volatile EventEntry             current;
+    private volatile SocketChannelHandler   handler;
+    private final BlockingQueue<EventEntry> pending      = new LinkedBlockingQueue<EventEntry>();
+    private volatile long                   position;
+    private volatile int                    remaining;
+    private final AtomicReference<State>    state        = new AtomicReference<State>(
+                                                                                      State.WAITING);
 
     /**
      * @return the state of the outbound replicator
@@ -71,7 +70,7 @@ public final class Duplicator {
     }
 
     public void handleConnect(SocketChannel channel,
-                              final SocketChannelHandler<? extends CommunicationsHandler> handler) {
+                              final SocketChannelHandler handler) {
         this.handler = handler;
     }
 

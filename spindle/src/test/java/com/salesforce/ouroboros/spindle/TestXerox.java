@@ -57,7 +57,7 @@ public class TestXerox {
         Segment segment1 = mock(Segment.class);
         Segment segment2 = mock(Segment.class);
         SocketChannel socket = mock(SocketChannel.class);
-        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Node node = new Node(0x1639, 0x1640, 0x1641);
         CountDownLatch latch = mock(CountDownLatch.class);
 

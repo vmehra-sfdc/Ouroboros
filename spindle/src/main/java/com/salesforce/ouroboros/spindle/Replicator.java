@@ -64,19 +64,19 @@ public class Replicator implements CommunicationsHandler {
         ERROR, ESTABLISHED, INITIAL, OUTBOUND_HANDSHAKE;
     }
 
-    private static final Logger              log            = Logger.getLogger(Replicator.class.getCanonicalName());
+    private static final Logger           log            = Logger.getLogger(Replicator.class.getCanonicalName());
 
-    static final int                         HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
-    static final int                         MAGIC          = 0x1638;
+    static final int                      HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
+    static final int                      MAGIC          = 0x1638;
 
-    private final ReplicatingAppender        appender;
-    private final Bundle                     bundle;
-    private final Duplicator                 duplicator;
-    private volatile SocketChannelHandler<?> handler;
-    private ByteBuffer                       handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private volatile Node                    partnerId;
-    private Rendezvous                       rendezvous;
-    private volatile State                   state          = State.INITIAL;
+    private final ReplicatingAppender     appender;
+    private final Bundle                  bundle;
+    private final Duplicator              duplicator;
+    private volatile SocketChannelHandler handler;
+    private ByteBuffer                    handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private volatile Node                 partnerId;
+    private Rendezvous                    rendezvous;
+    private volatile State                state          = State.INITIAL;
 
     public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
         duplicator = new Duplicator();
@@ -126,8 +126,7 @@ public class Replicator implements CommunicationsHandler {
     }
 
     @Override
-    public void handleAccept(SocketChannel channel,
-                             SocketChannelHandler<? extends CommunicationsHandler> handler) {
+    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
         this.handler = handler;
         switch (state) {
             case ESTABLISHED: {
@@ -151,7 +150,7 @@ public class Replicator implements CommunicationsHandler {
 
     @Override
     public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler<? extends CommunicationsHandler> handler) {
+                              SocketChannelHandler handler) {
         this.handler = handler;
         switch (state) {
             case INITIAL: {

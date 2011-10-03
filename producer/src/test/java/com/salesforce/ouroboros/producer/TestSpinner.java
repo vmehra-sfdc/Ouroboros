@@ -67,7 +67,7 @@ public class TestSpinner {
                 Event.crc32(events[2].getBytes()) };
         long timestamp = System.currentTimeMillis();
         final UUID channel = UUID.randomUUID();
-        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel outbound = mock(SocketChannel.class);
 
         Spinner spinner = new Spinner();

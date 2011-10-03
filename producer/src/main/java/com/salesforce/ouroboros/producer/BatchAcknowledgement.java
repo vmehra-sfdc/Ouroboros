@@ -25,9 +25,13 @@
  */
 package com.salesforce.ouroboros.producer;
 
+import java.nio.channels.SocketChannel;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicReference;
+
+import com.hellblazer.pinkie.CommunicationsHandler;
+import com.hellblazer.pinkie.SocketChannelHandler;
 
 /**
  * The state machine implementing the batch event acknowledgement protocol
@@ -35,7 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author hhildebrand
  * 
  */
-public class BatchAcknowledgement {
+public class BatchAcknowledgement implements CommunicationsHandler {
     public enum State {
     };
 
@@ -48,5 +52,36 @@ public class BatchAcknowledgement {
 
     public void waitFor(Batch events) {
         pending.add(events);
+    }
+
+    @Override
+    public void closing(SocketChannel channel) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void handleConnect(SocketChannel channel,
+                              SocketChannelHandler handler) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void handleRead(SocketChannel channel) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void handleWrite(SocketChannel channel) {
+        // TODO Auto-generated method stub
+
     }
 }

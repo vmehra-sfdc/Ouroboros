@@ -50,22 +50,22 @@ public class Xerox implements CommunicationsHandler {
         COPY, ERROR, FINISHED, HANDSHAKE, INITIALIZED, SEND_CLOSE, SEND_HEADER;
     }
 
-    public static final long                 MAGIC             = 0x1638L;
-    private static final int                 BUFFER_SIZE       = 8 + 8 + 8;
-    private static final int                 DEFAULT_TXFR_SIZE = 16 * 1024;
-    private static final Logger              log               = Logger.getLogger(Xerox.class.getCanonicalName());
+    public static final long              MAGIC             = 0x1638L;
+    private static final int              BUFFER_SIZE       = 8 + 8 + 8;
+    private static final int              DEFAULT_TXFR_SIZE = 16 * 1024;
+    private static final Logger           log               = Logger.getLogger(Xerox.class.getCanonicalName());
 
-    private final ByteBuffer                 buffer            = ByteBuffer.allocate(BUFFER_SIZE);
-    private final UUID                       channelId;
-    private volatile Segment                 current;
-    private volatile SocketChannelHandler<?> handler;
-    private CountDownLatch                   latch;
-    private final Node                       node;
-    private volatile long                    position;
-    private final Deque<Segment>             segments;
-    private volatile long                    segmentSize;
-    private volatile State                   state;
-    private final long                       transferSize;
+    private final ByteBuffer              buffer            = ByteBuffer.allocate(BUFFER_SIZE);
+    private final UUID                    channelId;
+    private volatile Segment              current;
+    private volatile SocketChannelHandler handler;
+    private CountDownLatch                latch;
+    private final Node                    node;
+    private volatile long                 position;
+    private final Deque<Segment>          segments;
+    private volatile long                 segmentSize;
+    private volatile State                state;
+    private final long                    transferSize;
 
     public Xerox(Node toNode, UUID channel, Deque<Segment> segments) {
         this(toNode, channel, segments, DEFAULT_TXFR_SIZE);
@@ -96,13 +96,12 @@ public class Xerox implements CommunicationsHandler {
     }
 
     @Override
-    public void handleAccept(SocketChannel channel,
-                             SocketChannelHandler<? extends CommunicationsHandler> handler) {
+    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void handleConnect(SocketChannel channel, SocketChannelHandler<? extends CommunicationsHandler> h) {
+    public void handleConnect(SocketChannel channel, SocketChannelHandler h) {
         handler = h;
         switch (state) {
             case INITIALIZED: {

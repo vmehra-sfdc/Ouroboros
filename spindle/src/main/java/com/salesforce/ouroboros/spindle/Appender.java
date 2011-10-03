@@ -53,7 +53,7 @@ public class Appender extends AbstractAppender implements CommunicationsHandler 
 
     @Override
     public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler<? extends CommunicationsHandler> handler) {
+                              SocketChannelHandler handler) {
         throw new UnsupportedOperationException();
     }
 

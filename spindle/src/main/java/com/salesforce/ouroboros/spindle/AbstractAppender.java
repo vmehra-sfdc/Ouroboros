@@ -31,7 +31,6 @@ import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
@@ -49,18 +48,18 @@ abstract public class AbstractAppender {
         APPEND, DEV_NULL, ERROR, INITIALIZED, READ_BATCH_HEADER, READY;
     }
 
-    private static final Logger                log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
+    private static final Logger             log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
 
-    protected final BatchHeader                batchHeader;
-    protected final Bundle                     bundle;
-    protected volatile ByteBuffer              devNull;
-    protected volatile EventChannel            eventChannel;
-    protected volatile SocketChannelHandler<?> handler;
-    protected volatile long                    offset   = -1L;
-    protected volatile long                    position = -1L;
-    protected volatile long                    remaining;
-    protected volatile Segment                 segment;
-    protected volatile State                   state    = State.INITIALIZED;
+    protected final BatchHeader             batchHeader;
+    protected final Bundle                  bundle;
+    protected volatile ByteBuffer           devNull;
+    protected volatile EventChannel         eventChannel;
+    protected volatile SocketChannelHandler handler;
+    protected volatile long                 offset   = -1L;
+    protected volatile long                 position = -1L;
+    protected volatile long                 remaining;
+    protected volatile Segment              segment;
+    protected volatile State                state    = State.INITIALIZED;
 
     public AbstractAppender(Bundle bundle) {
         super();
@@ -72,8 +71,7 @@ abstract public class AbstractAppender {
         return state;
     }
 
-    public void handleAccept(SocketChannel channel,
-                             SocketChannelHandler<? extends CommunicationsHandler> handler) {
+    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
         assert state == State.INITIALIZED;
         if (log.isLoggable(Level.FINER)) {
             log.finer("ACCEPT");

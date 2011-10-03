@@ -37,7 +37,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.EventHeader;
@@ -54,18 +53,18 @@ public class Spinner {
         WRITE_BATCH_HEADER, WRITE_EVENT_HEADER, WRITE_PAYLOAD;
     }
 
-    private static final Logger                                            log          = Logger.getLogger(Spinner.class.getCanonicalName());
-    private static final int                                               MAGIC        = 0x1638;
-    private static final int                                               POLL_TIMEOUT = 10;
-    private static final TimeUnit                                          POLL_UNIT    = TimeUnit.MILLISECONDS;
+    private static final Logger           log          = Logger.getLogger(Spinner.class.getCanonicalName());
+    private static final int              MAGIC        = 0x1638;
+    private static final int              POLL_TIMEOUT = 10;
+    private static final TimeUnit         POLL_UNIT    = TimeUnit.MILLISECONDS;
 
-    private final Deque<ByteBuffer>                                        batch        = new LinkedList<ByteBuffer>();
-    private final BatchHeader                                              batchHeader  = new BatchHeader();
-    private volatile SocketChannelHandler<? extends CommunicationsHandler> handler;
-    private final EventHeader                                              header       = new EventHeader();
-    private final BlockingQueue<Batch>                                     queued      = new LinkedBlockingQueue<Batch>();
-    private final AtomicReference<State>                                   state        = new AtomicReference<State>(
-                                                                                                                     State.INITIALIZED);
+    private final Deque<ByteBuffer>       batch        = new LinkedList<ByteBuffer>();
+    private final BatchHeader             batchHeader  = new BatchHeader();
+    private volatile SocketChannelHandler handler;
+    private final EventHeader             header       = new EventHeader();
+    private final BlockingQueue<Batch>    queued       = new LinkedBlockingQueue<Batch>();
+    private final AtomicReference<State>  state        = new AtomicReference<State>(
+                                                                                    State.INITIALIZED);
 
     public void closing(SocketChannel channel) {
         if (state.get() != State.ERROR) {
@@ -80,7 +79,7 @@ public class Spinner {
     }
 
     public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler<? extends CommunicationsHandler> handler) {
+                              SocketChannelHandler handler) {
         this.handler = handler;
         state.set(State.WAITING);
         process();

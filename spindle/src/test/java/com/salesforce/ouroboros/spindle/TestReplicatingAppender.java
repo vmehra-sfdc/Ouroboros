@@ -74,7 +74,7 @@ public class TestReplicatingAppender {
         Bundle bundle = mock(Bundle.class);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(header.getOffset())).thenReturn(segment);
-        SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
         final ReplicatingAppender replicator = new ReplicatingAppender(bundle);
         SocketOptions options = new SocketOptions();

@@ -58,8 +58,7 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class Weaver implements Bundle {
 
-    private class ReplicatorFactory implements
-            CommunicationsHandlerFactory<Replicator> {
+    private class ReplicatorFactory implements CommunicationsHandlerFactory {
         @Override
         public Replicator createCommunicationsHandler(SocketChannel channel) {
             try {
@@ -109,29 +108,28 @@ public class Weaver implements Bundle {
         }
     }
 
-    private class SpindleFactory implements
-            CommunicationsHandlerFactory<Appender> {
+    private class SpindleFactory implements CommunicationsHandlerFactory {
         @Override
         public Appender createCommunicationsHandler(SocketChannel channel) {
             return new Appender(Weaver.this);
         }
     }
 
-    private static final Logger                          log               = Logger.getLogger(Weaver.class.getCanonicalName());
-    private static final String                          WEAVER_REPLICATOR = "Weaver Replicator";
-    private static final String                          WEAVER_SPINDLE    = "Weaver Spindle";
-    private static final String                          WEAVER_XEROX      = "Weaver Xerox";
+    private static final Logger                     log               = Logger.getLogger(Weaver.class.getCanonicalName());
+    private static final String                     WEAVER_REPLICATOR = "Weaver Replicator";
+    private static final String                     WEAVER_SPINDLE    = "Weaver Spindle";
+    private static final String                     WEAVER_XEROX      = "Weaver Xerox";
 
-    private final ConcurrentMap<UUID, EventChannel>      channels          = new ConcurrentHashMap<UUID, EventChannel>();
-    private final ContactInformation                     contactInfo;
-    private final Coordinator                            coordinator;
-    private final Node                                   id;
-    private final long                                   maxSegmentSize;
-    private final ServerSocketChannelHandler<Replicator> replicationHandler;
-    private final ConcurrentMap<Node, Replicator>        replicators       = new ConcurrentHashMap<Node, Replicator>();
-    private final File                                   root;
-    private final ServerSocketChannelHandler<Appender>   spindleHandler;
-    private final ChannelHandler<Xerox>                  xeroxHandler;
+    private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
+    private final ContactInformation                contactInfo;
+    private final Coordinator                       coordinator;
+    private final Node                              id;
+    private final long                              maxSegmentSize;
+    private final ServerSocketChannelHandler        replicationHandler;
+    private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
+    private final File                              root;
+    private final ServerSocketChannelHandler        spindleHandler;
+    private final ChannelHandler                    xeroxHandler;
 
     public Weaver(WeaverConfigation configuration, Coordinator coordinator)
                                                                            throws IOException {
@@ -140,22 +138,22 @@ public class Weaver implements Bundle {
         id = configuration.getId();
         root = configuration.getRoot();
         maxSegmentSize = configuration.getMaxSegmentSize();
-        xeroxHandler = new ChannelHandler<Xerox>(
-                                                 WEAVER_XEROX,
-                                                 configuration.getXeroxSocketOptions(),
-                                                 configuration.getXeroxes());
-        replicationHandler = new ServerSocketChannelHandler<Replicator>(
-                                                                        WEAVER_REPLICATOR,
-                                                                        configuration.getReplicationSocketOptions(),
-                                                                        configuration.getReplicationAddress(),
-                                                                        configuration.getReplicators(),
-                                                                        new ReplicatorFactory());
-        spindleHandler = new ServerSocketChannelHandler<Appender>(
-                                                                  WEAVER_SPINDLE,
-                                                                  configuration.getSpindleSocketOptions(),
-                                                                  configuration.getSpindleAddress(),
-                                                                  configuration.getSpindles(),
-                                                                  new SpindleFactory());
+        xeroxHandler = new ChannelHandler(
+                                          WEAVER_XEROX,
+                                          configuration.getXeroxSocketOptions(),
+                                          configuration.getXeroxes());
+        replicationHandler = new ServerSocketChannelHandler(
+                                                            WEAVER_REPLICATOR,
+                                                            configuration.getReplicationSocketOptions(),
+                                                            configuration.getReplicationAddress(),
+                                                            configuration.getReplicators(),
+                                                            new ReplicatorFactory());
+        spindleHandler = new ServerSocketChannelHandler(
+                                                        WEAVER_SPINDLE,
+                                                        configuration.getSpindleSocketOptions(),
+                                                        configuration.getSpindleAddress(),
+                                                        configuration.getSpindles(),
+                                                        new SpindleFactory());
         contactInfo = new ContactInformation(
                                              spindleHandler.getLocalAddress(),
                                              replicationHandler.getLocalAddress(),

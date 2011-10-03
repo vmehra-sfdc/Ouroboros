@@ -61,7 +61,7 @@ public class TestAppender {
 
     @Test
     public void testAppend() throws Exception {
-        final SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
+        final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("append", ".tst");
@@ -142,7 +142,7 @@ public class TestAppender {
 
     @Test
     public void testDuplicate() throws Exception {
-        final SocketChannelHandler<?> handler = mock(SocketChannelHandler.class);
+        final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("duplicate", ".tst");
