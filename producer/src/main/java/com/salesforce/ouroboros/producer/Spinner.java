@@ -25,213 +25,101 @@
  */
 package com.salesforce.ouroboros.producer;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.Deque;
-import java.util.LinkedList;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.NavigableMap;
+import java.util.SortedMap;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.BatchHeader;
-import com.salesforce.ouroboros.EventHeader;
+import com.salesforce.ouroboros.util.rate.Controller;
 
 /**
- * The state machine for handling non blocking writes of event batches.
  * 
  * @author hhildebrand
  * 
  */
-public class Spinner {
-    public enum State {
-        CLOSED, ERROR, INITIALIZED, INTERRUPTED, PROCESSING, WAITING,
-        WRITE_BATCH_HEADER, WRITE_EVENT_HEADER, WRITE_PAYLOAD;
+public class Spinner implements CommunicationsHandler {
+    private final Logger                             log         = Logger.getLogger(Spinner.class.getCanonicalName());
+
+    private final BatchAcknowledgement               ack;
+    private final Controller                         controller;
+    private final NavigableMap<BatchIdentity, Batch> pending;
+    private final BatchWriter                        writer;
+    private final int                                sampleFrequency;
+    private final AtomicInteger                      sampleCount = new AtomicInteger();
+
+    public Spinner(Controller rateController, int sampleFrequency) {
+        writer = new BatchWriter();
+        ack = new BatchAcknowledgement(this);
+        pending = new ConcurrentSkipListMap<BatchIdentity, Batch>();
+        controller = rateController;
+        this.sampleFrequency = sampleFrequency;
     }
 
-    private static final Logger           log          = Logger.getLogger(Spinner.class.getCanonicalName());
-    private static final int              MAGIC        = 0x1638;
-    private static final int              POLL_TIMEOUT = 10;
-    private static final TimeUnit         POLL_UNIT    = TimeUnit.MILLISECONDS;
-
-    private final Deque<ByteBuffer>       batch        = new LinkedList<ByteBuffer>();
-    private final BatchHeader             batchHeader  = new BatchHeader();
-    private volatile SocketChannelHandler handler;
-    private final EventHeader             header       = new EventHeader();
-    private final BlockingQueue<Batch>    queued       = new LinkedBlockingQueue<Batch>();
-    private final AtomicReference<State>  state        = new AtomicReference<State>(
-                                                                                    State.INITIALIZED);
-
+    @Override
     public void closing(SocketChannel channel) {
-        if (state.get() != State.ERROR) {
-            state.set(State.CLOSED);
-        }
-        queued.clear();
-        batch.clear();
+        ack.closing(channel);
+        writer.closing(channel);
     }
 
-    public State getState() {
-        return state.get();
+    /**
+     * Retrieve all the unacknowledged batch events for the channel.
+     * 
+     * @param channel
+     *            - the Channel
+     * @return a SortedSet of all the batch events for the channel that have not
+     *         been acknowledged
+     */
+    public SortedMap<BatchIdentity, Batch> getPending(UUID channel) {
+        return pending.subMap(new BatchIdentity(channel, 0),
+                              new BatchIdentity(channel, Long.MAX_VALUE));
     }
 
+    @Override
+    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void handleConnect(SocketChannel channel,
                               SocketChannelHandler handler) {
-        this.handler = handler;
-        state.set(State.WAITING);
-        process();
+        ack.handleConnect(channel, handler);
+        writer.handleConnect(channel, handler);
     }
 
+    @Override
+    public void handleRead(SocketChannel channel) {
+        ack.handleRead(channel);
+    }
+
+    @Override
     public void handleWrite(SocketChannel channel) {
-        final State s = state.get();
-        switch (s) {
-            case WRITE_BATCH_HEADER:
-                writeBatchHeader(channel);
-                break;
-            case WRITE_PAYLOAD:
-                writePayload(channel);
-                break;
-            case WRITE_EVENT_HEADER:
-                writeEventHeader(channel);
-                break;
-            default:
-                state.set(State.ERROR);
-                if (log.isLoggable(Level.WARNING)) {
-                    log.warning(String.format("Illegal write state: %s", s));
-                }
-        }
+        writer.handleWrite(channel);
     }
 
     public void push(Batch events) {
-        queued.add(events);
-        process();
+        pending.put(events, events);
+        writer.push(events);
     }
 
-    /**
-     * Batch the events to the channel buffer
-     * 
-     * @param channel
-     *            - the unique id of the channel
-     * @param timestamp
-     *            - the timestamp used for dedup
-     * @param events
-     *            - the event payloads to batch
-     */
-    private void batch(Batch entry) {
-        if (!state.compareAndSet(State.PROCESSING, State.WRITE_BATCH_HEADER)) {
-            throw new IllegalStateException(
-                                            String.format("Cannot batch events in state %s",
-                                                          state.get()));
-        }
-        int totalSize = 0;
-        for (ByteBuffer event : entry.events) {
-            totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
-            batch.add(event);
-        }
-        batchHeader.initialize(totalSize, MAGIC, entry.channel, entry.timestamp);
-        batchHeader.rewind();
-        handler.selectForWrite();
-    }
-
-    private void error() {
-        handler.close();
-        state.set(State.ERROR);
-        batch.clear();
-        queued.clear();
-    }
-
-    /**
-     * Process a pending event batch, if available
-     */
-    private void process() {
-        if (!state.compareAndSet(State.WAITING, State.PROCESSING)) {
-            return;
-        }
-        Batch entry;
-        try {
-            entry = queued.poll(POLL_TIMEOUT, POLL_UNIT);
-        } catch (InterruptedException e) {
-            state.set(State.INTERRUPTED);
-            return;
-        }
-        if (entry == null) {
-            state.compareAndSet(State.PROCESSING, State.WAITING);
-            return;
-        }
-        batch(entry);
-    }
-
-    private void writeBatchHeader(SocketChannel channel) {
-        try {
-            batchHeader.write(channel);
-        } catch (IOException e) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.log(Level.WARNING,
-                        String.format("Unable to write batch header %s on %s",
-                                      batchHeader, channel), e);
+    public void acknowledge(BatchIdentity ack) {
+        Batch batch = pending.remove(ack);
+        if (batch != null) {
+            if (sampleCount.incrementAndGet() % sampleFrequency == 0) {
+                controller.sample(batch.acknowledged());
             }
-            error();
-            return;
-        }
-        if (!batchHeader.hasRemaining()) {
-            writeNextEventHeader(channel);
-        } else {
-            handler.selectForWrite();
-        }
-    }
-
-    private void writeEventHeader(SocketChannel channel) {
-        try {
-            header.write(channel);
-        } catch (IOException e) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.log(Level.WARNING,
-                        String.format("Unable to write header %s on %s",
-                                      header, channel), e);
-            }
-            error();
-            return;
-        }
-        if (!header.hasRemaining()) {
-            state.set(State.WRITE_PAYLOAD);
-            writePayload(channel);
-        } else {
-            handler.selectForWrite();
-        }
-    }
-
-    private void writeNextEventHeader(SocketChannel channel) {
-        state.set(State.WRITE_EVENT_HEADER);
-        header.initialize(MAGIC, batch.peekFirst());
-        header.rewind();
-        writeEventHeader(channel);
-    }
-
-    private void writePayload(SocketChannel channel) {
-        try {
-            channel.write(batch.peekFirst());
-        } catch (IOException e) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.log(Level.WARNING,
-                        String.format("Unable to write event batch", channel),
-                        e);
-            }
-            error();
-            return;
-        }
-        if (!batch.peekFirst().hasRemaining()) {
-            batch.pop();
-            if (batch.isEmpty()) {
-                state.set(State.WAITING);
-                process();
-            } else {
-                writeNextEventHeader(channel);
+            if (log.isLoggable(Level.FINEST)) {
+                log.finest(String.format("Batch %s acknowledged", ack));
             }
         } else {
-            handler.selectForWrite();
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Acknowledgement for %s, but no batch pending..."));
+            }
         }
     }
 }

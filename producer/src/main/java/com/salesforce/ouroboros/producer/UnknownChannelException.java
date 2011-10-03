@@ -23,50 +23,29 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.util.rate;
-
-import com.hellblazer.jackal.util.SkipList;
-import com.hellblazer.jackal.util.Window;
+package com.salesforce.ouroboros.producer;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class SampleWindow extends Window {
-    private final SkipList sorted = new SkipList();
-    private final int      window;
+public class UnknownChannelException extends Exception {
+    private static final long serialVersionUID = 1L;
 
-    public SampleWindow(int windowSize) {
-        super(windowSize);
-        window = windowSize;
+    public UnknownChannelException() {
+        super();
     }
 
-    public void sample(double sample) {
-        sorted.add(sample);
-        if (count == samples.length) {
-            sorted.remove(removeFirst());
-        }
-        addLast(sample);
+    public UnknownChannelException(String message, Throwable cause) {
+        super(message, cause);
     }
 
-    public double getMedian() {
-        if (count == 0) {
-            throw new IllegalStateException(
-                                            "Must have at least one sample to calculate the median");
-        }
-        return sorted.get(sorted.size() / 2);
+    public UnknownChannelException(String message) {
+        super(message);
     }
 
-    public double getPercentile(double percentile) {
-        if (count == 0) {
-            throw new IllegalStateException(
-                                            "Must have at least one sample to calculate the percentile");
-        }
-        return sorted.get((int) ((sorted.size() - 1) * percentile));
-    }
-
-    public int getWindow() {
-        return window;
+    public UnknownChannelException(Throwable cause) {
+        super(cause);
     }
 }

@@ -23,20 +23,23 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.util.rate;
+package com.salesforce.ouroboros.util.rate.controllers;
+
+import static junit.framework.Assert.assertEquals;
 
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Random;
 
-import junit.framework.TestCase;
+import org.junit.Test;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class SampleWindowTest extends TestCase {
+public class SampleWindowTest {
+    @Test
     public void testNonVarying() {
         int windowSize = 1000;
         SampleWindow window = new SampleWindow(windowSize);
@@ -47,6 +50,7 @@ public class SampleWindowTest extends TestCase {
         assertEquals(1, (int) window.getPercentile(0.9));
     }
 
+    @Test
     public void testRandom() {
         Random r = new Random();
         int windowSize = 1000;

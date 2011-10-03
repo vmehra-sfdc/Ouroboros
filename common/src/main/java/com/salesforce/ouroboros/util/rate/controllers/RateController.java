@@ -29,7 +29,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.salesforce.ouroboros.util.rate.Controller;
 import com.salesforce.ouroboros.util.rate.Predicate;
-import com.salesforce.ouroboros.util.rate.SampleWindow;
 
 /**
  * 
@@ -73,6 +72,11 @@ public class RateController implements Controller {
     @Override
     public boolean accept() {
         return predicate.accept();
+    }
+
+    @Override
+    public boolean accept(int cost) {
+        return predicate.accept(cost);
     }
 
     public double getAdditiveIncrease() {

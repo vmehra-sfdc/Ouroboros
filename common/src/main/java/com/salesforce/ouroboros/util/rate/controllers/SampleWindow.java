@@ -23,39 +23,50 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.util.rate;
+package com.salesforce.ouroboros.util.rate.controllers;
+
+import com.hellblazer.jackal.util.SkipList;
+import com.hellblazer.jackal.util.Window;
 
 /**
- * 
- * The predicate for evaluating the rate of acceptance
  * 
  * @author hhildebrand
  * 
  */
-public interface Predicate {
+public class SampleWindow extends Window {
+    private final SkipList sorted = new SkipList();
+    private final int      window;
 
-    /**
-     * Evaluate the predicate, using the default cost
-     * 
-     * @return true if the predicated rate is valid, false otherwise
-     */
-    boolean accept();
+    public SampleWindow(int windowSize) {
+        super(windowSize);
+        window = windowSize;
+    }
 
-    /**
-     * Evaluate the predicate, using the supplied cost
-     * 
-     * @param cost
-     *            - the cost of accepting
-     * @return true if the predicated rate is valid given the cost, false
-     *         otherwise
-     */
-    boolean accept(int cost);
+    public void sample(double sample) {
+        sorted.add(sample);
+        if (count == samples.length) {
+            sorted.remove(removeFirst());
+        }
+        addLast(sample);
+    }
 
-    /**
-     * Set the target rate of the predicate
-     * 
-     * @param targetRate
-     */
-    void setTargetRate(double targetRate);
+    public double getMedian() {
+        if (count == 0) {
+            throw new IllegalStateException(
+                                            "Must have at least one sample to calculate the median");
+        }
+        return sorted.get(sorted.size() / 2);
+    }
 
+    public double getPercentile(double percentile) {
+        if (count == 0) {
+            throw new IllegalStateException(
+                                            "Must have at least one sample to calculate the percentile");
+        }
+        return sorted.get((int) ((sorted.size() - 1) * percentile));
+    }
+
+    public int getWindow() {
+        return window;
+    }
 }

@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.producer;
 
+import java.nio.ByteBuffer;
 import java.util.UUID;
 
 /**
@@ -33,11 +34,17 @@ import java.util.UUID;
  * 
  */
 public class BatchIdentity implements Comparable<BatchIdentity> {
-    public final UUID channel;
-    public final long timestamp;
+    public static final int BYTE_SIZE = 3 * 8;
+
+    public final UUID       channel;
+    public final long       timestamp;
+
+    public BatchIdentity(ByteBuffer buffer) {
+        channel = new UUID(buffer.getLong(), buffer.getLong());
+        timestamp = buffer.getLong();
+    }
 
     public BatchIdentity(UUID channel, long timestamp) {
-        super();
         this.channel = channel;
         this.timestamp = timestamp;
     }
@@ -83,5 +90,11 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
         result = prime * result + (channel == null ? 0 : channel.hashCode());
         result = prime * result + (int) (timestamp ^ timestamp >>> 32);
         return result;
+    }
+
+    public void serializeOn(ByteBuffer buffer) {
+        buffer.putLong(channel.getMostSignificantBits());
+        buffer.putLong(channel.getLeastSignificantBits());
+        buffer.putLong(timestamp);
     }
 }

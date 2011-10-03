@@ -25,12 +25,13 @@
  */
 package com.salesforce.ouroboros.producer;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.SortedSet;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 
 /**
@@ -39,49 +40,70 @@ import com.hellblazer.pinkie.SocketChannelHandler;
  * @author hhildebrand
  * 
  */
-public class BatchAcknowledgement implements CommunicationsHandler {
+public class BatchAcknowledgement {
     public enum State {
+        CLOSED, ERROR, INITIALIZED, READ_ACK;
     };
 
-    private final SortedSet<Batch>       pending = new ConcurrentSkipListSet<Batch>();
-    private final AtomicReference<State> state   = new AtomicReference<State>();
+    private final static Logger           log       = Logger.getLogger(BatchAcknowledgement.class.getCanonicalName());
+
+    private final ByteBuffer              ackBuffer = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
+    private volatile SocketChannelHandler handler;
+    private final Spinner                 spinner;
+    private final AtomicReference<State>  state     = new AtomicReference<State>(
+                                                                                 State.INITIALIZED);
+
+    public BatchAcknowledgement(Spinner spinner) {
+        this.spinner = spinner;
+    }
+
+    public void closing(SocketChannel channel) {
+        if (state.get() != State.ERROR) {
+            state.set(State.CLOSED);
+        }
+    }
 
     public State getState() {
         return state.get();
     }
 
-    public void waitFor(Batch events) {
-        pending.add(events);
-    }
-
-    @Override
-    public void closing(SocketChannel channel) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
     public void handleConnect(SocketChannel channel,
                               SocketChannelHandler handler) {
-        // TODO Auto-generated method stub
-
+        this.handler = handler;
+        state.set(State.READ_ACK);
+        handler.selectForRead();
     }
 
-    @Override
     public void handleRead(SocketChannel channel) {
-        // TODO Auto-generated method stub
-
+        State s = state.get();
+        switch (s) {
+            case READ_ACK: {
+                readAcknowlegement(channel);
+            }
+        }
     }
 
-    @Override
-    public void handleWrite(SocketChannel channel) {
-        // TODO Auto-generated method stub
+    private void error() {
+        state.set(State.ERROR);
+        handler.close();
+    }
 
+    private void readAcknowlegement(SocketChannel channel) {
+        try {
+            channel.read(ackBuffer);
+        } catch (IOException e) {
+            if (log.isLoggable(Level.WARNING)) {
+                log.log(Level.WARNING, "Error reading batch acknowlegement", e);
+            }
+            error();
+        }
+        if (!ackBuffer.hasRemaining()) {
+            BatchIdentity ack = new BatchIdentity(ackBuffer);
+            ackBuffer.rewind();
+            spinner.acknowledge(ack);
+            readAcknowlegement(channel);
+        } else {
+            handler.selectForRead();
+        }
     }
 }

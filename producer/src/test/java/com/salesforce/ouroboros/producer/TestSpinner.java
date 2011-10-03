@@ -45,7 +45,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
-import com.salesforce.ouroboros.producer.Spinner.State;
+import com.salesforce.ouroboros.producer.BatchWriter.State;
 
 /**
  * 
@@ -70,7 +70,7 @@ public class TestSpinner {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel outbound = mock(SocketChannel.class);
 
-        Spinner spinner = new Spinner();
+        BatchWriter spinner = new BatchWriter();
         assertEquals(State.INITIALIZED, spinner.getState());
         spinner.handleConnect(outbound, handler);
         assertEquals(State.WAITING, spinner.getState());

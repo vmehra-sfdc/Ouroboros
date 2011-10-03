@@ -35,11 +35,11 @@ import com.salesforce.ouroboros.util.rate.Predicate;
  * 
  */
 public class RateLimiter implements Predicate {
-    private volatile int    maxTokens;
-    private volatile double currentTokens;
-    private volatile double regenerationTime;
-    private volatile long   last;
-    private final long      minimumRegenerationTime;
+    private int        maxTokens;
+    private double     currentTokens;
+    private double     regenerationTime;
+    private long       last;
+    private final long minimumRegenerationTime;
 
     /**
      * @param targetRate
@@ -63,15 +63,24 @@ public class RateLimiter implements Predicate {
         last = System.currentTimeMillis();
     }
 
-    /**
-     * @return true if a new element can be accepted
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.util.rate.Predicate#accept()
      */
     @Override
-    public synchronized boolean accept() {
+    public boolean accept() {
+        return accept(1);
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.util.rate.Predicate#accept(int)
+     */
+    @Override
+    public synchronized boolean accept(int cost) {
         long curtime = System.currentTimeMillis();
         long delay = curtime - last;
 
         if (delay >= minimumRegenerationTime) {
+            // Regenerate tokens
             double numTokens = delay / regenerationTime;
             currentTokens += numTokens;
             if (currentTokens > maxTokens) {
@@ -80,8 +89,8 @@ public class RateLimiter implements Predicate {
             last = curtime;
         }
 
-        if (currentTokens >= 1.0) {
-            currentTokens -= 1.0;
+        if (currentTokens >= cost) {
+            currentTokens -= cost;
             return true;
         } else {
             return false;

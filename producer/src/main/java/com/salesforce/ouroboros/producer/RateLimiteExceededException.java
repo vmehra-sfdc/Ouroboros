@@ -23,39 +23,30 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.util.rate;
+package com.salesforce.ouroboros.producer;
 
 /**
- * 
- * The predicate for evaluating the rate of acceptance
  * 
  * @author hhildebrand
  * 
  */
-public interface Predicate {
+public class RateLimiteExceededException extends Exception {
+    private static final long serialVersionUID = 1L;
 
-    /**
-     * Evaluate the predicate, using the default cost
-     * 
-     * @return true if the predicated rate is valid, false otherwise
-     */
-    boolean accept();
+    public RateLimiteExceededException() {
+        super();
+    }
 
-    /**
-     * Evaluate the predicate, using the supplied cost
-     * 
-     * @param cost
-     *            - the cost of accepting
-     * @return true if the predicated rate is valid given the cost, false
-     *         otherwise
-     */
-    boolean accept(int cost);
+    public RateLimiteExceededException(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-    /**
-     * Set the target rate of the predicate
-     * 
-     * @param targetRate
-     */
-    void setTargetRate(double targetRate);
+    public RateLimiteExceededException(String message) {
+        super(message);
+    }
+
+    public RateLimiteExceededException(Throwable cause) {
+        super(cause);
+    }
 
 }

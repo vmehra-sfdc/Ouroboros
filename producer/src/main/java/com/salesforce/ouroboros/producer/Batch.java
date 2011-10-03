@@ -36,9 +36,21 @@ import java.util.UUID;
  */
 public class Batch extends BatchIdentity {
     public final Collection<ByteBuffer> events;
+    private final long                  created = System.currentTimeMillis();
 
     public Batch(UUID channel, long timestamp, Collection<ByteBuffer> events) {
         super(channel, timestamp);
+        assert events != null : "events must not be null";
         this.events = events;
+    }
+
+    /**
+     * Acknowledge the batch comitment.
+     * 
+     * @return the interval, in milliseconds, between when the batch was
+     *         submitted and when it was acknowledged
+     */
+    public int acknowledged() {
+        return (int) (System.currentTimeMillis() - created);
     }
 }

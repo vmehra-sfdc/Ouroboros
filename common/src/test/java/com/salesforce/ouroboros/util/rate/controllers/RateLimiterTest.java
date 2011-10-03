@@ -25,15 +25,20 @@
  */
 package com.salesforce.ouroboros.util.rate.controllers;
 
-import junit.framework.TestCase;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
+
+import org.junit.Test;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class RateLimiterTest extends TestCase {
+public class RateLimiterTest {
 
+    @Test
     public void testLimiter() throws InterruptedException {
         RateLimiter limiter = new RateLimiter(10.0, 10, 0);
         assertTrue(limiter.accept());

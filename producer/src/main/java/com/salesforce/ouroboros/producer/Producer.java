@@ -25,11 +25,65 @@
  */
 package com.salesforce.ouroboros.producer;
 
+import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import com.salesforce.ouroboros.util.rate.Controller;
+import com.salesforce.ouroboros.util.rate.controllers.RateController;
+import com.salesforce.ouroboros.util.rate.controllers.RateLimiter;
+
 /**
  * 
  * @author hhildebrand
  * 
  */
 public class Producer {
+    private final Controller         controller;
+    private final Map<UUID, Spinner> primaryChannels = new ConcurrentHashMap<UUID, Spinner>();
 
+    public Producer(ProducerConfiguration configuration) {
+        controller = new RateController(
+                                        new RateLimiter(
+                                                        configuration.getTargetRate(),
+                                                        configuration.getTokenLimit(),
+                                                        configuration.getMinRegenerationTime()),
+                                        configuration.getMinimumRate(),
+                                        configuration.getMaximumRate(),
+                                        configuration.getWindowSize());
+    }
+
+    /**
+     * Publish the events on the indicated channel
+     * 
+     * @param channel
+     *            - the id of the event channel
+     * @param timestamp
+     *            - the timestamp for this batch
+     * @param events
+     *            - the batch of events to publish to the channel
+     * 
+     * @throws RateLimiteExceededException
+     *             - if the event publishing rate has been exceeded
+     * @throws UnknownChannelException
+     *             - if the supplied channel id does not exist
+     */
+    public void publish(UUID channel, long timestamp,
+                        Collection<ByteBuffer> events)
+                                                      throws RateLimiteExceededException,
+                                                      UnknownChannelException {
+        Spinner spinner = primaryChannels.get(channel);
+        if (spinner == null) {
+            throw new UnknownChannelException(
+                                              String.format("The channel %s does not exist",
+                                                            channel));
+        }
+        if (!controller.accept(events.size())) {
+            throw new RateLimiteExceededException(
+                                                  String.format("The rate limit for this producer has been exceeded"));
+        }
+        spinner.push(new Batch(channel, timestamp, events));
+    }
 }

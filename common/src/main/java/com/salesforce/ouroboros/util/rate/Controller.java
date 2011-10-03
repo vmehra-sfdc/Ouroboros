@@ -28,16 +28,19 @@ package com.salesforce.ouroboros.util.rate;
 /**
  * 
  * @author hhildebrand
- *
+ * 
  */
 public interface Controller {
 
     /**
-     * Set the target response time, in milliseconds
-     * 
-     * @param target
+     * @return true if a new element can be accepted, using the default cost
      */
-    void setTarget(double target);
+    public abstract boolean accept();
+
+    /**
+     * @return true if a new element can be accepted, using the supplied cost
+     */
+    public abstract boolean accept(int cost);
 
     /**
      * Answer the target response time
@@ -55,24 +58,29 @@ public interface Controller {
     public void sample(int responseTime);
 
     /**
-     * @return true if a new element can be accepted
-     */
-    public abstract boolean accept();
-
-    /**
-     * @return the median of the sampled response time over the history of the controller
+     * @return the median of the sampled response time over the history of the
+     *         controller
      */
     double getMedianResponseTime();
 
     /**
-     * @return the 90th percentile of the sampled response time over the history of the controller
+     * @return the 90th percentile of the sampled response time over the history
+     *         of the controller
      */
     double getResponseTime();
-    
+
     /**
      * Answer the size of the sample window
+     * 
      * @return the size of the sample window
      */
     int getWindow();
+
+    /**
+     * Set the target response time, in milliseconds
+     * 
+     * @param target
+     */
+    void setTarget(double target);
 
 }
