@@ -44,13 +44,10 @@ public class TestSpinnerSpindle {
     public void testSimpleAppend() throws Exception {
         Executor spindelExec = Executors.newSingleThreadExecutor();
         SocketOptions socketOptions = new SocketOptions();
-        @SuppressWarnings("rawtypes")
-        ChannelHandler<?> spinnerHandler = new ChannelHandler(
-                                                              "Spinner Handler",
-                                                              socketOptions,
-                                                              spindelExec);
+        ChannelHandler spinnerHandler = new ChannelHandler("Spinner Handler",
+                                                           socketOptions,
+                                                           spindelExec);
         spinnerHandler.start();
-        
-        
+
     }
 }
