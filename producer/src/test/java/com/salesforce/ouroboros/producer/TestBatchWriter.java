@@ -52,7 +52,7 @@ import com.salesforce.ouroboros.producer.BatchWriter.State;
  * @author hhildebrand
  * 
  */
-public class TestSpinner {
+public class TestBatchWriter {
 
     @Test
     public void testBatching() throws Exception {

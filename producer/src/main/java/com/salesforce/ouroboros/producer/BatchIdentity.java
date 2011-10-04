@@ -69,7 +69,7 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
         if (getClass() != obj.getClass()) {
             return false;
         }
-        Batch other = (Batch) obj;
+        BatchIdentity other = (BatchIdentity) obj;
         if (channel == null) {
             if (other.channel != null) {
                 return false;

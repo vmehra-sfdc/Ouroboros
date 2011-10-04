@@ -98,6 +98,7 @@ public class BatchAcknowledgement {
             error();
         }
         if (!ackBuffer.hasRemaining()) {
+            ackBuffer.flip();
             BatchIdentity ack = new BatchIdentity(ackBuffer);
             ackBuffer.rewind();
             spinner.acknowledge(ack);
