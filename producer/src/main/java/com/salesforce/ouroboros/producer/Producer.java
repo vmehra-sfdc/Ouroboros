@@ -30,6 +30,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.producer.internal.Batch;
 import com.salesforce.ouroboros.producer.internal.Spinner;
@@ -43,6 +45,7 @@ import com.salesforce.ouroboros.util.rate.controllers.RateLimiter;
  * 
  */
 public class Producer {
+    private final static Logger      log             = Logger.getLogger(Producer.class.getCanonicalName());
     private final Controller         controller;
     private final Map<UUID, Spinner> primaryChannels = new ConcurrentHashMap<UUID, Spinner>();
 
@@ -94,14 +97,29 @@ public class Producer {
                                                       UnknownChannelException {
         Spinner spinner = primaryChannels.get(channel);
         if (spinner == null) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Push to a channel which does not exist: %s",
+                                       channel));
+            }
             throw new UnknownChannelException(
                                               String.format("The channel %s does not exist",
                                                             channel));
         }
         if (!controller.accept(events.size())) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Rate limit exceeded for push to %s",
+                                       channel));
+            }
             throw new RateLimiteExceededException(
                                                   String.format("The rate limit for this producer has been exceeded"));
         }
-        spinner.push(new Batch(channel, timestamp, events));
+        if (!spinner.push(new Batch(channel, timestamp, events))) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Rate limited, as service temporarily down for channel: %s",
+                                       channel));
+            }
+            throw new RateLimiteExceededException(
+                                                  String.format("The system cannot currently service the push request"));
+        }
     }
 }

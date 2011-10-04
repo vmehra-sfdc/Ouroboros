@@ -44,14 +44,14 @@ import com.salesforce.ouroboros.util.rate.Controller;
  * 
  */
 public class Spinner implements CommunicationsHandler {
-    private final Logger                             log         = Logger.getLogger(Spinner.class.getCanonicalName());
 
     private final BatchAcknowledgement               ack;
     private final Controller                         controller;
+    private final Logger                             log         = Logger.getLogger(Spinner.class.getCanonicalName());
     private final NavigableMap<BatchIdentity, Batch> pending;
-    private final BatchWriter                        writer;
-    private final int                                sampleFrequency;
     private final AtomicInteger                      sampleCount = new AtomicInteger();
+    private final int                                sampleFrequency;
+    private final BatchWriter                        writer;
 
     public Spinner(Controller rateController, int sampleFrequency) {
         writer = new BatchWriter();
@@ -59,6 +59,31 @@ public class Spinner implements CommunicationsHandler {
         pending = new ConcurrentSkipListMap<BatchIdentity, Batch>();
         controller = rateController;
         this.sampleFrequency = sampleFrequency;
+    }
+
+    public void acknowledge(BatchIdentity ack) {
+        Batch batch = pending.remove(ack);
+        if (batch != null) {
+            if (sampleCount.incrementAndGet() % sampleFrequency == 0) {
+                controller.sample(batch.acknowledged());
+            }
+            if (log.isLoggable(Level.FINEST)) {
+                log.finest(String.format("Batch %s acknowledged", ack));
+            }
+        } else {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Acknowledgement for %s, but no batch pending...",
+                                       ack));
+            }
+        }
+    }
+
+    /**
+     * Close the receiver
+     */
+    public void close() {
+        // TODO Auto-generated method stub
+
     }
 
     @Override
@@ -102,25 +127,27 @@ public class Spinner implements CommunicationsHandler {
         writer.handleWrite(channel);
     }
 
-    public void push(Batch events) {
+    /**
+     * Push the batch of events.
+     * 
+     * @param events
+     *            - the batch to push
+     * @return true, if the push is allowed, false if the system is closed or in
+     *         the error state.
+     */
+    public boolean push(Batch events) {
         pending.put(events, events);
-        writer.push(events);
+        return writer.push(events);
     }
 
-    public void acknowledge(BatchIdentity ack) {
-        Batch batch = pending.remove(ack);
-        if (batch != null) {
-            if (sampleCount.incrementAndGet() % sampleFrequency == 0) {
-                controller.sample(batch.acknowledged());
-            }
-            if (log.isLoggable(Level.FINEST)) {
-                log.finest(String.format("Batch %s acknowledged", ack));
-            }
-        } else {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Acknowledgement for %s, but no batch pending...",
-                                       ack));
-            }
-        }
+    /**
+     * Close the multiplexed channel handled by this spinner
+     * 
+     * @param channel
+     *            - the id of the channel to close
+     */
+    public void close(UUID channel) {
+        // TODO Auto-generated method stub
+
     }
 }

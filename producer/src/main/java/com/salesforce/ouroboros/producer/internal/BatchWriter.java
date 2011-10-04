@@ -105,9 +105,14 @@ public class BatchWriter {
         }
     }
 
-    public void push(Batch events) {
+    public boolean push(Batch events) {
+        State s = state.get();
+        if (s == State.CLOSED || s == State.ERROR) {
+            return false;
+        }
         queued.add(events);
         process();
+        return true;
     }
 
     /**

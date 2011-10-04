@@ -25,6 +25,8 @@
  */
 package com.salesforce.ouroboros.spindle.orchestration;
 
+import static com.salesforce.ouroboros.util.Utils.point;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,7 +39,6 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -47,8 +48,8 @@ import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.channel.ChannelMessageHandler;
 import com.salesforce.ouroboros.channel.ChannelMessage;
+import com.salesforce.ouroboros.channel.ChannelMessageHandler;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
@@ -67,23 +68,19 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class Coordinator implements Member, ChannelMessageHandler {
 
-    private final static Logger log             = Logger.getLogger(Coordinator.class.getCanonicalName());
-    static final int            DEFAULT_TIMEOUT = 1;
-    static final TimeUnit       TIMEOUT_UNIT    = TimeUnit.MINUTES;
+    private final static Logger                 log                  = Logger.getLogger(Coordinator.class.getCanonicalName());
+    static final int                            DEFAULT_TIMEOUT      = 1;
+    static final TimeUnit                       TIMEOUT_UNIT         = TimeUnit.MINUTES;
 
-    public static long point(UUID id) {
-        return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
-    }
-
-    private final Set<UUID>                               channels             = new HashSet<UUID>();
-    private Weaver                                        localWeaver;
-    private final SortedSet<Node>                         members              = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>                         newMembers           = new ConcurrentSkipListSet<Node>();
-    private final AtomicReference<Rendezvous>             replicatorRendezvous = new AtomicReference<Rendezvous>();
-    private Switchboard                                   switchboard;
-    private final ScheduledExecutorService                timer;
-    private ConsistentHashFunction<Node>                  weaverRing           = new ConsistentHashFunction<Node>();
-    private final ConcurrentMap<Node, ContactInformation> yellowPages          = new ConcurrentHashMap<Node, ContactInformation>();
+    private final Set<UUID>                     channels             = new HashSet<UUID>();
+    private Weaver                              localWeaver;
+    private final SortedSet<Node>               members              = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>               newMembers           = new ConcurrentSkipListSet<Node>();
+    private final AtomicReference<Rendezvous>   replicatorRendezvous = new AtomicReference<Rendezvous>();
+    private Switchboard                         switchboard;
+    private final ScheduledExecutorService      timer;
+    private ConsistentHashFunction<Node>        weaverRing           = new ConsistentHashFunction<Node>();
+    private final Map<Node, ContactInformation> yellowPages          = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(ScheduledExecutorService timer) {
         this.timer = timer;
@@ -128,6 +125,7 @@ public class Coordinator implements Member, ChannelMessageHandler {
 
     @Override
     public void destabilize() {
+        newMembers.clear();
     }
 
     @Override
@@ -136,7 +134,7 @@ public class Coordinator implements Member, ChannelMessageHandler {
         switch (type) {
             case ADVERTISE_CHANNEL_BUFFER:
                 members.add(sender);
-                yellowPages.putIfAbsent(sender, (ContactInformation) payload);
+                yellowPages.put(sender, (ContactInformation) payload);
                 break;
             default:
                 break;
@@ -406,7 +404,7 @@ public class Coordinator implements Member, ChannelMessageHandler {
         members.removeAll(switchboard.getDeadMembers());
         newMembers.clear();
         for (Node node : switchboard.getNewMembers()) {
-            if (members.contains(node)) {
+            if (members.remove(node)) {
                 newMembers.add(node);
             }
         }
