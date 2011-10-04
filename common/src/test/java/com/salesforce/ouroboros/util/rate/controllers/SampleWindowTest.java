@@ -52,7 +52,7 @@ public class SampleWindowTest {
 
     @Test
     public void testRandom() {
-        Random r = new Random();
+        Random r = new Random(666);
         int windowSize = 1000;
         ArrayDeque<Integer> deque = new ArrayDeque<Integer>();
         SampleWindow window = new SampleWindow(windowSize);
