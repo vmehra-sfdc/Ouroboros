@@ -97,4 +97,13 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
         buffer.putLong(channel.getLeastSignificantBits());
         buffer.putLong(timestamp);
     }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "BatchIdentity [channel=" + channel + ", timestamp=" + timestamp
+               + "]";
+    }
 }

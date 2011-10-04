@@ -118,7 +118,8 @@ public class Spinner implements CommunicationsHandler {
             }
         } else {
             if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Acknowledgement for %s, but no batch pending..."));
+                log.info(String.format("Acknowledgement for %s, but no batch pending...",
+                                       ack));
             }
         }
     }

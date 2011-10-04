@@ -25,41 +25,37 @@
  */
 package com.salesforce.ouroboros.producer;
 
-import java.nio.ByteBuffer;
-import java.util.Collection;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
+import java.nio.channels.SocketChannel;
+import java.util.Collections;
 import java.util.UUID;
+
+import org.junit.Test;
+
+import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.util.rate.Controller;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class Batch extends BatchIdentity {
-    public final Collection<ByteBuffer> events;
-    private final long                  created = System.currentTimeMillis();
+public class TestSpinner {
+    @Test
+    public void testPush() throws Exception {
+        SocketChannel channel = mock(SocketChannel.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        Controller rateController = mock(Controller.class);
+        Spinner spinner = new Spinner(rateController, 1);
+        spinner.handleConnect(channel, handler);
 
-    public Batch(UUID channel, long timestamp, Collection<ByteBuffer> events) {
-        super(channel, timestamp);
-        assert events != null : "events must not be null";
-        this.events = events;
-    }
-
-    /**
-     * Acknowledge the batch comitment.
-     * 
-     * @return the interval, in milliseconds, between when the batch was
-     *         submitted and when it was acknowledged
-     */
-    public int acknowledged() {
-        return (int) (System.currentTimeMillis() - created);
-    }
-
-    /* (non-Javadoc)
-     * @see java.lang.Object#toString()
-     */
-    @Override
-    public String toString() {
-        return "Batch [#events=" + events.size() + ", created=" + created
-               + ", channel=" + channel + ", timestamp=" + timestamp + "]";
+        @SuppressWarnings("unchecked")
+        Batch batch = new Batch(UUID.randomUUID(), 0L, Collections.EMPTY_LIST);
+        spinner.push(batch);
+        Thread.sleep(10);
+        spinner.acknowledge(batch);
+        verify(rateController).sample(10);
     }
 }
