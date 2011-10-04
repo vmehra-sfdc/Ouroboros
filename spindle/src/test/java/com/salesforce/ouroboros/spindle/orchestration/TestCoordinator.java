@@ -53,6 +53,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * 
@@ -116,7 +117,7 @@ public class TestCoordinator {
         UUID primary = null;
         while (primary == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Coordinator.point(test), 2);
+            List<Node> pair = ring.hash(Utils.point(test), 2);
             if (pair.get(0).equals(localNode)) {
                 primary = test;
             }
@@ -124,7 +125,7 @@ public class TestCoordinator {
         UUID mirror = null;
         while (mirror == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Coordinator.point(test), 2);
+            List<Node> pair = ring.hash(Utils.point(test), 2);
             if (pair.get(1).equals(localNode)) {
                 mirror = test;
             }
@@ -210,7 +211,7 @@ public class TestCoordinator {
         UUID primary = null;
         while (primary == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Coordinator.point(test), 2);
+            List<Node> pair = ring.hash(Utils.point(test), 2);
             if (pair.get(0).equals(localNode)) {
                 primary = test;
             }
@@ -218,7 +219,7 @@ public class TestCoordinator {
         UUID mirror = null;
         while (mirror == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Coordinator.point(test), 2);
+            List<Node> pair = ring.hash(Utils.point(test), 2);
             if (pair.get(1).equals(localNode)) {
                 mirror = test;
             }
@@ -299,7 +300,7 @@ public class TestCoordinator {
         UUID primary = null;
         while (primary == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Coordinator.point(test), 2);
+            List<Node> pair = ring.hash(Utils.point(test), 2);
             if (pair.get(0).equals(localNode)) {
                 primary = test;
             }
@@ -307,7 +308,7 @@ public class TestCoordinator {
         UUID mirror = null;
         while (mirror == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Coordinator.point(test), 2);
+            List<Node> pair = ring.hash(Utils.point(test), 2);
             if (pair.get(1).equals(localNode)) {
                 mirror = test;
             }
@@ -352,7 +353,7 @@ public class TestCoordinator {
         UUID primary = null;
         while (primary == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Coordinator.point(test), 2);
+            List<Node> pair = ring.hash(Utils.point(test), 2);
             if (pair.get(0).equals(localNode)) {
                 primary = test;
             }
@@ -360,7 +361,7 @@ public class TestCoordinator {
         UUID mirror = null;
         while (mirror == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Coordinator.point(test), 2);
+            List<Node> pair = ring.hash(Utils.point(test), 2);
             if (pair.get(1).equals(localNode)) {
                 mirror = test;
             }
