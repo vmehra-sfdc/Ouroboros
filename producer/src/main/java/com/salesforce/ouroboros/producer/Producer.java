@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.salesforce.ouroboros.producer.internal.Batch;
+import com.salesforce.ouroboros.producer.internal.Spinner;
 import com.salesforce.ouroboros.util.rate.Controller;
 import com.salesforce.ouroboros.util.rate.controllers.RateController;
 import com.salesforce.ouroboros.util.rate.controllers.RateLimiter;

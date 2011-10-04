@@ -23,53 +23,43 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer;
+package com.salesforce.ouroboros.producer.internal;
 
-import static junit.framework.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-
-import java.nio.channels.SocketChannel;
-import java.util.Collections;
+import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.UUID;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.MockitoAnnotations;
-
-import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.util.rate.Controller;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class TestSpinner {
-    @Captor
-    ArgumentCaptor<Integer> captor;
+public class Batch extends BatchIdentity {
+    public final Collection<ByteBuffer> events;
+    private final long                  created = System.currentTimeMillis();
 
-    @Before
-    public void init() {
-        MockitoAnnotations.initMocks(this);
+    public Batch(UUID channel, long timestamp, Collection<ByteBuffer> events) {
+        super(channel, timestamp);
+        assert events != null : "events must not be null";
+        this.events = events;
     }
 
-    @Test
-    public void testPush() throws Exception {
-        SocketChannel channel = mock(SocketChannel.class);
-        SocketChannelHandler handler = mock(SocketChannelHandler.class);
-        Controller rateController = mock(Controller.class);
-        Spinner spinner = new Spinner(rateController, 1);
-        spinner.handleConnect(channel, handler);
+    /**
+     * Acknowledge the batch comitment.
+     * 
+     * @return the interval, in milliseconds, between when the batch was
+     *         submitted and when it was acknowledged
+     */
+    public int acknowledged() {
+        return (int) (System.currentTimeMillis() - created);
+    }
 
-        @SuppressWarnings("unchecked")
-        Batch batch = new Batch(UUID.randomUUID(), 0L, Collections.EMPTY_LIST);
-        spinner.push(batch);
-        Thread.sleep(10);
-        spinner.acknowledge(batch);
-        verify(rateController).sample(captor.capture());
-        assertTrue(10 <= captor.getValue().intValue());
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "Batch [#events=" + events.size() + ", created=" + created
+               + ", channel=" + channel + ", timestamp=" + timestamp + "]";
     }
 }
