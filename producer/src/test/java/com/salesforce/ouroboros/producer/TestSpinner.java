@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.producer;
 
+import static junit.framework.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -32,7 +33,11 @@ import java.nio.channels.SocketChannel;
 import java.util.Collections;
 import java.util.UUID;
 
+import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.MockitoAnnotations;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.util.rate.Controller;
@@ -43,6 +48,14 @@ import com.salesforce.ouroboros.util.rate.Controller;
  * 
  */
 public class TestSpinner {
+    @Captor
+    ArgumentCaptor<Integer> captor;
+
+    @Before
+    public void init() {
+        MockitoAnnotations.initMocks(this);
+    }
+
     @Test
     public void testPush() throws Exception {
         SocketChannel channel = mock(SocketChannel.class);
@@ -56,6 +69,7 @@ public class TestSpinner {
         spinner.push(batch);
         Thread.sleep(10);
         spinner.acknowledge(batch);
-        verify(rateController).sample(10);
+        verify(rateController).sample(captor.capture());
+        assertTrue(10 <= captor.getValue().intValue());
     }
 }

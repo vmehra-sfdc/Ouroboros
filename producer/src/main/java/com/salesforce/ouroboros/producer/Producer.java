@@ -56,6 +56,22 @@ public class Producer {
     }
 
     /**
+     * @return the 90th percentile of the sampled event push response time
+     */
+    public double getResponseTime() {
+        return controller.getResponseTime();
+    }
+
+    /**
+     * Answer the target response time for event push
+     * 
+     * @return
+     */
+    public double getTargetResponseTime() {
+        return controller.getTarget();
+    }
+
+    /**
      * Publish the events on the indicated channel
      * 
      * @param channel
