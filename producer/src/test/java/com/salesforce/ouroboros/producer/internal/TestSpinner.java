@@ -25,12 +25,16 @@
  */
 package com.salesforce.ouroboros.producer.internal;
 
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import java.nio.channels.SocketChannel;
 import java.util.Collections;
+import java.util.SortedMap;
 import java.util.UUID;
 
 import org.junit.Before;
@@ -40,8 +44,6 @@ import org.mockito.Captor;
 import org.mockito.MockitoAnnotations;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.producer.internal.Batch;
-import com.salesforce.ouroboros.producer.internal.Spinner;
 import com.salesforce.ouroboros.util.rate.Controller;
 
 /**
@@ -73,5 +75,42 @@ public class TestSpinner {
         spinner.acknowledge(batch);
         verify(rateController).sample(captor.capture());
         assertTrue(10 <= captor.getValue().intValue());
+    }
+
+    @Test
+    public void testPending() throws Exception {
+        SocketChannel outbound = mock(SocketChannel.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        Controller rateController = mock(Controller.class);
+        Spinner spinner = new Spinner(rateController, 1);
+        spinner.handleConnect(outbound, handler);
+
+        long timestamp = 100000L;
+        UUID channel = UUID.randomUUID();
+        @SuppressWarnings("unchecked")
+        Batch batch1 = new Batch(channel, timestamp, Collections.EMPTY_LIST);
+        @SuppressWarnings("unchecked")
+        Batch batch2 = new Batch(channel, timestamp + 20,
+                                 Collections.EMPTY_LIST);
+        @SuppressWarnings("unchecked")
+        Batch batch3 = new Batch(channel, timestamp + 100,
+                                 Collections.EMPTY_LIST);
+        @SuppressWarnings("unchecked")
+        Batch batch4 = new Batch(channel, timestamp + 100,
+                                 Collections.EMPTY_LIST);
+        assertTrue(spinner.push(batch1));
+        assertTrue(spinner.push(batch2));
+        assertTrue(spinner.push(batch3));
+        spinner.closing(outbound);
+        assertFalse(spinner.push(batch4));
+
+        SortedMap<BatchIdentity, Batch> pending = spinner.getPending(channel);
+        assertNotNull(pending);
+        assertEquals(3, pending.size());
+        assertEquals(batch1, pending.get(batch1));
+        assertEquals(batch2, pending.get(batch2));
+        assertEquals(batch3, pending.get(batch3));
+        assertEquals(batch1, pending.firstKey());
+        assertEquals(batch3, pending.lastKey());
     }
 }

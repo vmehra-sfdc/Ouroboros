@@ -53,7 +53,12 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
     public int compareTo(BatchIdentity bi) {
         int channelComp = channel.compareTo(bi.channel);
         if (channelComp == 0) {
-            return (int) (timestamp - bi.timestamp);
+            if (timestamp == bi.timestamp) {
+                return 0;
+            } else if (timestamp < bi.timestamp) {
+                return -1;
+            }
+            return 1;
         }
         return channelComp;
     }

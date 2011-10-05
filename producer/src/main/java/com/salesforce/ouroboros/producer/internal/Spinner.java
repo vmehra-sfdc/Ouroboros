@@ -57,6 +57,7 @@ public class Spinner implements CommunicationsHandler {
         writer = new BatchWriter();
         ack = new BatchAcknowledgement(this);
         pending = new ConcurrentSkipListMap<BatchIdentity, Batch>();
+        
         controller = rateController;
         this.sampleFrequency = sampleFrequency;
     }
