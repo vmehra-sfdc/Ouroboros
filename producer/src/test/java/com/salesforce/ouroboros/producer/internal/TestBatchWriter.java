@@ -34,6 +34,8 @@ import static org.mockito.Mockito.when;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import org.junit.Test;
@@ -72,12 +74,17 @@ public class TestBatchWriter {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel outbound = mock(SocketChannel.class);
 
-        BatchWriter spinner = new BatchWriter();
-        assertEquals(State.INITIALIZED, spinner.getState());
-        spinner.handleConnect(outbound, handler);
-        assertEquals(State.WAITING, spinner.getState());
-        spinner.push(new Batch(channel, timestamp, Arrays.asList(payloads)));
-        assertEquals(State.WRITE_BATCH_HEADER, spinner.getState());
+        SortedMap<BatchIdentity, Batch> pending = new TreeMap<BatchIdentity, Batch>();
+
+        BatchWriter batchWriter = new BatchWriter();
+        assertEquals(State.INITIALIZED, batchWriter.getState());
+        batchWriter.handleConnect(outbound, handler);
+        assertEquals(State.WAITING, batchWriter.getState());
+        Batch batch = new Batch(channel, timestamp, Arrays.asList(payloads));
+        batchWriter.push(batch, pending);
+        assertEquals(1, pending.size());
+        assertEquals(batch, pending.get(batch));
+        assertEquals(State.WRITE_BATCH_HEADER, batchWriter.getState());
         Answer<Integer> readBatchHeader = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
@@ -152,8 +159,8 @@ public class TestBatchWriter {
             }
         };
         when(outbound.write(isA(ByteBuffer.class))).thenAnswer(readBatchHeader).thenAnswer(readEventHeader0).thenAnswer(readPayload0).thenAnswer(readEventHeader1).thenAnswer(readPayload1).thenAnswer(readEventHeader2).thenAnswer(readPayload2);
-        spinner.handleWrite(outbound);
-        assertEquals(State.WAITING, spinner.getState());
+        batchWriter.handleWrite(outbound);
+        assertEquals(State.WAITING, batchWriter.getState());
         verify(outbound, new Times(7)).write(isA(ByteBuffer.class));
     }
 }

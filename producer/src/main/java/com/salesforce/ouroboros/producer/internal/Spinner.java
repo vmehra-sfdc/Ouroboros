@@ -44,7 +44,6 @@ import com.salesforce.ouroboros.util.rate.Controller;
  * 
  */
 public class Spinner implements CommunicationsHandler {
-
     private final BatchAcknowledgement               ack;
     private final Controller                         controller;
     private final Logger                             log         = Logger.getLogger(Spinner.class.getCanonicalName());
@@ -52,6 +51,7 @@ public class Spinner implements CommunicationsHandler {
     private final AtomicInteger                      sampleCount = new AtomicInteger();
     private final int                                sampleFrequency;
     private final BatchWriter                        writer;
+    private SocketChannelHandler                     handler;
 
     public Spinner(Controller rateController, int sampleFrequency) {
         writer = new BatchWriter();
@@ -61,6 +61,12 @@ public class Spinner implements CommunicationsHandler {
         this.sampleFrequency = sampleFrequency;
     }
 
+    /**
+     * Acknowledge a successful commit of an event batch.
+     * 
+     * @param ack
+     *            - the identity of the successfully commited event batch
+     */
     public void acknowledge(BatchIdentity ack) {
         Batch batch = pending.remove(ack);
         if (batch != null) {
@@ -82,8 +88,7 @@ public class Spinner implements CommunicationsHandler {
      * Close the receiver
      */
     public void close() {
-        // TODO Auto-generated method stub
-
+        handler.close();
     }
 
     @Override
@@ -97,8 +102,9 @@ public class Spinner implements CommunicationsHandler {
      * 
      * @param channel
      *            - the Channel
-     * @return a SortedSet of all the batch events for the channel that have not
-     *         been acknowledged
+     * @return a SortedMap of all the batch events for the channel that have not
+     *         been acknowledged. All pending batches for this channel are
+     *         stored in ascending timestamp order
      */
     public SortedMap<BatchIdentity, Batch> getPending(UUID channel) {
         return pending.subMap(new BatchIdentity(channel, 0),
@@ -113,6 +119,7 @@ public class Spinner implements CommunicationsHandler {
     @Override
     public void handleConnect(SocketChannel channel,
                               SocketChannelHandler handler) {
+        this.handler = handler;
         ack.handleConnect(channel, handler);
         writer.handleConnect(channel, handler);
     }
@@ -136,8 +143,7 @@ public class Spinner implements CommunicationsHandler {
      *         the error state.
      */
     public boolean push(Batch events) {
-        pending.put(events, events);
-        return writer.push(events);
+        return writer.push(events, pending);
     }
 
     /**

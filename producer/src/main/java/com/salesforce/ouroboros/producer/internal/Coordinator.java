@@ -159,7 +159,8 @@ public class Coordinator implements Member, ChannelMessageHandler {
                 if (spinner == null) { // primary is dead, so get mirror
                     spinner = spinners.get(channelPair[1]);
                 }
-                channels.put(channel, spinner);
+                Spinner previous = channels.put(channel, spinner);
+                assert previous == null : String.format("Apparently this node %s is already primary for %");
             }
         }
 
@@ -167,14 +168,19 @@ public class Coordinator implements Member, ChannelMessageHandler {
         for (Entry<UUID, Spinner> entry : channels.entrySet()) {
             Node[] pair = getChannelBufferReplicationPair(entry.getKey());
             if (deadMembers.contains(pair[0])) {
-                Spinner spinner = spinners.get(entry.getKey());
-                if (spinner == null) {
+                Spinner newPrimary = spinners.get(entry.getKey());
+                if (newPrimary == null) {
                     if (log.isLoggable(Level.WARNING)) {
                         log.warning(String.format("Both the primary and the secondary for %s have failed!",
                                                   entry.getKey()));
                     }
                 } else {
-                    channels.put(entry.getKey(), spinner);
+                    Spinner failedPrimary = entry.getValue();
+                    // Fail over to the new primary
+                    for (Batch batch : failedPrimary.getPending(entry.getKey()).values()) {
+                        newPrimary.push(batch);
+                    }
+                    entry.setValue(newPrimary);
                 }
             }
         }

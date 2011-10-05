@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -105,11 +106,25 @@ public class BatchWriter {
         }
     }
 
-    public boolean push(Batch events) {
+    /**
+     * Push the batch of events into the system. If the push is successful, the
+     * batch of events will be added to the list of pending events, waiting for
+     * acknowledgement.
+     * 
+     * @param events
+     *            - the batch of events to push
+     * @param pending
+     *            - the map of pending events to record the batch, if the push
+     *            can continue.
+     * @return true if the events have been scheduled for push, false if the
+     *         receiver cannot push the events
+     */
+    public boolean push(Batch events, Map<BatchIdentity, Batch> pending) {
         State s = state.get();
         if (s == State.CLOSED || s == State.ERROR) {
             return false;
         }
+        pending.put(events, events);
         queued.add(events);
         process();
         return true;
