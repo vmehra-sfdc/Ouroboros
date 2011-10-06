@@ -39,6 +39,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -59,21 +60,23 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * 
  */
 public class Coordinator implements Member, ChannelMessageHandler {
-    private final static Logger                   log               = Logger.getLogger(Coordinator.class.getCanonicalName());
+    private final static Logger                           log          = Logger.getLogger(Coordinator.class.getCanonicalName());
 
-    private volatile ConsistentHashFunction<Node> channelBufferRing = new ConsistentHashFunction<Node>();
-    private final SortedSet<Node>                 channelBuffers    = new ConcurrentSkipListSet<Node>();
-    private final Map<UUID, Spinner>              channels          = new ConcurrentHashMap<UUID, Spinner>();
-    private final SortedSet<UUID>                 mirrors           = new ConcurrentSkipListSet<UUID>();
-    private final SortedSet<Node>                 newChannelBuffers = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>                 newProducers      = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<UUID>                 primary           = new ConcurrentSkipListSet<UUID>();
-    private volatile ConsistentHashFunction<Node> producerRing      = new ConsistentHashFunction<Node>();
-    private final SortedSet<Node>                 producers         = new ConcurrentSkipListSet<Node>();
-    private final Node                            self;
-    private final ConcurrentMap<Node, Spinner>    spinners          = new ConcurrentHashMap<Node, Spinner>();
-    private Switchboard                           switchboard;
-    private final Map<Node, ContactInformation>   yellowPages       = new ConcurrentHashMap<Node, ContactInformation>();
+    private AtomicReference<ConsistentHashFunction<Node>> weaverRing   = new AtomicReference<ConsistentHashFunction<Node>>(
+                                                                                                                           new ConsistentHashFunction<Node>());
+    private final SortedSet<Node>                         weavers      = new ConcurrentSkipListSet<Node>();
+    private final Map<UUID, Spinner>                      channels     = new ConcurrentHashMap<UUID, Spinner>();
+    private final SortedSet<UUID>                         mirrors      = new ConcurrentSkipListSet<UUID>();
+    private final SortedSet<Node>                         newWeavers   = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>                         newProducers = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<UUID>                         primary      = new ConcurrentSkipListSet<UUID>();
+    private AtomicReference<ConsistentHashFunction<Node>> producerRing = new AtomicReference<ConsistentHashFunction<Node>>(
+                                                                                                                           new ConsistentHashFunction<Node>());
+    private final SortedSet<Node>                         producers    = new ConcurrentSkipListSet<Node>();
+    private final Node                                    self;
+    private final ConcurrentMap<Node, Spinner>            spinners     = new ConcurrentHashMap<Node, Spinner>();
+    private Switchboard                                   switchboard;
+    private final Map<Node, ContactInformation>           yellowPages  = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(Node self) {
         this.self = self;
@@ -96,8 +99,6 @@ public class Coordinator implements Member, ChannelMessageHandler {
 
     @Override
     public void destabilize() {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -105,7 +106,7 @@ public class Coordinator implements Member, ChannelMessageHandler {
                          Serializable payload, long time) {
         switch (type) {
             case ADVERTISE_CHANNEL_BUFFER:
-                channelBuffers.add(sender);
+                weavers.add(sender);
                 yellowPages.put(sender, (ContactInformation) payload);
                 break;
             case ADVERTISE_PRODUCER:
@@ -221,32 +222,42 @@ public class Coordinator implements Member, ChannelMessageHandler {
 
     @Override
     public void stabilized() {
-        failover(switchboard.getDeadMembers());
         filterSystemMembership();
+        failover(switchboard.getDeadMembers());
     }
 
     private void filterSystemMembership() {
         producers.removeAll(switchboard.getDeadMembers());
-        channelBuffers.removeAll(switchboard.getDeadMembers());
+        weavers.removeAll(switchboard.getDeadMembers());
         newProducers.clear();
-        newChannelBuffers.clear();
+        newWeavers.clear();
         for (Node node : switchboard.getNewMembers()) {
             if (producers.remove(node)) {
                 newProducers.add(node);
             }
-            if (channelBuffers.remove(node)) {
+            if (weavers.remove(node)) {
                 newProducers.add(node);
             }
         }
     }
 
     private Node[] getChannelBufferReplicationPair(UUID channel) {
-        List<Node> pair = channelBufferRing.hash(point(channel), 2);
+        List<Node> pair = weaverRing.get().hash(point(channel), 2);
         return new Node[] { pair.get(0), pair.get(1) };
     }
 
     private Node[] getProducerReplicationPair(UUID channel) {
-        List<Node> pair = producerRing.hash(point(channel), 2);
+        List<Node> pair = producerRing.get().hash(point(channel), 2);
         return new Node[] { pair.get(0), pair.get(1) };
+    }
+
+    /**
+     * Update the consistent hash function for the weaver processs ring.
+     * 
+     * @param ring
+     *            - the updated consistent hash function
+     */
+    public void updateRing(ConsistentHashFunction<Node> ring) {
+        weaverRing.set(ring);
     }
 }
