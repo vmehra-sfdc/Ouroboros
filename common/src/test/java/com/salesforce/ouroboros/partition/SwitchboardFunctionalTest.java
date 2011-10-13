@@ -100,13 +100,14 @@ public class SwitchboardFunctionalTest {
     }
 
     static class M implements Member {
-        Node             node;
+        final Node        node;
+        volatile boolean  stabilized = false;
+        final Switchboard switchboard;
 
-        volatile boolean stabilized = false;
-        Switchboard      switchboard;
-
-        M(Node n) {
+        M(Node n, Switchboard s) {
             node = n;
+            switchboard = s;
+            switchboard.setMember(this);
         }
 
         @Override
@@ -136,11 +137,6 @@ public class SwitchboardFunctionalTest {
                              Serializable payload, long time) {
             // TODO Auto-generated method stub
 
-        }
-
-        @Override
-        public void setSwitchboard(Switchboard switchboard) {
-            this.switchboard = switchboard;
         }
 
         @Override
@@ -357,7 +353,8 @@ public class SwitchboardFunctionalTest {
 
         @Bean(initMethod = "start", destroyMethod = "terminate")
         public Switchboard switchboard() {
-            return new Switchboard(member(), memberNode(), partition());
+            Switchboard switchboard = new Switchboard(memberNode(), partition());
+            return switchboard;
         }
 
         @Bean
@@ -367,7 +364,7 @@ public class SwitchboardFunctionalTest {
 
         @Bean
         public M member() {
-            return new M(memberNode());
+            return new M(memberNode(), switchboard());
         }
     }
 
