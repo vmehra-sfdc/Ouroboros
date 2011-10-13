@@ -75,11 +75,12 @@ public class Coordinator implements Member, ChannelMessageHandler {
     private final SortedSet<Node>                         producers    = new ConcurrentSkipListSet<Node>();
     private final Node                                    self;
     private final ConcurrentMap<Node, Spinner>            spinners     = new ConcurrentHashMap<Node, Spinner>();
-    private Switchboard                                   switchboard;
+    private final Switchboard                             switchboard;
     private final Map<Node, ContactInformation>           yellowPages  = new ConcurrentHashMap<Node, ContactInformation>();
 
-    public Coordinator(Node self) {
+    public Coordinator(Node self, Switchboard switchboard) {
         this.self = self;
+        this.switchboard = switchboard;
     }
 
     @Override
@@ -135,12 +136,11 @@ public class Coordinator implements Member, ChannelMessageHandler {
      *         primary producer
      */
     public List<UUID> failover(Collection<Node> deadMembers) {
-        // Close dead spinners
+        // Initiate the failover proceedure for the dead spinners
         for (Iterator<Entry<Node, Spinner>> entries = spinners.entrySet().iterator(); entries.hasNext();) {
             Entry<Node, Spinner> entry = entries.next();
             if (deadMembers.contains(entry.getKey())) {
-                entry.getValue().close();
-                entries.remove();
+                entry.getValue().failover();
             }
         }
 
@@ -161,7 +161,7 @@ public class Coordinator implements Member, ChannelMessageHandler {
                     spinner = spinners.get(channelPair[1]);
                 }
                 Spinner previous = channels.put(channel, spinner);
-                assert previous == null : String.format("Apparently this node %s is already primary for %");
+                assert previous == null : String.format("Apparently node %s is already primary for %");
             }
         }
 
@@ -183,6 +183,14 @@ public class Coordinator implements Member, ChannelMessageHandler {
                     }
                     entry.setValue(newPrimary);
                 }
+            }
+        }
+
+        // Remove dead spinners
+        for (Iterator<Entry<Node, Spinner>> entries = spinners.entrySet().iterator(); entries.hasNext();) {
+            Entry<Node, Spinner> entry = entries.next();
+            if (deadMembers.contains(entry.getKey())) {
+                entries.remove();
             }
         }
         return newPrimaries;
@@ -213,11 +221,6 @@ public class Coordinator implements Member, ChannelMessageHandler {
     public void primaryOpened(UUID channel, Node primary) {
         // TODO Auto-generated method stub
 
-    }
-
-    @Override
-    public void setSwitchboard(Switchboard switchboard) {
-        this.switchboard = switchboard;
     }
 
     @Override

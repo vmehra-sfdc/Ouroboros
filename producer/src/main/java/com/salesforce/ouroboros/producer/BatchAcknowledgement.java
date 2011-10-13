@@ -42,7 +42,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
  */
 public class BatchAcknowledgement {
     public enum State {
-        CLOSED, ERROR, INITIALIZED, READ_ACK;
+        CLOSED, ERROR, FAILOVER, INITIALIZED, READ_ACK;
     };
 
     private final static Logger           log       = Logger.getLogger(BatchAcknowledgement.class.getCanonicalName());
@@ -63,6 +63,10 @@ public class BatchAcknowledgement {
         }
     }
 
+    public void failover() {
+        state.set(State.FAILOVER);
+    }
+
     public State getState() {
         return state.get();
     }
@@ -79,7 +83,13 @@ public class BatchAcknowledgement {
         switch (s) {
             case READ_ACK: {
                 readAcknowlegement(channel);
+                break;
             }
+            case FAILOVER: {
+                break;
+            }
+            default:
+                error();
         }
     }
 

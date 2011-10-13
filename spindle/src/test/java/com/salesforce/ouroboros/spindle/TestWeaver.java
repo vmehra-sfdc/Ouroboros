@@ -66,7 +66,8 @@ public class TestWeaver {
         WeaverConfigation config = new WeaverConfigation();
         config.setId(id);
         config.setRoot(root);
-        Weaver weaver = new Weaver(config, coordinator);
+        Weaver weaver = new Weaver(config);
+        weaver.setCoordinator(coordinator);
         weaver.openPrimary(channel, mirror);
         assertNotNull(weaver.eventChannelFor(channel));
         weaver.close(channel);
@@ -88,7 +89,8 @@ public class TestWeaver {
         WeaverConfigation config = new WeaverConfigation();
         config.setId(id);
         config.setRoot(root);
-        Weaver weaver = new Weaver(config, coordinator);
+        Weaver weaver = new Weaver(config);
+        weaver.setCoordinator(coordinator);
         weaver.openMirror(channel, primary);
         EventChannel eventChannel = weaver.eventChannelFor(channel);
         assertNotNull(eventChannel);
@@ -111,7 +113,8 @@ public class TestWeaver {
         WeaverConfigation config = new WeaverConfigation();
         config.setId(id);
         config.setRoot(root);
-        Weaver weaver = new Weaver(config, coordinator);
+        Weaver weaver = new Weaver(config);
+        weaver.setCoordinator(coordinator);
         weaver.openPrimary(channel, mirror);
         EventChannel eventChannel = weaver.eventChannelFor(channel);
         assertNotNull(eventChannel);
@@ -148,7 +151,8 @@ public class TestWeaver {
         WeaverConfigation config = new WeaverConfigation();
         config.setId(id);
         config.setRoot(root);
-        Weaver weaver = new Weaver(config, coordinator);
+        Weaver weaver = new Weaver(config);
+        weaver.setCoordinator(coordinator);
         weaver.start();
         weaver.openReplicator(mirror, info, rendezvous);
         SocketChannel connected = server.accept();

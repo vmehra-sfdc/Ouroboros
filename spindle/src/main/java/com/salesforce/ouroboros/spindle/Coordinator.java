@@ -71,27 +71,33 @@ public class Coordinator implements Member, ChannelMessageHandler {
     static final TimeUnit                                 TIMEOUT_UNIT         = TimeUnit.MINUTES;
 
     private final Set<UUID>                               channels             = new HashSet<UUID>();
-    private Weaver                                        localWeaver;
+    private final Weaver                                  weaver;
     private final SortedSet<Node>                         members              = new ConcurrentSkipListSet<Node>();
     private final SortedSet<Node>                         newMembers           = new ConcurrentSkipListSet<Node>();
     private final AtomicReference<Rendezvous>             replicatorRendezvous = new AtomicReference<Rendezvous>();
-    private Switchboard                                   switchboard;
+    private final Switchboard                             switchboard;
     private final ScheduledExecutorService                timer;
     private AtomicReference<ConsistentHashFunction<Node>> weaverRing           = new AtomicReference<ConsistentHashFunction<Node>>(
                                                                                                                                    new ConsistentHashFunction<Node>());
     private final Map<Node, ContactInformation>           yellowPages          = new ConcurrentHashMap<Node, ContactInformation>();
 
-    public Coordinator(ScheduledExecutorService timer) {
+    public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
+                       Weaver weaver) {
         this.timer = timer;
+        this.switchboard = switchboard;
+        this.weaver = weaver;
+        switchboard.setMember(this);
+        weaver.setCoordinator(this);
+        yellowPages.put(weaver.getId(), weaver.getContactInformation());
     }
 
     @Override
     public void advertise() {
-        assert localWeaver != null : "local weaver has not been initialized";
-        ContactInformation info = yellowPages.get(localWeaver.getId());
+        assert weaver != null : "local weaver has not been initialized";
+        ContactInformation info = yellowPages.get(weaver.getId());
         assert info != null : "local weaver contact information has not been initialized";
         switchboard.ringCast(new Message(
-                                         localWeaver.getId(),
+                                         weaver.getId(),
                                          GlobalMessageType.ADVERTISE_CHANNEL_BUFFER,
                                          info));
     }
@@ -107,15 +113,15 @@ public class Coordinator implements Member, ChannelMessageHandler {
     public void close(UUID channel, Node requester) {
         channels.remove(channel);
         Node[] pair = getReplicationPair(channel);
-        if (pair[0].equals(localWeaver.getId())) {
+        if (pair[0].equals(weaver.getId())) {
             switchboard.send(new Message(getId(),
                                          ChannelMessage.PRIMARY_CLOSED, channel),
                              requester);
-            localWeaver.close(channel);
-        } else if (pair[1].equals(localWeaver.getId())) {
+            weaver.close(channel);
+        } else if (pair[1].equals(weaver.getId())) {
             switchboard.send(new Message(getId(), ChannelMessage.MIRROR_CLOSED,
                                          channel), requester);
-            localWeaver.close(channel);
+            weaver.close(channel);
         }
     }
 
@@ -160,13 +166,13 @@ public class Coordinator implements Member, ChannelMessageHandler {
                                        node));
             }
             yellowPages.remove(node);
-            localWeaver.closeReplicator(node);
+            weaver.closeReplicator(node);
         }
-        localWeaver.failover(deadMembers);
+        weaver.failover(deadMembers);
     }
 
     public Node getId() {
-        return localWeaver.getId();
+        return weaver.getId();
     }
 
     public SortedSet<Node> getMembers() {
@@ -202,7 +208,7 @@ public class Coordinator implements Member, ChannelMessageHandler {
      * @return true if this process is the leader of the group.
      */
     public boolean isLeader() {
-        return localWeaver.getId().equals(members.last());
+        return weaver.getId().equals(members.last());
     }
 
     @Override
@@ -233,21 +239,21 @@ public class Coordinator implements Member, ChannelMessageHandler {
             return;
         }
         Node[] pair = getReplicationPair(channel);
-        if (pair[0].equals(localWeaver.getId())) {
+        if (pair[0].equals(weaver.getId())) {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Opening primary for channel %s on %s",
                                        channel, getId()));
             }
-            localWeaver.openPrimary(channel, pair[1]);
+            weaver.openPrimary(channel, pair[1]);
             switchboard.send(new Message(getId(),
                                          ChannelMessage.PRIMARY_OPENED, channel),
                              requester);
-        } else if (pair[1].equals(localWeaver.getId())) {
+        } else if (pair[1].equals(weaver.getId())) {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Opening mirror for channel %s on %s",
                                        channel, getId()));
             }
-            localWeaver.openMirror(channel, pair[0]);
+            weaver.openMirror(channel, pair[0]);
             switchboard.send(new Message(getId(), ChannelMessage.MIRROR_OPENED,
                                          channel), requester);
         } else {
@@ -275,8 +281,7 @@ public class Coordinator implements Member, ChannelMessageHandler {
         Rendezvous rendezvous = new Rendezvous(newMembers.size(),
                                                rendezvousAction);
         for (Node member : newMembers) {
-            localWeaver.openReplicator(member, yellowPages.get(member),
-                                       rendezvous);
+            weaver.openReplicator(member, yellowPages.get(member), rendezvous);
         }
         rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer,
                                         timeoutAction);
@@ -296,17 +301,6 @@ public class Coordinator implements Member, ChannelMessageHandler {
     }
 
     /**
-     * Set the local weaver
-     * 
-     * @param weaver
-     *            - the local weaver for this coordinator
-     */
-    public void ready(Weaver weaver, ContactInformation info) {
-        localWeaver = weaver;
-        yellowPages.put(weaver.getId(), info);
-    }
-
-    /**
      * Rebalance the channels which this node has responsibility for
      * 
      * @param remapped
@@ -319,8 +313,8 @@ public class Coordinator implements Member, ChannelMessageHandler {
                                  Collection<Node> deadMembers) {
         List<Xerox> xeroxes = new ArrayList<Xerox>();
         for (Entry<UUID, Node[]> entry : remapped.entrySet()) {
-            xeroxes.addAll(localWeaver.rebalance(entry.getKey(),
-                                                 entry.getValue(), deadMembers));
+            xeroxes.addAll(weaver.rebalance(entry.getKey(), entry.getValue(),
+                                            deadMembers));
         }
         return xeroxes;
     }
@@ -339,7 +333,7 @@ public class Coordinator implements Member, ChannelMessageHandler {
             long channelPoint = point(channel);
             List<Node> newPair = newRing.hash(channelPoint, 2);
             List<Node> oldPair = weaverRing.get().hash(channelPoint, 2);
-            if (oldPair.contains(localWeaver.getId())) {
+            if (oldPair.contains(weaver.getId())) {
                 if (!oldPair.get(0).equals(newPair.get(0))
                     || !oldPair.get(1).equals(newPair.get(1))) {
                     remapped.put(channel,
@@ -348,11 +342,6 @@ public class Coordinator implements Member, ChannelMessageHandler {
             }
         }
         return remapped;
-    }
-
-    @Override
-    public void setSwitchboard(Switchboard switchboard) {
-        this.switchboard = switchboard;
     }
 
     @Override

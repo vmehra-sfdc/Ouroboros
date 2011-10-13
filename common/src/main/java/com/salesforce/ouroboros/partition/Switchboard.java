@@ -48,8 +48,8 @@ import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 import org.smartfrog.services.anubis.partition.views.View;
 
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.channel.ChannelMessageHandler;
 import com.salesforce.ouroboros.channel.ChannelMessage;
+import com.salesforce.ouroboros.channel.ChannelMessageHandler;
 
 /**
  * The common high level distribute coordination logic for Ouroboros group
@@ -77,12 +77,10 @@ public class Switchboard {
         void dispatch(GlobalMessageType type, Node sender,
                       Serializable payload, long time);
 
-        void setSwitchboard(Switchboard switchboard);
-
-        void stabilized();
-
         void dispatch(MemberDispatch type, Node sender, Serializable payload,
                       long time);
+
+        void stabilized();
 
     }
 
@@ -139,7 +137,7 @@ public class Switchboard {
     static final Logger                  log             = Logger.getLogger(Switchboard.class.getCanonicalName());
     private final SortedSet<Node>        deadMembers     = new TreeSet<Node>();
     private boolean                      leader          = false;
-    private final Member                 member;
+    private Member                       member;
     private SortedSet<Node>              previousMembers = new ConcurrentSkipListSet<Node>();
     private SortedSet<Node>              members         = new ConcurrentSkipListSet<Node>();
     private final Executor               messageProcessor;
@@ -151,11 +149,9 @@ public class Switchboard {
                                                                                       State.UNSTABLE);
     protected NodeIdSet                  view;
 
-    public Switchboard(Member m, Node node, Partition p) {
+    public Switchboard(Node node, Partition p) {
         self = node;
         partition = p;
-        member = m;
-        m.setSwitchboard(this);
         messageProcessor = Executors.newSingleThreadExecutor(new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -201,11 +197,6 @@ public class Switchboard {
         }
     }
 
-    public void dispatchToMember(MemberDispatch type, Node sender,
-                                 Serializable payload, long time) {
-        member.dispatch(type, sender, payload, time);
-    }
-
     public void dispatchToMember(ChannelMessage type, Node sender,
                                  Serializable payload, long time) {
         if (member instanceof ChannelMessageHandler) {
@@ -216,6 +207,11 @@ public class Switchboard {
                                         type, payload));
             }
         }
+    }
+
+    public void dispatchToMember(MemberDispatch type, Node sender,
+                                 Serializable payload, long time) {
+        member.dispatch(type, sender, payload, time);
     }
 
     public Collection<Node> getDeadMembers() {
@@ -237,10 +233,6 @@ public class Switchboard {
             }
         }
         return newMembers;
-    }
-
-    public State getPartitionState() {
-        return state.get();
     }
 
     public State getState() {
@@ -307,12 +299,6 @@ public class Switchboard {
         send(message, getRightNeighbor(ring));
     }
 
-    private Node getRightNeighbor(SortedSet<Node> ring) {
-        Iterator<Node> tail = ring.tailSet(self).iterator();
-        tail.next();
-        return tail.hasNext() ? tail.next() : ring.first();
-    }
-
     /**
      * Send a message to a specific node
      * 
@@ -344,12 +330,22 @@ public class Switchboard {
         }
     }
 
+    public void setMember(Member m) {
+        member = m;
+    }
+
     public void start() {
         partition.register(notification);
     }
 
     public void terminate() {
         partition.deregister(notification);
+    }
+
+    private Node getRightNeighbor(SortedSet<Node> ring) {
+        Iterator<Node> tail = ring.tailSet(self).iterator();
+        tail.next();
+        return tail.hasNext() ? tail.next() : ring.first();
     }
 
     // test access

@@ -121,7 +121,7 @@ public class Weaver implements Bundle {
 
     private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
     private final ContactInformation                contactInfo;
-    private final Coordinator                       coordinator;
+    private Coordinator                             coordinator;
     private final Node                              id;
     private final long                              maxSegmentSize;
     private final ServerSocketChannelHandler        replicationHandler;
@@ -130,10 +130,8 @@ public class Weaver implements Bundle {
     private final ServerSocketChannelHandler        spindleHandler;
     private final ChannelHandler                    xeroxHandler;
 
-    public Weaver(WeaverConfigation configuration, Coordinator coordinator)
-                                                                           throws IOException {
+    public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
-        this.coordinator = coordinator;
         id = configuration.getId();
         root = configuration.getRoot();
         maxSegmentSize = configuration.getMaxSegmentSize();
@@ -170,7 +168,6 @@ public class Weaver implements Bundle {
                                             String.format("Root is not a directory: %s",
                                                           root.getAbsolutePath()));
         }
-        coordinator.ready(this, contactInfo);
     }
 
     public void close(UUID channel) {
@@ -387,5 +384,9 @@ public class Weaver implements Bundle {
      */
     private boolean thisEndInitiatesConnectionsTo(Node target) {
         return id.compareTo(target) < 0;
+    }
+
+    public void setCoordinator(Coordinator coordinator) {
+        this.coordinator = coordinator;
     }
 }

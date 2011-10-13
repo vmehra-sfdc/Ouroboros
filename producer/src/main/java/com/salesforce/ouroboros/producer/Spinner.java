@@ -98,6 +98,12 @@ public class Spinner implements CommunicationsHandler {
         writer.closing(channel);
     }
 
+    public void failover() {
+        writer.failover();
+        ack.failover();
+        handler.close();
+    }
+
     /**
      * Retrieve all the unacknowledged batch events for the channel.
      * 

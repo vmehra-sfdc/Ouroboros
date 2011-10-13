@@ -75,12 +75,11 @@ public class TestCoordinator {
     public void testClose() {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
+        Switchboard switchboard = mock(Switchboard.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
-        Coordinator coordinator = new Coordinator(timer);
-        coordinator.ready(weaver, dummyInfo);
-        Switchboard switchboard = mock(Switchboard.class);
-        coordinator.setSwitchboard(switchboard);
+        when(weaver.getContactInformation()).thenReturn(dummyInfo);
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
         Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -145,10 +144,11 @@ public class TestCoordinator {
     public void testFailover() {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
+        Switchboard switchboard = mock(Switchboard.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
-        Coordinator coordinator = new Coordinator(timer);
-        coordinator.ready(weaver, dummyInfo);
+        when(weaver.getContactInformation()).thenReturn(dummyInfo);
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver); 
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -190,12 +190,11 @@ public class TestCoordinator {
     public void testOpen() {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
+        Switchboard switchboard = mock(Switchboard.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
-        Coordinator coordinator = new Coordinator(timer);
-        coordinator.ready(weaver, dummyInfo);
-        Switchboard switchboard = mock(Switchboard.class);
-        coordinator.setSwitchboard(switchboard);
+        when(weaver.getContactInformation()).thenReturn(dummyInfo);
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver); 
         Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -237,9 +236,10 @@ public class TestCoordinator {
         Runnable rendezvousAction = mock(Runnable.class);
         Runnable cancelledAction = mock(Runnable.class);
         Weaver weaver = mock(Weaver.class);
+        Switchboard switchboard = mock(Switchboard.class);
         when(weaver.getId()).thenReturn(new Node(0, 0, 0));
-        Coordinator coordinator = new Coordinator(timer);
-        coordinator.ready(weaver, dummyInfo);
+        when(weaver.getContactInformation()).thenReturn(dummyInfo);
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver); 
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -280,12 +280,11 @@ public class TestCoordinator {
     public void testRebalance() {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
+        Switchboard switchboard = mock(Switchboard.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
-        Coordinator coordinator = new Coordinator(timer);
-        coordinator.ready(weaver, dummyInfo);
-        Switchboard switchboard = mock(Switchboard.class);
-        coordinator.setSwitchboard(switchboard);
+        when(weaver.getContactInformation()).thenReturn(dummyInfo);
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver); 
         Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -333,12 +332,11 @@ public class TestCoordinator {
     public void testRemap() {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
-        Coordinator coordinator = new Coordinator(timer);
         Node localNode = new Node(0, 0, 0);
-        when(weaver.getId()).thenReturn(localNode);
-        coordinator.ready(weaver, dummyInfo);
+        when(weaver.getId()).thenReturn(localNode); 
+        when(weaver.getContactInformation()).thenReturn(dummyInfo);
         Switchboard switchboard = mock(Switchboard.class);
-        coordinator.setSwitchboard(switchboard);
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
         Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);

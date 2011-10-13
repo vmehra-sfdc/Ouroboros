@@ -50,8 +50,8 @@ import com.salesforce.ouroboros.EventHeader;
  */
 public class BatchWriter {
     public enum State {
-        CLOSED, ERROR, INITIALIZED, INTERRUPTED, PROCESSING, WAITING,
-        WRITE_BATCH_HEADER, WRITE_EVENT_HEADER, WRITE_PAYLOAD;
+        CLOSED, ERROR, FAILOVER, INITIALIZED, INTERRUPTED, PROCESSING,
+        WAITING, WRITE_BATCH_HEADER, WRITE_EVENT_HEADER, WRITE_PAYLOAD;
     }
 
     private static final Logger           log          = Logger.getLogger(BatchWriter.class.getCanonicalName());
@@ -68,11 +68,16 @@ public class BatchWriter {
                                                                                     State.INITIALIZED);
 
     public void closing(SocketChannel channel) {
-        if (state.get() != State.ERROR) {
+        final State s = state.get();
+        if (s != State.ERROR) {
             state.set(State.CLOSED);
         }
         queued.clear();
         batch.clear();
+    }
+
+    public void failover() {
+        state.set(State.FAILOVER);
     }
 
     public State getState() {
@@ -97,6 +102,8 @@ public class BatchWriter {
                 break;
             case WRITE_EVENT_HEADER:
                 writeEventHeader(channel);
+                break;
+            case FAILOVER:
                 break;
             default:
                 state.set(State.ERROR);
