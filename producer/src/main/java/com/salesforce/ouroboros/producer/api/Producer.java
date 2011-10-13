@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer;
+package com.salesforce.ouroboros.producer.api;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -33,8 +33,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.salesforce.ouroboros.producer.internal.Batch;
-import com.salesforce.ouroboros.producer.internal.Spinner;
+import com.salesforce.ouroboros.producer.Batch;
+import com.salesforce.ouroboros.producer.Spinner;
 import com.salesforce.ouroboros.util.rate.Controller;
 import com.salesforce.ouroboros.util.rate.controllers.RateController;
 import com.salesforce.ouroboros.util.rate.controllers.RateLimiter;

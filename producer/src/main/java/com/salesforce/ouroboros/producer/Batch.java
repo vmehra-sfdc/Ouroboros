@@ -25,28 +25,41 @@
  */
 package com.salesforce.ouroboros.producer;
 
+import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.UUID;
+
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class RateLimiteExceededException extends Exception {
-    private static final long serialVersionUID = 1L;
+public class Batch extends BatchIdentity {
+    public final Collection<ByteBuffer> events;
+    private final long                  created = System.currentTimeMillis();
 
-    public RateLimiteExceededException() {
-        super();
+    public Batch(UUID channel, long timestamp, Collection<ByteBuffer> events) {
+        super(channel, timestamp);
+        assert events != null : "events must not be null";
+        this.events = events;
     }
 
-    public RateLimiteExceededException(String message, Throwable cause) {
-        super(message, cause);
+    /**
+     * Acknowledge the batch comitment.
+     * 
+     * @return the interval, in milliseconds, between when the batch was
+     *         submitted and when it was acknowledged
+     */
+    public int acknowledged() {
+        return (int) (System.currentTimeMillis() - created);
     }
 
-    public RateLimiteExceededException(String message) {
-        super(message);
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "Batch [#events=" + events.size() + ", created=" + created
+               + ", channel=" + channel + ", timestamp=" + timestamp + "]";
     }
-
-    public RateLimiteExceededException(Throwable cause) {
-        super(cause);
-    }
-
 }

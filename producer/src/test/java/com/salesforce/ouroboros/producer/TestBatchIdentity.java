@@ -25,27 +25,41 @@
  */
 package com.salesforce.ouroboros.producer;
 
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
+
+import java.util.UUID;
+
+import org.junit.Test;
+
+import com.salesforce.ouroboros.producer.BatchIdentity;
+
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class UnknownChannelException extends Exception {
-    private static final long serialVersionUID = 1L;
+public class TestBatchIdentity {
+    @Test
+    public void testCompare() {
+        UUID channel = UUID.randomUUID();
+        BatchIdentity lowBatch = new BatchIdentity(channel, 0L);
+        BatchIdentity highBatch = new BatchIdentity(channel, Long.MAX_VALUE);
+        assertTrue(lowBatch.compareTo(highBatch) < 0);
+        assertTrue(highBatch.compareTo(lowBatch) > 0);
 
-    public UnknownChannelException() {
-        super();
-    }
+        UUID channel2 = new UUID(channel.getMostSignificantBits(),
+                                 channel.getLeastSignificantBits() + 1);
 
-    public UnknownChannelException(String message, Throwable cause) {
-        super(message, cause);
-    }
+        BatchIdentity otherBatch = new BatchIdentity(channel2, 0L);
+        assertTrue(lowBatch.compareTo(otherBatch) < 0);
+        assertTrue(highBatch.compareTo(otherBatch) < 0);
+        assertTrue(otherBatch.compareTo(lowBatch) > 0);
+        assertTrue(otherBatch.compareTo(highBatch) > 0);
 
-    public UnknownChannelException(String message) {
-        super(message);
-    }
-
-    public UnknownChannelException(Throwable cause) {
-        super(cause);
+        BatchIdentity equalsBatch = new BatchIdentity(channel, 0L);
+        assertEquals(lowBatch, equalsBatch);
+        assertEquals(0, lowBatch.compareTo(equalsBatch));
+        assertEquals(0, equalsBatch.compareTo(lowBatch));
     }
 }

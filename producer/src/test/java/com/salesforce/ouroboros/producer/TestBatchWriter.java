@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer.internal;
+package com.salesforce.ouroboros.producer;
 
 import static junit.framework.Assert.assertEquals;
 import static org.mockito.Matchers.isA;
@@ -47,9 +47,10 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
-import com.salesforce.ouroboros.producer.internal.Batch;
-import com.salesforce.ouroboros.producer.internal.BatchWriter;
-import com.salesforce.ouroboros.producer.internal.BatchWriter.State;
+import com.salesforce.ouroboros.producer.Batch;
+import com.salesforce.ouroboros.producer.BatchIdentity;
+import com.salesforce.ouroboros.producer.BatchWriter;
+import com.salesforce.ouroboros.producer.BatchWriter.State;
 
 /**
  * 

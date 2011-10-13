@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer.internal;
+package com.salesforce.ouroboros.producer;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
@@ -44,6 +44,9 @@ import org.mockito.Captor;
 import org.mockito.MockitoAnnotations;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.producer.Batch;
+import com.salesforce.ouroboros.producer.BatchIdentity;
+import com.salesforce.ouroboros.producer.Spinner;
 import com.salesforce.ouroboros.util.rate.Controller;
 
 /**
