@@ -25,9 +25,19 @@
  */
 package com.salesforce.ouroboros.producer;
 
+import static junit.framework.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.MockitoAnnotations;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.GlobalMessageType;
+import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 
 /**
@@ -36,10 +46,22 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * 
  */
 public class TestCoordinator {
+    @Captor
+    ArgumentCaptor<Message> captor;
+
+    @Before
+    public void init() {
+        MockitoAnnotations.initMocks(this);
+    }
+    
+    @Test
     public void testAdvertise() {
         Node self = mock(Node.class);
         Switchboard switchboard = mock(Switchboard.class);
 
         Coordinator coordinator = new Coordinator(self, switchboard);
+        coordinator.advertise();
+        verify(switchboard).ringCast(captor.capture());
+        assertEquals(GlobalMessageType.ADVERTISE_PRODUCER, captor.getValue().type);
     }
 }
