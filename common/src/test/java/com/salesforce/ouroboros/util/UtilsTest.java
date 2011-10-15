@@ -25,39 +25,21 @@
  */
 package com.salesforce.ouroboros.util;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
 
-import com.fasterxml.uuid.UUIDType;
-import com.fasterxml.uuid.impl.NameBasedGenerator;
+import org.junit.Test;
+import static junit.framework.Assert.*;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-final public class Utils {
+public class UtilsTest {
 
-    private final static NameBasedGenerator UUID_GENERATOR;
-
-    static {
-        MessageDigest digester;
-        try {
-            digester = MessageDigest.getInstance("MD5");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Cannot get MD5 digester instance",
-                                            e);
-        }
-        UUID_GENERATOR = new NameBasedGenerator(null, digester,
-                                                UUIDType.NAME_BASED_MD5);
-    }
-
-    public static long point(UUID id) {
-        return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
-    }
-
-    public static UUID toUUID(String string) {
-        return UUID_GENERATOR.generate(string);
+    @Test
+    public void testToUUID() {
+        UUID id = Utils.toUUID("Give me slack or give me food or kill me");
+        assertEquals(new UUID(2667629127066337179L, -5045420069158256364L), id);
     }
 }

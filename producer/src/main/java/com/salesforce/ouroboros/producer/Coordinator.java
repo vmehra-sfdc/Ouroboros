@@ -45,7 +45,6 @@ import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.channel.ChannelMessageHandler;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
@@ -59,7 +58,7 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * @author hhildebrand
  * 
  */
-public class Coordinator implements Member, ChannelMessageHandler {
+public class Coordinator implements Member {
     private final static Logger                           log          = Logger.getLogger(Coordinator.class.getCanonicalName());
 
     private AtomicReference<ConsistentHashFunction<Node>> weaverRing   = new AtomicReference<ConsistentHashFunction<Node>>(
@@ -90,8 +89,13 @@ public class Coordinator implements Member, ChannelMessageHandler {
                                          null));
     }
 
-    @Override
-    public void close(UUID channel, Node requester) {
+    /**
+     * Close the channel
+     * 
+     * @param channel
+     *            - the id of the channel to close
+     */
+    public void close(UUID channel) {
         Spinner spinner = channels.remove(channel);
         if (spinner != null) {
             spinner.close(channel);
@@ -196,30 +200,13 @@ public class Coordinator implements Member, ChannelMessageHandler {
         return newPrimaries;
     }
 
-    @Override
-    public void mirrorClosed(UUID channel, Node mirror) {
-        // do nothing
-    }
-
-    @Override
-    public void mirrorOpened(UUID channel, Node mirror) {
-        // do nothing
-    }
-
-    @Override
-    public void open(UUID channel, Node requester) {
-
-    }
-
-    @Override
-    public void primaryClosed(UUID channel, Node primary) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void primaryOpened(UUID channel, Node primary) {
-        // TODO Auto-generated method stub
+    /**
+     * Open the channel identified by the supplied id
+     * 
+     * @param channel
+     *            - the unique id of the channel
+     */
+    public void open(UUID channel) {
 
     }
 

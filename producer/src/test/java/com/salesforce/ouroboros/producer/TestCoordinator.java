@@ -47,7 +47,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
  */
 public class TestCoordinator {
     @Captor
-    ArgumentCaptor<Message> captor;
+    ArgumentCaptor<Message> messageCaptor;
 
     @Before
     public void init() {
@@ -61,7 +61,7 @@ public class TestCoordinator {
 
         Coordinator coordinator = new Coordinator(self, switchboard);
         coordinator.advertise();
-        verify(switchboard).ringCast(captor.capture());
-        assertEquals(GlobalMessageType.ADVERTISE_PRODUCER, captor.getValue().type);
+        verify(switchboard).ringCast(messageCaptor.capture());
+        assertEquals(GlobalMessageType.ADVERTISE_PRODUCER, messageCaptor.getValue().type);
     }
 }

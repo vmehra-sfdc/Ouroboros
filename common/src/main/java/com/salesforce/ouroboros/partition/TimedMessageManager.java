@@ -23,41 +23,24 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.util;
+package com.salesforce.ouroboros.partition;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.UUID;
-
-import com.fasterxml.uuid.UUIDType;
-import com.fasterxml.uuid.impl.NameBasedGenerator;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-final public class Utils {
+public class TimedMessageManager {
+    private final int                      heartbeat;
+    private final int                      period;
+    private final ScheduledExecutorService timer;
 
-    private final static NameBasedGenerator UUID_GENERATOR;
-
-    static {
-        MessageDigest digester;
-        try {
-            digester = MessageDigest.getInstance("MD5");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Cannot get MD5 digester instance",
-                                            e);
-        }
-        UUID_GENERATOR = new NameBasedGenerator(null, digester,
-                                                UUIDType.NAME_BASED_MD5);
-    }
-
-    public static long point(UUID id) {
-        return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
-    }
-
-    public static UUID toUUID(String string) {
-        return UUID_GENERATOR.generate(string);
+    public TimedMessageManager(int heartbeat, int period,
+                               ScheduledExecutorService executor) {
+        this.heartbeat = heartbeat;
+        this.period = period;
+        timer = executor;
     }
 }
