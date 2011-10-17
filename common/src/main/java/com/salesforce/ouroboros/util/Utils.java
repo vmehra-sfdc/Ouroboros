@@ -44,13 +44,14 @@ final public class Utils {
     static {
         MessageDigest digester;
         try {
-            digester = MessageDigest.getInstance("MD5");
+            digester = MessageDigest.getInstance("SHA-1");
         } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Cannot get MD5 digester instance",
+            throw new IllegalStateException(
+                                            "Cannot get SHA-1 digester instance",
                                             e);
         }
         UUID_GENERATOR = new NameBasedGenerator(null, digester,
-                                                UUIDType.NAME_BASED_MD5);
+                                                UUIDType.NAME_BASED_SHA1);
     }
 
     public static long point(UUID id) {

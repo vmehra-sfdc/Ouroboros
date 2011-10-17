@@ -40,6 +40,6 @@ public class UtilsTest {
     @Test
     public void testToUUID() {
         UUID id = Utils.toUUID("Give me slack or give me food or kill me");
-        assertEquals(new UUID(2667629127066337179L, -5045420069158256364L), id);
+        assertEquals(new UUID(2600045304908566988L, -5179243405379937427L), id);
     }
 }
