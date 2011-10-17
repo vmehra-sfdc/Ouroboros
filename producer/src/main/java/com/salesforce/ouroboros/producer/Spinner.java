@@ -30,13 +30,11 @@ import java.util.NavigableMap;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.util.rate.Controller;
 
 /**
  * 
@@ -45,21 +43,17 @@ import com.salesforce.ouroboros.util.rate.Controller;
  */
 public class Spinner implements CommunicationsHandler {
     private final BatchAcknowledgement               ack;
-    private final Controller                         controller;
-    private final Logger                             log         = Logger.getLogger(Spinner.class.getCanonicalName());
-    private final NavigableMap<BatchIdentity, Batch> pending;
-    private final AtomicInteger                      sampleCount = new AtomicInteger();
-    private final int                                sampleFrequency;
-    private final BatchWriter                        writer;
+    private final Coordinator                        coordinator;
     private SocketChannelHandler                     handler;
+    private final Logger                             log = Logger.getLogger(Spinner.class.getCanonicalName());
+    private final NavigableMap<BatchIdentity, Batch> pending;
+    private final BatchWriter                        writer;
 
-    public Spinner(Controller rateController, int sampleFrequency) {
+    public Spinner(Coordinator coordinator) {
         writer = new BatchWriter();
         ack = new BatchAcknowledgement(this);
         pending = new ConcurrentSkipListMap<BatchIdentity, Batch>();
-
-        controller = rateController;
-        this.sampleFrequency = sampleFrequency;
+        this.coordinator = coordinator;
     }
 
     /**
@@ -71,16 +65,16 @@ public class Spinner implements CommunicationsHandler {
     public void acknowledge(BatchIdentity ack) {
         Batch batch = pending.remove(ack);
         if (batch != null) {
-            if (sampleCount.incrementAndGet() % sampleFrequency == 0) {
-                controller.sample(batch.acknowledged());
-            }
-            if (log.isLoggable(Level.FINEST)) {
-                log.finest(String.format("Batch %s acknowledged", ack));
+            coordinator.acknowledge(batch.interval());
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("Acknowledgement for %s on primary %s",
+                                        ack, coordinator.getId()));
             }
         } else {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Acknowledgement for %s, but no batch pending...",
-                                       ack));
+            coordinator.acknowledge(ack);
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("Acknowledgement for %s on mirror %s",
+                                        ack, coordinator.getId()));
             }
         }
     }
@@ -90,6 +84,16 @@ public class Spinner implements CommunicationsHandler {
      */
     public void close() {
         handler.close();
+    }
+
+    /**
+     * Close the multiplexed channel handled by this spinner
+     * 
+     * @param channel
+     *            - the id of the channel to close
+     */
+    public void close(UUID channel) {
+        getPending(channel).clear();
     }
 
     @Override
@@ -151,15 +155,5 @@ public class Spinner implements CommunicationsHandler {
      */
     public boolean push(Batch events) {
         return writer.push(events, pending);
-    }
-
-    /**
-     * Close the multiplexed channel handled by this spinner
-     * 
-     * @param channel
-     *            - the id of the channel to close
-     */
-    public void close(UUID channel) {
-        getPending(channel).clear();
     }
 }

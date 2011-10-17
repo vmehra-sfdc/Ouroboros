@@ -23,52 +23,29 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer;
-
-import static junit.framework.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.MockitoAnnotations;
-
-import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.api.producer.EventSource;
-import com.salesforce.ouroboros.partition.GlobalMessageType;
-import com.salesforce.ouroboros.partition.Message;
-import com.salesforce.ouroboros.partition.Switchboard;
+package com.salesforce.ouroboros.api.producer;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class TestCoordinator {
-    @Captor
-    ArgumentCaptor<Message> messageCaptor;
+public class UnknownChannelException extends Exception {
+    private static final long serialVersionUID = 1L;
 
-    @Before
-    public void init() {
-        MockitoAnnotations.initMocks(this);
+    public UnknownChannelException() {
+        super();
     }
 
-    @Test
-    public void testAdvertise() throws Exception {
-        Node self = mock(Node.class);
-        EventSource source = mock(EventSource.class);
-        Switchboard switchboard = mock(Switchboard.class);
+    public UnknownChannelException(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-        Coordinator coordinator = new Coordinator(
-                                                  self,
-                                                  switchboard,
-                                                  source,
-                                                  new CoordinatorConfiguration());
-        coordinator.advertise();
-        verify(switchboard).ringCast(messageCaptor.capture());
-        assertEquals(GlobalMessageType.ADVERTISE_PRODUCER,
-                     messageCaptor.getValue().type);
+    public UnknownChannelException(String message) {
+        super(message);
+    }
+
+    public UnknownChannelException(Throwable cause) {
+        super(cause);
     }
 }

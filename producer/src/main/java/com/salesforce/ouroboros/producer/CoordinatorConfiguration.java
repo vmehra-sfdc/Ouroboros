@@ -23,20 +23,48 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer.api;
+package com.salesforce.ouroboros.producer;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import com.hellblazer.pinkie.SocketOptions;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class ProducerConfiguration {
-    private double maximumEventRate;
-    private double minimumEventRate;
-    private int    minimumTokenRegenerationTime;
-    private int    sampleWindowSize;
-    private double targetEventRate;
-    private int    tokenLimit;
+public class CoordinatorConfiguration {
+
+    public static ThreadFactory threadFactory(final String prefix) {
+        return new ThreadFactory() {
+            private AtomicInteger count = new AtomicInteger(0);
+
+            @Override
+            public Thread newThread(Runnable runnable) {
+                Thread thread = new Thread(
+                                           runnable,
+                                           String.format("%s[%s]",
+                                                         prefix,
+                                                         count.getAndIncrement()));
+                thread.setDaemon(true);
+                return thread;
+            }
+        };
+    }
+
+    private double              maximumEventRate             = 2000.0;
+    private double              minimumEventRate             = 500.0;
+    private int                 minimumTokenRegenerationTime = 10;
+    private int                 sampleFrequency              = 10;
+    private int                 sampleWindowSize             = 1000;
+    private Executor            spinners                     = Executors.newSingleThreadExecutor(threadFactory("Spinner"));
+    private final SocketOptions spinnerSocketOptions         = new SocketOptions();
+    private double              targetEventRate              = 1000.0;
+    private int                 tokenLimit                   = 1000;
 
     /**
      * @return the maximumEventRate
@@ -60,10 +88,31 @@ public class ProducerConfiguration {
     }
 
     /**
+     * @return the sampleFrequency
+     */
+    public int getSampleFrequency() {
+        return sampleFrequency;
+    }
+
+    /**
      * @return the sampleWindowSize
      */
     public int getSampleWindowSize() {
         return sampleWindowSize;
+    }
+
+    /**
+     * @return the spinners
+     */
+    public Executor getSpinners() {
+        return spinners;
+    }
+
+    /**
+     * @return the spinnerSocketOptions
+     */
+    public SocketOptions getSpinnerSocketOptions() {
+        return spinnerSocketOptions;
     }
 
     /**
@@ -105,11 +154,27 @@ public class ProducerConfiguration {
     }
 
     /**
+     * @param sampleFrequency
+     *            the sampleFrequency to set
+     */
+    public void setSampleFrequency(int sampleFrequency) {
+        this.sampleFrequency = sampleFrequency;
+    }
+
+    /**
      * @param sampleWindowSize
      *            the sampleWindowSize to set
      */
     public void setSampleWindowSize(int sampleWindowSize) {
         this.sampleWindowSize = sampleWindowSize;
+    }
+
+    /**
+     * @param spinners
+     *            the spinners to set
+     */
+    public void setSpinners(Executor spinners) {
+        this.spinners = spinners;
     }
 
     /**

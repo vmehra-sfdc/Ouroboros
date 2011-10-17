@@ -45,12 +45,10 @@ public class Batch extends BatchIdentity {
     }
 
     /**
-     * Acknowledge the batch comitment.
-     * 
      * @return the interval, in milliseconds, between when the batch was
      *         submitted and when it was acknowledged
      */
-    public int acknowledged() {
+    public int interval() {
         return (int) (System.currentTimeMillis() - created);
     }
 

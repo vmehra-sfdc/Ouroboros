@@ -44,10 +44,6 @@ import org.mockito.Captor;
 import org.mockito.MockitoAnnotations;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.producer.Batch;
-import com.salesforce.ouroboros.producer.BatchIdentity;
-import com.salesforce.ouroboros.producer.Spinner;
-import com.salesforce.ouroboros.util.rate.Controller;
 
 /**
  * 
@@ -56,7 +52,7 @@ import com.salesforce.ouroboros.util.rate.Controller;
  */
 public class TestSpinner {
     @Captor
-    ArgumentCaptor<Integer> captor;
+    ArgumentCaptor<Double> captor;
 
     @Before
     public void init() {
@@ -67,8 +63,8 @@ public class TestSpinner {
     public void testPush() throws Exception {
         SocketChannel channel = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
-        Controller rateController = mock(Controller.class);
-        Spinner spinner = new Spinner(rateController, 1);
+        Coordinator coordinator = mock(Coordinator.class);
+        Spinner spinner = new Spinner(coordinator);
         spinner.handleConnect(channel, handler);
 
         @SuppressWarnings("unchecked")
@@ -76,7 +72,7 @@ public class TestSpinner {
         spinner.push(batch);
         Thread.sleep(10);
         spinner.acknowledge(batch);
-        verify(rateController).sample(captor.capture());
+        verify(coordinator).acknowledge(captor.capture());
         assertTrue(10 <= captor.getValue().intValue());
     }
 
@@ -84,8 +80,8 @@ public class TestSpinner {
     public void testPending() throws Exception {
         SocketChannel outbound = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
-        Controller rateController = mock(Controller.class);
-        Spinner spinner = new Spinner(rateController, 1);
+        Coordinator coordinator = mock(Coordinator.class);
+        Spinner spinner = new Spinner(coordinator);
         spinner.handleConnect(outbound, handler);
 
         long timestamp = 100000L;

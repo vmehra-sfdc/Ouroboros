@@ -23,29 +23,26 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer.api;
+package com.salesforce.ouroboros.api.producer;
+
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class UnknownChannelException extends Exception {
-    private static final long serialVersionUID = 1L;
+public interface EventSource {
 
-    public UnknownChannelException() {
-        super();
-    }
+    /**
+     * Assume primary responsibility for the channels, using the supplied
+     * timstamp as the last committed event batch from the failed primary.
+     * 
+     * @param newPrimaries
+     *            - the map between the ID of the channel and the last committed
+     *            event batch timestamp for the channel for
+     */
+    void assumePrimary(Map<UUID, Long> newPrimaries);
 
-    public UnknownChannelException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    public UnknownChannelException(String message) {
-        super(message);
-    }
-
-    public UnknownChannelException(Throwable cause) {
-        super(cause);
-    }
 }
