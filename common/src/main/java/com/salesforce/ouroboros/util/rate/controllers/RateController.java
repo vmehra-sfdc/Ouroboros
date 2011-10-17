@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.util.rate.controllers;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.salesforce.ouroboros.util.rate.Controller;
@@ -39,34 +40,39 @@ import com.salesforce.ouroboros.util.rate.Predicate;
  * 
  */
 public class RateController implements Controller {
-    private final Predicate     predicate;
-    private volatile double     maximum                = 5000.0;
-    private volatile double     minimum                = 0.05;
+    private volatile double     additiveIncrease       = 0.5;
     private volatile double     highWaterMark          = 1.2D;
     private volatile long       lastSampled            = System.currentTimeMillis();
+    private final ReentrantLock lock                   = new ReentrantLock();
     private volatile double     lowWaterMark           = 0.9D;
+    private volatile double     maximum                = 5000.0;
+    private volatile double     minimum                = 0.05;
+    private volatile double     multiplicativeDecrease = 2;
+    private final Predicate     predicate;
+    private final AtomicInteger sampleCount            = new AtomicInteger();
+    private final int           sampleFrequency;
     private volatile long       sampleRate             = 1000L;
     private volatile double     smoothConstant         = 0.7;
     private volatile double     target;
     private final SampleWindow  window;
-    private volatile double     additiveIncrease       = 0.5;
-    private volatile double     multiplicativeDecrease = 2;
-    private final ReentrantLock lock                   = new ReentrantLock();
 
     public RateController(Predicate predicate) {
-        this(predicate, 1000);
+        this(predicate, 1000, 1);
     }
 
     public RateController(Predicate predicate, double minimumRate,
-                          double maximumRate, int windowSize) {
-        this(predicate, windowSize);
+                          double maximumRate, int windowSize,
+                          int sampleFrequency) {
+        this(predicate, windowSize, sampleFrequency);
         minimum = minimumRate;
         maximum = maximumRate;
     }
 
-    public RateController(Predicate predicate, int windowSize) {
+    public RateController(Predicate predicate, int windowSize,
+                          int sampleFrequency) {
         window = new SampleWindow(windowSize);
         this.predicate = predicate;
+        this.sampleFrequency = sampleFrequency;
     }
 
     @Override
@@ -132,7 +138,11 @@ public class RateController implements Controller {
     }
 
     @Override
-    public void sample(int rt) {
+    public void sample(double sample) {
+        // Only sample every N batches
+        if (sampleCount.incrementAndGet() % sampleFrequency != 0) {
+            return;
+        }
         ReentrantLock myLock = lock;
         if (!myLock.tryLock()) {
             // Skip sample if locked
@@ -144,13 +154,13 @@ public class RateController implements Controller {
             if ((curtime - lastSampled) < sampleRate) {
                 return;
             }
-            window.sample(rt);
+            window.sample(sample);
             lastSampled = curtime;
-            double responseTime = window.getPercentile(0.9);
+            double ninetieth = window.getPercentile(0.9);
 
-            if (responseTime < (lowWaterMark * target)) {
+            if (ninetieth < (lowWaterMark * target)) {
                 increaseRate();
-            } else if (responseTime > (highWaterMark * target)) {
+            } else if (ninetieth > (highWaterMark * target)) {
                 decreaseRate();
             }
         } finally {

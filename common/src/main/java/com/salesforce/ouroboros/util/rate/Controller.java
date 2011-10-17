@@ -57,7 +57,7 @@ public interface Controller {
      * @param responseTime
      *            - the new sample
      */
-    public void sample(int responseTime);
+    public void sample(double responseTime);
 
     /**
      * @return the median of the sampled response time over the history of the
