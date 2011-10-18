@@ -23,24 +23,32 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.partition;
-
-import java.util.concurrent.ScheduledExecutorService;
+package com.salesforce.ouroboros.util;
 
 /**
+ * Ye olde re-closable gate.
  * 
  * @author hhildebrand
  * 
  */
-public class TimedMessageManager {
-    private final int                      heartbeat;
-    private final int                      period;
-    private final ScheduledExecutorService timer;
+public class Gate {
+    private int     generation;
+    private boolean isOpen;
 
-    public TimedMessageManager(int heartbeat, int period,
-                               ScheduledExecutorService executor) {
-        this.heartbeat = heartbeat;
-        this.period = period;
-        timer = executor;
+    public synchronized void await() throws InterruptedException {
+        int arrivalGeneration = generation;
+        while (!isOpen && arrivalGeneration == generation) {
+            wait();
+        }
+    }
+
+    public synchronized void close() {
+        isOpen = false;
+    }
+
+    public synchronized void open() {
+        ++generation;
+        isOpen = true;
+        notifyAll();
     }
 }

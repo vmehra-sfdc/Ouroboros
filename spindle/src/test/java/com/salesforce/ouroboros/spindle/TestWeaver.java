@@ -65,7 +65,7 @@ public class TestWeaver {
         Coordinator coordinator = mock(Coordinator.class);
         WeaverConfigation config = new WeaverConfigation();
         config.setId(id);
-        config.setRoot(root);
+        config.addRoot(root);
         Weaver weaver = new Weaver(config);
         weaver.setCoordinator(coordinator);
         weaver.openPrimary(channel, mirror);
@@ -88,7 +88,7 @@ public class TestWeaver {
         Coordinator coordinator = mock(Coordinator.class);
         WeaverConfigation config = new WeaverConfigation();
         config.setId(id);
-        config.setRoot(root);
+        config.addRoot(root);
         Weaver weaver = new Weaver(config);
         weaver.setCoordinator(coordinator);
         weaver.openMirror(channel, primary);
@@ -112,7 +112,7 @@ public class TestWeaver {
         Coordinator coordinator = mock(Coordinator.class);
         WeaverConfigation config = new WeaverConfigation();
         config.setId(id);
-        config.setRoot(root);
+        config.addRoot(root);
         Weaver weaver = new Weaver(config);
         weaver.setCoordinator(coordinator);
         weaver.openPrimary(channel, mirror);
@@ -150,7 +150,7 @@ public class TestWeaver {
         Coordinator coordinator = mock(Coordinator.class);
         WeaverConfigation config = new WeaverConfigation();
         config.setId(id);
-        config.setRoot(root);
+        config.addRoot(root);
         Weaver weaver = new Weaver(config);
         weaver.setCoordinator(coordinator);
         weaver.start();

@@ -58,6 +58,7 @@ import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
+import com.salesforce.ouroboros.util.Gate;
 import com.salesforce.ouroboros.util.rate.Controller;
 import com.salesforce.ouroboros.util.rate.controllers.RateController;
 import com.salesforce.ouroboros.util.rate.controllers.RateLimiter;
@@ -69,51 +70,28 @@ import com.salesforce.ouroboros.util.rate.controllers.RateLimiter;
  * 
  */
 public class Coordinator implements Member {
-    private static class Gate {
-        private int     generation;
-        private boolean isOpen;
+    private final static Logger                                 log               = Logger.getLogger(Coordinator.class.getCanonicalName());
 
-        // BLOCKS-UNTIL: opened-since(generation on entry)
-        public synchronized void await() throws InterruptedException {
-            int arrivalGeneration = generation;
-            while (!isOpen && arrivalGeneration == generation) {
-                wait();
-            }
-        }
-
-        public synchronized void close() {
-            isOpen = false;
-        }
-
-        public synchronized void open() {
-            ++generation;
-            isOpen = true;
-            notifyAll();
-        }
-    }
-
-    private final static Logger                           log               = Logger.getLogger(Coordinator.class.getCanonicalName());
-
-    private final Map<UUID, Spinner>                      channels          = new ConcurrentHashMap<UUID, Spinner>();
-    private final Controller                              controller;
-    private final Map<UUID, Long>                         mirrors           = new ConcurrentHashMap<UUID, Long>();
-    private final SortedSet<Node>                         newProducers      = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>                         newWeavers        = new ConcurrentSkipListSet<Node>();
-    private AtomicReference<ConsistentHashFunction<Node>> producerRing      = new AtomicReference<ConsistentHashFunction<Node>>(
-                                                                                                                                new ConsistentHashFunction<Node>());
-    private final SortedSet<Node>                         producers         = new ConcurrentSkipListSet<Node>();
-    private final Gate                                    publishGate       = new Gate();
-    private final AtomicInteger                           publishingThreads = new AtomicInteger(
-                                                                                                0);
-    private final Node                                    self;
-    private final EventSource                             source;
-    private final ChannelHandler                          spinnerHandler;
-    private final ConcurrentMap<Node, Spinner>            spinners          = new ConcurrentHashMap<Node, Spinner>();
-    private final Switchboard                             switchboard;
-    private AtomicReference<ConsistentHashFunction<Node>> weaverRing        = new AtomicReference<ConsistentHashFunction<Node>>(
-                                                                                                                                new ConsistentHashFunction<Node>());
-    private final SortedSet<Node>                         weavers           = new ConcurrentSkipListSet<Node>();
-    private final Map<Node, ContactInformation>           yellowPages       = new ConcurrentHashMap<Node, ContactInformation>();
+    private final ConcurrentMap<UUID, Spinner>                  channels          = new ConcurrentHashMap<UUID, Spinner>();
+    private final Controller                                    controller;
+    private final Map<UUID, Long>                               mirrors           = new ConcurrentHashMap<UUID, Long>();
+    private final SortedSet<Node>                               newProducers      = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>                               newWeavers        = new ConcurrentSkipListSet<Node>();
+    private final AtomicReference<ConsistentHashFunction<Node>> producerRing      = new AtomicReference<ConsistentHashFunction<Node>>(
+                                                                                                                                      new ConsistentHashFunction<Node>());
+    private final SortedSet<Node>                               producers         = new ConcurrentSkipListSet<Node>();
+    private final Gate                                          publishGate       = new Gate();
+    private final AtomicInteger                                 publishingThreads = new AtomicInteger(
+                                                                                                      0);
+    private final Node                                          self;
+    private final EventSource                                   source;
+    private final ChannelHandler                                spinnerHandler;
+    private final ConcurrentMap<Node, Spinner>                  spinners          = new ConcurrentHashMap<Node, Spinner>();
+    private final Switchboard                                   switchboard;
+    private final AtomicReference<ConsistentHashFunction<Node>> weaverRing        = new AtomicReference<ConsistentHashFunction<Node>>(
+                                                                                                                                      new ConsistentHashFunction<Node>());
+    private final SortedSet<Node>                               weavers           = new ConcurrentSkipListSet<Node>();
+    private final Map<Node, ContactInformation>                 yellowPages       = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(Node self, Switchboard switchboard, EventSource source,
                        CoordinatorConfiguration configuration)
@@ -300,27 +278,28 @@ public class Coordinator implements Member {
      * @param channel
      *            - the unique id of the channel
      * @throws IllegalArgumentException
-     *             if this coordinator is not the primary for this process
+     *             if this coordinator is not the primary producer responsible
+     *             for this process
      */
     public void open(UUID channel) {
         Node[] producerPair = getProducerReplicationPair(channel);
-        if (producerPair != null) {
-            if (self.equals(producerPair[0])) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Node %s is primary for channel %s, opening",
-                                           self, channel));
-                }
-                // We are indeed the primary for this channel 
-                mapSpinner(channel);
-            } else if (!producers.contains(producerPair[0])
-                       && self.equals(producerPair[1])) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Node %s is mirror for channel %s, primary %s does not exist, opening",
-                                           self, channel, producerPair[0]));
-                }
-                // The primary is not available and we are the mirror
-                mapSpinner(channel);
+        if (self.equals(producerPair[0])) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("%s is primary for channel %s, opening",
+                                       self, channel));
             }
+            mapSpinner(channel);
+        } else if (!producers.contains(producerPair[0])
+                   && self.equals(producerPair[1])) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("%s is mirror for channel %s, primary %s does not exist, opening",
+                                       self, channel, producerPair[0]));
+            }
+            mapSpinner(channel);
+        } else {
+            throw new IllegalArgumentException(
+                                               String.format("%s is not the primary for channel %s",
+                                                             self, channel));
         }
     }
 
@@ -509,29 +488,28 @@ public class Coordinator implements Member {
         Spinner spinner = spinners.get(channelPair[0]);
         if (spinner == null) {
             if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Primary node %s for channel %s is down, attempting to use mirror",
+                log.info(String.format("Primary node %s for channel %s is down, mapping mirror %s",
                                        channelPair[0], channel, channelPair[1]));
             }
             spinner = spinners.get(channelPair[1]);
             if (spinner == null) {
                 if (log.isLoggable(Level.SEVERE)) {
-                    log.severe(String.format("Mirror node %s for channel %s is down",
-                                             channelPair[0], channel,
-                                             channelPair[1]));
+                    log.severe(String.format("Mirror %s for channel %s is down",
+                                             channelPair[0], channel));
                 }
             } else {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Mapping channel %s to mirror $s",
                                            channel, channelPair[1]));
                 }
-                channels.put(channel, spinner);
+                channels.putIfAbsent(channel, spinner);
             }
         } else {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Mapping channel %s to primary $s",
                                        channel, channelPair[0]));
             }
-            channels.put(channel, spinner);
+            channels.putIfAbsent(channel, spinner);
         }
     }
 

@@ -25,6 +25,8 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import static com.salesforce.ouroboros.util.Utils.point;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -45,6 +47,8 @@ import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
+import com.salesforce.ouroboros.spindle.WeaverConfigation.RootDirectory;
+import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
@@ -126,14 +130,28 @@ public class Weaver implements Bundle {
     private final long                              maxSegmentSize;
     private final ServerSocketChannelHandler        replicationHandler;
     private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
-    private final File                              root;
+    private final ConsistentHashFunction<File>      roots             = new ConsistentHashFunction<File>();
     private final ServerSocketChannelHandler        spindleHandler;
     private final ChannelHandler                    xeroxHandler;
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
         id = configuration.getId();
-        root = configuration.getRoot();
+        for (RootDirectory root : configuration.getRoots()) {
+            roots.add(root.directory, root.weight);
+            if (!root.directory.exists()) {
+                if (!root.directory.mkdirs()) {
+                    throw new IllegalStateException(
+                                                    String.format("Cannot create root directory: %s",
+                                                                  root.directory.getAbsolutePath()));
+                }
+            }
+            if (!root.directory.isDirectory()) {
+                throw new IllegalStateException(
+                                                String.format("Root is not a directory: %s",
+                                                              root.directory.getAbsolutePath()));
+            }
+        }
         maxSegmentSize = configuration.getMaxSegmentSize();
         xeroxHandler = new ChannelHandler(
                                           WEAVER_XEROX,
@@ -155,19 +173,6 @@ public class Weaver implements Bundle {
                                              spindleHandler.getLocalAddress(),
                                              replicationHandler.getLocalAddress(),
                                              null);
-
-        if (!root.exists()) {
-            if (!root.mkdirs()) {
-                throw new IllegalStateException(
-                                                String.format("Cannot create root directory: %s",
-                                                              root.getAbsolutePath()));
-            }
-        }
-        if (!root.isDirectory()) {
-            throw new IllegalStateException(
-                                            String.format("Root is not a directory: %s",
-                                                          root.getAbsolutePath()));
-        }
     }
 
     public void close(UUID channel) {
@@ -226,6 +231,7 @@ public class Weaver implements Bundle {
     /**
      * @return the id
      */
+    @Override
     public Node getId() {
         return id;
     }
@@ -244,7 +250,8 @@ public class Weaver implements Bundle {
             log.fine(String.format(" Weaver[%s] is the mirror for the new subscription %s",
                                    id, channel));
         }
-        EventChannel ec = new EventChannel(Role.MIRROR, channel, root,
+        EventChannel ec = new EventChannel(Role.MIRROR, channel,
+                                           roots.hash(point(channel)),
                                            maxSegmentSize,
                                            replicators.get(primary));
         channels.put(channel, ec);
@@ -264,7 +271,8 @@ public class Weaver implements Bundle {
             log.fine(String.format(" Weaver[%s] is the primary for the new subscription %s",
                                    id, channel));
         }
-        EventChannel ec = new EventChannel(Role.PRIMARY, channel, root,
+        EventChannel ec = new EventChannel(Role.PRIMARY, channel,
+                                           roots.hash(point(channel)),
                                            maxSegmentSize,
                                            replicators.get(mirror));
         channels.put(channel, ec);
@@ -350,6 +358,10 @@ public class Weaver implements Bundle {
         return xeroxes;
     }
 
+    public void setCoordinator(Coordinator coordinator) {
+        this.coordinator = coordinator;
+    }
+
     /**
      * Start the weaver
      */
@@ -384,9 +396,5 @@ public class Weaver implements Bundle {
      */
     private boolean thisEndInitiatesConnectionsTo(Node target) {
         return id.compareTo(target) < 0;
-    }
-
-    public void setCoordinator(Coordinator coordinator) {
-        this.coordinator = coordinator;
     }
 }

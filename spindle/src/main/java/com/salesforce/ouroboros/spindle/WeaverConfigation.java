@@ -27,6 +27,8 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.File;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -43,15 +45,27 @@ import com.salesforce.ouroboros.Node;
  * 
  */
 public class WeaverConfigation {
+    public static class RootDirectory {
+        public final File directory;
+        public final int  weight;
+
+        public RootDirectory(File directory, int weight) {
+            super();
+            this.directory = directory;
+            this.weight = weight;
+        }
+    }
+
     public static final long     DEFAULT_MAX_SEGMENTSIZE        = 1000 * 1024;
     public static final long     DEFAULT_PARTITION_TIMEOUT      = 60;
     public static final TimeUnit DEFAULT_PARTITION_TIMEOUT_UNIT = TimeUnit.SECONDS;
     public static final int      DEFAULT_REPLICATION_QUEUE_SIZE = 100;
+
     public static final String   DEFAULT_STATE_NAME             = "weavers";
 
     public static ThreadFactory threadFactory(final String prefix) {
         return new ThreadFactory() {
-            private AtomicInteger count = new AtomicInteger(0);
+            private final AtomicInteger count = new AtomicInteger(0);
 
             @Override
             public Thread newThread(Runnable runnable) {
@@ -66,23 +80,33 @@ public class WeaverConfigation {
         };
     }
 
-    private Node                id;
-    private long                maxSegmentSize           = DEFAULT_MAX_SEGMENTSIZE;
-    private long                partitionTimeout         = DEFAULT_PARTITION_TIMEOUT;
-    private TimeUnit            partitionTimeoutUnit     = DEFAULT_PARTITION_TIMEOUT_UNIT;
-    private InetSocketAddress   replicationAddress       = new InetSocketAddress("127.0.0.1", 
-                                                                                 0);
-    private int                 replicationQueueSize     = DEFAULT_REPLICATION_QUEUE_SIZE;
-    private final SocketOptions replicationSocketOptions = new SocketOptions();
-    private Executor            replicators              = Executors.newSingleThreadExecutor(threadFactory("replicator"));
-    private File                root;
-    private InetSocketAddress   spindleAddress           = new InetSocketAddress("127.0.0.1", 
-                                                                                 0);
-    private Executor            spindles                 = Executors.newSingleThreadExecutor(threadFactory("spindle"));
-    private final SocketOptions spindleSocketOptions     = new SocketOptions();
-    private String              stateName                = DEFAULT_STATE_NAME;
-    private Executor            xeroxes                  = Executors.newSingleThreadExecutor(threadFactory("xerox"));
-    private final SocketOptions xeroxSocketOptions       = new SocketOptions();
+    private Node                      id;
+    private long                      maxSegmentSize           = DEFAULT_MAX_SEGMENTSIZE;
+    private long                      partitionTimeout         = DEFAULT_PARTITION_TIMEOUT;
+    private TimeUnit                  partitionTimeoutUnit     = DEFAULT_PARTITION_TIMEOUT_UNIT;
+    private InetSocketAddress         replicationAddress       = new InetSocketAddress(
+                                                                                       "127.0.0.1",
+                                                                                       0);
+    private int                       replicationQueueSize     = DEFAULT_REPLICATION_QUEUE_SIZE;
+    private final SocketOptions       replicationSocketOptions = new SocketOptions();
+    private Executor                  replicators              = Executors.newSingleThreadExecutor(threadFactory("replicator"));
+    private final List<RootDirectory> roots                    = new ArrayList<RootDirectory>();
+    private InetSocketAddress         spindleAddress           = new InetSocketAddress(
+                                                                                       "127.0.0.1",
+                                                                                       0);
+    private Executor                  spindles                 = Executors.newSingleThreadExecutor(threadFactory("spindle"));
+    private final SocketOptions       spindleSocketOptions     = new SocketOptions();
+    private String                    stateName                = DEFAULT_STATE_NAME;
+    private Executor                  xeroxes                  = Executors.newSingleThreadExecutor(threadFactory("xerox"));
+    private final SocketOptions       xeroxSocketOptions       = new SocketOptions();
+
+    public void addRoot(File directory) {
+        addRoot(directory, 1);
+    }
+
+    public void addRoot(File directory, int weight) {
+        roots.add(new RootDirectory(directory, weight));
+    }
 
     /**
      * @return the id
@@ -141,10 +165,10 @@ public class WeaverConfigation {
     }
 
     /**
-     * @return the root
+     * @return the roots
      */
-    public File getRoot() {
-        return root;
+    public List<RootDirectory> getRoots() {
+        return roots;
     }
 
     /**
@@ -246,14 +270,6 @@ public class WeaverConfigation {
     }
 
     /**
-     * @param root
-     *            the root to set
-     */
-    public void setRoot(File root) {
-        this.root = root;
-    }
-
-    /**
      * @param spindleAddress
      *            the spindleAddress to set
      */
@@ -287,6 +303,6 @@ public class WeaverConfigation {
 
     public void validate() {
         assert id != null : "Id must not be null";
-        assert root != null : "Root must not be null";
+        assert !roots.isEmpty() : "List of roots must not be empty";
     }
 }
