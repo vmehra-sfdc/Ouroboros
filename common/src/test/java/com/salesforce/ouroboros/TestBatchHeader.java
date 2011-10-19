@@ -39,15 +39,17 @@ import org.junit.Test;
 public class TestBatchHeader {
     @Test
     public void testOffsets() {
+        Node mirror = new Node(666);
         UUID channel = UUID.randomUUID();
         int batchByteLength = 25;
         int magic = 777;
         long timestamp = System.currentTimeMillis();
-        BatchHeader header = new BatchHeader(batchByteLength, magic, channel,
-                                             timestamp);
+        BatchHeader header = new BatchHeader(mirror, batchByteLength, magic,
+                                             channel, timestamp);
         assertEquals(batchByteLength, header.getBatchByteLength());
         assertEquals(channel, header.getChannel());
         assertEquals(magic, header.getMagic());
         assertEquals(timestamp, header.getTimestamp());
+        assertEquals(mirror, header.getProducerMirror());
     }
 }

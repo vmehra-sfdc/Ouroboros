@@ -25,10 +25,16 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.Node;
 
 /**
  * The communications wrapper that ties together the appender and the
@@ -39,12 +45,29 @@ import com.hellblazer.pinkie.SocketChannelHandler;
  */
 public class Spindle implements CommunicationsHandler {
 
-    private final Acknowledger acknowledger;
-    private final Appender     appender;
+    private final static Logger log   = Logger.getLogger(Spindle.class.getCanonicalName());
+    public final static int     MAGIC = 0x1638;
+
+    public enum State {
+        ERROR, ESTABLISHED, INITIAL;
+    }
+
+    private final Acknowledger           acknowledger;
+    private final Appender               appender;
+    private final AtomicReference<State> state     = new AtomicReference<State>(
+                                                                                State.INITIAL);
+    private ByteBuffer                   handshake = ByteBuffer.allocate(Node.BYTE_LENGTH + 4);
+    private SocketChannelHandler         handler;
+    private final Bundle                 bundle;
 
     public Spindle(Bundle bundle) {
         acknowledger = new Acknowledger();
         appender = new Appender(bundle, acknowledger);
+        this.bundle = bundle;
+    }
+
+    public State getState() {
+        return state.get();
     }
 
     @Override
@@ -64,12 +87,46 @@ public class Spindle implements CommunicationsHandler {
 
     @Override
     public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+        this.handler = handler;
         acknowledger.handleAccept(channel, handler);
         appender.handleAccept(channel, handler);
+        readHandshake(channel);
     }
 
     @Override
     public void handleRead(SocketChannel channel) {
+        final State s = state.get();
+        switch (s) {
+            case INITIAL: {
+                readHandshake(channel);
+                break;
+            }
+            default:
+                state.set(State.ERROR);
+                log.warning(String.format("Invalid state for read: %s", s));
+        }
         appender.handleRead(channel);
+    }
+
+    private void readHandshake(SocketChannel channel) {
+        try {
+            channel.read(handshake);
+        } catch (IOException e) {
+            state.set(State.ERROR);
+            log.log(Level.WARNING, String.format("Error reading handshake"), e);
+            handler.close();
+        }
+        if (!handshake.hasRemaining()) {
+            int magic = handshake.getInt();
+            if (magic != MAGIC) {
+                state.set(State.ERROR);
+                log.warning(String.format("Invalid handshak magic: %s", magic));
+                handler.close();
+                return;
+            }
+            Node producer = new Node(handshake);
+            bundle.map(producer, acknowledger);
+        }
+        handler.selectForRead();
     }
 }

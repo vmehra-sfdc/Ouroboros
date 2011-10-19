@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.Node;
 
 /**
  * 
@@ -51,9 +52,9 @@ public class ReplicatedBatchHeader extends BatchHeader {
         super(b);
     }
 
-    public ReplicatedBatchHeader(int batchByteLength, int magic, UUID channel,
-                                 long timestamp, long batchOffset) {
-        super(batchByteLength, magic, channel, timestamp);
+    public ReplicatedBatchHeader(Node mirror, int batchByteLength, int magic,
+                                 UUID channel, long timestamp, long batchOffset) {
+        super(mirror, batchByteLength, magic, channel, timestamp);
         getBytes().putLong(BATCH_OFFSET_OFFSET, batchOffset);
     }
 

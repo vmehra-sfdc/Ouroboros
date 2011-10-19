@@ -45,6 +45,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Duplicator.State;
 
 /**
@@ -151,7 +152,9 @@ public class TestDuplicator {
                 return State.WAITING == replicator.getState();
             }
         }, 1000L, 100L);
+        Node mirror = new Node(0x1638);
         replicator.replicate(new ReplicatedBatchHeader(
+                                                       mirror,
                                                        event.totalSize(),
                                                        magic,
                                                        channel,
@@ -203,7 +206,9 @@ public class TestDuplicator {
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
+        Node mirror = new Node(0x1638);
         ReplicatedBatchHeader batchHeader = new ReplicatedBatchHeader(
+                                                                      mirror,
                                                                       event.totalSize(),
                                                                       magic,
                                                                       channel,

@@ -123,6 +123,7 @@ public class Weaver implements Bundle {
     private static final String                     WEAVER_SPINDLE    = "Weaver Spindle";
     private static final String                     WEAVER_XEROX      = "Weaver Xerox";
 
+    private final ConcurrentMap<Node, Acknowledger> acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
     private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
     private final ContactInformation                contactInfo;
     private Coordinator                             coordinator;
@@ -224,6 +225,14 @@ public class Weaver implements Bundle {
         }
     }
 
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.Bundle#getAcknowledger(com.salesforce.ouroboros.Node)
+     */
+    @Override
+    public Acknowledger getAcknowledger(Node node) {
+        return acknowledgers.get(node);
+    }
+
     public ContactInformation getContactInformation() {
         return contactInfo;
     }
@@ -234,6 +243,14 @@ public class Weaver implements Bundle {
     @Override
     public Node getId() {
         return id;
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.Bundle#map(com.salesforce.ouroboros.Node, com.salesforce.ouroboros.spindle.Acknowledger)
+     */
+    @Override
+    public void map(Node producer, Acknowledger acknowledger) {
+        acknowledgers.put(producer, acknowledger);
     }
 
     /**

@@ -44,6 +44,7 @@ import org.junit.Test;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Event;
+import com.salesforce.ouroboros.Node;
 
 /**
  * 
@@ -64,7 +65,9 @@ public class TestReplicatingAppender {
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
+        Node mirror = new Node(0x1638);
         ReplicatedBatchHeader header = new ReplicatedBatchHeader(
+                                                                 mirror,
                                                                  event.totalSize(),
                                                                  magic,
                                                                  channel,

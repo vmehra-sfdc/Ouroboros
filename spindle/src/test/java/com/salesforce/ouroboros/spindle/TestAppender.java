@@ -49,6 +49,7 @@ import org.mockito.internal.verification.Times;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.AbstractAppender.State;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 
@@ -81,14 +82,15 @@ public class TestAppender {
         appender.handleAccept(inbound, handler);
         assertEquals(State.READY, appender.getState());
 
+        Node mirror = new Node(0x1638);
         int magic = 666;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
-        BatchHeader header = new BatchHeader(event.totalSize(), magic, channel,
-                                             timestamp);
+        BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
+                                             channel, timestamp);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,
@@ -163,14 +165,15 @@ public class TestAppender {
         appender.handleAccept(inbound, handler);
         assertEquals(State.READY, appender.getState());
 
+        Node mirror = new Node(0x1638);
         int magic = 666;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
-        BatchHeader header = new BatchHeader(event.totalSize(), magic, channel,
-                                             timestamp);
+        BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
+                                             channel, timestamp);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,

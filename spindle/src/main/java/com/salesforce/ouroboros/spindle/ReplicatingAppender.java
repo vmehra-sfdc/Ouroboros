@@ -25,7 +25,10 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import java.util.logging.Logger;
+
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 
 /**
@@ -35,6 +38,8 @@ import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
  * 
  */
 public class ReplicatingAppender extends AbstractAppender {
+
+    private static final Logger log = Logger.getLogger(ReplicatingAppender.class.getCanonicalName());
 
     public ReplicatingAppender(final Bundle bundle) {
         super(bundle);
@@ -46,6 +51,15 @@ public class ReplicatingAppender extends AbstractAppender {
     @Override
     protected void commit() {
         eventChannel.append(batchHeader, offset);
+        Node node = batchHeader.getProducerMirror();
+        Acknowledger acknowledger = bundle.getAcknowledger(node);
+        if (acknowledger == null) {
+            log.warning(String.format("Could not find an acknowledger for %s",
+                                      node));
+            return;
+        }
+        acknowledger.acknowledge(batchHeader.getChannel(),
+                                 batchHeader.getTimestamp());
     }
 
     @Override

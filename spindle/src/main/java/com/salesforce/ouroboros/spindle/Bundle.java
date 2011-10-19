@@ -52,4 +52,20 @@ public interface Bundle {
      *         exists.
      */
     public abstract EventChannel eventChannelFor(UUID channelId);
+
+    /**
+     * Map the producer node to the acknowledger
+     * 
+     * @param producer
+     * @param acknowledger
+     */
+    void map(Node producer, Acknowledger acknowledger);
+
+    /**
+     * Answer the Acknowledger associated the node
+     * 
+     * @param node
+     * @return the Acknowledger associated with the node
+     */
+    Acknowledger getAcknowledger(Node node);
 }

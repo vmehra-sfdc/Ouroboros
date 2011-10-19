@@ -48,8 +48,7 @@ import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
-import com.salesforce.ouroboros.producer.Batch;
-import com.salesforce.ouroboros.producer.BatchWriter;
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.producer.BatchWriter.State;
 
 /**
@@ -81,7 +80,9 @@ public class TestBatchWriter {
         assertEquals(State.INITIALIZED, batchWriter.getState());
         batchWriter.handleConnect(outbound, handler);
         assertEquals(State.WAITING, batchWriter.getState());
-        Batch batch = new Batch(channel, timestamp, Arrays.asList(payloads));
+        Node mirror = new Node(0x1638);
+        Batch batch = new Batch(mirror, channel, timestamp,
+                                Arrays.asList(payloads));
         batchWriter.push(batch, pending);
         assertEquals(1, pending.size());
         assertEquals(batch, pending.get(batch));

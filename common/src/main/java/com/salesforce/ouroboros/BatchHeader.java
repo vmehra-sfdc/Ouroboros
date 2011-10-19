@@ -39,6 +39,7 @@ import java.util.UUID;
  * <pre>
  *       4 byte byte length of the batch
  *       4 byte magic
+ *       4 byte producer mirror node process id
  *      16 byte channel
  *       4 byte last event offset
  *       8 byte last event timestamp
@@ -50,10 +51,11 @@ import java.util.UUID;
 public class BatchHeader {
     protected static final int BATCH_BYTE_LENGTH_OFFSET = 0;
     protected static final int MAGIC_OFFSET             = BATCH_BYTE_LENGTH_OFFSET + 4;
-    protected static final int CH_MSB_OFFSET            = MAGIC_OFFSET + 4;
+    protected static final int PRODUCER_MIRROR_OFFSET   = MAGIC_OFFSET + 4;
+    protected static final int CH_MSB_OFFSET            = PRODUCER_MIRROR_OFFSET + 4;
     protected static final int CH_LSB_OFFSET            = CH_MSB_OFFSET + 8;
     protected static final int TIMESTAMP_OFFSET         = CH_LSB_OFFSET + 8;
-    public static final int    HEADER_BYTE_SIZE              = TIMESTAMP_OFFSET + 8;
+    public static final int    HEADER_BYTE_SIZE         = TIMESTAMP_OFFSET + 8;
 
     private final ByteBuffer   bytes;
 
@@ -65,10 +67,10 @@ public class BatchHeader {
         bytes = b;
     }
 
-    public BatchHeader(int batchByteLength, int magic, UUID channel,
-                       long timestamp) {
+    public BatchHeader(Node mirror, int batchByteLength, int magic,
+                       UUID channel, long timestamp) {
         this();
-        initialize(batchByteLength, magic, channel, timestamp);
+        initialize(mirror, batchByteLength, magic, channel, timestamp);
     }
 
     @Override
@@ -76,6 +78,7 @@ public class BatchHeader {
         if (o instanceof BatchHeader) {
             BatchHeader b = (BatchHeader) o;
             return b.getMagic() == getMagic()
+                   && b.getProducerMirror().equals(getProducerMirror())
                    && b.getBatchByteLength() == getBatchByteLength()
                    && b.getTimestamp() == b.getTimestamp()
                    && b.getChannel().equals(getChannel());
@@ -122,10 +125,11 @@ public class BatchHeader {
         return bytes.hasRemaining();
     }
 
-    public void initialize(int batchByteLength, int magic, UUID channel,
-                           long timestamp) {
+    public void initialize(Node mirror, int batchByteLength, int magic,
+                           UUID channel, long timestamp) {
         bytes.putInt(BATCH_BYTE_LENGTH_OFFSET, batchByteLength);
         bytes.putInt(MAGIC_OFFSET, magic);
+        bytes.putInt(PRODUCER_MIRROR_OFFSET, mirror.processId);
         bytes.putLong(CH_MSB_OFFSET, channel.getMostSignificantBits());
         bytes.putLong(CH_LSB_OFFSET, channel.getLeastSignificantBits());
         bytes.putLong(TIMESTAMP_OFFSET, timestamp);
@@ -175,5 +179,9 @@ public class BatchHeader {
 
     protected int getHeaderSize() {
         return HEADER_BYTE_SIZE;
+    }
+
+    public Node getProducerMirror() {
+        return new Node(bytes.getInt(PRODUCER_MIRROR_OFFSET));
     }
 }

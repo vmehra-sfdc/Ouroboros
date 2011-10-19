@@ -76,6 +76,10 @@ public class Node implements Comparable<Node>, Serializable {
         releaseGroup = buffer.getInt();
     }
 
+    public Node(int processId) {
+        this(processId, 0, 0);
+    }
+
     public Node(int processId, int machineId, int rackId) {
         this(processId, machineId, rackId, 1, 0);
     }

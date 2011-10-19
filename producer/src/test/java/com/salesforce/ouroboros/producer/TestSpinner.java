@@ -45,6 +45,7 @@ import org.mockito.MockitoAnnotations;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
+import com.salesforce.ouroboros.Node;
 
 /**
  * 
@@ -68,8 +69,10 @@ public class TestSpinner {
         Spinner spinner = new Spinner(coordinator);
         spinner.handleConnect(channel, handler);
 
+        Node mirror = new Node(0x1638);
         @SuppressWarnings("unchecked")
-        Batch batch = new Batch(UUID.randomUUID(), 0L, Collections.EMPTY_LIST);
+        Batch batch = new Batch(mirror, UUID.randomUUID(), 0L,
+                                Collections.EMPTY_LIST);
         spinner.push(batch);
         Thread.sleep(10);
         spinner.acknowledge(batch);
@@ -87,16 +90,18 @@ public class TestSpinner {
 
         long timestamp = 100000L;
         UUID channel = UUID.randomUUID();
+        Node mirror = new Node(0x1638);
         @SuppressWarnings("unchecked")
-        Batch batch1 = new Batch(channel, timestamp, Collections.EMPTY_LIST);
-        @SuppressWarnings("unchecked")
-        Batch batch2 = new Batch(channel, timestamp + 20,
+        Batch batch1 = new Batch(mirror, channel, timestamp,
                                  Collections.EMPTY_LIST);
         @SuppressWarnings("unchecked")
-        Batch batch3 = new Batch(channel, timestamp + 100,
+        Batch batch2 = new Batch(mirror, channel, timestamp + 20,
                                  Collections.EMPTY_LIST);
         @SuppressWarnings("unchecked")
-        Batch batch4 = new Batch(channel, timestamp + 100,
+        Batch batch3 = new Batch(mirror, channel, timestamp + 100,
+                                 Collections.EMPTY_LIST);
+        @SuppressWarnings("unchecked")
+        Batch batch4 = new Batch(mirror, channel, timestamp + 100,
                                  Collections.EMPTY_LIST);
         assertTrue(spinner.push(batch1));
         assertTrue(spinner.push(batch2));

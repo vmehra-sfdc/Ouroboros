@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.UUID;
 
 import com.salesforce.ouroboros.BatchIdentity;
+import com.salesforce.ouroboros.Node;
 
 /**
  * 
@@ -38,12 +39,15 @@ import com.salesforce.ouroboros.BatchIdentity;
  */
 public class Batch extends BatchIdentity {
     public final Collection<ByteBuffer> events;
+    public final Node                   mirror;
     private final long                  created = System.currentTimeMillis();
 
-    public Batch(UUID channel, long timestamp, Collection<ByteBuffer> events) {
+    public Batch(Node mirror, UUID channel, long timestamp,
+                 Collection<ByteBuffer> events) {
         super(channel, timestamp);
         assert events != null : "events must not be null";
         this.events = events;
+        this.mirror = mirror;
     }
 
     /**

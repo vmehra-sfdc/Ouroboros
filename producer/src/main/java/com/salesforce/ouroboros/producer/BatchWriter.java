@@ -51,8 +51,8 @@ import com.salesforce.ouroboros.EventHeader;
  */
 public class BatchWriter {
     public enum State {
-        CLOSED, ERROR, FAILOVER, INITIALIZED, INTERRUPTED, PROCESSING,
-        WAITING, WRITE_BATCH_HEADER, WRITE_EVENT_HEADER, WRITE_PAYLOAD;
+        CLOSED, ERROR, FAILOVER, INITIALIZED, INTERRUPTED, PROCESSING, WAITING,
+        WRITE_BATCH_HEADER, WRITE_EVENT_HEADER, WRITE_PAYLOAD;
     }
 
     private static final Logger           log          = Logger.getLogger(BatchWriter.class.getCanonicalName());
@@ -159,7 +159,8 @@ public class BatchWriter {
             totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
             batch.add(event);
         }
-        batchHeader.initialize(totalSize, MAGIC, entry.channel, entry.timestamp);
+        batchHeader.initialize(entry.mirror, totalSize, MAGIC, entry.channel,
+                               entry.timestamp);
         batchHeader.rewind();
         handler.selectForWrite();
     }

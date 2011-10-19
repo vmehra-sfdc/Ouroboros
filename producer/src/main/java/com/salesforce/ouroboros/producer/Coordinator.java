@@ -347,7 +347,8 @@ public class Coordinator implements Member {
                 throw new RateLimiteExceededException(
                                                       String.format("The rate limit for this producer has been exceeded"));
             }
-            if (!spinner.push(new Batch(channel, timestamp, events))) {
+            Node[] pair = getProducerReplicationPair(channel);
+            if (!spinner.push(new Batch(pair[1], channel, timestamp, events))) {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Rate limited, as service temporarily down for channel: %s",
                                            channel));
