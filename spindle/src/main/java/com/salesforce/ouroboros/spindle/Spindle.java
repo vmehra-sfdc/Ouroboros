@@ -45,20 +45,21 @@ import com.salesforce.ouroboros.Node;
  */
 public class Spindle implements CommunicationsHandler {
 
-    private final static Logger log   = Logger.getLogger(Spindle.class.getCanonicalName());
-    public final static int     MAGIC = 0x1638;
-
     public enum State {
         ERROR, ESTABLISHED, INITIAL;
     }
 
+    public static final Integer          HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
+    public final static int              MAGIC          = 0x1638;
+    private final static Logger          log            = Logger.getLogger(Spindle.class.getCanonicalName());
+
     private final Acknowledger           acknowledger;
     private final Appender               appender;
-    private final AtomicReference<State> state     = new AtomicReference<State>(
-                                                                                State.INITIAL);
-    private ByteBuffer                   handshake = ByteBuffer.allocate(Node.BYTE_LENGTH + 4);
-    private SocketChannelHandler         handler;
     private final Bundle                 bundle;
+    private SocketChannelHandler         handler;
+    private ByteBuffer                   handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private final AtomicReference<State> state          = new AtomicReference<State>(
+                                                                                     State.INITIAL);
 
     public Spindle(Bundle bundle) {
         acknowledger = new Acknowledger();
@@ -66,23 +67,12 @@ public class Spindle implements CommunicationsHandler {
         this.bundle = bundle;
     }
 
-    public State getState() {
-        return state.get();
-    }
-
     @Override
     public void closing(SocketChannel channel) {
     }
 
-    @Override
-    public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler handler) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void handleWrite(SocketChannel channel) {
-        acknowledger.handleWrite(channel);
+    public State getState() {
+        return state.get();
     }
 
     @Override
@@ -94,6 +84,12 @@ public class Spindle implements CommunicationsHandler {
     }
 
     @Override
+    public void handleConnect(SocketChannel channel,
+                              SocketChannelHandler handler) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void handleRead(SocketChannel channel) {
         final State s = state.get();
         switch (s) {
@@ -101,11 +97,19 @@ public class Spindle implements CommunicationsHandler {
                 readHandshake(channel);
                 break;
             }
+            case ESTABLISHED: {
+                appender.handleRead(channel);
+                break;
+            }
             default:
                 state.set(State.ERROR);
                 log.warning(String.format("Invalid state for read: %s", s));
         }
-        appender.handleRead(channel);
+    }
+
+    @Override
+    public void handleWrite(SocketChannel channel) {
+        acknowledger.handleWrite(channel);
     }
 
     private void readHandshake(SocketChannel channel) {
@@ -117,6 +121,7 @@ public class Spindle implements CommunicationsHandler {
             handler.close();
         }
         if (!handshake.hasRemaining()) {
+            handshake.flip();
             int magic = handshake.getInt();
             if (magic != MAGIC) {
                 state.set(State.ERROR);
@@ -126,6 +131,7 @@ public class Spindle implements CommunicationsHandler {
             }
             Node producer = new Node(handshake);
             bundle.map(producer, acknowledger);
+            state.set(State.ESTABLISHED);
         }
         handler.selectForRead();
     }
