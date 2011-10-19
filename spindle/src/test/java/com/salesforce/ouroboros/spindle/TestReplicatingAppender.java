@@ -58,6 +58,7 @@ public class TestReplicatingAppender {
         File tmpFile = File.createTempFile("inbound-replication", ".tst");
         tmpFile.deleteOnExit();
         Segment segment = new Segment(tmpFile);
+        Acknowledger acknowledger = mock(Acknowledger.class);
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
@@ -76,6 +77,7 @@ public class TestReplicatingAppender {
         EventChannel eventChannel = mock(EventChannel.class);
         Bundle bundle = mock(Bundle.class);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
+        when(bundle.getAcknowledger(mirror)).thenReturn(acknowledger);
         when(eventChannel.segmentFor(header.getOffset())).thenReturn(segment);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
@@ -134,5 +136,6 @@ public class TestReplicatingAppender {
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
         verify(eventChannel).append(eq(header), eq(0L));
+        verify(acknowledger).acknowledge(channel, timestamp);
     }
 }
