@@ -44,6 +44,7 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
@@ -69,8 +70,8 @@ public class TestSpindle {
         EventChannel eventChannel = mock(EventChannel.class);
         Node mirror = new Node(0x1638);
         int magic = 666;
-        UUID channel = UUID.randomUUID();
-        long timestamp = System.currentTimeMillis();
+        final UUID channel = UUID.randomUUID();
+        final long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
@@ -100,6 +101,18 @@ public class TestSpindle {
                 return 100;
             }
         }).when(socketChannel).read(isA(ByteBuffer.class));
+
+        doReturn(0).doAnswer(new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                BatchIdentity identity = new BatchIdentity(buffer);
+                assertEquals(channel, identity.channel);
+                assertEquals(timestamp, identity.timestamp);
+                return BatchIdentity.BYTE_SIZE;
+            }
+        }).when(socketChannel).write(isA(ByteBuffer.class));
+
         when(socketChannel.write(isA(ByteBuffer.class))).thenReturn(0);
         spindle.handleAccept(socketChannel, handler);
         assertEquals(State.INITIAL, spindle.getState());
@@ -107,6 +120,10 @@ public class TestSpindle {
         assertEquals(State.ESTABLISHED, spindle.getState());
         spindle.handleRead(socketChannel);
         verify(handler, new Times(4)).selectForRead();
+        spindle.acknowledger.acknowledge(channel, timestamp);
         verify(segment).transferFrom(socketChannel, 0, event.totalSize());
+        spindle.handleWrite(socketChannel);
+        verify(handler).selectForWrite();
+        verify(socketChannel).write(isA(ByteBuffer.class));
     }
 }

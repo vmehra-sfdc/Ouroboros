@@ -53,13 +53,13 @@ public class Spindle implements CommunicationsHandler {
     public final static int              MAGIC          = 0x1638;
     private final static Logger          log            = Logger.getLogger(Spindle.class.getCanonicalName());
 
-    private final Acknowledger           acknowledger;
-    private final Appender               appender;
     private final Bundle                 bundle;
     private SocketChannelHandler         handler;
     private ByteBuffer                   handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
     private final AtomicReference<State> state          = new AtomicReference<State>(
                                                                                      State.INITIAL);
+    final Acknowledger                   acknowledger;
+    final Appender                       appender;
 
     public Spindle(Bundle bundle) {
         acknowledger = new Acknowledger();
