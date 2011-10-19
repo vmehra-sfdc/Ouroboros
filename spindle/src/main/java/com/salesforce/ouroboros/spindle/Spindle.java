@@ -39,10 +39,12 @@ import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
  * @author hhildebrand
  * 
  */
-public class Appender extends AbstractAppender implements CommunicationsHandler {
-    private static final Logger log = Logger.getLogger(Appender.class.getCanonicalName());
+public class Spindle extends AbstractAppender implements CommunicationsHandler {
+    private static final Logger log          = Logger.getLogger(Spindle.class.getCanonicalName());
 
-    public Appender(Bundle bundle) {
+    private final Acknowledger  acknowledger = new Acknowledger();
+
+    public Spindle(Bundle bundle) {
         super(bundle);
     }
 
@@ -59,13 +61,13 @@ public class Appender extends AbstractAppender implements CommunicationsHandler 
 
     @Override
     public void handleWrite(SocketChannel channel) {
-        throw new UnsupportedOperationException();
+        acknowledger.handleWrite(channel);
     }
 
     @Override
     protected void commit() {
         eventChannel.append(new ReplicatedBatchHeader(batchHeader, offset),
-                            segment);
+                            segment, acknowledger);
     }
 
     @Override

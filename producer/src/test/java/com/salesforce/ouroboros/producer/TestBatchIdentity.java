@@ -32,7 +32,7 @@ import java.util.UUID;
 
 import org.junit.Test;
 
-import com.salesforce.ouroboros.producer.BatchIdentity;
+import com.salesforce.ouroboros.BatchIdentity;
 
 /**
  * 

@@ -73,9 +73,9 @@ public class Replicator implements CommunicationsHandler {
     private final Bundle                  bundle;
     private final Duplicator              duplicator;
     private volatile SocketChannelHandler handler;
-    private ByteBuffer                    handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private final ByteBuffer                    handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
     private volatile Node                 partnerId;
-    private Rendezvous                    rendezvous;
+    private final Rendezvous                    rendezvous;
     private volatile State                state          = State.INITIAL;
 
     public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
@@ -198,8 +198,8 @@ public class Replicator implements CommunicationsHandler {
     }
 
     public void replicate(ReplicatedBatchHeader header, EventChannel channel,
-                          Segment segment) {
-        duplicator.replicate(header, channel, segment);
+                          Segment segment, Acknowledger acknowledger) {
+        duplicator.replicate(header, channel, segment, acknowledger);
     }
 
     private void writeHandshake(SocketChannel channel) {

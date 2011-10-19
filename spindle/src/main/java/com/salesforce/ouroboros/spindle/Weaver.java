@@ -113,8 +113,8 @@ public class Weaver implements Bundle {
 
     private class SpindleFactory implements CommunicationsHandlerFactory {
         @Override
-        public Appender createCommunicationsHandler(SocketChannel channel) {
-            return new Appender(Weaver.this);
+        public Spindle createCommunicationsHandler(SocketChannel channel) {
+            return new Spindle(Weaver.this);
         }
     }
 

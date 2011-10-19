@@ -45,10 +45,10 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.producer.Batch;
-import com.salesforce.ouroboros.producer.BatchIdentity;
 import com.salesforce.ouroboros.producer.BatchWriter;
 import com.salesforce.ouroboros.producer.BatchWriter.State;
 

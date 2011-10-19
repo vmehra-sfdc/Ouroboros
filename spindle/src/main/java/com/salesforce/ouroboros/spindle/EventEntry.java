@@ -35,12 +35,14 @@ public class EventEntry {
     public final EventChannel          eventChannel;
     public final ReplicatedBatchHeader header;
     public final Segment               segment;
+    public final Acknowledger          acknowledger;
 
     public EventEntry(ReplicatedBatchHeader header, EventChannel eventChannel,
-                      Segment segment) {
+                      Segment segment, Acknowledger acknowledger) {
         this.header = header;
         this.eventChannel = eventChannel;
         this.segment = segment;
+        this.acknowledger = acknowledger;
     }
 
 }

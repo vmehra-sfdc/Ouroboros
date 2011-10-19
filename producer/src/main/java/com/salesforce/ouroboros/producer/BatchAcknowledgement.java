@@ -33,6 +33,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.BatchIdentity;
 
 /**
  * The state machine implementing the batch event acknowledgement protocol

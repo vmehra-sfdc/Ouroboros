@@ -104,6 +104,7 @@ public class TestDuplicator {
         tmpFile.deleteOnExit();
         Segment segment = new Segment(tmpFile);
         Bundle bundle = mock(Bundle.class);
+        Acknowledger acknowledger = mock(Acknowledger.class);
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
@@ -156,7 +157,7 @@ public class TestDuplicator {
                                                        channel,
                                                        System.currentTimeMillis(),
                                                        0), eventChannel,
-                             segment);
+                             segment, acknowledger);
         assertEquals(State.WRITE_HEADER, replicator.getState());
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
 
@@ -186,6 +187,8 @@ public class TestDuplicator {
         Segment inboundSegment = new Segment(inboundTmpFile);
         EventChannel inboundEventChannel = mock(EventChannel.class);
         Bundle inboundBundle = mock(Bundle.class);
+        Acknowledger acknowledger = mock(Acknowledger.class);
+
         final ReplicatingAppender inboundReplicator = new ReplicatingAppender(
                                                                               inboundBundle);
         EventChannel eventChannel = mock(EventChannel.class);
@@ -258,7 +261,8 @@ public class TestDuplicator {
 
         outboundDuplicator.handleConnect(outbound, handler);
         outboundDuplicator.replicate(new ReplicatedBatchHeader(batchHeader, 0),
-                                     eventChannel, outboundSegment);
+                                     eventChannel, outboundSegment,
+                                     acknowledger);
         assertEquals(State.WRITE_HEADER, outboundDuplicator.getState());
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override

@@ -37,8 +37,8 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.producer.BatchAcknowledgement;
-import com.salesforce.ouroboros.producer.BatchIdentity;
 import com.salesforce.ouroboros.producer.Spinner;
 import com.salesforce.ouroboros.producer.BatchAcknowledgement.State;
 

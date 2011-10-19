@@ -49,9 +49,7 @@ public final class Duplicator {
     }
 
     static final Logger                     log          = Logger.getLogger(Duplicator.class.getCanonicalName());
-
     private static final int                POLL_TIMEOUT = 10;
-
     private static final TimeUnit           POLL_UNIT    = TimeUnit.MILLISECONDS;
 
     private volatile EventEntry             current;
@@ -91,15 +89,11 @@ public final class Duplicator {
 
     /**
      * Replicate the event to the mirror
-     * 
-     * @param eventChannel
-     * @param offset
-     * @param segment
-     * @param size
      */
     public void replicate(ReplicatedBatchHeader header,
-                          EventChannel eventChannel, Segment segment) {
-        pending.add(new EventEntry(header, eventChannel, segment));
+                          EventChannel eventChannel, Segment segment,
+                          Acknowledger acknowledger) {
+        pending.add(new EventEntry(header, eventChannel, segment, acknowledger));
         process();
     }
 
@@ -162,6 +156,8 @@ public final class Duplicator {
             if (transferTo(channel)) {
                 state.set(State.WAITING);
                 current.eventChannel.commit(current.header.getOffset());
+                current.acknowledger.acknowledge(current.header.getChannel(),
+                                                 current.header.getTimestamp());
                 process();
             }
         } catch (IOException e) {

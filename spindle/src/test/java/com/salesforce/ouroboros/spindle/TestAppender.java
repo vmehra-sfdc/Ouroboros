@@ -67,7 +67,7 @@ public class TestAppender {
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        final AbstractAppender appender = new Appender(bundle);
+        final Spindle spindle = new Spindle(bundle);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
@@ -77,8 +77,8 @@ public class TestAppender {
         final SocketChannel inbound = server.accept();
         inbound.configureBlocking(false);
 
-        appender.handleAccept(inbound, handler);
-        assertEquals(State.READY, appender.getState());
+        spindle.handleAccept(inbound, handler);
+        assertEquals(State.READY, spindle.getState());
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
@@ -99,8 +99,8 @@ public class TestAppender {
         Util.waitFor("Header has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                appender.handleRead(inbound);
-                return appender.getState() == State.APPEND;
+                spindle.handleRead(inbound);
+                return spindle.getState() == State.APPEND;
             }
         }, 1000, 100);
 
@@ -110,8 +110,8 @@ public class TestAppender {
         Util.waitFor("Payload has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                appender.handleRead(inbound);
-                return appender.getState() == State.READY;
+                spindle.handleRead(inbound);
+                return spindle.getState() == State.READY;
             }
         }, 1000, 100);
 
@@ -134,7 +134,7 @@ public class TestAppender {
         verify(handler, new Times(3)).selectForRead();
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).append(isA(ReplicatedBatchHeader.class),
-                                    eq(writeSegment));
+                                    eq(writeSegment), isA(Acknowledger.class));
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
         verifyNoMoreInteractions(handler, bundle, eventChannel);
@@ -148,7 +148,7 @@ public class TestAppender {
         File tmpFile = File.createTempFile("duplicate", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        final AbstractAppender appender = new Appender(bundle);
+        final Spindle spindle = new Spindle(bundle);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
@@ -158,8 +158,8 @@ public class TestAppender {
         final SocketChannel inbound = server.accept();
         inbound.configureBlocking(false);
 
-        appender.handleAccept(inbound, handler);
-        assertEquals(State.READY, appender.getState());
+        spindle.handleAccept(inbound, handler);
+        assertEquals(State.READY, spindle.getState());
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
@@ -180,8 +180,8 @@ public class TestAppender {
         Util.waitFor("Header has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                appender.handleRead(inbound);
-                return appender.getState() == State.DEV_NULL;
+                spindle.handleRead(inbound);
+                return spindle.getState() == State.DEV_NULL;
             }
         }, 1000, 100);
 
@@ -191,8 +191,8 @@ public class TestAppender {
         Util.waitFor("Payload has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                appender.handleRead(inbound);
-                return appender.getState() == State.READY;
+                spindle.handleRead(inbound);
+                return spindle.getState() == State.READY;
             }
         }, 1000, 100);
 

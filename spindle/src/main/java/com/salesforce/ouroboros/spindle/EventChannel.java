@@ -174,10 +174,12 @@ public class EventChannel {
      * @param batchHeader
      * @param offset
      * @param segment
+     * @param acknowledger
      */
-    public void append(ReplicatedBatchHeader batchHeader, Segment segment) {
+    public void append(ReplicatedBatchHeader batchHeader, Segment segment,
+                       Acknowledger acknowledger) {
         append(batchHeader, batchHeader.getOffset());
-        replicator.replicate(batchHeader, this, segment);
+        replicator.replicate(batchHeader, this, segment, acknowledger);
     }
 
     /**

@@ -29,6 +29,8 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.UUID;
 
+import com.salesforce.ouroboros.BatchIdentity;
+
 /**
  * 
  * @author hhildebrand

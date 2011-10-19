@@ -44,6 +44,7 @@ import org.mockito.Captor;
 import org.mockito.MockitoAnnotations;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.BatchIdentity;
 
 /**
  * 
