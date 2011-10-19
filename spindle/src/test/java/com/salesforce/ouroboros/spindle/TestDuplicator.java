@@ -153,14 +153,12 @@ public class TestDuplicator {
             }
         }, 1000L, 100L);
         Node mirror = new Node(0x1638);
-        replicator.replicate(new ReplicatedBatchHeader(
-                                                       mirror,
+        long timestamp = System.currentTimeMillis();
+        replicator.replicate(new ReplicatedBatchHeader(mirror,
                                                        event.totalSize(),
-                                                       magic,
-                                                       channel,
-                                                       System.currentTimeMillis(),
-                                                       0), eventChannel,
-                             segment, acknowledger);
+                                                       magic, channel,
+                                                       timestamp, 0),
+                             eventChannel, segment, acknowledger);
         assertEquals(State.WRITE_HEADER, replicator.getState());
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
 
@@ -179,6 +177,7 @@ public class TestDuplicator {
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
         verify(eventChannel).commit(0);
+        verify(acknowledger).acknowledge(channel, timestamp);
     }
 
     @Test
@@ -190,7 +189,8 @@ public class TestDuplicator {
         Segment inboundSegment = new Segment(inboundTmpFile);
         EventChannel inboundEventChannel = mock(EventChannel.class);
         Bundle inboundBundle = mock(Bundle.class);
-        Acknowledger acknowledger = mock(Acknowledger.class);
+        Acknowledger outboundAcknowledger = mock(Acknowledger.class);
+        Acknowledger inboundAcknowledger = mock(Acknowledger.class);
 
         final ReplicatingAppender inboundReplicator = new ReplicatingAppender(
                                                                               inboundBundle);
@@ -221,6 +221,7 @@ public class TestDuplicator {
         long offset = 0L;
 
         when(inboundBundle.eventChannelFor(channel)).thenReturn(inboundEventChannel);
+        when(inboundBundle.getAcknowledger(mirror)).thenReturn(inboundAcknowledger);
         when(inboundEventChannel.segmentFor(offset)).thenReturn(inboundSegment);
 
         final Duplicator outboundDuplicator = new Duplicator();
@@ -267,7 +268,7 @@ public class TestDuplicator {
         outboundDuplicator.handleConnect(outbound, handler);
         outboundDuplicator.replicate(new ReplicatedBatchHeader(batchHeader, 0),
                                      eventChannel, outboundSegment,
-                                     acknowledger);
+                                     outboundAcknowledger);
         assertEquals(State.WRITE_HEADER, outboundDuplicator.getState());
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
@@ -290,5 +291,7 @@ public class TestDuplicator {
         assertEquals(event.getMagic(), replicatedEvent.getMagic());
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
+        verify(outboundAcknowledger).acknowledge(channel, timestamp);
+        verify(inboundAcknowledger).acknowledge(channel, timestamp);
     }
 }
