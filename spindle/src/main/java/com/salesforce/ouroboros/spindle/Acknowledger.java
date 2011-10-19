@@ -77,6 +77,10 @@ public class Acknowledger {
         return state.get();
     }
 
+    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+        this.handler = handler;
+    }
+
     public void handleWrite(SocketChannel channel) {
         switch (state.get()) {
             case WRITE_ACK: {

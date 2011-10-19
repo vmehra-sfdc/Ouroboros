@@ -63,11 +63,12 @@ public class TestAppender {
     public void testAppend() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
+        Acknowledger acknowledger = mock(Acknowledger.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        final Spindle spindle = new Spindle(bundle);
+        final Appender appender = new Appender(bundle, acknowledger);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
@@ -77,8 +78,8 @@ public class TestAppender {
         final SocketChannel inbound = server.accept();
         inbound.configureBlocking(false);
 
-        spindle.handleAccept(inbound, handler);
-        assertEquals(State.READY, spindle.getState());
+        appender.handleAccept(inbound, handler);
+        assertEquals(State.READY, appender.getState());
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
@@ -99,8 +100,8 @@ public class TestAppender {
         Util.waitFor("Header has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                spindle.handleRead(inbound);
-                return spindle.getState() == State.APPEND;
+                appender.handleRead(inbound);
+                return appender.getState() == State.APPEND;
             }
         }, 1000, 100);
 
@@ -110,8 +111,8 @@ public class TestAppender {
         Util.waitFor("Payload has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                spindle.handleRead(inbound);
-                return spindle.getState() == State.READY;
+                appender.handleRead(inbound);
+                return appender.getState() == State.READY;
             }
         }, 1000, 100);
 
@@ -144,11 +145,12 @@ public class TestAppender {
     public void testDuplicate() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
+        Acknowledger acknowledger = mock(Acknowledger.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("duplicate", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        final Spindle spindle = new Spindle(bundle);
+        final Appender appender = new Appender(bundle, acknowledger);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
@@ -158,8 +160,8 @@ public class TestAppender {
         final SocketChannel inbound = server.accept();
         inbound.configureBlocking(false);
 
-        spindle.handleAccept(inbound, handler);
-        assertEquals(State.READY, spindle.getState());
+        appender.handleAccept(inbound, handler);
+        assertEquals(State.READY, appender.getState());
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
@@ -180,8 +182,8 @@ public class TestAppender {
         Util.waitFor("Header has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                spindle.handleRead(inbound);
-                return spindle.getState() == State.DEV_NULL;
+                appender.handleRead(inbound);
+                return appender.getState() == State.DEV_NULL;
             }
         }, 1000, 100);
 
@@ -191,8 +193,8 @@ public class TestAppender {
         Util.waitFor("Payload has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                spindle.handleRead(inbound);
-                return spindle.getState() == State.READY;
+                appender.handleRead(inbound);
+                return appender.getState() == State.READY;
             }
         }, 1000, 100);
 

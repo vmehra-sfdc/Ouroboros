@@ -25,51 +25,36 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.nio.channels.SocketChannel;
-
-import com.hellblazer.pinkie.CommunicationsHandler;
-import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 
 /**
- * The communications wrapper that ties together the appender and the
- * acknowledger.
  * 
  * @author hhildebrand
  * 
  */
-public class Spindle implements CommunicationsHandler {
+public class Appender extends AbstractAppender {
 
     private final Acknowledger acknowledger;
-    private final Appender     appender;
 
-    public Spindle(Bundle bundle) {
-        acknowledger = new Acknowledger();
-        appender = new Appender(bundle, acknowledger);
+    public Appender(Bundle bundle, Acknowledger acknowledger) {
+        super(bundle);
+        this.acknowledger = acknowledger;
     }
 
     @Override
-    public void closing(SocketChannel channel) {
+    protected void commit() {
+        eventChannel.append(new ReplicatedBatchHeader(batchHeader, offset),
+                            segment, acknowledger);
     }
 
     @Override
-    public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler handler) {
-        throw new UnsupportedOperationException();
+    protected BatchHeader createBatchHeader() {
+        return new BatchHeader();
     }
 
     @Override
-    public void handleWrite(SocketChannel channel) {
-        acknowledger.handleWrite(channel);
-    }
-
-    @Override
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
-        acknowledger.handleAccept(channel, handler);
-        appender.handleAccept(channel, handler);
-    }
-
-    @Override
-    public void handleRead(SocketChannel channel) {
-        appender.handleRead(channel);
+    protected AppendSegment getLogicalSegment() {
+        return eventChannel.segmentFor(batchHeader);
     }
 }
