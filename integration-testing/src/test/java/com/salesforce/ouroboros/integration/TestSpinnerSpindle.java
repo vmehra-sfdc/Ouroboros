@@ -117,7 +117,7 @@ public class TestSpinnerSpindle {
                                                                                    "Spindle Handler",
                                                                                    spindleSocketOptions,
                                                                                    new InetSocketAddress(
-                                                                                                         "localhost",
+                                                                                                         "127.0.0.1",
                                                                                                          0),
                                                                                    spindleExec,
                                                                                    spindleFactory);
