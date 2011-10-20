@@ -25,7 +25,9 @@
  */
 package com.salesforce.ouroboros.integration;
 
-import static junit.framework.Assert.*;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertTrue;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.doAnswer;
@@ -135,7 +137,7 @@ public class TestSpinnerSpindle {
         Node coordNode = new Node(2);
         Coordinator coordinator = mock(Coordinator.class);
         when(coordinator.getId()).thenReturn(coordNode);
-        Spinner spinner = new Spinner(coordinator);
+        final Spinner spinner = new Spinner(coordinator);
 
         spindleHandler.connectTo(spindleAddress, spinner);
 
@@ -147,10 +149,15 @@ public class TestSpinnerSpindle {
         }, 2000, 100);
 
         assertEquals(1, spindles.size());
-        Spindle spindle = spindles.get(0);
-        assertEquals(Spindle.State.ESTABLISHED, spindle.getState());
+        final Spindle spindle = spindles.get(0);
 
-        assertEquals(Spinner.State.ESTABLISHED, spinner.getState());
+        Util.waitFor("Handshake did not complete", new Util.Condition() {
+            @Override
+            public boolean value() {
+                return Spindle.State.ESTABLISHED == spindle.getState()
+                       && Spinner.State.ESTABLISHED == spinner.getState();
+            }
+        }, 4000, 100);
 
         String[] eventContent = new String[] { "give me slack",
                 "or give me food", "or kill me" };
@@ -167,7 +174,7 @@ public class TestSpinnerSpindle {
             public boolean value() {
                 return committed.get();
             }
-        }, 2000, 100);
+        }, 4000, 100);
 
         segment.position(0);
 
