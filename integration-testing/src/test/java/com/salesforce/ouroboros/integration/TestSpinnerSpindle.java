@@ -182,5 +182,8 @@ public class TestSpinnerSpindle {
             payload.get(bytes);
             assertEquals(content, new String(bytes));
         }
+
+        spindleHandler.terminate();
+        spinnerHandler.terminate();
     }
 }
