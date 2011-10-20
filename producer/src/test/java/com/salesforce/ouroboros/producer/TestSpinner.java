@@ -29,9 +29,13 @@ import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
+import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Collections;
 import java.util.SortedMap;
@@ -42,10 +46,14 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.MockitoAnnotations;
+import org.mockito.internal.verification.Times;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.producer.Spinner.State;
 
 /**
  * 
@@ -62,10 +70,40 @@ public class TestSpinner {
     }
 
     @Test
+    public void testHandshake() throws Exception {
+        SocketChannel channel = mock(SocketChannel.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        Coordinator coordinator = mock(Coordinator.class);
+        final Node node = new Node(0x1638);
+        when(coordinator.getId()).thenReturn(node);
+        Spinner spinner = new Spinner(coordinator);
+
+        doReturn(0).doAnswer(new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                assertEquals(Spinner.MAGIC, buffer.getInt());
+                Node n = new Node(buffer);
+                assertEquals(node, n);
+                return Spinner.HANDSHAKE_BYTE_SIZE;
+            }
+        }).when(channel).write(isA(ByteBuffer.class));
+
+        assertEquals(State.INITIAL, spinner.getState());
+        spinner.handleConnect(channel, handler);
+        assertEquals(State.INITIAL, spinner.getState());
+        spinner.handleWrite(channel);
+        assertEquals(State.ESTABLISHED, spinner.getState());
+        verify(channel, new Times(2)).write(isA(ByteBuffer.class));
+    }
+
+    @Test
     public void testPush() throws Exception {
         SocketChannel channel = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Coordinator coordinator = mock(Coordinator.class);
+        Node node = new Node(0x1638);
+        when(coordinator.getId()).thenReturn(node);
         Spinner spinner = new Spinner(coordinator);
         spinner.handleConnect(channel, handler);
 
@@ -85,6 +123,8 @@ public class TestSpinner {
         SocketChannel outbound = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Coordinator coordinator = mock(Coordinator.class);
+        Node node = new Node(0x1638);
+        when(coordinator.getId()).thenReturn(node);
         Spinner spinner = new Spinner(coordinator);
         spinner.handleConnect(outbound, handler);
 

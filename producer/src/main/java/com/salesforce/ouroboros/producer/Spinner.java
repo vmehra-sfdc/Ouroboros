@@ -25,17 +25,21 @@
  */
 package com.salesforce.ouroboros.producer;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.NavigableMap;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
+import com.salesforce.ouroboros.Node;
 
 /**
  * 
@@ -43,11 +47,22 @@ import com.salesforce.ouroboros.BatchIdentity;
  * 
  */
 public class Spinner implements CommunicationsHandler {
+
+    public enum State {
+        ERROR, ESTABLISHED, INITIAL;
+    }
+
+    public static final int                          HANDSHAKE_BYTE_SIZE = Node.BYTE_LENGTH + 4;
+    public static final int                          MAGIC               = 0x1638;
+    private final static Logger                      log                 = Logger.getLogger(Spinner.class.getCanonicalName());
+
     private final BatchAcknowledgement               ack;
     private final Coordinator                        coordinator;
     private SocketChannelHandler                     handler;
-    private final Logger                             log = Logger.getLogger(Spinner.class.getCanonicalName());
+    private ByteBuffer                               handshake           = ByteBuffer.allocate(HANDSHAKE_BYTE_SIZE);
     private final NavigableMap<BatchIdentity, Batch> pending;
+    private final AtomicReference<State>             state               = new AtomicReference<State>(
+                                                                                                      State.INITIAL);
     private final BatchWriter                        writer;
 
     public Spinner(Coordinator coordinator) {
@@ -55,6 +70,9 @@ public class Spinner implements CommunicationsHandler {
         ack = new BatchAcknowledgement(this);
         pending = new ConcurrentSkipListMap<BatchIdentity, Batch>();
         this.coordinator = coordinator;
+        handshake.putInt(MAGIC);
+        coordinator.getId().serialize(handshake);
+        handshake.flip();
     }
 
     /**
@@ -134,6 +152,7 @@ public class Spinner implements CommunicationsHandler {
         this.handler = handler;
         ack.handleConnect(channel, handler);
         writer.handleConnect(channel, handler);
+        writeHandshake(channel);
     }
 
     @Override
@@ -143,7 +162,36 @@ public class Spinner implements CommunicationsHandler {
 
     @Override
     public void handleWrite(SocketChannel channel) {
-        writer.handleWrite(channel);
+        State s = state.get();
+        switch (s) {
+            case INITIAL:
+                writeHandshake(channel);
+                break;
+            case ESTABLISHED:
+                writer.handleWrite(channel);
+                break;
+            default:
+                log.severe(String.format("Illegal state for write: %s", s));
+                handler.close();
+        }
+    }
+
+    private void writeHandshake(SocketChannel channel) {
+        try {
+            channel.write(handshake);
+        } catch (IOException e) {
+            log.log(Level.WARNING, "Unable to write handshake", e);
+            state.set(State.ERROR);
+            handler.close();
+            handshake = null;
+            return;
+        }
+        if (!handshake.hasRemaining()) {
+            state.set(State.ESTABLISHED);
+            handshake = null;
+        } else {
+            handler.selectForWrite();
+        }
     }
 
     /**
@@ -156,5 +204,9 @@ public class Spinner implements CommunicationsHandler {
      */
     public boolean push(Batch events) {
         return writer.push(events, pending);
+    }
+
+    public State getState() {
+        return state.get();
     }
 }

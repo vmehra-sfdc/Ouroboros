@@ -127,9 +127,11 @@ public class Spindle implements CommunicationsHandler {
                 state.set(State.ERROR);
                 log.warning(String.format("Invalid handshak magic: %s", magic));
                 handler.close();
+                handshake = null;
                 return;
             }
             Node producer = new Node(handshake);
+            handshake = null;
             bundle.map(producer, acknowledger);
             state.set(State.ESTABLISHED);
         }
