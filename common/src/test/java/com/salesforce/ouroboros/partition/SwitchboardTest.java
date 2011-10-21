@@ -40,6 +40,7 @@ import org.smartfrog.services.anubis.partition.views.View;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
+import com.salesforce.ouroboros.partition.Switchboard.State;
 
 /**
  * 

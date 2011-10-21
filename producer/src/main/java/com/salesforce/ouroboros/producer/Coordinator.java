@@ -108,6 +108,7 @@ public class Coordinator implements Member {
                                         configuration.getSampleFrequency());
         this.self = self;
         this.switchboard = switchboard;
+        switchboard.setMember(this);
         this.source = source;
         spinnerHandler = new ChannelHandler(
                                             "Spinner Handler",

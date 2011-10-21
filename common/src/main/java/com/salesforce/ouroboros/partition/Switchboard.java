@@ -61,7 +61,6 @@ import com.salesforce.ouroboros.channel.ChannelMessageHandler;
  * 
  */
 public class Switchboard {
-
     public interface Member {
         /**
          * Advertise the receiver service, by ring casting the service across
@@ -82,6 +81,49 @@ public class Switchboard {
 
         void stabilized();
 
+    }
+
+    public enum State {
+        STABLE {
+            @Override
+            void next(State next, Switchboard switchboard, View view, int leader) {
+                switch (next) {
+                    case STABLE: {
+                        if (log.isLoggable(Level.INFO)) {
+                            log.info(String.format("Stable view received while in the stable state: %s, leader: %s",
+                                                   view, leader));
+                        }
+                        break;
+                    }
+                    case UNSTABLE: {
+                        switchboard.destabilize(view, leader);
+                    }
+                }
+            }
+
+        },
+        UNSTABLE {
+            @Override
+            void next(State next, Switchboard switchboard, View view, int leader) {
+                switch (next) {
+                    case UNSTABLE: {
+                        if (log.isLoggable(Level.FINEST)) {
+                            log.finest(String.format("Untable view received while in the unstable state: %s, leader: %s",
+                                                     view, leader));
+                        }
+                        break;
+                    }
+                    case STABLE: {
+                        switchboard.stabilize(view, leader);
+                    }
+                }
+            }
+
+        };
+        private final static Logger log = Logger.getLogger(State.class.getCanonicalName());
+
+        abstract void next(State next, Switchboard switchboard, View view,
+                           int leader);
     }
 
     class Notification implements PartitionNotification {
@@ -138,11 +180,11 @@ public class Switchboard {
     private final SortedSet<Node>        deadMembers     = new TreeSet<Node>();
     private boolean                      leader          = false;
     private Member                       member;
-    private SortedSet<Node>              previousMembers = new ConcurrentSkipListSet<Node>();
     private SortedSet<Node>              members         = new ConcurrentSkipListSet<Node>();
     private final Executor               messageProcessor;
     private final PartitionNotification  notification    = new Notification();
     private final Partition              partition;
+    private SortedSet<Node>              previousMembers = new ConcurrentSkipListSet<Node>();
     private NodeIdSet                    previousView;
     private final Node                   self;
     private final AtomicReference<State> state           = new AtomicReference<State>(

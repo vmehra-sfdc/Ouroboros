@@ -25,17 +25,26 @@
  */
 package com.salesforce.ouroboros.integration;
 
+import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertTrue;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.smartfrog.services.anubis.BasicConfiguration;
 import org.smartfrog.services.anubis.partition.test.controller.Controller;
 import org.smartfrog.services.anubis.partition.test.controller.ControllerConfiguration;
@@ -43,6 +52,7 @@ import org.smartfrog.services.anubis.partition.test.controller.NodeData;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.View;
 import org.smartfrog.services.anubis.partition.wire.msg.Heartbeat;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -61,13 +71,6 @@ import com.salesforce.ouroboros.spindle.WeaverConfigation;
  */
 public class TestProducerChannelBuffer {
 
-    public static class Source implements EventSource {
-        @Override
-        public void assumePrimary(Map<UUID, Long> newPrimaries) {
-            // TODO Auto-generated method stub 
-        }
-    }
-
     public static class ControlNode extends NodeData {
         static final Logger log = Logger.getLogger(ControlNode.class.getCanonicalName());
 
@@ -80,7 +83,7 @@ public class TestProducerChannelBuffer {
 
         @Override
         protected void partitionNotification(View partition, int leader) {
-            log.fine("Partition notification: " + partition);
+            log.finest("Partition notification: " + partition);
             super.partitionNotification(partition, leader);
             if (partition.isStable() && partition.cardinality() == cardinality) {
                 latch.countDown();
@@ -109,6 +112,13 @@ public class TestProducerChannelBuffer {
 
     }
 
+    public static class Source implements EventSource {
+        @Override
+        public void assumePrimary(Map<UUID, Long> newPrimaries) {
+            // TODO Auto-generated method stub 
+        }
+    }
+
     @Configuration
     static class MyControllerConfig extends ControllerConfiguration {
         @Override
@@ -132,24 +142,15 @@ public class TestProducerChannelBuffer {
         }
 
         @Override
-        protected Controller constructController() throws UnknownHostException {
+        protected MyController constructController()
+                                                    throws UnknownHostException {
             return new MyController(timer(), 1000, 300000, partitionIdentity(),
                                     heartbeatTimeout(), heartbeatInterval());
         }
 
     }
 
-    static class ProducerCfg extends BasicConfiguration {
-        @Bean
-        public com.salesforce.ouroboros.producer.Coordinator coordinator()
-                                                                          throws IOException {
-            return new com.salesforce.ouroboros.producer.Coordinator(
-                                                                     memberNode(),
-                                                                     switchboard(),
-                                                                     eventSource(),
-                                                                     producerConfiguration());
-        }
-
+    static class nodeCfg extends BasicConfiguration {
         @Override
         public int getMagic() {
             try {
@@ -166,12 +167,35 @@ public class TestProducerChannelBuffer {
 
         @Bean
         public Node memberNode() {
-            return new Node(0, 0, 0);
+            return new Node(node(), node(), node());
         }
 
         @Bean(initMethod = "start", destroyMethod = "terminate")
         public Switchboard switchboard() {
-            return new Switchboard(memberNode(), partition());
+            Switchboard switchboard = new Switchboard(memberNode(), partition());
+            return switchboard;
+        }
+    }
+
+    @Configuration
+    static class ProducerCfg extends nodeCfg {
+
+        @Bean(initMethod = "start", destroyMethod = "terminate")
+        public com.salesforce.ouroboros.producer.Coordinator coordinator()
+                                                                          throws IOException {
+            return new com.salesforce.ouroboros.producer.Coordinator(
+                                                                     memberNode(),
+                                                                     switchboard(),
+                                                                     eventSource(),
+                                                                     producerConfiguration());
+        }
+
+        /* (non-Javadoc)
+         * @see org.smartfrog.services.anubis.BasicConfiguration#node()
+         */
+        @Override
+        public int node() {
+            return 2;
         }
 
         @Bean
@@ -188,7 +212,9 @@ public class TestProducerChannelBuffer {
         }
     }
 
-    static class WeaverCfg extends BasicConfiguration {
+    @Configuration
+    static class WeaverCfg extends nodeCfg {
+
         @Bean
         public com.salesforce.ouroboros.spindle.Coordinator coordinator()
                                                                          throws IOException {
@@ -198,28 +224,12 @@ public class TestProducerChannelBuffer {
                                                                     weaver());
         }
 
+        /* (non-Javadoc)
+         * @see org.smartfrog.services.anubis.BasicConfiguration#node()
+         */
         @Override
-        public int getMagic() {
-            try {
-                return Identity.getMagicFromLocalIpAddress();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        @Override
-        public int heartbeatGroupTTL() {
-            return 0;
-        }
-
-        @Bean
-        public Node memberNode() {
-            return new Node(0, 0, 0);
-        }
-
-        @Bean(initMethod = "start", destroyMethod = "terminate")
-        public Switchboard switchboard() {
-            return new Switchboard(memberNode(), partition());
+        public int node() {
+            return 3;
         }
 
         @Bean
@@ -227,7 +237,7 @@ public class TestProducerChannelBuffer {
             return Executors.newSingleThreadScheduledExecutor();
         }
 
-        @Bean
+        @Bean(initMethod = "start", destroyMethod = "terminate")
         public Weaver weaver() throws IOException {
             return new Weaver(weaverConfiguration());
         }
@@ -244,4 +254,98 @@ public class TestProducerChannelBuffer {
         }
     }
 
+    private static final Logger        log = Logger.getLogger(TestProducerChannelBuffer.class.getCanonicalName());
+
+    MyController                       controller;
+    AnnotationConfigApplicationContext controllerContext;
+    CountDownLatch                     initialLatch;
+    List<ControlNode>                  partition;
+    AnnotationConfigApplicationContext producerContext;
+    AnnotationConfigApplicationContext weaverContext;
+
+    @Before
+    public void starUp() throws Exception {
+        log.info("Setting up initial partition");
+        initialLatch = new CountDownLatch(2);
+        controllerContext = new AnnotationConfigApplicationContext(
+                                                                   MyControllerConfig.class);
+        controller = controllerContext.getBean(MyController.class);
+        controller.cardinality = 2;
+        controller.latch = initialLatch;
+        producerContext = new AnnotationConfigApplicationContext(
+                                                                 WeaverCfg.class);
+        weaverContext = new AnnotationConfigApplicationContext(
+                                                               ProducerCfg.class);
+        log.info("Awaiting initial partition stability");
+        boolean success = false;
+        try {
+            success = initialLatch.await(120, TimeUnit.SECONDS);
+            assertTrue("Initial partition did not acheive stability", success);
+            log.info("Initial partition stable");
+            partition = new ArrayList<ControlNode>();
+            ControlNode member = (ControlNode) controller.getNode(producerContext.getBean(Identity.class));
+            assertNotNull("Can't find node: "
+                                  + producerContext.getBean(Identity.class),
+                          member);
+            partition.add(member);
+            member = (ControlNode) controller.getNode(weaverContext.getBean(Identity.class));
+            assertNotNull("Can't find node: "
+                                  + weaverContext.getBean(Identity.class),
+                          member);
+            partition.add(member);
+        } finally {
+            if (!success) {
+                tearDown();
+            }
+        }
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        if (controllerContext != null) {
+            try {
+                controllerContext.close();
+            } catch (Throwable e) {
+                e.printStackTrace();
+            }
+        }
+        controllerContext = null;
+        if (producerContext != null) {
+            try {
+                producerContext.close();
+            } catch (Throwable e) {
+                e.printStackTrace();
+            }
+        }
+        if (weaverContext != null) {
+            try {
+                weaverContext.close();
+            } catch (Throwable e) {
+                e.printStackTrace();
+            }
+        }
+        controller = null;
+        partition = null;
+        initialLatch = null;
+    }
+
+    @Test
+    public void testPush() throws Exception {
+        final Switchboard producerSwitchboard = producerContext.getBean(Switchboard.class);
+        final Switchboard weaverSwitchboard = weaverContext.getBean(Switchboard.class);
+        Util.waitFor("producer did not stabilize", new Util.Condition() {
+            @Override
+            public boolean value() {
+                return producerSwitchboard.getState() == Switchboard.State.STABLE;
+            }
+        }, 3000, 200);
+
+        Util.waitFor("weaver did not stabilize", new Util.Condition() {
+            @Override
+            public boolean value() {
+                return weaverSwitchboard.getState() == Switchboard.State.STABLE;
+            }
+        }, 3000, 200);
+
+    }
 }
