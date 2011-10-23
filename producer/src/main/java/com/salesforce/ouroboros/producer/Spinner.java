@@ -84,7 +84,7 @@ public class Spinner implements CommunicationsHandler {
     public void acknowledge(BatchIdentity ack) {
         Batch batch = pending.remove(ack);
         if (batch != null) {
-            coordinator.acknowledge(batch.interval());
+            coordinator.acknowledge(batch);
             if (log.isLoggable(Level.FINER)) {
                 log.finer(String.format("Acknowledgement for %s on primary %s",
                                         ack, coordinator.getId()));

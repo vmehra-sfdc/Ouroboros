@@ -62,7 +62,7 @@ import com.salesforce.ouroboros.producer.Spinner.State;
  */
 public class TestSpinner {
     @Captor
-    ArgumentCaptor<Double> captor;
+    ArgumentCaptor<Batch> captor;
 
     @Before
     public void init() {
@@ -115,7 +115,7 @@ public class TestSpinner {
         Thread.sleep(10);
         spinner.acknowledge(batch);
         verify(coordinator).acknowledge(captor.capture());
-        assertTrue(10 <= captor.getValue().intValue());
+        assertTrue(10 <= captor.getValue().interval());
     }
 
     @Test

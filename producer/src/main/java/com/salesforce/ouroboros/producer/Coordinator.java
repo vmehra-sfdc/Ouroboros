@@ -30,6 +30,7 @@ import static com.salesforce.ouroboros.util.Utils.point;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -71,9 +72,31 @@ import com.salesforce.ouroboros.util.rate.controllers.RateLimiter;
  * 
  */
 public class Coordinator implements Member {
+
+    public class UpdateState {
+        public final UUID channel;
+        public final long timestamp;
+
+        public UpdateState(UUID channel, long timestamp) {
+            super();
+            this.channel = channel;
+            this.timestamp = timestamp;
+        }
+    }
+
+    private static class ChannelState {
+        volatile Spinner spinner;
+        volatile long    timestamp;
+
+        public ChannelState(Spinner spinner, long timestamp) {
+            this.spinner = spinner;
+            this.timestamp = timestamp;
+        }
+    }
+
     private final static Logger                                 log               = Logger.getLogger(Coordinator.class.getCanonicalName());
 
-    private final ConcurrentMap<UUID, Spinner>                  channels          = new ConcurrentHashMap<UUID, Spinner>();
+    private final ConcurrentMap<UUID, ChannelState>             channelState      = new ConcurrentHashMap<UUID, ChannelState>();
     private final Controller                                    controller;
     private final Map<UUID, Long>                               mirrors           = new ConcurrentHashMap<UUID, Long>();
     private final SortedSet<Node>                               newProducers      = new ConcurrentSkipListSet<Node>();
@@ -117,6 +140,18 @@ public class Coordinator implements Member {
     }
 
     /**
+     * Acknowledge the commited event batch, where this node is the primary
+     * event producer for the channel of this batch
+     * 
+     * @param batch
+     *            - The committed event batch
+     */
+    public void acknowledge(Batch batch) {
+        controller.sample(batch.interval());
+        channelState.get(batch.channel).timestamp = batch.timestamp;
+    }
+
+    /**
      * Acknowledge the commited event batch, where this node is the mirror event
      * producer for the channel for this batch
      * 
@@ -125,18 +160,6 @@ public class Coordinator implements Member {
      */
     public void acknowledge(BatchIdentity ack) {
         mirrors.put(ack.channel, ack.timestamp);
-    }
-
-    /**
-     * Acknowledge the commited event batch, where this node is the primary
-     * event producer for the channel of this batch
-     * 
-     * @param batchResponseTime
-     *            - The time, in milliseconds, the system processed the event
-     *            batch
-     */
-    public void acknowledge(double batchResponseTime) {
-        controller.sample(batchResponseTime);
     }
 
     @Override
@@ -153,9 +176,9 @@ public class Coordinator implements Member {
      *            - the id of the channel to close
      */
     public void close(UUID channel) {
-        Spinner spinner = channels.remove(channel);
-        if (spinner != null) {
-            spinner.close(channel);
+        ChannelState state = channelState.remove(channel);
+        if (state != null) {
+            state.spinner.close(channel);
         }
     }
 
@@ -224,13 +247,16 @@ public class Coordinator implements Member {
                 if (spinner == null) { // primary is dead, so get mirror
                     spinner = spinners.get(channelPair[1]);
                 }
-                Spinner previous = channels.put(channel, spinner);
+                ChannelState previous = channelState.put(channel,
+                                                         new ChannelState(
+                                                                          spinner,
+                                                                          entry.getValue()));
                 assert previous == null : String.format("Apparently node %s is already primary for %");
             }
         }
 
         // Assign failover mirror for dead primaries
-        for (Entry<UUID, Spinner> entry : channels.entrySet()) {
+        for (Entry<UUID, ChannelState> entry : channelState.entrySet()) {
             Node[] pair = getChannelBufferReplicationPair(entry.getKey());
             if (deadMembers.contains(pair[0])) {
                 Spinner newPrimary = spinners.get(entry.getKey());
@@ -240,12 +266,12 @@ public class Coordinator implements Member {
                                                   entry.getKey()));
                     }
                 } else {
-                    Spinner failedPrimary = entry.getValue();
+                    ChannelState failedPrimary = entry.getValue();
                     // Fail over to the new primary
-                    for (Batch batch : failedPrimary.getPending(entry.getKey()).values()) {
+                    for (Batch batch : failedPrimary.spinner.getPending(entry.getKey()).values()) {
                         newPrimary.push(batch);
                     }
-                    entry.setValue(newPrimary);
+                    failedPrimary.spinner = newPrimary;
                 }
             }
         }
@@ -330,8 +356,8 @@ public class Coordinator implements Member {
         publishGate.await();
         publishingThreads.incrementAndGet();
         try {
-            Spinner spinner = channels.get(channel);
-            if (spinner == null) {
+            ChannelState state = channelState.get(channel);
+            if (state == null) {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Push to a channel which does not exist: %s",
                                            channel));
@@ -349,7 +375,8 @@ public class Coordinator implements Member {
                                                       String.format("The rate limit for this producer has been exceeded"));
             }
             Node[] pair = getProducerReplicationPair(channel);
-            if (!spinner.push(new Batch(pair[1], channel, timestamp, events))) {
+            if (!state.spinner.push(new Batch(pair[1], channel, timestamp,
+                                              events))) {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Rate limited, as service temporarily down for channel: %s",
                                            channel));
@@ -360,6 +387,75 @@ public class Coordinator implements Member {
         } finally {
             publishingThreads.decrementAndGet();
         }
+    }
+
+    /**
+     * Remap the producers by incorporating the set of new producers into the
+     * consistent hash ring of producers. This remappming may result in event
+     * channels that this node is serving as the primary have now been moved to
+     * a new primary.
+     * 
+     * @return the update mappings for channels that are moved to new primaries.
+     * @throws InterruptedException
+     */
+    public Map<Node, List<UpdateState>> remapProducers() {
+        ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
+        for (Node producer : producers) {
+            newRing.add(producer, producer.capacity);
+        }
+        for (Node producer : producers) {
+            newRing.add(producer, producer.capacity);
+        }
+        for (Node producer : newProducers) {
+            producers.add(producer);
+            newRing.add(producer, producer.capacity);
+        }
+        newProducers.clear();
+        HashMap<Node, List<UpdateState>> remapped = new HashMap<Node, List<UpdateState>>();
+        for (Iterator<Entry<UUID, ChannelState>> mappings = channelState.entrySet().iterator(); mappings.hasNext();) {
+            Entry<UUID, ChannelState> mapping = mappings.next();
+            Node primary = newRing.hash(point(mapping.getKey()));
+            if (!primary.equals(self)) {
+                List<UpdateState> updates = remapped.get(primary);
+                if (updates == null) {
+                    updates = new ArrayList<UpdateState>();
+                    remapped.put(primary, updates);
+                }
+                updates.add(new UpdateState(mapping.getKey(),
+                                            mapping.getValue().timestamp));
+                mappings.remove();
+            }
+        }
+        return remapped;
+    }
+
+    /**
+     * Remap the spinners by incorporating the set of new weavers into the
+     * consistent hash ring. This amounts to recalculating the weaver consistent
+     * hash ring and then doing the equivalent of a failover to the newly mapped
+     * primaries: all currently pending pushes for the old primaries will be
+     * reenqueued on the new primaries.
+     */
+    public void remapWeavers() {
+        ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
+        for (Node weaver : weavers) {
+            newRing.add(weaver, weaver.capacity);
+        }
+        for (Node weaver : newWeavers) {
+            weavers.add(weaver);
+            newRing.add(weaver, weaver.capacity);
+        }
+        newWeavers.clear();
+        for (Entry<UUID, ChannelState> mapping : channelState.entrySet()) {
+            Spinner remapped = spinners.get(newRing.hash(point(mapping.getKey())));
+            if (remapped != mapping.getValue().spinner) {
+                mapping.getValue().spinner = remapped;
+                for (Batch batch : mapping.getValue().spinner.getPending(mapping.getKey()).values()) {
+                    remapped.push(batch);
+                }
+            }
+        }
+        weaverRing.set(newRing);
     }
 
     @Override
@@ -389,26 +485,6 @@ public class Coordinator implements Member {
      */
     public void terminate() {
         spinnerHandler.terminate();
-    }
-
-    /**
-     * Update the consistent hash function for the producer processs ring.
-     * 
-     * @param ring
-     *            - the updated consistent hash function
-     */
-    public void updateProducerRing(ConsistentHashFunction<Node> ring) {
-        producerRing.set(ring);
-    }
-
-    /**
-     * Update the consistent hash function for the weaver processs ring.
-     * 
-     * @param ring
-     *            - the updated consistent hash function
-     */
-    public void updateWeaverRing(ConsistentHashFunction<Node> ring) {
-        weaverRing.set(ring);
     }
 
     private void closePublishingGate() throws InterruptedException {
@@ -505,14 +581,14 @@ public class Coordinator implements Member {
                     log.info(String.format("Mapping channel %s to mirror $s",
                                            channel, channelPair[1]));
                 }
-                channels.putIfAbsent(channel, spinner);
+                channelState.putIfAbsent(channel, new ChannelState(spinner, -1));
             }
         } else {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Mapping channel %s to primary $s",
                                        channel, channelPair[0]));
             }
-            channels.putIfAbsent(channel, spinner);
+            channelState.putIfAbsent(channel, new ChannelState(spinner, -1));
         }
     }
 

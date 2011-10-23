@@ -84,46 +84,7 @@ public class Switchboard {
     }
 
     public enum State {
-        STABLE {
-            @Override
-            void next(State next, Switchboard switchboard, View view, int leader) {
-                switch (next) {
-                    case STABLE: {
-                        if (log.isLoggable(Level.INFO)) {
-                            log.info(String.format("Stable view received while in the stable state: %s, leader: %s",
-                                                   view, leader));
-                        }
-                        break;
-                    }
-                    case UNSTABLE: {
-                        switchboard.destabilize(view, leader);
-                    }
-                }
-            }
-
-        },
-        UNSTABLE {
-            @Override
-            void next(State next, Switchboard switchboard, View view, int leader) {
-                switch (next) {
-                    case UNSTABLE: {
-                        if (log.isLoggable(Level.FINEST)) {
-                            log.finest(String.format("Untable view received while in the unstable state: %s, leader: %s",
-                                                     view, leader));
-                        }
-                        break;
-                    }
-                    case STABLE: {
-                        switchboard.stabilize(view, leader);
-                    }
-                }
-            }
-
-        };
-        private final static Logger log = Logger.getLogger(State.class.getCanonicalName());
-
-        abstract void next(State next, Switchboard switchboard, View view,
-                           int leader);
+        STABLE, UNSTABLE;
     }
 
     class Notification implements PartitionNotification {
@@ -496,7 +457,36 @@ public class Switchboard {
     void partitionEvent(View view, int leaderNode) {
         leader = self.processId == leaderNode;
         State next = view.isStable() ? State.STABLE : State.UNSTABLE;
-        state.getAndSet(next).next(next, this, view, leaderNode);
+        switch (state.getAndSet(next)) {
+            case STABLE: {
+                switch (next) {
+                    case STABLE:
+                        if (log.isLoggable(Level.INFO)) {
+                            log.info(String.format("Stable view received while in the stable state: %s, leader: %s",
+                                                   view, leader));
+                        }
+                        break;
+                    case UNSTABLE: {
+                        destabilize(view, leaderNode);
+                    }
+                }
+                break;
+            }
+            case UNSTABLE: {
+                switch (next) {
+                    case STABLE: {
+                        stabilize(view, leaderNode);
+                    }
+                    case UNSTABLE: {
+                        if (log.isLoggable(Level.FINEST)) {
+                            log.finest(String.format("Untable view received while in the unstable state: %s, leader: %s",
+                                                     view, leader));
+                        }
+                    }
+                }
+
+            }
+        }
     }
 
     /**
