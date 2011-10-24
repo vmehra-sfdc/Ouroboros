@@ -172,7 +172,6 @@ public class EventChannel {
      * the event batch
      * 
      * @param batchHeader
-     * @param offset
      * @param segment
      * @param acknowledger
      */

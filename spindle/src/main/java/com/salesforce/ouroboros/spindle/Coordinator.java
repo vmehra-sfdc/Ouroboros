@@ -66,20 +66,21 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class Coordinator implements Member, ChannelMessageHandler {
 
-    private final static Logger                           log                  = Logger.getLogger(Coordinator.class.getCanonicalName());
-    static final int                                      DEFAULT_TIMEOUT      = 1;
-    static final TimeUnit                                 TIMEOUT_UNIT         = TimeUnit.MINUTES;
+    private final static Logger                                 log                  = Logger.getLogger(Coordinator.class.getCanonicalName());
+    static final int                                            DEFAULT_TIMEOUT      = 1;
+    static final TimeUnit                                       TIMEOUT_UNIT         = TimeUnit.MINUTES;
 
-    private final Set<UUID>                               channels             = new HashSet<UUID>();
-    private final Weaver                                  weaver;
-    private final SortedSet<Node>                         members              = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>                         newMembers           = new ConcurrentSkipListSet<Node>();
-    private final AtomicReference<Rendezvous>             replicatorRendezvous = new AtomicReference<Rendezvous>();
-    private final Switchboard                             switchboard;
-    private final ScheduledExecutorService                timer;
-    private AtomicReference<ConsistentHashFunction<Node>> weaverRing           = new AtomicReference<ConsistentHashFunction<Node>>(
-                                                                                                                                   new ConsistentHashFunction<Node>());
-    private final Map<Node, ContactInformation>           yellowPages          = new ConcurrentHashMap<Node, ContactInformation>();
+    private final Set<UUID>                                     channels             = new HashSet<UUID>();
+    private final Node                                          id;
+    private final SortedSet<Node>                               members              = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>                               newMembers           = new ConcurrentSkipListSet<Node>();
+    private final AtomicReference<Rendezvous>                   replicatorRendezvous = new AtomicReference<Rendezvous>();
+    private final Switchboard                                   switchboard;
+    private final ScheduledExecutorService                      timer;
+    private final Weaver                                        weaver;
+    private final AtomicReference<ConsistentHashFunction<Node>> weaverRing           = new AtomicReference<ConsistentHashFunction<Node>>(
+                                                                                                                                         new ConsistentHashFunction<Node>());
+    private final Map<Node, ContactInformation>                 yellowPages          = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
                        Weaver weaver) {
@@ -88,14 +89,13 @@ public class Coordinator implements Member, ChannelMessageHandler {
         this.weaver = weaver;
         switchboard.setMember(this);
         weaver.setCoordinator(this);
-        yellowPages.put(weaver.getId(), weaver.getContactInformation());
+        id = weaver.getId();
+        yellowPages.put(id, weaver.getContactInformation());
     }
 
     @Override
     public void advertise() {
-        assert weaver != null : "local weaver has not been initialized";
-        ContactInformation info = yellowPages.get(weaver.getId());
-        assert info != null : "local weaver contact information has not been initialized";
+        ContactInformation info = yellowPages.get(id);
         switchboard.ringCast(new Message(
                                          weaver.getId(),
                                          GlobalMessageType.ADVERTISE_CHANNEL_BUFFER,
@@ -113,13 +113,12 @@ public class Coordinator implements Member, ChannelMessageHandler {
     public void close(UUID channel, Node requester) {
         channels.remove(channel);
         Node[] pair = getReplicationPair(channel);
-        if (pair[0].equals(weaver.getId())) {
-            switchboard.send(new Message(getId(),
-                                         ChannelMessage.PRIMARY_CLOSED, channel),
-                             requester);
+        if (pair[0].equals(id)) {
+            switchboard.send(new Message(id, ChannelMessage.PRIMARY_CLOSED,
+                                         channel), requester);
             weaver.close(channel);
-        } else if (pair[1].equals(weaver.getId())) {
-            switchboard.send(new Message(getId(), ChannelMessage.MIRROR_CLOSED,
+        } else if (pair[1].equals(id)) {
+            switchboard.send(new Message(id, ChannelMessage.MIRROR_CLOSED,
                                          channel), requester);
             weaver.close(channel);
         }
@@ -171,18 +170,6 @@ public class Coordinator implements Member, ChannelMessageHandler {
         weaver.failover(deadMembers);
     }
 
-    public Node getId() {
-        return weaver.getId();
-    }
-
-    public SortedSet<Node> getMembers() {
-        return members;
-    }
-
-    public SortedSet<Node> getNewMembers() {
-        return newMembers;
-    }
-
     /**
      * Answer the replication pair of nodes that provide the primary and mirror
      * for the channel
@@ -194,21 +181,6 @@ public class Coordinator implements Member, ChannelMessageHandler {
     public Node[] getReplicationPair(UUID channel) {
         List<Node> pair = weaverRing.get().hash(point(channel), 2);
         return new Node[] { pair.get(0), pair.get(1) };
-    }
-
-    public Switchboard getSwitchboard() {
-        return switchboard;
-    }
-
-    public ScheduledExecutorService getTimer() {
-        return timer;
-    }
-
-    /**
-     * @return true if this process is the leader of the group.
-     */
-    public boolean isLeader() {
-        return weaver.getId().equals(members.last());
     }
 
     @Override
@@ -239,27 +211,26 @@ public class Coordinator implements Member, ChannelMessageHandler {
             return;
         }
         Node[] pair = getReplicationPair(channel);
-        if (pair[0].equals(weaver.getId())) {
+        if (pair[0].equals(id)) {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Opening primary for channel %s on %s",
-                                       channel, getId()));
+                                       channel, id));
             }
             weaver.openPrimary(channel, pair[1]);
-            switchboard.send(new Message(getId(),
-                                         ChannelMessage.PRIMARY_OPENED, channel),
-                             requester);
-        } else if (pair[1].equals(weaver.getId())) {
+            switchboard.send(new Message(id, ChannelMessage.PRIMARY_OPENED,
+                                         channel), requester);
+        } else if (pair[1].equals(id)) {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Opening mirror for channel %s on %s",
-                                       channel, getId()));
+                                       channel, id));
             }
             weaver.openMirror(channel, pair[0]);
-            switchboard.send(new Message(getId(), ChannelMessage.MIRROR_OPENED,
+            switchboard.send(new Message(id, ChannelMessage.MIRROR_OPENED,
                                          channel), requester);
         } else {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("%s is neither the primary or secondary of %s, yet received request to open",
-                                       getId(), channel));
+                                       id, channel));
             }
         }
     }
@@ -333,7 +304,7 @@ public class Coordinator implements Member, ChannelMessageHandler {
             long channelPoint = point(channel);
             List<Node> newPair = newRing.hash(channelPoint, 2);
             List<Node> oldPair = weaverRing.get().hash(channelPoint, 2);
-            if (oldPair.contains(weaver.getId())) {
+            if (oldPair.contains(id)) {
                 if (!oldPair.get(0).equals(newPair.get(0))
                     || !oldPair.get(1).equals(newPair.get(1))) {
                     remapped.put(channel,
@@ -353,7 +324,7 @@ public class Coordinator implements Member, ChannelMessageHandler {
             public void run() {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Replicators synchronization achieved on %s",
-                                           getId()));
+                                           id));
                 }
             }
         };
@@ -362,15 +333,15 @@ public class Coordinator implements Member, ChannelMessageHandler {
             public void run() {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Replicators synchronization timed out on %s",
-                                           getId()));
+                                           id));
                 }
             }
         };
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Synchronization of replicators initiated on %s",
-                                   getId()));
+                                   id));
         }
-        replicatorRendezvous.set(openReplicators(getNewMembers(), action,
+        replicatorRendezvous.set(openReplicators(newMembers, action,
                                                  timeoutAction));
     }
 
