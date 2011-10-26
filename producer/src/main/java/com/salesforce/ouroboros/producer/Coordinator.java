@@ -49,6 +49,7 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.ChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
+import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
@@ -176,14 +177,46 @@ public class Coordinator implements Member {
      *            - the id of the channel to close
      */
     public void close(UUID channel) {
+        Node[] pair = getChannelBufferReplicationPair(channel);
+        Node primary;
+        if (weavers.contains(pair[0])) {
+            primary = pair[0];
+        } else {
+            primary = pair[1];
+        }
+        switchboard.send(new Message(self, ChannelMessage.CLOSE), primary);
+    }
+
+    public void closed(UUID channel) {
         ChannelState state = channelState.remove(channel);
         if (state != null) {
             state.spinner.close(channel);
         }
+        source.closed(channel);
     }
 
     @Override
     public void destabilize() {
+    }
+
+    @Override
+    public void dispatch(ChannelMessage type, Node sender,
+                         Serializable payload, long time) {
+        switch (type) {
+            case OPENED: {
+                opened((UUID) payload);
+                break;
+            }
+            case CLOSED: {
+                break;
+            }
+            default: {
+                if (log.isLoggable(Level.WARNING)) {
+                    log.warning(String.format("Invalid target %s for channel message: %s",
+                                              self, type));
+                }
+            }
+        }
     }
 
     @Override
@@ -301,7 +334,8 @@ public class Coordinator implements Member {
     }
 
     /**
-     * Open the channel identified by the supplied id
+     * Open the channel identified by the supplied id. The channel is not open
+     * until the opened event is sent to the caller
      * 
      * @param channel
      *            - the unique id of the channel
@@ -316,19 +350,36 @@ public class Coordinator implements Member {
                 log.info(String.format("%s is primary for channel %s, opening",
                                        self, channel));
             }
-            mapSpinner(channel);
         } else if (!producers.contains(producerPair[0])
                    && self.equals(producerPair[1])) {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("%s is mirror for channel %s, primary %s does not exist, opening",
                                        self, channel, producerPair[0]));
             }
-            mapSpinner(channel);
         } else {
             throw new IllegalArgumentException(
                                                String.format("%s is not the primary for channel %s",
                                                              self, channel));
         }
+        Node[] pair = getChannelBufferReplicationPair(channel);
+        Node primary;
+        if (weavers.contains(pair[0])) {
+            primary = pair[0];
+        } else {
+            primary = pair[1];
+        }
+        switchboard.send(new Message(self, ChannelMessage.OPEN), primary);
+    }
+
+    /**
+     * The channel has been opened.
+     * 
+     * @param channel
+     *            - the id of the channel
+     */
+    public void opened(UUID channel) {
+        mapSpinner(channel);
+        source.opened(channel);
     }
 
     /**

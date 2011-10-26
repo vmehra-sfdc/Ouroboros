@@ -271,7 +271,7 @@ public class Weaver implements Bundle {
                                            roots.hash(point(channel)),
                                            maxSegmentSize,
                                            replicators.get(primary));
-        channels.put(channel, ec);
+        channels.putIfAbsent(channel, ec);
     }
 
     /**
@@ -292,7 +292,7 @@ public class Weaver implements Bundle {
                                            roots.hash(point(channel)),
                                            maxSegmentSize,
                                            replicators.get(mirror));
-        channels.put(channel, ec);
+        channels.putIfAbsent(channel, ec);
     }
 
     /**

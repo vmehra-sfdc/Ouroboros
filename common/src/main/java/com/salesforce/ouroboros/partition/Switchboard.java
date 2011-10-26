@@ -47,9 +47,8 @@ import org.smartfrog.services.anubis.partition.comms.MessageConnection;
 import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 import org.smartfrog.services.anubis.partition.views.View;
 
+import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.channel.ChannelMessage;
-import com.salesforce.ouroboros.channel.ChannelMessageHandler;
 
 /**
  * The common high level distribute coordination logic for Ouroboros group
@@ -77,6 +76,9 @@ public class Switchboard {
                       Serializable payload, long time);
 
         void dispatch(MemberDispatch type, Node sender, Serializable payload,
+                      long time);
+
+        void dispatch(ChannelMessage type, Node sender, Serializable payload,
                       long time);
 
         void stabilized();
@@ -202,14 +204,7 @@ public class Switchboard {
 
     public void dispatchToMember(ChannelMessage type, Node sender,
                                  Serializable payload, long time) {
-        if (member instanceof ChannelMessageHandler) {
-            type.dispatch((ChannelMessageHandler) member, sender, payload, time);
-        } else {
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Member ignoring channel message %s [%s]",
-                                        type, payload));
-            }
-        }
+        member.dispatch(type, sender, payload, time);
     }
 
     public void dispatchToMember(MemberDispatch type, Node sender,

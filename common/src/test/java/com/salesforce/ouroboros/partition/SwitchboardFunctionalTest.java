@@ -48,6 +48,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
+import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.partition.Util.Condition;
@@ -121,6 +122,13 @@ public class SwitchboardFunctionalTest {
         @Override
         public void destabilize() {
             stabilized = false;
+        }
+
+        @Override
+        public void dispatch(ChannelMessage type, Node sender,
+                             Serializable payload, long time) {
+            // TODO Auto-generated method stub
+            
         }
 
         @Override
@@ -351,10 +359,9 @@ public class SwitchboardFunctionalTest {
             return 0;
         }
 
-        @Bean(initMethod = "start", destroyMethod = "terminate")
-        public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(memberNode(), partition());
-            return switchboard;
+        @Bean
+        public M member() {
+            return new M(memberNode(), switchboard());
         }
 
         @Bean
@@ -362,9 +369,10 @@ public class SwitchboardFunctionalTest {
             return new Node(node(), node(), node());
         }
 
-        @Bean
-        public M member() {
-            return new M(memberNode(), switchboard());
+        @Bean(initMethod = "start", destroyMethod = "terminate")
+        public Switchboard switchboard() {
+            Switchboard switchboard = new Switchboard(memberNode(), partition());
+            return switchboard;
         }
     }
 
@@ -451,14 +459,6 @@ public class SwitchboardFunctionalTest {
         }
     }
 
-    private List<AnnotationConfigApplicationContext> createMembers() {
-        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
-        for (Class<?> config : configs) {
-            contexts.add(new AnnotationConfigApplicationContext(config));
-        }
-        return contexts;
-    }
-
     protected Class<?>[] getConfigs() {
         return new Class[] { node0.class, node1.class, node2.class,
                 node3.class, node4.class, node5.class, node6.class,
@@ -470,5 +470,13 @@ public class SwitchboardFunctionalTest {
 
     protected Class<?> getControllerConfig() {
         return MyControllerConfig.class;
+    }
+
+    private List<AnnotationConfigApplicationContext> createMembers() {
+        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
+        for (Class<?> config : configs) {
+            contexts.add(new AnnotationConfigApplicationContext(config));
+        }
+        return contexts;
     }
 }

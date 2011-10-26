@@ -23,12 +23,10 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.channel;
+package com.salesforce.ouroboros;
 
 import java.io.Serializable;
-import java.util.UUID;
 
-import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Switchboard;
 
@@ -38,52 +36,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * 
  */
 public enum ChannelMessage implements MemberDispatch {
-    CLOSE {
-        @Override
-        public void dispatch(ChannelMessageHandler handler, Node sender,
-                             Serializable payload, long time) {
-            handler.close((UUID) payload, sender);
-        }
-    },
-    MIRROR_CLOSED {
-        @Override
-        public void dispatch(ChannelMessageHandler handler, Node sender,
-                             Serializable payload, long time) {
-            handler.mirrorClosed((UUID) payload, sender);
-        }
-    },
-    MIRROR_OPENED {
-        @Override
-        public void dispatch(ChannelMessageHandler handler, Node sender,
-                             Serializable payload, long time) {
-            handler.mirrorOpened((UUID) payload, sender);
-        }
-    },
-    OPEN {
-        @Override
-        public void dispatch(ChannelMessageHandler handler, Node sender,
-                             Serializable payload, long time) {
-            handler.open((UUID) payload, sender);
-        }
-    },
-    PRIMARY_CLOSED {
-        @Override
-        public void dispatch(ChannelMessageHandler handler, Node sender,
-                             Serializable payload, long time) {
-            handler.primaryClosed((UUID) payload, sender);
-        }
-    },
-    PRIMARY_OPENED {
-        @Override
-        public void dispatch(ChannelMessageHandler handler, Node sender,
-                             Serializable payload, long time) {
-
-            handler.primaryOpened((UUID) payload, sender);
-        }
-    };
-
-    abstract public void dispatch(ChannelMessageHandler handler, Node sender,
-                                  Serializable payload, long time);
+    CLOSE, CLOSE_MIRROR, CLOSED, OPEN, OPEN_MIRROR, OPENED;
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,

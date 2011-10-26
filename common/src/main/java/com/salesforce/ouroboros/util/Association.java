@@ -23,27 +23,24 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.channel;
+package com.salesforce.ouroboros.util;
 
-import java.util.UUID;
-
-import com.salesforce.ouroboros.Node;
+import java.io.Serializable;
 
 /**
  * 
  * @author hhildebrand
  * 
+ * @param <K>
+ * @param <V>
  */
-public interface ChannelMessageHandler {
-    void close(UUID channel, Node requester);
+public class Association<K, V> implements Serializable {
+    private static final long serialVersionUID = 1L;
+    public final K            key;
+    public final V            value;
 
-    void mirrorClosed(UUID channel, Node mirror);
-
-    void mirrorOpened(UUID channel, Node mirror);
-
-    void open(UUID channel, Node requester);
-
-    void primaryClosed(UUID channel, Node primary);
-
-    void primaryOpened(UUID channel, Node primary);
+    public Association(K key, V value) {
+        this.key = key;
+        this.value = value;
+    }
 }
