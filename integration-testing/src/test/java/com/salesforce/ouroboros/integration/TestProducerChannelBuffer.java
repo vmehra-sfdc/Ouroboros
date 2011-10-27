@@ -117,6 +117,18 @@ public class TestProducerChannelBuffer {
         public void assumePrimary(Map<UUID, Long> newPrimaries) {
             // TODO Auto-generated method stub 
         }
+
+        @Override
+        public void opened(UUID channel) {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void closed(UUID channel) {
+            // TODO Auto-generated method stub
+            
+        }
     }
 
     @Configuration
