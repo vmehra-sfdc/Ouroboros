@@ -19,6 +19,7 @@
     </licenses>
 
     <modules>
+        <module>smc-plugin</module>
         <module>common</module>
         <module>spindle</module>
         <module>producer</module>
