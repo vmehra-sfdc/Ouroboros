@@ -11,7 +11,7 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>Producer - the Event Producer Framework</name>
 	<description>Framework for the event producer client</description>
-	
+
 	<dependencies>
 		<dependency>
 			<groupId>org.mockito</groupId>
@@ -53,4 +53,29 @@
 			<scope>compile</scope>
 		</dependency>
 	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>com.salesforce.ouroboros</groupId>
+				<artifactId>smc-plugin</artifactId>
+				<version>6.0.1-SNAPSHOT</version>
+				<executions>
+					<execution>
+						<id>generate</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+						<configuration>
+							<targetDirectory>src/main/java</targetDirectory>
+							<packageName>com.salesforce.ouroboros.producer</packageName>
+							<table>true</table>
+							<verbose>true</verbose>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 </project>
