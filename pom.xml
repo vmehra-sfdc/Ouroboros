@@ -25,7 +25,6 @@
         <module>spindle</module>
         <module>producer</module>
         <module>integration-testing</module>
-        <module>smc-runtime</module>
     </modules>
 
     <build>
