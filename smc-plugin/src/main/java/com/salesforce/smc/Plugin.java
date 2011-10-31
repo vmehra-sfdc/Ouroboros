@@ -141,7 +141,7 @@ public class Plugin extends AbstractMojo {
      * 
      * @parameter
      */
-    private String  smDirectory     = "sm";
+    private String  smDirectory     = "src/main/sm";
 
     /**
      * May be used only with the java, groovy, scala, vb and csharp target
