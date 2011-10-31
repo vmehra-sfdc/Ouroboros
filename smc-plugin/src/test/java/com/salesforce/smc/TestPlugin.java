@@ -42,27 +42,49 @@ public class TestPlugin {
     @Test
     public void testGenerate() throws Exception {
         MavenProject project = mock(MavenProject.class);
-        File tempDir = File.createTempFile("smc", "generated");
+        File tempDir = File.createTempFile("smc", "generated", new File("."));
+        when(project.getBasedir()).thenReturn(tempDir);
         tempDir.delete();
         tempDir.deleteOnExit();
-        String targetDirectory = "generated-sources/sm";
-        Plugin plugin = new Plugin(tempDir, 2, true, true, 2, new File("."),
-                                   true, true, "src/test/resources/sm", true,
-                                   true, "java", targetDirectory, true, false, project);
+        String docDirectory = "target/classes/generated-sources/sm";
+        String targetDirectory = docDirectory;
+        Plugin plugin = new Plugin();
+
+        plugin.setDocDirectory(docDirectory);
+        plugin.setDebugLevel(2);
+        plugin.setFsmVerbose(false);
+        plugin.setGeneric(true);
+        plugin.setGraph(true);
+        plugin.setGraphLevel(2);
+        plugin.setProject(project);
+        plugin.setReflection(true);
+        plugin.setSerial(true);
+        plugin.setSmDirectory("../src/test/resources/sm");
+        plugin.setSync(true);
+        plugin.setTable(true);
+        plugin.setTarget("java");
+        plugin.setTargetDirectory(targetDirectory);
+        plugin.setVerbose(true);
+        String packageName = "smc_ex5";
+        plugin.setPackageName(packageName);
+
+        File targetDir = new File(tempDir, targetDirectory);
+        File packageDir = new File(targetDir, packageName);
+        File docDir = new File(tempDir, docDirectory);
+
         plugin.execute();
-        File genDir = new File(tempDir, targetDirectory);
         assertTrue("TaskFSM DOT file not generated",
-                   new File(genDir, "TaskFSM.dot").exists());
+                   new File(docDir, "TaskFSM.dot").exists());
         assertTrue("TaskFSM HTML table not generated",
-                   new File(genDir, "TaskFSM.html").exists());
+                   new File(docDir, "TaskFSM.html").exists());
         assertTrue("TaskFSM.java not generated",
-                   new File(genDir, "TaskFSM.java").exists());
+                   new File(packageDir, "TaskFSM.java").exists());
 
         assertTrue("TaskManagerFSM DOT file not generated",
-                   new File(genDir, "TaskManagerFSM.dot").exists());
+                   new File(docDir, "TaskManagerFSM.dot").exists());
         assertTrue("TaskManagerFSM HTML table not generated",
-                   new File(genDir, "TaskManagerFSM.html").exists());
+                   new File(docDir, "TaskManagerFSM.html").exists());
         assertTrue("TaskManagerFSM.java not generated",
-                   new File(genDir, "TaskManagerFSM.java").exists());
+                   new File(packageDir, "TaskManagerFSM.java").exists());
     }
 }

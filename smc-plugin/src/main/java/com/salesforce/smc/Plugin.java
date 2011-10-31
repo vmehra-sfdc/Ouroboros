@@ -61,13 +61,6 @@ import org.apache.maven.project.MavenProject;
  * @phase generate-sources
  */
 public class Plugin extends AbstractMojo {
-    /**
-     * Location of the build directory.
-     * 
-     * @parameter expression="${project.build.directory}"
-     * @required
-     */
-    private File         buildDirectory;
 
     /**
      * DebugLevel. 0, 1: Adds debug output messages to the generated code. 0
@@ -79,6 +72,15 @@ public class Plugin extends AbstractMojo {
      * @parameter
      */
     private int          debugLevel      = -1;
+
+    /**
+     * Generated documentation directory, relative to the project based
+     * directory. This is where the HTML table and DOT graph will be generated.
+     * Defaults to the targetDirectory.
+     * 
+     * @parameter
+     */
+    private String       docDirectory;
 
     /**
      * FSM verbose output
@@ -112,12 +114,20 @@ public class Plugin extends AbstractMojo {
     private int          graphLevel      = -1;
 
     /**
-     * Location of the project home directory.
+     * Package of the generated files
      * 
-     * @parameter expression="${project.home.directory}"
-     * @required
+     * @parameter
      */
-    private File         projectDirectory;
+    private String       packageName;
+
+    /**
+     * Project instance.
+     * 
+     * @parameter default-value="${project}"
+     * @required
+     * @readonly
+     */
+    private MavenProject project;
 
     /**
      * Reflection. May be used only with target languages csharp, groovy, java,
@@ -179,11 +189,11 @@ public class Plugin extends AbstractMojo {
     private String       target          = "java";
 
     /**
-     * Generated source directory, relative to the project build directory
+     * Generated source directory, relative to the project base directory
      * 
      * @parameter
      */
-    private String       targetDirectory = "generated-sources/sm";
+    private String       targetDirectory = "target/generated-sources/sm";
 
     /**
      * Verbose output.
@@ -191,52 +201,20 @@ public class Plugin extends AbstractMojo {
      * @parameter
      */
     private boolean      verbose         = false;
-    /**
-     * Project instance.
-     * 
-     * @parameter default-value="${project}"
-     * @required
-     * @readonly
-     */
-    private MavenProject project;
-
-    public Plugin(File buildDirectory, int debugLevel, boolean generic,
-                  boolean graph, int graphLevel, File projectDirectory,
-                  boolean reflection, boolean serial, String smDirectory,
-                  boolean sync, boolean table, String target,
-                  String targetDirectory, boolean verbose, boolean fsmVerbose,
-                  MavenProject project) {
-        super();
-        this.project = project;
-        this.buildDirectory = buildDirectory;
-        this.debugLevel = debugLevel;
-        this.generic = generic;
-        this.graph = graph;
-        this.graphLevel = graphLevel;
-        this.projectDirectory = projectDirectory;
-        this.reflection = reflection;
-        this.serial = serial;
-        this.smDirectory = smDirectory;
-        this.sync = sync;
-        this.table = table;
-        this.target = target;
-        this.targetDirectory = targetDirectory;
-        this.verbose = verbose;
-        this.fsmVerbose = fsmVerbose;
-    }
 
     @Override
     public void execute() throws MojoExecutionException {
+        if (docDirectory == null) {
+            docDirectory = targetDirectory;
+        }
+
         ArrayList<String> commonArgs = new ArrayList<String>();
 
         commonArgs.add("-return");
-        File targetDir = new File(buildDirectory, targetDirectory);
+        File targetDir = new File(project.getBasedir(), targetDirectory);
         targetDir.mkdirs();
 
-        commonArgs.add("-d");
-        commonArgs.add(targetDir.getAbsolutePath());
-
-        File srcDir = new File(projectDirectory, smDirectory);
+        File srcDir = new File(project.getBasedir(), smDirectory);
 
         project.addCompileSourceRoot(srcDir.getAbsolutePath());
         project.addCompileSourceRoot(targetDir.getAbsolutePath());
@@ -284,11 +262,27 @@ public class Plugin extends AbstractMojo {
                 args.add("-generic");
             }
         }
+
+        args.add("-d");
+        if (packageName == null) {
+            args.add(targetDir.getAbsolutePath());
+        } else {
+            packageName = packageName.replace('.', '/');
+            File packageDir = new File(targetDir, packageName);
+            packageDir.mkdirs();
+            args.add(packageDir.getAbsolutePath());
+        }
         args.add("-" + target);
         args.addAll(sources);
 
         // generate FSM source
         Smc.main(args.toArray(new String[0]));
+
+        File docDir = new File(project.getBasedir(), docDirectory);
+        docDir.mkdirs();
+
+        commonArgs.add("-d");
+        commonArgs.add(docDir.getAbsolutePath());
 
         if (graph) {
             args = new ArrayList<String>(commonArgs);
@@ -318,5 +312,133 @@ public class Plugin extends AbstractMojo {
             // Generate graphs
             Smc.main(args.toArray(new String[0]));
         }
+    }
+
+    /**
+     * @param debugLevel
+     *            the debugLevel to set
+     */
+    public void setDebugLevel(int debugLevel) {
+        this.debugLevel = debugLevel;
+    }
+
+    /**
+     * @param docDirectory
+     *            the docDirectory to set
+     */
+    public void setDocDirectory(String docDirectory) {
+        this.docDirectory = docDirectory;
+    }
+
+    /**
+     * @param fsmVerbose
+     *            the fsmVerbose to set
+     */
+    public void setFsmVerbose(boolean fsmVerbose) {
+        this.fsmVerbose = fsmVerbose;
+    }
+
+    /**
+     * @param generic
+     *            the generic to set
+     */
+    public void setGeneric(boolean generic) {
+        this.generic = generic;
+    }
+
+    /**
+     * @param graph
+     *            the graph to set
+     */
+    public void setGraph(boolean graph) {
+        this.graph = graph;
+    }
+
+    /**
+     * @param graphLevel
+     *            the graphLevel to set
+     */
+    public void setGraphLevel(int graphLevel) {
+        this.graphLevel = graphLevel;
+    }
+
+    /**
+     * @param packageName
+     *            the packageName to set
+     */
+    public void setPackageName(String packageName) {
+        this.packageName = packageName;
+    }
+
+    /**
+     * @param project
+     *            the project to set
+     */
+    public void setProject(MavenProject project) {
+        this.project = project;
+    }
+
+    /**
+     * @param reflection
+     *            the reflection to set
+     */
+    public void setReflection(boolean reflection) {
+        this.reflection = reflection;
+    }
+
+    /**
+     * @param serial
+     *            the serial to set
+     */
+    public void setSerial(boolean serial) {
+        this.serial = serial;
+    }
+
+    /**
+     * @param smDirectory
+     *            the smDirectory to set
+     */
+    public void setSmDirectory(String smDirectory) {
+        this.smDirectory = smDirectory;
+    }
+
+    /**
+     * @param sync
+     *            the sync to set
+     */
+    public void setSync(boolean sync) {
+        this.sync = sync;
+    }
+
+    /**
+     * @param table
+     *            the table to set
+     */
+    public void setTable(boolean table) {
+        this.table = table;
+    }
+
+    /**
+     * @param target
+     *            the target to set
+     */
+    public void setTarget(String target) {
+        this.target = target;
+    }
+
+    /**
+     * @param targetDirectory
+     *            the targetDirectory to set
+     */
+    public void setTargetDirectory(String targetDirectory) {
+        this.targetDirectory = targetDirectory;
+    }
+
+    /**
+     * @param verbose
+     *            the verbose to set
+     */
+    public void setVerbose(boolean verbose) {
+        this.verbose = verbose;
     }
 }
