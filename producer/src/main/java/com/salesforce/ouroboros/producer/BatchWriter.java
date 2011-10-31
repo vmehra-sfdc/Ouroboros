@@ -60,7 +60,7 @@ public class BatchWriter {
     private static final int              POLL_TIMEOUT = 10;
     private static final TimeUnit         POLL_UNIT    = TimeUnit.MILLISECONDS;
 
-    private final Deque<ByteBuffer>       batch        = new LinkedList<ByteBuffer>();
+    final Deque<ByteBuffer>               batch        = new LinkedList<ByteBuffer>();
     private final BatchHeader             batchHeader  = new BatchHeader();
     private volatile SocketChannelHandler handler;
     private final EventHeader             header       = new EventHeader();

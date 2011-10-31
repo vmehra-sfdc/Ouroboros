@@ -31,39 +31,92 @@
 
 %class BatchWriter
 %package com.salesforce.ouroboros.producer
-//%fsmclass BatchWriterFSM
 %access package
 
-%start BatchWriterFSM::SUSPENDED
+%start BatchWriterFSM::Suspended
 %map BatchWriterFSM
 %%
-CLOSED {
+Suspended {
+	connect	
+		Waiting {}
 }
 
-ERROR {
+Waiting {
+	pushBatch(events: Batch, pending: java.util.Map<com.salesforce.ouroboros.BatchIdentity, Batch>)
+		Processing {}
 }
 
-FAILOVER {
-} 
-
-SUSPENDED {
-} 
-
-INTERRUPTED {
+Processing {
+	batch
+		WriteBatchHeader{}
 }
 
-PROCESSING {
+Failover {
+	pushBatch(events: Batch, pending: java.util.Map<com.salesforce.ouroboros.BatchIdentity, Batch>)
+		Failover{}
 } 
 
-WAITING {
+WriteBatchHeader {
+	writeReady
+		WriteBatchHeader{}
+		
+	batchHeaderWritten
+		WriteEventHeader{}
+} 
+
+WriteEventHeader {
+	writeReady
+		WriteEventHeader{}
+		
+	eventHeaderWritten
+		WritePayload{}
+} 
+
+WritePayload {
+	writeReady
+		WritePayload{}
+		
+	payloadWritten
+		[!ctxt.batch.isEmpty()]
+		WriteEventHeader{}
+		
+	payloadWritten
+		[ctxt.batch.isEmpty()]
+		Waiting{}
 }
 
-WRITE_BATCH_HEADER {
-} 
+Error { 
+	writeReady
+		nil{}
+		
+	readReady
+		nil{}
+}
 
-WRITE_EVENT_HEADER {
-} 
+Interrupted { 
+	writeReady
+		nil{}
+		
+	readReady
+		nil{}
+}
 
-WRITE_PAYLOAD {
+Closed { 
+	writeReady
+		nil{}
+		
+	readReady
+		nil{}
+}
+
+Default {
+	close
+		Closed{}
+
+	error
+		Error{}
+
+	interrupt
+		Interrupted {}
 }
 %%
