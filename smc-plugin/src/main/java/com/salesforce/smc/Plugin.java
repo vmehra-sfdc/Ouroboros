@@ -49,6 +49,7 @@ import net.sf.smc.Smc;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.project.MavenProject;
 
 /**
  * @author hhildebrand
@@ -66,7 +67,7 @@ public class Plugin extends AbstractMojo {
      * @parameter expression="${project.build.directory}"
      * @required
      */
-    private File    buildDirectory;
+    private File         buildDirectory;
 
     /**
      * DebugLevel. 0, 1: Adds debug output messages to the generated code. 0
@@ -77,14 +78,14 @@ public class Plugin extends AbstractMojo {
      * 
      * @parameter
      */
-    private int     debugLevel      = -1;
+    private int          debugLevel      = -1;
 
     /**
      * FSM verbose output
      * 
      * @parameter
      */
-    private boolean fsmVerbose      = false;
+    private boolean      fsmVerbose      = false;
 
     /**
      * Generic collections. May be used only with target languages csharp, java
@@ -93,14 +94,14 @@ public class Plugin extends AbstractMojo {
      * 
      * @parameter
      */
-    private boolean generic         = true;
+    private boolean      generic         = true;
 
     /**
      * Produce DOT graph output.
      * 
      * @parameter
      */
-    private boolean graph           = false;
+    private boolean      graph           = false;
 
     /**
      * Graph level. Specifies how much detail to place into the DOT file. Level
@@ -108,7 +109,7 @@ public class Plugin extends AbstractMojo {
      * 
      * @parameter
      */
-    private int     graphLevel      = -1;
+    private int          graphLevel      = -1;
 
     /**
      * Location of the project home directory.
@@ -116,7 +117,7 @@ public class Plugin extends AbstractMojo {
      * @parameter expression="${project.home.directory}"
      * @required
      */
-    private File    projectDirectory;
+    private File         projectDirectory;
 
     /**
      * Reflection. May be used only with target languages csharp, groovy, java,
@@ -126,7 +127,7 @@ public class Plugin extends AbstractMojo {
      * 
      * @parameter
      */
-    private boolean reflection      = false;
+    private boolean      reflection      = false;
 
     /**
      * Serialization. Generate unique integer IDs for each state. These IDs can
@@ -134,14 +135,14 @@ public class Plugin extends AbstractMojo {
      * 
      * @parameter
      */
-    private boolean serial          = true;
+    private boolean      serial          = true;
 
     /**
      * State machine files source directory, relative to the project root.
      * 
      * @parameter
      */
-    private String  smDirectory     = "src/main/sm";
+    private String       smDirectory     = "src/main/sm";
 
     /**
      * May be used only with the java, groovy, scala, vb and csharp target
@@ -161,46 +162,52 @@ public class Plugin extends AbstractMojo {
      * 
      * @parameter
      */
-    private boolean sync            = false;
+    private boolean      sync            = false;
 
     /**
      * Produce HTML table output.
      * 
      * @parameter
      */
-    private boolean table           = false;
+    private boolean      table           = false;
 
     /**
      * Target language
      * 
      * @parameter
      */
-    private String  target          = "java";
+    private String       target          = "java";
 
     /**
      * Generated source directory, relative to the project build directory
      * 
      * @parameter
      */
-    private String  targetDirectory = "generated-sources/sm";
+    private String       targetDirectory = "generated-sources/sm";
 
     /**
      * Verbose output.
      * 
      * @parameter
      */
-    private boolean verbose         = false;
-
-    public Plugin() {
-        super();
-    }
+    private boolean      verbose         = false;
+    /**
+     * Project instance.
+     * 
+     * @parameter default-value="${project}"
+     * @required
+     * @readonly
+     */
+    private MavenProject project;
 
     public Plugin(File buildDirectory, int debugLevel, boolean generic,
                   boolean graph, int graphLevel, File projectDirectory,
                   boolean reflection, boolean serial, String smDirectory,
                   boolean sync, boolean table, String target,
-                  String targetDirectory, boolean verbose, boolean fsmVerbose) {
+                  String targetDirectory, boolean verbose, boolean fsmVerbose,
+                  MavenProject project) {
         super();
+        this.project = project;
         this.buildDirectory = buildDirectory;
         this.debugLevel = debugLevel;
         this.generic = generic;
@@ -230,6 +237,9 @@ public class Plugin extends AbstractMojo {
         commonArgs.add(targetDir.getAbsolutePath());
 
         File srcDir = new File(projectDirectory, smDirectory);
+
+        project.addCompileSourceRoot(srcDir.getAbsolutePath());
+        project.addCompileSourceRoot(targetDir.getAbsolutePath());
 
         ArrayList<String> sources = new ArrayList<String>();
         for (File source : srcDir.listFiles(new FilenameFilter() {

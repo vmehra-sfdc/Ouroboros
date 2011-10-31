@@ -29,7 +29,9 @@ import static junit.framework.Assert.assertTrue;
 
 import java.io.File;
 
+import org.apache.maven.project.MavenProject;
 import org.junit.Test;
+import static org.mockito.Mockito.*;
 
 /**
  * 
@@ -39,13 +41,14 @@ import org.junit.Test;
 public class TestPlugin {
     @Test
     public void testGenerate() throws Exception {
+        MavenProject project = mock(MavenProject.class);
         File tempDir = File.createTempFile("smc", "generated");
         tempDir.delete();
         tempDir.deleteOnExit();
         String targetDirectory = "generated-sources/sm";
         Plugin plugin = new Plugin(tempDir, 2, true, true, 2, new File("."),
                                    true, true, "src/test/resources/sm", true,
-                                   true, "java", targetDirectory, true, false);
+                                   true, "java", targetDirectory, true, false, project);
         plugin.execute();
         File genDir = new File(tempDir, targetDirectory);
         assertTrue("TaskFSM DOT file not generated",
