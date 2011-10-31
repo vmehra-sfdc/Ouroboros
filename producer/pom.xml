@@ -11,53 +11,7 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>Producer - the Event Producer Framework</name>
 	<description>Framework for the event producer client</description>
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-antrun-plugin</artifactId>
-				<version>1.6</version>
-				<executions>
-					<execution>
-						<id>compile</id>
-						<phase>compile</phase>
-						<configuration>
-							<target>
-								<property name="compile_classpath" refid="maven.compile.classpath" />
-								<property name="runtime_classpath" refid="maven.runtime.classpath" />
-								<property name="test_classpath" refid="maven.test.classpath" />
-								<property name="plugin_classpath" refid="maven.plugin.classpath" />
-
-								<echo message="compile classpath: ${compile_classpath}" />
-								<echo message="runtime classpath: ${runtime_classpath}" />
-								<echo message="test classpath:    ${test_classpath}" />
-								<echo message="plugin classpath:  ${plugin_classpath}" />
-							</target>
-						</configuration>
-						<goals>
-							<goal>run</goal>
-						</goals>
-					</execution>
-				</executions>
-				<dependencies>
-					<dependency>
-						<groupId>smc</groupId>
-						<artifactId>Smc</artifactId>
-						<version>6.0.1</version>
-						<scope>system</scope>
-						<systemPath>${basedir}/../lib/Smc.jar</systemPath>
-					</dependency>
-					<dependency>
-						<groupId>smc</groupId>
-						<artifactId>smc-ant</artifactId>
-						<version>6.0.1</version>
-						<scope>system</scope>
-						<systemPath>${basedir}/../lib/smc-ant.jar</systemPath>
-					</dependency>
-				</dependencies>
-			</plugin>
-		</plugins>
-	</build>
+	
 	<dependencies>
 		<dependency>
 			<groupId>smc</groupId>
@@ -96,6 +50,13 @@
 			<groupId>com.hellblazer.anubis</groupId>
 			<artifactId>anubis</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>smc</groupId>
+			<artifactId>smc-runtime</artifactId>
+			<version>6.0.1</version>
+			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
 	</dependencies>

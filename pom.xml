@@ -19,11 +19,13 @@
     </licenses>
 
     <modules>
+        <module>smc-runtime</module>
         <module>smc-plugin</module>
         <module>common</module>
         <module>spindle</module>
         <module>producer</module>
         <module>integration-testing</module>
+        <module>smc-runtime</module>
     </modules>
 
     <build>
