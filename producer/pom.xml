@@ -69,6 +69,7 @@
 						</goals>
 						<configuration>
 							<targetDirectory>src/main/java</targetDirectory>
+							<docDirectory>target/generated-sources/sm</docDirectory>
 							<packageName>com.salesforce.ouroboros.producer</packageName>
 							<table>true</table>
 							<verbose>true</verbose>
