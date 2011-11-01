@@ -141,7 +141,7 @@ public class TestSpinner {
         Batch batch3 = new Batch(mirror, channel, timestamp + 100,
                                  Collections.EMPTY_LIST);
         @SuppressWarnings("unchecked")
-        Batch batch4 = new Batch(mirror, channel, timestamp + 100,
+        Batch batch4 = new Batch(mirror, channel, timestamp + 140,
                                  Collections.EMPTY_LIST);
         assertTrue(spinner.push(batch1));
         assertTrue(spinner.push(batch2));

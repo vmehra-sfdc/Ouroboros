@@ -33,8 +33,6 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -42,76 +40,68 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.EventHeader;
+import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterFSM;
+import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterState;
 
 /**
- * The state machine for handling non blocking writes of event batches.
+ * The event action context for the batch writing protocol FSM
  * 
  * @author hhildebrand
  * 
  */
 public class BatchWriter {
-    public enum State {
-        CLOSED, ERROR, FAILOVER, INITIALIZED, INTERRUPTED, PROCESSING, WAITING,
-        WRITE_BATCH_HEADER, WRITE_EVENT_HEADER, WRITE_PAYLOAD;
-    }
 
-    private static final Logger           log          = Logger.getLogger(BatchWriter.class.getCanonicalName());
-    private static final int              MAGIC        = 0x1638;
-    private static final int              POLL_TIMEOUT = 10;
-    private static final TimeUnit         POLL_UNIT    = TimeUnit.MILLISECONDS;
+    private static final Logger           log         = Logger.getLogger(BatchWriter.class.getCanonicalName());
+    private static final int              MAGIC       = 0x1638;
 
-    final Deque<ByteBuffer>               batch        = new LinkedList<ByteBuffer>();
-    private final BatchHeader             batchHeader  = new BatchHeader();
+    private final BatchHeader             batchHeader = new BatchHeader();
+    private final BatchWriterContext      fsm         = new BatchWriterContext(
+                                                                               this);
     private volatile SocketChannelHandler handler;
-    private final EventHeader             header       = new EventHeader();
-    private final BlockingQueue<Batch>    queued       = new LinkedBlockingQueue<Batch>();
-    private final AtomicReference<State>  state        = new AtomicReference<State>(
-                                                                                    State.INITIALIZED);
+    private final EventHeader             header      = new EventHeader();
+    private boolean                       inError     = false;
+    private final BlockingQueue<Batch>    queued      = new LinkedBlockingQueue<Batch>();
+    final Deque<ByteBuffer>               batch       = new LinkedList<ByteBuffer>();
 
     public void closing(SocketChannel channel) {
-        final State s = state.get();
-        if (s != State.ERROR) {
-            state.set(State.CLOSED);
-        }
-        queued.clear();
-        batch.clear();
+        fsm.close();
     }
 
     public void failover() {
-        state.set(State.FAILOVER);
+        fsm.failover();
     }
 
-    public State getState() {
-        return state.get();
+    public BatchWriterState getState() {
+        return fsm.getState();
     }
 
     public void handleConnect(SocketChannel channel,
                               SocketChannelHandler handler) {
         this.handler = handler;
-        state.set(State.WAITING);
-        process();
+        fsm.connect();
     }
 
     public void handleWrite(SocketChannel channel) {
-        final State s = state.get();
-        switch (s) {
-            case WRITE_BATCH_HEADER:
-                writeBatchHeader(channel);
-                break;
-            case WRITE_PAYLOAD:
-                writePayload(channel);
-                break;
-            case WRITE_EVENT_HEADER:
-                writeEventHeader(channel);
-                break;
-            case FAILOVER:
-                break;
-            default:
-                state.set(State.ERROR);
-                if (log.isLoggable(Level.WARNING)) {
-                    log.warning(String.format("Illegal write state: %s", s));
-                }
+        fsm.writeReady(channel);
+    }
+
+    public void nextBatch() {
+        Batch entry;
+        try {
+            entry = queued.take();
+        } catch (InterruptedException e) {
+            inError = true;
+            return;
         }
+        int totalSize = 0;
+        for (ByteBuffer event : entry.events) {
+            totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
+            batch.add(event);
+        }
+        batchHeader.initialize(entry.mirror, totalSize, MAGIC, entry.channel,
+                               entry.timestamp);
+        batchHeader.rewind();
+        handler.selectForWrite();
     }
 
     /**
@@ -128,32 +118,20 @@ public class BatchWriter {
      *         receiver cannot push the events
      */
     public boolean push(Batch events, Map<BatchIdentity, Batch> pending) {
-        State s = state.get();
-        if (s == State.CLOSED || s == State.ERROR) {
-            return false;
-        }
         pending.put(events, events);
         queued.add(events);
-        process();
-        return true;
+        fsm.pushBatch();
+        if (fsm.getState() == BatchWriterFSM.Closed) {
+            queued.clear();
+            pending.remove(events);
+            return false;
+        } else {
+            return true;
+        }
     }
 
-    /**
-     * Batch the events to the channel buffer
-     * 
-     * @param channel
-     *            - the unique id of the channel
-     * @param timestamp
-     *            - the timestamp used for dedup
-     * @param events
-     *            - the event payloads to batch
-     */
-    private void batch(Batch entry) {
-        if (!state.compareAndSet(State.PROCESSING, State.WRITE_BATCH_HEADER)) {
-            throw new IllegalStateException(
-                                            String.format("Cannot batch events in state %s",
-                                                          state.get()));
-        }
+    protected void batch(Batch entry, Map<BatchIdentity, Batch> pending) {
+        pending.put(entry, entry);
         int totalSize = 0;
         for (ByteBuffer event : entry.events) {
             totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
@@ -165,35 +143,42 @@ public class BatchWriter {
         handler.selectForWrite();
     }
 
-    private void error() {
+    protected boolean batchHeaderWritten() {
+        return !batchHeader.hasRemaining();
+    }
+
+    protected void close() {
         handler.close();
-        state.set(State.ERROR);
         batch.clear();
         queued.clear();
     }
 
-    /**
-     * Process a pending event batch, if available
-     */
-    private void process() {
-        if (!state.compareAndSet(State.WAITING, State.PROCESSING)) {
-            return;
-        }
-        Batch entry;
-        try {
-            entry = queued.poll(POLL_TIMEOUT, POLL_UNIT);
-        } catch (InterruptedException e) {
-            state.set(State.INTERRUPTED);
-            return;
-        }
-        if (entry == null) {
-            state.compareAndSet(State.PROCESSING, State.WAITING);
-            return;
-        }
-        batch(entry);
+    protected boolean eventHeaderWritten() {
+        return !header.hasRemaining();
     }
 
-    private void writeBatchHeader(SocketChannel channel) {
+    protected boolean hasPendingBatch() {
+        return queued.poll() != null;
+    }
+
+    protected boolean inError() {
+        return inError;
+    }
+
+    protected void nextEventHeader() {
+        header.initialize(MAGIC, batch.peekFirst());
+        header.rewind();
+    }
+
+    protected boolean payloadWritten() {
+        return !batch.peekFirst().hasRemaining();
+    }
+
+    protected void selectForWrite() {
+        handler.selectForWrite();
+    }
+
+    protected boolean writeBatchHeader(SocketChannel channel) {
         try {
             batchHeader.write(channel);
         } catch (IOException e) {
@@ -202,17 +187,13 @@ public class BatchWriter {
                         String.format("Unable to write batch header %s on %s",
                                       batchHeader, channel), e);
             }
-            error();
-            return;
+            inError = true;
+            return false;
         }
-        if (!batchHeader.hasRemaining()) {
-            writeNextEventHeader(channel);
-        } else {
-            handler.selectForWrite();
-        }
+        return !batchHeader.hasRemaining();
     }
 
-    private void writeEventHeader(SocketChannel channel) {
+    protected boolean writeEventHeader(SocketChannel channel) {
         try {
             header.write(channel);
         } catch (IOException e) {
@@ -221,25 +202,13 @@ public class BatchWriter {
                         String.format("Unable to write header %s on %s",
                                       header, channel), e);
             }
-            error();
-            return;
+            inError = true;
+            return false;
         }
-        if (!header.hasRemaining()) {
-            state.set(State.WRITE_PAYLOAD);
-            writePayload(channel);
-        } else {
-            handler.selectForWrite();
-        }
+        return !header.hasRemaining();
     }
 
-    private void writeNextEventHeader(SocketChannel channel) {
-        state.set(State.WRITE_EVENT_HEADER);
-        header.initialize(MAGIC, batch.peekFirst());
-        header.rewind();
-        writeEventHeader(channel);
-    }
-
-    private void writePayload(SocketChannel channel) {
+    protected boolean writePayload(SocketChannel channel) {
         try {
             channel.write(batch.peekFirst());
         } catch (IOException e) {
@@ -248,19 +217,13 @@ public class BatchWriter {
                         String.format("Unable to write event batch", channel),
                         e);
             }
-            error();
-            return;
+            inError = true;
+            return false;
         }
         if (!batch.peekFirst().hasRemaining()) {
             batch.pop();
-            if (batch.isEmpty()) {
-                state.set(State.WAITING);
-                process();
-            } else {
-                writeNextEventHeader(channel);
-            }
-        } else {
-            handler.selectForWrite();
+            return true;
         }
+        return false;
     }
 }

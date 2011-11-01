@@ -49,7 +49,7 @@ import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.producer.BatchWriter.State;
+import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterFSM;
 
 /**
  * 
@@ -77,16 +77,16 @@ public class TestBatchWriter {
         SortedMap<BatchIdentity, Batch> pending = new TreeMap<BatchIdentity, Batch>();
 
         BatchWriter batchWriter = new BatchWriter();
-        assertEquals(State.INITIALIZED, batchWriter.getState());
+        assertEquals(BatchWriterFSM.Suspended, batchWriter.getState());
         batchWriter.handleConnect(outbound, handler);
-        assertEquals(State.WAITING, batchWriter.getState());
+        assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
         Node mirror = new Node(0x1638);
         Batch batch = new Batch(mirror, channel, timestamp,
                                 Arrays.asList(payloads));
         batchWriter.push(batch, pending);
         assertEquals(1, pending.size());
         assertEquals(batch, pending.get(batch));
-        assertEquals(State.WRITE_BATCH_HEADER, batchWriter.getState());
+        assertEquals(BatchWriterFSM.WriteBatchHeader, batchWriter.getState());
         Answer<Integer> readBatchHeader = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
@@ -162,7 +162,18 @@ public class TestBatchWriter {
         };
         when(outbound.write(isA(ByteBuffer.class))).thenAnswer(readBatchHeader).thenAnswer(readEventHeader0).thenAnswer(readPayload0).thenAnswer(readEventHeader1).thenAnswer(readPayload1).thenAnswer(readEventHeader2).thenAnswer(readPayload2);
         batchWriter.handleWrite(outbound);
-        assertEquals(State.WAITING, batchWriter.getState());
+        assertEquals(BatchWriterFSM.WriteEventHeader, batchWriter.getState());
+        batchWriter.handleWrite(outbound);
+        assertEquals(BatchWriterFSM.WritePayload, batchWriter.getState());
+        batchWriter.handleWrite(outbound);
+        assertEquals(BatchWriterFSM.WriteEventHeader, batchWriter.getState());
+        batchWriter.handleWrite(outbound);
+        assertEquals(BatchWriterFSM.WritePayload, batchWriter.getState());
+        batchWriter.handleWrite(outbound);
+        assertEquals(BatchWriterFSM.WriteEventHeader, batchWriter.getState());
+        batchWriter.handleWrite(outbound);
+        assertEquals(BatchWriterFSM.WritePayload, batchWriter.getState());
+        batchWriter.handleWrite(outbound);
         verify(outbound, new Times(7)).write(isA(ByteBuffer.class));
     }
 }

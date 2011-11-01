@@ -72,7 +72,10 @@
 							<docDirectory>target/generated-sources/sm</docDirectory>
 							<packageName>com.salesforce.ouroboros.producer</packageName>
 							<table>true</table>
+							<graph>true</graph>
+							<graphLevel>2</graphLevel>
 							<verbose>true</verbose>
+							<sync>true</sync>
 						</configuration>
 					</execution>
 				</executions>

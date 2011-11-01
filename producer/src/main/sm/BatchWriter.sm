@@ -26,8 +26,7 @@
  */
 %}
 
-// This FSM works for the BatchWriter class only and only the BatchWriter
-// class may instantiate it.
+// The FSM for writing event batches to channel buffers.
 
 %class BatchWriter
 %package com.salesforce.ouroboros.producer
@@ -37,86 +36,107 @@
 %map BatchWriterFSM
 %%
 Suspended {
-	connect	
+	connect
+		[ctxt.hasPendingBatch()]
+		WriteBatchHeader {
+			nextBatch();
+			selectForWrite();
+		}
+		
+	connect
+		[!ctxt.hasPendingBatch()]
 		Waiting {}
 }
 
 Waiting {
-	pushBatch(events: Batch, pending: java.util.Map<com.salesforce.ouroboros.BatchIdentity, Batch>)
-		Processing {}
+	pushBatch
+		WriteBatchHeader {
+			nextBatch();
+			selectForWrite();
+		}
 }
-
-Processing {
-	batch
-		WriteBatchHeader{}
-}
-
-Failover {
-	pushBatch(events: Batch, pending: java.util.Map<com.salesforce.ouroboros.BatchIdentity, Batch>)
-		Failover{}
-} 
 
 WriteBatchHeader {
-	writeReady
-		WriteBatchHeader{}
+	writeReady(channel: java.nio.channels.SocketChannel)
+		[!ctxt.writeBatchHeader(channel)]
+		WriteBatchHeader{
+			selectForWrite();
+		}
 		
-	batchHeaderWritten
-		WriteEventHeader{}
+	writeReady(channel: java.nio.channels.SocketChannel)
+		[ctxt.inError()]
+		Closed{
+			close();
+		}
+		
+	writeReady(channel: java.nio.channels.SocketChannel)
+		[ctxt.batchHeaderWritten()]
+		WriteEventHeader{
+			nextEventHeader();
+			selectForWrite();
+		}
 } 
 
 WriteEventHeader {
-	writeReady
-		WriteEventHeader{}
+	writeReady(channel: java.nio.channels.SocketChannel)
+		[!ctxt.writeEventHeader(channel)]
+		WriteEventHeader{
+			selectForWrite();
+		}
 		
-	eventHeaderWritten
-		WritePayload{}
+	writeReady(channel: java.nio.channels.SocketChannel)
+		[ctxt.inError()]
+		Closed{
+			close();
+		}
+		
+	writeReady(channel: java.nio.channels.SocketChannel)
+		[ctxt.eventHeaderWritten()]
+		WritePayload{
+			selectForWrite();
+		}
 } 
 
 WritePayload {
-	writeReady
-		WritePayload{}
+	writeReady(channel: java.nio.channels.SocketChannel)
+		[!ctxt.writePayload(channel)]
+		WritePayload{
+			selectForWrite();
+		}
 		
-	payloadWritten
+	writeReady(channel: java.nio.channels.SocketChannel)
+		[ctxt.inError()]
+		Closed{
+			close();
+		}
+		
+	writeReady(channel: java.nio.channels.SocketChannel)
 		[!ctxt.batch.isEmpty()]
-		WriteEventHeader{}
+		WriteEventHeader{
+			nextEventHeader();
+			selectForWrite();
+		}
 		
-	payloadWritten
+	writeReady(channel: java.nio.channels.SocketChannel)
 		[ctxt.batch.isEmpty()]
 		Waiting{}
 }
 
-Error { 
-	writeReady
-		nil{}
-		
-	readReady
-		nil{}
-}
-
-Interrupted { 
-	writeReady
-		nil{}
-		
-	readReady
-		nil{}
-}
-
-Closed { 
-	writeReady
-		nil{}
-		
-	readReady
-		nil{}
+Closed {
 }
 
 Default {
+	failover
+		Closed{
+			close();
+		}
+
+	pushBatch
+		nil {}
+
 	close
-		Closed{}
-
-	error
-		Error{}
-
-	interrupt
-		Interrupted {}
+		Closed{
+			close();
+		}
 }
 %%
