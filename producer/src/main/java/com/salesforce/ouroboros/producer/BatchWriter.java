@@ -64,7 +64,9 @@ public class BatchWriter {
     final Deque<ByteBuffer>               batch       = new LinkedList<ByteBuffer>();
 
     public void closing(SocketChannel channel) {
-        fsm.close();
+        if (!fsm.isInTransition()) {
+            fsm.close();
+        }
     }
 
     public void failover() {
