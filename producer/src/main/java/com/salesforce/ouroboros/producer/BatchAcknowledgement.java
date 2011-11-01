@@ -28,12 +28,12 @@ package com.salesforce.ouroboros.producer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
+import com.salesforce.ouroboros.producer.BatchAcknowledgementContext.BatchAcknowledgementState;
 
 /**
  * The state machine implementing the batch event acknowledgement protocol
@@ -42,80 +42,76 @@ import com.salesforce.ouroboros.BatchIdentity;
  * 
  */
 public class BatchAcknowledgement {
-    public enum State {
-        CLOSED, ERROR, FAILOVER, INITIALIZED, READ_ACK;
-    };
+    private final static Logger               log       = Logger.getLogger(BatchAcknowledgement.class.getCanonicalName());
 
-    private final static Logger           log       = Logger.getLogger(BatchAcknowledgement.class.getCanonicalName());
-
-    private final ByteBuffer              ackBuffer = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
-    private volatile SocketChannelHandler handler;
-    private final Spinner                 spinner;
-    private final AtomicReference<State>  state     = new AtomicReference<State>(
-                                                                                 State.INITIALIZED);
+    private final ByteBuffer                  ackBuffer = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
+    private final BatchAcknowledgementContext fsm       = new BatchAcknowledgementContext(
+                                                                                          this);
+    private volatile SocketChannelHandler     handler;
+    private boolean                           inError   = false;
+    private final Spinner                     spinner;
 
     public BatchAcknowledgement(Spinner spinner) {
         this.spinner = spinner;
     }
 
+    protected boolean acknowledgementRead() {
+        return !ackBuffer.hasRemaining();
+    }
+
     public void closing(SocketChannel channel) {
-        if (state.get() != State.ERROR) {
-            state.set(State.CLOSED);
+        if (!fsm.isInTransition()) {
+            fsm.close();
         }
     }
 
     public void failover() {
-        state.set(State.FAILOVER);
+        fsm.close();
     }
 
-    public State getState() {
-        return state.get();
+    public BatchAcknowledgementState getState() {
+        return fsm.getState();
     }
 
     public void handleConnect(SocketChannel channel,
                               SocketChannelHandler handler) {
         this.handler = handler;
-        state.set(State.READ_ACK);
-        handler.selectForRead();
+        fsm.connect();
     }
 
     public void handleRead(SocketChannel channel) {
-        State s = state.get();
-        switch (s) {
-            case READ_ACK: {
-                readAcknowlegement(channel);
-                break;
-            }
-            case FAILOVER: {
-                break;
-            }
-            default:
-                error();
-        }
+        fsm.readReady(channel);
     }
 
-    private void error() {
-        state.set(State.ERROR);
+    protected void close() {
         handler.close();
     }
 
-    private void readAcknowlegement(SocketChannel channel) {
+    protected void dispatchAcknowledgement() {
+        ackBuffer.flip();
+        BatchIdentity ack = new BatchIdentity(ackBuffer);
+        ackBuffer.rewind();
+        spinner.acknowledge(ack);
+    }
+
+    protected boolean inError() {
+        return inError;
+    }
+
+    protected boolean readAcknowledgement(SocketChannel channel) {
         try {
             channel.read(ackBuffer);
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING, "Error reading batch acknowlegement", e);
             }
-            error();
+            inError = true;
+            return false;
         }
-        if (!ackBuffer.hasRemaining()) {
-            ackBuffer.flip();
-            BatchIdentity ack = new BatchIdentity(ackBuffer);
-            ackBuffer.rewind();
-            spinner.acknowledge(ack);
-            readAcknowlegement(channel);
-        } else {
-            handler.selectForRead();
-        }
+        return !ackBuffer.hasRemaining();
+    }
+
+    protected void selectForRead() {
+        handler.selectForRead();
     }
 }

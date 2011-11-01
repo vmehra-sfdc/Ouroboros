@@ -26,7 +26,10 @@
 package com.salesforce.ouroboros.producer;
 
 import static junit.framework.Assert.assertEquals;
-import static org.mockito.Mockito.*;
+import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -38,9 +41,7 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
-import com.salesforce.ouroboros.producer.BatchAcknowledgement;
-import com.salesforce.ouroboros.producer.Spinner;
-import com.salesforce.ouroboros.producer.BatchAcknowledgement.State;
+import com.salesforce.ouroboros.producer.BatchAcknowledgementContext.BatchAcknowledgementFSM;
 
 /**
  * 
@@ -54,9 +55,9 @@ public class TestBatchAcknowledgement {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Spinner spinner = mock(Spinner.class);
         BatchAcknowledgement ba = new BatchAcknowledgement(spinner);
-        assertEquals(State.INITIALIZED, ba.getState());
+        assertEquals(BatchAcknowledgementFSM.Suspended, ba.getState());
         ba.handleConnect(inbound, handler);
-        assertEquals(State.READ_ACK, ba.getState());
+        assertEquals(BatchAcknowledgementFSM.ReadAcknowledgement, ba.getState());
         final BatchIdentity ack1 = new BatchIdentity(UUID.randomUUID(),
                                                      System.currentTimeMillis());
         final BatchIdentity ack2 = new BatchIdentity(
@@ -92,11 +93,13 @@ public class TestBatchAcknowledgement {
 
         ba.handleRead(inbound);
         verify(spinner).acknowledge(ack1);
-        assertEquals(State.READ_ACK, ba.getState());
+        assertEquals(BatchAcknowledgementFSM.ReadAcknowledgement, ba.getState());
 
         ba.handleRead(inbound);
+        
+        ba.handleRead(inbound);
         verify(spinner).acknowledge(ack2);
-        assertEquals(State.READ_ACK, ba.getState());
+        assertEquals(BatchAcknowledgementFSM.ReadAcknowledgement, ba.getState());
 
     }
 }
