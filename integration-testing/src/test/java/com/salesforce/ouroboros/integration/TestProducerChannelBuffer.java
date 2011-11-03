@@ -121,13 +121,13 @@ public class TestProducerChannelBuffer {
         @Override
         public void opened(UUID channel) {
             // TODO Auto-generated method stub
-            
+
         }
 
         @Override
         public void closed(UUID channel) {
             // TODO Auto-generated method stub
-            
+
         }
     }
 
@@ -348,14 +348,14 @@ public class TestProducerChannelBuffer {
         Util.waitFor("producer did not stabilize", new Util.Condition() {
             @Override
             public boolean value() {
-                return producerSwitchboard.getState() == Switchboard.State.STABLE;
+                return producerSwitchboard.isStable();
             }
         }, 3000, 200);
 
         Util.waitFor("weaver did not stabilize", new Util.Condition() {
             @Override
             public boolean value() {
-                return weaverSwitchboard.getState() == Switchboard.State.STABLE;
+                return weaverSwitchboard.isStable();
             }
         }, 3000, 200);
 

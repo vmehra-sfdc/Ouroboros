@@ -69,6 +69,42 @@
 			<type>jar</type>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>smc</groupId>
+			<artifactId>smc-runtime</artifactId>
+			<version>6.0.1</version>
+			<scope>compile</scope>
+		</dependency>
 	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>com.salesforce.ouroboros</groupId>
+				<artifactId>smc-plugin</artifactId>
+				<version>6.0.1-SNAPSHOT</version>
+				<executions>
+					<execution>
+						<id>generate</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+						<configuration>
+							<targetDirectory>src/main/java</targetDirectory>
+							<docDirectory>target/generated-sources/sm</docDirectory>
+							<packageName>com.salesforce.ouroboros.partition</packageName>
+							<table>true</table>
+							<graph>true</graph>
+							<graphLevel>2</graphLevel>
+							<verbose>true</verbose>
+							<reflect>true</reflect>
+							<sync>true</sync>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 
 </project>

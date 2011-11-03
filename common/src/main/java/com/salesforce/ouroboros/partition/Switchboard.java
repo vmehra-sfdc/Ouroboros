@@ -37,7 +37,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -49,6 +48,8 @@ import org.smartfrog.services.anubis.partition.views.View;
 
 import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardFSM;
+import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardState;
 
 /**
  * The common high level distribute coordination logic for Ouroboros group
@@ -85,10 +86,6 @@ public class Switchboard {
 
     }
 
-    public enum State {
-        STABLE, UNSTABLE;
-    }
-
     class Notification implements PartitionNotification {
 
         @Override
@@ -118,41 +115,29 @@ public class Switchboard {
 
         private void processMessage(final Message message, int sender,
                                     final long time) {
-            switch (state.get()) {
-                case STABLE: {
-                    if (log.isLoggable(Level.FINE)) {
-                        log.fine(String.format("Processing inbound %s on: %s",
-                                               message, self));
-                    }
-                    message.type.dispatch(Switchboard.this, message.sender,
-                                          message.payload, time);
-                    break;
-                }
-                case UNSTABLE: {
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Discarding %s from %s received at %s during partition instability on %s",
-                                               message, sender, time, self));
-                    }
-                    break;
-                }
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Processing inbound %s on: %s", message,
+                                       self));
             }
+            message.type.dispatch(Switchboard.this, message.sender,
+                                  message.payload, time);
         }
     }
 
-    static final Logger                  log             = Logger.getLogger(Switchboard.class.getCanonicalName());
-    private final SortedSet<Node>        deadMembers     = new TreeSet<Node>();
-    private boolean                      leader          = false;
-    private Member                       member;
-    private SortedSet<Node>              members         = new ConcurrentSkipListSet<Node>();
-    private final Executor               messageProcessor;
-    private final PartitionNotification  notification    = new Notification();
-    private final Partition              partition;
-    private SortedSet<Node>              previousMembers = new ConcurrentSkipListSet<Node>();
-    private NodeIdSet                    previousView;
-    private final Node                   self;
-    private final AtomicReference<State> state           = new AtomicReference<State>(
-                                                                                      State.UNSTABLE);
-    protected NodeIdSet                  view;
+    static final Logger                 log             = Logger.getLogger(Switchboard.class.getCanonicalName());
+    private final SortedSet<Node>       deadMembers     = new TreeSet<Node>();
+    private boolean                     leader          = false;
+    Member                              member;
+    private SortedSet<Node>             members         = new ConcurrentSkipListSet<Node>();
+    private final Executor              messageProcessor;
+    private final PartitionNotification notification    = new Notification();
+    private final Partition             partition;
+    private SortedSet<Node>             previousMembers = new ConcurrentSkipListSet<Node>();
+    private NodeIdSet                   previousView;
+    private final Node                  self;
+    private final SwitchboardContext    fsm             = new SwitchboardContext(
+                                                                                 this);
+    protected NodeIdSet                 view;
 
     public Switchboard(Node node, Partition p) {
         self = node;
@@ -233,8 +218,12 @@ public class Switchboard {
         return newMembers;
     }
 
-    public State getState() {
-        return state.get();
+    public SwitchboardState getState() {
+        return fsm.getState();
+    }
+
+    public boolean isStable() {
+        return fsm.getState() == SwitchboardFSM.Stable;
     }
 
     /**
@@ -253,25 +242,14 @@ public class Switchboard {
                                        self));
             }
         }
-        switch (state.get()) {
-            case STABLE: {
-                MessageConnection connection = partition.connect(neighbor);
-                if (connection == null) {
-                    if (log.isLoggable(Level.WARNING)) {
-                        log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
-                                                  message, neighbor, self));
-                    }
-                } else {
-                    connection.sendObject(message);
-                }
-                break;
+        MessageConnection connection = partition.connect(neighbor);
+        if (connection == null) {
+            if (log.isLoggable(Level.WARNING)) {
+                log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
+                                          message, neighbor, self));
             }
-            case UNSTABLE: {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Unable to send %s to %s from %s as the partition is UNSTABLE",
-                                           message, neighbor, self));
-                }
-            }
+        } else {
+            connection.sendObject(message);
         }
     }
 
@@ -306,25 +284,14 @@ public class Switchboard {
      *            - the receiver of the message
      */
     public void send(Message msg, Node node) {
-        switch (state.get()) {
-            case STABLE: {
-                MessageConnection connection = partition.connect(node.processId);
-                if (connection == null) {
-                    if (log.isLoggable(Level.WARNING)) {
-                        log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
-                                                  msg, node, self));
-                    }
-                } else {
-                    connection.sendObject(msg);
-                }
-                break;
+        MessageConnection connection = partition.connect(node.processId);
+        if (connection == null) {
+            if (log.isLoggable(Level.WARNING)) {
+                log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
+                                          msg, node, self));
             }
-            case UNSTABLE: {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Unable to send %s to %s from %s as the partition is UNSTABLE",
-                                           msg, node, self));
-                }
-            }
+        } else {
+            connection.sendObject(msg);
         }
     }
 
@@ -376,7 +343,7 @@ public class Switchboard {
      * @param sender
      *            - the member
      */
-    void discover(Node sender) {
+    synchronized void discover(Node sender) {
         if (!view.contains(sender.processId)) {
             if (log.isLoggable(Level.WARNING)) {
                 log.warning(String.format("discovery received from member %s, which is not in the view of %s",
@@ -384,23 +351,16 @@ public class Switchboard {
             }
             return;
         }
-        synchronized (members) {
-            if (members.add(sender)) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("member %s discovered on %s",
-                                           sender, self));
-                }
-                if (leader) {
-                    if (members.size() == view.cardinality()) {
-                        if (log.isLoggable(Level.INFO)) {
-                            log.info(String.format("All members discovered on %s",
-                                                   self));
-                        }
-                        ringCast(new Message(
-                                             self,
-                                             GlobalMessageType.DISCOVERY_COMPLETE));
-                    }
-                }
+        if (leader && members.add(sender)
+            && members.size() == view.cardinality()) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("All members discovered on %s", self));
+            }
+            ringCast(new Message(self, GlobalMessageType.DISCOVERY_COMPLETE));
+        } else {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("member %s discovered on %s", sender,
+                                       self));
             }
         }
     }
@@ -428,7 +388,7 @@ public class Switchboard {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Discovery complete on %s", self));
                 }
-                stabilized();
+                fsm.discoveryComplete();
                 break;
             default:
                 if (log.isLoggable(Level.INFO)) {
@@ -451,36 +411,10 @@ public class Switchboard {
      */
     void partitionEvent(View view, int leaderNode) {
         leader = self.processId == leaderNode;
-        State next = view.isStable() ? State.STABLE : State.UNSTABLE;
-        switch (state.getAndSet(next)) {
-            case STABLE: {
-                switch (next) {
-                    case STABLE:
-                        if (log.isLoggable(Level.INFO)) {
-                            log.info(String.format("Stable view received while in the stable state: %s, leader: %s",
-                                                   view, leader));
-                        }
-                        break;
-                    case UNSTABLE: {
-                        destabilize(view, leaderNode);
-                    }
-                }
-                break;
-            }
-            case UNSTABLE: {
-                switch (next) {
-                    case STABLE: {
-                        stabilize(view, leaderNode);
-                    }
-                    case UNSTABLE: {
-                        if (log.isLoggable(Level.FINEST)) {
-                            log.finest(String.format("Untable view received while in the unstable state: %s, leader: %s",
-                                                     view, leader));
-                        }
-                    }
-                }
-
-            }
+        if (view.isStable()) {
+            fsm.stabilized(view, leaderNode);
+        } else {
+            fsm.destabilize(view, leaderNode);
         }
     }
 
@@ -492,7 +426,7 @@ public class Switchboard {
      * @param leader
      *            - the leader
      */
-    void stabilize(View v, int leader) {
+    protected void stabilize(View v, int leader) {
         previousView = view;
         view = v.toBitSet().clone();
         if (log.isLoggable(Level.INFO)) {
@@ -505,14 +439,17 @@ public class Switchboard {
             }
         }
         previousMembers.clear();
-        member.advertise();
     }
 
-    void stabilized() {
+    protected void stabilized() {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Partition stable and discovery complete on %s",
                                    self));
         }
         member.stabilized();
+    }
+
+    protected void advertise() {
+        member.advertise();
     }
 }

@@ -40,7 +40,7 @@ import org.smartfrog.services.anubis.partition.views.View;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
-import com.salesforce.ouroboros.partition.Switchboard.State;
+import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardFSM;
 
 /**
  * 
@@ -87,7 +87,7 @@ public class SwitchboardTest {
         view.add(testNode2.processId);
         view.remove(testNode.processId);
         switchboard.partitionEvent(view, 0);
-        assertEquals(State.UNSTABLE, switchboard.getState());
+        assertEquals(SwitchboardFSM.Unstable, switchboard.getState());
         verify(member).destabilize();
         view.stablize();
         switchboard.partitionEvent(view, 0);
@@ -240,7 +240,7 @@ public class SwitchboardTest {
     }
 
     @Test
-    public void testStabilize() {
+    public void testAdvertise() {
         Node node = new Node(0, 0, 0);
         Node testNode = new Node(1, 0, 0);
         Partition partition = mock(Partition.class);
@@ -255,7 +255,40 @@ public class SwitchboardTest {
         Switchboard switchboard = new Switchboard(node, partition);
         switchboard.setMember(member);
         switchboard.partitionEvent(view, 0);
-        assertEquals(State.STABLE, switchboard.getState());
+        assertEquals(SwitchboardFSM.Advertising, switchboard.getState());
         verify(member).advertise();
+    }
+
+    @Test
+    public void testStabilize() {
+        Node node = new Node(0, 0, 0);
+        Node testNode = new Node(1, 0, 0);
+        Partition partition = mock(Partition.class);
+        Member member = mock(Member.class);
+        MessageConnection connection = mock(MessageConnection.class);
+        when(partition.connect(testNode.processId)).thenReturn(connection);
+        Answer<Void> answer = new Answer<Void>() {
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                Message message = (Message) invocation.getArguments()[0];
+                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE, message.type);
+                return null;
+            }
+        };
+        doAnswer(answer).when(connection).sendObject(isA(Message.class));
+        BitView view = new BitView();
+        view.add(node.processId);
+        view.add(testNode.processId);
+        view.stablize();
+
+        Switchboard switchboard = new Switchboard(node, partition);
+        switchboard.setMember(member);
+        switchboard.partitionEvent(view, 0);
+        switchboard.discover(node);
+        switchboard.discover(testNode);
+        switchboard.dispatch(GlobalMessageType.DISCOVERY_COMPLETE, node, null, -1);
+        assertEquals(SwitchboardFSM.Stable, switchboard.getState());
+        verify(member).stabilized();
+        verify(connection).sendObject(isA(Message.class));
     }
 }
