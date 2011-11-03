@@ -48,7 +48,7 @@ Advertising {
 	stabilized
 		[ctxt.replicatorRendezvous != null]
 		EstablishReplicators{
-			
+			recoverPreviousReplicators();
 		}
 		
 }

@@ -66,21 +66,21 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class Coordinator implements Member {
 
+    private final static Logger                                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     static final int                                            DEFAULT_TIMEOUT = 1;
     static final TimeUnit                                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
-    private final static Logger                                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
 
     private final Set<UUID>                                     channels        = new HashSet<UUID>();
     private final Node                                          id;
     private final SortedSet<Node>                               members         = new ConcurrentSkipListSet<Node>();
     private final SortedSet<Node>                               newMembers      = new ConcurrentSkipListSet<Node>();
-    Rendezvous                                                  replicatorRendezvous;
     private final Switchboard                                   switchboard;
     private final ScheduledExecutorService                      timer;
     private final Weaver                                        weaver;
     private final AtomicReference<ConsistentHashFunction<Node>> weaverRing      = new AtomicReference<ConsistentHashFunction<Node>>(
                                                                                                                                     new ConsistentHashFunction<Node>());
     private final Map<Node, ContactInformation>                 yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
+    Rendezvous                                                  replicatorRendezvous;
 
     public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
                        Weaver weaver) {
@@ -325,6 +325,11 @@ public class Coordinator implements Member {
                                             deadMembers));
         }
         return xeroxes;
+    }
+
+    public void recoverPreviousReplicators() {
+        // TODO Auto-generated method stub
+        
     }
 
     /**
