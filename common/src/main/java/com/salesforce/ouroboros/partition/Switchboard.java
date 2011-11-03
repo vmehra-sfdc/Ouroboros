@@ -73,13 +73,13 @@ public class Switchboard {
          */
         void destabilize();
 
+        void dispatch(ChannelMessage type, Node sender, Serializable payload,
+                      long time);
+
         void dispatch(GlobalMessageType type, Node sender,
                       Serializable payload, long time);
 
         void dispatch(MemberDispatch type, Node sender, Serializable payload,
-                      long time);
-
-        void dispatch(ChannelMessage type, Node sender, Serializable payload,
                       long time);
 
         void stabilized();
@@ -126,8 +126,9 @@ public class Switchboard {
 
     static final Logger                 log             = Logger.getLogger(Switchboard.class.getCanonicalName());
     private final SortedSet<Node>       deadMembers     = new TreeSet<Node>();
+    private final SwitchboardContext    fsm             = new SwitchboardContext(
+                                                                                 this);
     private boolean                     leader          = false;
-    Member                              member;
     private SortedSet<Node>             members         = new ConcurrentSkipListSet<Node>();
     private final Executor              messageProcessor;
     private final PartitionNotification notification    = new Notification();
@@ -135,9 +136,8 @@ public class Switchboard {
     private SortedSet<Node>             previousMembers = new ConcurrentSkipListSet<Node>();
     private NodeIdSet                   previousView;
     private final Node                  self;
-    private final SwitchboardContext    fsm             = new SwitchboardContext(
-                                                                                 this);
     protected NodeIdSet                 view;
+    Member                              member;
 
     public Switchboard(Node node, Partition p) {
         self = node;
@@ -313,6 +313,41 @@ public class Switchboard {
         return tail.hasNext() ? tail.next() : ring.first();
     }
 
+    protected void advertise() {
+        member.advertise();
+    }
+
+    /**
+     * Stabilize the partition
+     * 
+     * @param v
+     *            - the stable view of the partition
+     * @param leader
+     *            - the leader
+     */
+    protected void stabilize(View v, int leader) {
+        previousView = view;
+        view = v.toBitSet().clone();
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Stabilizing partition on: %s, view: %s, leader: %s",
+                                   self, view, leader));
+        }
+        for (Node member : previousMembers) {
+            if (!view.contains(member.processId)) {
+                deadMembers.add(member);
+            }
+        }
+        previousMembers.clear();
+    }
+
+    protected void stabilized() {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Partition stable and discovery complete on %s",
+                                   self));
+        }
+        member.stabilized();
+    }
+
     // test access
     void add(Node node) {
         members.add(node);
@@ -416,40 +451,5 @@ public class Switchboard {
         } else {
             fsm.destabilize(view, leaderNode);
         }
-    }
-
-    /**
-     * Stabilize the partition
-     * 
-     * @param v
-     *            - the stable view of the partition
-     * @param leader
-     *            - the leader
-     */
-    protected void stabilize(View v, int leader) {
-        previousView = view;
-        view = v.toBitSet().clone();
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Stabilizing partition on: %s, view: %s, leader: %s",
-                                   self, view, leader));
-        }
-        for (Node member : previousMembers) {
-            if (!view.contains(member.processId)) {
-                deadMembers.add(member);
-            }
-        }
-        previousMembers.clear();
-    }
-
-    protected void stabilized() {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Partition stable and discovery complete on %s",
-                                   self));
-        }
-        member.stabilized();
-    }
-
-    protected void advertise() {
-        member.advertise();
     }
 }
