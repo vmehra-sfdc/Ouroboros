@@ -42,7 +42,7 @@ Unstable {
 
 Advertising {
 	stabilized
-		[ctxt.replicatorRendezvous == null]
+		[ctxt.replicatorRendezvous == null && ctxt.hasNewMembers()]
 		EstablishReplicators{}
 		
 	stabilized
@@ -66,14 +66,26 @@ EstablishReplicators {
 
 Rebalance {
 	rebalanced
-		TakeOver{}
+		AnnounceTakeOver{}
 	
 	destabilize
 		Unstable{}
 }
 
-TakeOver {
+AnnounceTakeOver {
+	takeoverAcknowledged
+		TakeOver{}
+		
+	destabilize
+		Unstable{}
+}
 
+TakeOver {
+	commitTakeOver
+		Stable{}
+}
+
+Stable {
 }
 
 Shutdown {

@@ -229,6 +229,10 @@ public class Coordinator implements Member {
         return new Node[] { pair.get(0), pair.get(1) };
     }
 
+    public boolean hasNewMembers() {
+        return !newMembers.isEmpty();
+    }
+
     /**
      * Open the new channel if this node is a primary or mirror of the new
      * channel.
@@ -329,7 +333,7 @@ public class Coordinator implements Member {
 
     public void recoverPreviousReplicators() {
         // TODO Auto-generated method stub
-        
+
     }
 
     /**
