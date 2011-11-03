@@ -31,6 +31,7 @@
 %class BatchWriter
 %package com.salesforce.ouroboros.producer
 %access package
+%import java.nio.channels.SocketChannel
 
 %start BatchWriterFSM::Suspended
 %map BatchWriterFSM
@@ -57,19 +58,19 @@ Waiting {
 }
 
 WriteBatchHeader {
-	writeReady(channel: java.nio.channels.SocketChannel)
+	writeReady(channel: SocketChannel)
 		[!ctxt.writeBatchHeader(channel)]
 		WriteBatchHeader{
 			selectForWrite();
 		}
 		
-	writeReady(channel: java.nio.channels.SocketChannel)
+	writeReady(channel: SocketChannel)
 		[ctxt.inError()]
 		Closed{
 			close();
 		}
 		
-	writeReady(channel: java.nio.channels.SocketChannel)
+	writeReady(channel: SocketChannel)
 		[ctxt.batchHeaderWritten()]
 		WriteEventHeader{
 			nextEventHeader();
@@ -78,19 +79,19 @@ WriteBatchHeader {
 } 
 
 WriteEventHeader {
-	writeReady(channel: java.nio.channels.SocketChannel)
+	writeReady(channel: SocketChannel)
 		[!ctxt.writeEventHeader(channel)]
 		WriteEventHeader{
 			selectForWrite();
 		}
 		
-	writeReady(channel: java.nio.channels.SocketChannel)
+	writeReady(channel: SocketChannel)
 		[ctxt.inError()]
 		Closed{
 			close();
 		}
 		
-	writeReady(channel: java.nio.channels.SocketChannel)
+	writeReady(channel: SocketChannel)
 		[ctxt.eventHeaderWritten()]
 		WritePayload{
 			selectForWrite();
@@ -98,26 +99,26 @@ WriteEventHeader {
 } 
 
 WritePayload {
-	writeReady(channel: java.nio.channels.SocketChannel)
+	writeReady(channel: SocketChannel)
 		[!ctxt.writePayload(channel)]
 		WritePayload{
 			selectForWrite();
 		}
 		
-	writeReady(channel: java.nio.channels.SocketChannel)
+	writeReady(channel: SocketChannel)
 		[ctxt.inError()]
 		Closed{
 			close();
 		}
 		
-	writeReady(channel: java.nio.channels.SocketChannel)
+	writeReady(channel: SocketChannel)
 		[!ctxt.batch.isEmpty()]
 		WriteEventHeader{
 			nextEventHeader();
 			selectForWrite();
 		}
 		
-	writeReady(channel: java.nio.channels.SocketChannel)
+	writeReady(channel: SocketChannel)
 		[ctxt.batch.isEmpty()]
 		Waiting{}
 }

@@ -30,13 +30,14 @@
 
 %class Switchboard
 %package com.salesforce.ouroboros.partition
-%access public
+%access package
+%import org.smartfrog.services.anubis.partition.views.View
 
 %start SwitchboardFSM::Unstable
 %map SwitchboardFSM
 %%
 Unstable {
-	stabilized(view: org.smartfrog.services.anubis.partition.views.View, leader: int)
+	stabilized(view: View, leader: int)
 		Advertising{
 			stabilize(view, leader);
 			member.advertise();
@@ -59,10 +60,10 @@ Stopped {
 }
 
 Default {
-	stabilized(view: org.smartfrog.services.anubis.partition.views.View, leader: int)
+	stabilized(view: View, leader: int)
 		nil{}
 		
-	destabilize(view: org.smartfrog.services.anubis.partition.views.View, leader: int)
+	destabilize(view: View, leader: int)
 		Unstable{
 			destabilize(view, leader);
 		}

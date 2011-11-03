@@ -26,56 +26,61 @@
  */
 %}
 
-// The FSM for writing event batches to channel buffers.
+// The FSM for the distributed control of the weaver
 
-%class BatchAcknowledgement
-%package com.salesforce.ouroboros.producer
+%class Coordinator
+%package com.salesforce.ouroboros.spindle
 %access package
-%import java.nio.channels.SocketChannel
 
-%start BatchAcknowledgementFSM::Suspended
-%map BatchAcknowledgementFSM
-%%
-Suspended {
-	connect
-		ReadAcknowledgement {
-			selectForRead();
-		}
+%start CoordinatorFSM::Unstable
+%map CoordinatorFSM
+%% 
+Unstable {
+	advertise
+		Advertising{}
 }
 
-ReadAcknowledgement {
-	readReady(channel: SocketChannel)
-		[!ctxt.readAcknowledgement(channel)]
-		ReadAcknowledgement {
-			selectForRead();
+Advertising {
+	stabilized
+		[ctxt.replicatorRendezvous == null]
+		EstablishReplicators{}
+		
+	stabilized
+		[ctxt.replicatorRendezvous != null]
+		EstablishReplicators{
+			
 		}
 		
-	readReady(channel: SocketChannel)
-		[ctxt.inError()]
-		Closed {
-			close();
-		}
-		
-	readReady(channel: SocketChannel)
-		[ctxt.acknowledgementRead()]
-		ReadAcknowledgement {
-			dispatchAcknowledgement();
-			selectForRead();
-		}
 }
 
-Closed {
+EstablishReplicators {
+	replicatorsEstablished
+		Rebalance{}
+	
+	replicatorsTimeout
+		Unstable{}
+	
+	destabilize
+		Unstable{}
+}
+
+Rebalance {
+	rebalanced
+		TakeOver{}
+	
+	destabilize
+		Unstable{}
+}
+
+TakeOver {
+
+}
+
+Shutdown {
 }
 
 Default {
-	failover
-		Closed{
-			close();
-		}
-
-	close
-		Closed{
-			close();
-		}
+	destabilize
+		Unstable{}
 }
 %%
