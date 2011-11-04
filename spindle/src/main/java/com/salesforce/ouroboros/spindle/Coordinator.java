@@ -65,22 +65,22 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * 
  */
 public class Coordinator implements Member {
-
     private final static Logger                                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     static final int                                            DEFAULT_TIMEOUT = 1;
     static final TimeUnit                                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
 
     private final Set<UUID>                                     channels        = new HashSet<UUID>();
+    private final CoordinatorContext                            fsm             = new CoordinatorContext(
+                                                                                                         this);
     private final Node                                          id;
     private final SortedSet<Node>                               members         = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>                               newMembers      = new ConcurrentSkipListSet<Node>();
     private final Switchboard                                   switchboard;
     private final ScheduledExecutorService                      timer;
     private final Weaver                                        weaver;
     private final AtomicReference<ConsistentHashFunction<Node>> weaverRing      = new AtomicReference<ConsistentHashFunction<Node>>(
                                                                                                                                     new ConsistentHashFunction<Node>());
     private final Map<Node, ContactInformation>                 yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
-    Rendezvous                                                  replicatorRendezvous;
+    final SortedSet<Node>                                       newMembers      = new ConcurrentSkipListSet<Node>();
 
     public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
                        Weaver weaver) {
@@ -140,6 +140,7 @@ public class Coordinator implements Member {
 
     @Override
     public void destabilize() {
+        fsm.destabilize();
     }
 
     @Override
@@ -196,27 +197,6 @@ public class Coordinator implements Member {
     }
 
     /**
-     * The weaver membership has partitioned. Failover any channels the dead
-     * members were serving as primary that the receiver's node is providing
-     * mirrors for
-     * 
-     * @param deadMembers
-     *            - the weaver nodes that have failed and are no longer part of
-     *            the partition
-     */
-    public void failover(Collection<Node> deadMembers) {
-        for (Node node : deadMembers) {
-            if (log.isLoggable(Level.INFO)) {
-                log.fine(String.format("Removing weaver[%s] from the partition",
-                                       node));
-            }
-            yellowPages.remove(node);
-            weaver.closeReplicator(node);
-        }
-        weaver.failover(deadMembers);
-    }
-
-    /**
      * Answer the replication pair of nodes that provide the primary and mirror
      * for the channel
      * 
@@ -227,10 +207,6 @@ public class Coordinator implements Member {
     public Node[] getReplicationPair(UUID channel) {
         List<Node> pair = weaverRing.get().hash(point(channel), 2);
         return new Node[] { pair.get(0), pair.get(1) };
-    }
-
-    public boolean hasNewMembers() {
-        return !newMembers.isEmpty();
     }
 
     /**
@@ -288,20 +264,79 @@ public class Coordinator implements Member {
                          requester);
     }
 
+    @Override
+    public void stabilized() {
+        fsm.stabilize();
+    }
+
+    /**
+     * The weaver membership has partitioned. Failover any channels the dead
+     * members were serving as primary that the receiver's node is providing
+     * mirrors for.
+     */
+    protected void failover() {
+        Collection<Node> deadMembers = switchboard.getDeadMembers();
+        for (Node node : deadMembers) {
+            if (log.isLoggable(Level.INFO)) {
+                log.fine(String.format("Removing weaver[%s] from the partition",
+                                       node));
+            }
+            yellowPages.remove(node);
+            weaver.closeReplicator(node);
+        }
+        weaver.failover(deadMembers);
+    }
+
+    protected void filterSystemMembership() {
+        members.removeAll(switchboard.getDeadMembers());
+        newMembers.clear();
+        for (Node node : switchboard.getNewMembers()) {
+            if (members.remove(node)) {
+                newMembers.add(node);
+            }
+        }
+    }
+
+    protected ConsistentHashFunction<Node> nextRing() {
+        ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
+        for (Node node : members) {
+            newRing.add(node, node.capacity);
+        }
+        for (Node node : newMembers) {
+            newRing.add(node, node.capacity);
+        }
+        return newRing;
+    }
+
     /**
      * Open the replicators to the the new members
      * 
-     * @param newMembers
-     *            - the new member nodes
-     * @param rendezvousAction
-     *            - the action to execute when the rendezvous occurs
-     * @param timeoutAction
-     *            - the action to execute when the rendezvous times out
      * @return - the Rendezvous used to synchronize with replication connections
      */
-    public Rendezvous openReplicators(Collection<Node> newMembers,
-                                      Runnable rendezvousAction,
-                                      Runnable timeoutAction) {
+    protected Rendezvous openReplicators() {
+        Runnable rendezvousAction = new Runnable() {
+            @Override
+            public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Replicators established on %s", id));
+                }
+                fsm.replicatorsEstablished();
+            }
+        };
+        Runnable timeoutAction = new Runnable() {
+            @Override
+            public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Replicator establishment timed out on %s",
+                                           id));
+                }
+                fsm.replicatorsEstablishmentTimeout();
+            }
+        };
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Establishment of replicators initiated on %s",
+                                   id));
+        }
         Rendezvous rendezvous = new Rendezvous(newMembers.size(),
                                                rendezvousAction);
         for (Node member : newMembers) {
@@ -321,19 +356,14 @@ public class Coordinator implements Member {
      *            - the weaver nodes that have failed and are no longer part of
      *            the partition
      */
-    public List<Xerox> rebalance(Map<UUID, Node[]> remapped,
-                                 Collection<Node> deadMembers) {
+    protected List<Xerox> rebalance(Map<UUID, Node[]> remapped,
+                                    Collection<Node> deadMembers) {
         List<Xerox> xeroxes = new ArrayList<Xerox>();
         for (Entry<UUID, Node[]> entry : remapped.entrySet()) {
             xeroxes.addAll(weaver.rebalance(entry.getKey(), entry.getValue(),
                                             deadMembers));
         }
         return xeroxes;
-    }
-
-    public void recoverPreviousReplicators() {
-        // TODO Auto-generated method stub
-
     }
 
     /**
@@ -344,7 +374,7 @@ public class Coordinator implements Member {
      * @return the remapping of channels hosted on this node that have changed
      *         their primary or mirror in the new hash ring
      */
-    public Map<UUID, Node[]> remap(ConsistentHashFunction<Node> newRing) {
+    protected Map<UUID, Node[]> remap(ConsistentHashFunction<Node> newRing) {
         Map<UUID, Node[]> remapped = new HashMap<UUID, Node[]>();
         for (UUID channel : channels) {
             long channelPoint = point(channel);
@@ -361,53 +391,17 @@ public class Coordinator implements Member {
         return remapped;
     }
 
-    @Override
-    public void stabilized() {
-        failover(switchboard.getDeadMembers());
-        filterSystemMembership();
-        Runnable action = new Runnable() {
-            @Override
-            public void run() {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Replicators synchronization achieved on %s",
-                                           id));
-                }
-            }
-        };
-        Runnable timeoutAction = new Runnable() {
-            @Override
-            public void run() {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Replicators synchronization timed out on %s",
-                                           id));
-                }
-            }
-        };
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Synchronization of replicators initiated on %s",
-                                   id));
-        }
-        replicatorRendezvous = openReplicators(newMembers, action,
-                                               timeoutAction);
-    }
-
     /**
      * Update the consistent hash function for the weaver processs ring.
      * 
      * @param ring
      *            - the updated consistent hash function
      */
-    public void updateRing(ConsistentHashFunction<Node> ring) {
+    protected void updateRing(ConsistentHashFunction<Node> ring) {
         weaverRing.set(ring);
     }
 
-    private void filterSystemMembership() {
-        members.removeAll(switchboard.getDeadMembers());
-        newMembers.clear();
-        for (Node node : switchboard.getNewMembers()) {
-            if (members.remove(node)) {
-                newMembers.add(node);
-            }
-        }
+    protected void rebalance() {
+        rebalance(remap(nextRing()), switchboard.getDeadMembers());
     }
 }

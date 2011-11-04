@@ -35,36 +35,40 @@
 %start CoordinatorFSM::Unstable
 %map CoordinatorFSM
 %% 
-Unstable {
-	advertise
-		Advertising{}
+Unstable
+Entry { 
+	failover();
+	filterSystemMembership();
 }
-
-Advertising {
-	stabilized
-		[ctxt.replicatorRendezvous == null && ctxt.hasNewMembers()]
+{ 
+	stabilize
+	[!ctxt.newMembers.isEmpty()]
 		EstablishReplicators{}
-		
-	stabilized
-		[ctxt.replicatorRendezvous != null]
-		EstablishReplicators{
-			recoverPreviousReplicators();
-		}
-		
+	stabilize
+	[ctxt.newMembers.isEmpty()]
+		Stable{}
 }
 
-EstablishReplicators {
+EstablishReplicators
+Entry {
+	openReplicators();
+}
+{
 	replicatorsEstablished
 		Rebalance{}
 	
-	replicatorsTimeout
+	replicatorsEstablishmentTimeout
 		Unstable{}
 	
 	destabilize
 		Unstable{}
 }
 
-Rebalance {
+Rebalance
+Entry {
+	rebalance();
+}
+{
 	rebalanced
 		AnnounceTakeOver{}
 	

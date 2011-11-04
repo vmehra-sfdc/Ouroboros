@@ -175,7 +175,8 @@ public class TestCoordinator {
         newMembers.put(node2, contactInformation2);
         newMembers.put(node3, contactInformation3);
         Set<Node> deadMembers = newMembers.keySet();
-        coordinator.failover(deadMembers);
+        when(switchboard.getDeadMembers()).thenReturn(deadMembers);
+        coordinator.failover();
 
         verify(weaver).failover(deadMembers);
         verify(weaver).closeReplicator(localNode);
@@ -231,8 +232,6 @@ public class TestCoordinator {
     @Test
     public void testOpenReplicators() {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
-        Runnable rendezvousAction = mock(Runnable.class);
-        Runnable cancelledAction = mock(Runnable.class);
         Weaver weaver = mock(Weaver.class);
         Switchboard switchboard = mock(Switchboard.class);
         when(weaver.getId()).thenReturn(new Node(0, 0, 0));
@@ -261,11 +260,8 @@ public class TestCoordinator {
                              contactInformation2, 0);
         coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node3,
                              contactInformation3, 0);
-        Rendezvous rendezvous = coordinator.openReplicators(Arrays.asList(node1,
-                                                                          node2,
-                                                                          node3),
-                                                            rendezvousAction,
-                                                            cancelledAction);
+        coordinator.newMembers.addAll(Arrays.asList(node1, node2, node3));
+        Rendezvous rendezvous = coordinator.openReplicators();
         assertNotNull(rendezvous);
         assertEquals(3, rendezvous.getParties());
 
