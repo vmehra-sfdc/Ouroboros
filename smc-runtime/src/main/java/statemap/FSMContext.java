@@ -37,9 +37,10 @@ import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.PrintStream;
 import java.io.Serializable;
 import java.util.EmptyStackException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Base class for all SMC-generated application context classes.
@@ -73,9 +74,8 @@ public abstract class FSMContext
         _transition = "";
         _previousState = null;
         _stateStack = null;
-        _debugFlag = false;
-        _debugStream = System.err;
         _listeners = new PropertyChangeSupport(this);
+        log = Logger.getLogger(getClass().getCanonicalName());
     } // end of FSMContext(State)
 
     //
@@ -108,6 +108,7 @@ public abstract class FSMContext
 
         // Create an empty listeners list.
         _listeners = new PropertyChangeSupport(this);
+        log = Logger.getLogger(getClass().getCanonicalName());
 
         return;
     } // end of readObject(ObjectInputStream)
@@ -119,6 +120,14 @@ public abstract class FSMContext
     //-----------------------------------------------------------
     // Get methods.
     //
+    
+    /**
+     * Returns the logger
+     * @return the Logger
+     */
+    public Logger getLog() {
+        return log;
+    }
 
     /**
      * Returns the FSM name.
@@ -128,27 +137,6 @@ public abstract class FSMContext
     {
         return (_name);
     } // end of getName()
-
-    /**
-     * When debug is set to {@code true}, the state machine
-     * will print messages to the console.
-     * @return {@code true} if debug output is generated.
-     */
-    public boolean getDebugFlag()
-    {
-        return(_debugFlag && _debugStream != null);
-    } // end of getDebugFlag()
-
-    /**
-     * Writes the debug output to this stream.
-     * @return the debug output stream.
-     */
-    public PrintStream getDebugStream()
-    {
-        return (_debugStream == null ?
-                System.err :
-                _debugStream);
-    } // end of getDebugStream()
 
     /**
      * Returns {@code true} if this FSM is in a transition and
@@ -211,37 +199,15 @@ public abstract class FSMContext
     } // end of setName(String)
 
     /**
-     * Turns debug output on if {@code flag} is {@code true} and
-     * off if {@code flag} is {@code false}.
-     * @param flag {@code true} to turn debuggin on and
-     * {@code false} to turn debugging off.
-     */
-    public void setDebugFlag(boolean flag)
-    {
-        _debugFlag = flag;
-        return;
-    } // end of setDebugFlag(boolean)
-
-    /**
-     * Sets the debug output stream to the given value.
-     * @param stream The debug output stream.
-     */
-    public void setDebugStream(PrintStream stream)
-    {
-        _debugStream = stream;
-        return;
-    } // end of setDebugStream(PrintStream)
-
-    /**
      * Sets the current state to the given value.
      * @param state The current state.
      */
     public void setState(State state)
     {
-        if (getDebugFlag() == true)
+        if (log.isLoggable(Level.FINEST))
         {
-            getDebugStream().println("ENTER STATE     : " +
-                                     state.getName());
+            log.finest(String.format("ENTER STATE     : %s",
+                                     state.getName()));
         }
 
         _state = state;
@@ -282,10 +248,10 @@ public abstract class FSMContext
             throw (new NullPointerException());
         }
 
-        if (getDebugFlag() == true)
+        if (log.isLoggable(Level.FINEST))
         {
-            getDebugStream().println("PUSH TO STATE   : " +
-                                     state.getName());
+            log.finest(String.format("PUSH TO STATE   : %s",
+                                     state.getName()));
         }
 
         if (_stateStack == null)
@@ -317,9 +283,9 @@ public abstract class FSMContext
         if (_stateStack == null ||
             _stateStack.isEmpty() == true)
         {
-            if (getDebugFlag() == true)
+            if (log.isLoggable(Level.FINEST))
             {
-                getDebugStream().println(
+                log.finest(
                     "POPPING ON EMPTY STATE STACK.");
             }
 
@@ -338,10 +304,10 @@ public abstract class FSMContext
                 _stateStack = null;
             }
 
-            if (getDebugFlag() == true)
+            if (log.isLoggable(Level.FINEST))
             {
-                getDebugStream().println("POP TO STATE    : " +
-                                      _state.getName());
+                log.finest(String.format("POP TO STATE    : %s",
+                                      _state.getName()));
             }
 
             // Inform any and all listeners about this state
@@ -424,19 +390,19 @@ public abstract class FSMContext
      * The current state. Will be {@code null} while in
      * transition.
      */
-    transient protected State _state;
+    transient volatile protected State _state;
 
     /**
      * The current transition name. Used for debugging
      * purposes. Will be en empty string when not in
      * transition.
      */
-    transient protected String _transition;
+    transient volatile protected String _transition;
 
     /**
      * Stores which state a transition left. May be {@code null}.
      */
-    transient protected State _previousState;
+    transient volatile protected State _previousState;
 
     /**
      * This stack is used to store the current state when a push
@@ -444,19 +410,10 @@ public abstract class FSMContext
      */
     transient protected java.util.Stack<State> _stateStack;
 
-    /**
-     * When this flag is set to {@code true}, this class will
-     * print out debug messages.
-     */
-    transient protected boolean _debugFlag;
-
-    /**
-     * Write debug output to this stream.
-     */
-    transient protected PrintStream _debugStream;
-
     // Stores the property change listeners here.
     transient private PropertyChangeSupport _listeners;
+    
+    transient private Logger log;
 
     //-----------------------------------------------------------
     // Constants.
