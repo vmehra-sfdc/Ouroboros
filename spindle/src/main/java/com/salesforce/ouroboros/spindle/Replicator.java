@@ -73,9 +73,9 @@ public class Replicator implements CommunicationsHandler {
     private final Bundle                  bundle;
     private final Duplicator              duplicator;
     private volatile SocketChannelHandler handler;
-    private final ByteBuffer                    handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private final ByteBuffer              handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
     private volatile Node                 partnerId;
-    private final Rendezvous                    rendezvous;
+    private final Rendezvous              rendezvous;
     private volatile State                state          = State.INITIAL;
 
     public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
@@ -97,7 +97,7 @@ public class Replicator implements CommunicationsHandler {
 
     @Override
     public void closing(SocketChannel channel) {
-        // TODO Auto-generated method stub
+        bundle.closeReplicator(partnerId);
     }
 
     /**
@@ -144,6 +144,7 @@ public class Replicator implements CommunicationsHandler {
             }
             default: {
                 log.warning(String.format("Invalid accept state: %s", state));
+                close();
             }
         }
     }
@@ -163,6 +164,7 @@ public class Replicator implements CommunicationsHandler {
             }
             default: {
                 log.warning(String.format("Invalid connect state: %s", state));
+                close();
             }
         }
     }
@@ -176,6 +178,7 @@ public class Replicator implements CommunicationsHandler {
             }
             default: {
                 log.warning(String.format("Invalid read state: %s", state));
+                close();
             }
         }
     }
@@ -193,6 +196,7 @@ public class Replicator implements CommunicationsHandler {
             }
             default: {
                 log.warning(String.format("Invalid write state: %s", state));
+                close();
             }
         }
     }
