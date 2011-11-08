@@ -47,22 +47,20 @@ Suspended {
 }
 
 ReadAcknowledgement {
-	readReady()
-		[!ctxt.readAcknowledgement()]
-		ReadAcknowledgement {
+	readReady
+		[ctxt.readAcknowledgements()]
+		nil {
 			selectForRead();
 		}
 		
-	readReady()
+	readReady
 		[ctxt.inError()]
 		Closed {
 			close();
 		}
 		
-	readReady()
-		[ctxt.acknowledgementRead()]
-		ReadAcknowledgement {
-			dispatchAcknowledgement();
+	readReady 
+		nil {
 			selectForRead();
 		}
 }

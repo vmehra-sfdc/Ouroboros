@@ -84,10 +84,6 @@ public class TestBatchWriter {
         Node mirror = new Node(0x1638);
         Batch batch = new Batch(mirror, channel, timestamp,
                                 Arrays.asList(payloads));
-        batchWriter.push(batch, pending);
-        assertEquals(1, pending.size());
-        assertEquals(batch, pending.get(batch));
-        assertEquals(BatchWriterFSM.WriteBatchHeader, batchWriter.getState());
         Answer<Integer> readBatchHeader = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
@@ -162,19 +158,14 @@ public class TestBatchWriter {
             }
         };
         when(outbound.write(isA(ByteBuffer.class))).thenAnswer(readBatchHeader).thenAnswer(readEventHeader0).thenAnswer(readPayload0).thenAnswer(readEventHeader1).thenAnswer(readPayload1).thenAnswer(readEventHeader2).thenAnswer(readPayload2);
+
+        batchWriter.push(batch, pending);
+        assertEquals(1, pending.size());
+        assertEquals(batch, pending.get(batch));
+        assertEquals(BatchWriterFSM.WriteBatchHeader, batchWriter.getState());
+        
         batchWriter.writeReady();
-        assertEquals(BatchWriterFSM.WriteEventHeader, batchWriter.getState());
-        batchWriter.writeReady();
-        assertEquals(BatchWriterFSM.WritePayload, batchWriter.getState());
-        batchWriter.writeReady();
-        assertEquals(BatchWriterFSM.WriteEventHeader, batchWriter.getState());
-        batchWriter.writeReady();
-        assertEquals(BatchWriterFSM.WritePayload, batchWriter.getState());
-        batchWriter.writeReady();
-        assertEquals(BatchWriterFSM.WriteEventHeader, batchWriter.getState());
-        batchWriter.writeReady();
-        assertEquals(BatchWriterFSM.WritePayload, batchWriter.getState());
-        batchWriter.writeReady();
+        assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
         verify(outbound, new Times(7)).write(isA(ByteBuffer.class));
     }
 }

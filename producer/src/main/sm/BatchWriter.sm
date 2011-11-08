@@ -54,75 +54,84 @@ Suspended {
 
 Waiting {
 	pushBatch
-		WriteBatchHeader {
-			nextBatch();
-			selectForWrite();
-		}
+		WriteBatchHeader {}
 }
 
-WriteBatchHeader {
-	writeReady()
+WriteBatchHeader
+Entry {
+	nextBatch();
+}
+{
+	writeReady
+		[ctxt.batchHeaderWritten()]
+		WriteEventHeader{}
+		
+	writeReady
 		[!ctxt.writeBatchHeader()]
 		nil {
 			selectForWrite();
 		}
 		
-	writeReady()
+	writeReady
 		[ctxt.inError()]
 		Closed{
 			close();
 		}
 		
-	writeReady()
-		[ctxt.batchHeaderWritten()]
-		WriteEventHeader{
-			nextEventHeader();
-			selectForWrite();
-		}
+	batchHeaderWritten
+		WriteEventHeader{}
 } 
 
-WriteEventHeader {
-	writeReady()
+WriteEventHeader
+Entry {
+	nextEventHeader();
+}
+{
+	writeReady
+		[ctxt.eventHeaderWritten()]
+		WritePayload{}
+		
+	writeReady
 		[!ctxt.writeEventHeader()]
 		nil {
 			selectForWrite();
 		}
 		
-	writeReady()
+	writeReady
 		[ctxt.inError()]
 		Closed{
 			close();
 		}
-		
-	writeReady()
-		[ctxt.eventHeaderWritten()]
-		WritePayload{
-			selectForWrite();
-		}
+
+	eventHeaderWritten
+		WritePayload{}
 } 
 
-WritePayload {
-	writeReady()
-		[!ctxt.writePayload()]
+WritePayload
+Entry {
+	nextPayload();
+}
+{
+	writeReady
+		[!ctxt.inError() && !ctxt.writePayload()]
 		nil{
 			selectForWrite();
 		}
 		
-	writeReady()
+	writeReady
 		[ctxt.inError()]
 		Closed{
 			close();
 		}
 		
-	writeReady()
+	writeReady
 		[!ctxt.batch.isEmpty()]
-		WriteEventHeader{
-			nextEventHeader();
-			selectForWrite();
-		}
+		WriteEventHeader{}
+	
+	payloadWritten
+		WriteEventHeader{}
 		
-	writeReady()
-		[ctxt.batch.isEmpty()]
+	waiting
 		Waiting{}
 }
 

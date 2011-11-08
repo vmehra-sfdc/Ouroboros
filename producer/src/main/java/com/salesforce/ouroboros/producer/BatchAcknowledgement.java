@@ -84,19 +84,22 @@ public class BatchAcknowledgement {
     protected void close() {
         handler.close();
     }
-
-    protected void dispatchAcknowledgement() {
-        ackBuffer.flip();
-        BatchIdentity ack = new BatchIdentity(ackBuffer);
-        ackBuffer.rewind();
-        spinner.acknowledge(ack);
+    
+    protected boolean readAcknowledgements() { 
+        while (readAcknowledgement()) {
+            ackBuffer.flip();
+            BatchIdentity ack = new BatchIdentity(ackBuffer);
+            ackBuffer.rewind();
+            spinner.acknowledge(ack); 
+        }
+        return false;
     }
 
     protected boolean inError() {
         return inError;
     }
 
-    protected boolean readAcknowledgement() {
+    private boolean readAcknowledgement() {
         try {
             handler.getChannel().read(ackBuffer);
         } catch (IOException e) {

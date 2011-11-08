@@ -68,40 +68,17 @@ public class BatchWriter {
         }
     }
 
+    public void connect(SocketChannelHandler handler) {
+        this.handler = handler;
+        fsm.connect();
+    }
+
     public void failover() {
         fsm.failover();
     }
 
     public BatchWriterState getState() {
         return fsm.getState();
-    }
-
-    public void connect(SocketChannelHandler handler) {
-        this.handler = handler;
-        fsm.connect();
-    }
-
-    public void writeReady() {
-        fsm.writeReady();
-    }
-
-    public void nextBatch() {
-        Batch entry;
-        try {
-            entry = queued.take();
-        } catch (InterruptedException e) {
-            inError = true;
-            return;
-        }
-        int totalSize = 0;
-        for (ByteBuffer event : entry.events) {
-            totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
-            batch.add(event);
-        }
-        batchHeader.initialize(entry.mirror, totalSize, MAGIC, entry.channel,
-                               entry.timestamp);
-        batchHeader.rewind();
-        handler.selectForWrite();
     }
 
     /**
@@ -165,9 +142,41 @@ public class BatchWriter {
         return inError;
     }
 
+    protected void nextBatch() {
+        Batch entry;
+        try {
+            entry = queued.take();
+        } catch (InterruptedException e) {
+            inError = true;
+            return;
+        }
+        int totalSize = 0;
+        for (ByteBuffer event : entry.events) {
+            totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
+            batch.add(event);
+        }
+        batchHeader.initialize(entry.mirror, totalSize, MAGIC, entry.channel,
+                               entry.timestamp);
+        batchHeader.rewind();
+        writeBatchHeader();
+    }
+
     protected void nextEventHeader() {
         header.initialize(MAGIC, batch.peekFirst());
         header.rewind();
+        if(writeEventHeader()) {
+            fsm.eventHeaderWritten();
+        }
+    }
+
+    protected void nextPayload() {
+        if (writePayload()) {
+            if (batch.isEmpty()) {
+                fsm.waiting();
+            } else {
+                fsm.payloadWritten();
+            }
+        }
     }
 
     protected boolean payloadWritten() {
@@ -192,7 +201,7 @@ public class BatchWriter {
         }
         return !batchHeader.hasRemaining();
     }
-
+    
     protected boolean writeEventHeader() {
         try {
             header.write(handler.getChannel());
@@ -214,7 +223,7 @@ public class BatchWriter {
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
-                        String.format("Unable to write event batch %s", handler.getChannel()),
+                        String.format("Unable to write event batch payload %s", handler.getChannel()),
                         e);
             }
             inError = true;
@@ -225,5 +234,9 @@ public class BatchWriter {
             return true;
         }
         return false;
+    }
+
+    protected void writeReady() {
+        fsm.writeReady();
     }
 }
