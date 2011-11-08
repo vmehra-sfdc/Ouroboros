@@ -120,18 +120,10 @@ public class BatchWriter {
         handler.selectForWrite();
     }
 
-    protected boolean batchHeaderWritten() {
-        return !batchHeader.hasRemaining();
-    }
-
     protected void close() {
         handler.close();
         batch.clear();
         queued.clear();
-    }
-
-    protected boolean eventHeaderWritten() {
-        return !header.hasRemaining();
     }
 
     protected boolean hasPendingBatch() {
@@ -158,14 +150,20 @@ public class BatchWriter {
         batchHeader.initialize(entry.mirror, totalSize, MAGIC, entry.channel,
                                entry.timestamp);
         batchHeader.rewind();
-        writeBatchHeader();
+        if (writeBatchHeader()) {
+            fsm.batchHeaderWritten();
+        } else {
+            handler.selectForWrite();
+        }
     }
 
     protected void nextEventHeader() {
         header.initialize(MAGIC, batch.peekFirst());
         header.rewind();
-        if(writeEventHeader()) {
+        if (writeEventHeader()) {
             fsm.eventHeaderWritten();
+        } else {
+            handler.selectForWrite();
         }
     }
 
@@ -176,6 +174,8 @@ public class BatchWriter {
             } else {
                 fsm.payloadWritten();
             }
+        } else {
+            handler.selectForWrite();
         }
     }
 
@@ -201,7 +201,7 @@ public class BatchWriter {
         }
         return !batchHeader.hasRemaining();
     }
-    
+
     protected boolean writeEventHeader() {
         try {
             header.write(handler.getChannel());
@@ -223,8 +223,8 @@ public class BatchWriter {
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
-                        String.format("Unable to write event batch payload %s", handler.getChannel()),
-                        e);
+                        String.format("Unable to write event batch payload %s",
+                                      handler.getChannel()), e);
             }
             inError = true;
             return false;

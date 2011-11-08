@@ -63,10 +63,6 @@ Entry {
 }
 {
 	writeReady
-		[ctxt.batchHeaderWritten()]
-		WriteEventHeader{}
-		
-	writeReady
 		[!ctxt.writeBatchHeader()]
 		nil {
 			selectForWrite();
@@ -77,6 +73,9 @@ Entry {
 		Closed{
 			close();
 		}
+
+	writeReady
+		WriteEventHeader{}
 		
 	batchHeaderWritten
 		WriteEventHeader{}
@@ -87,10 +86,6 @@ Entry {
 	nextEventHeader();
 }
 {
-	writeReady
-		[ctxt.eventHeaderWritten()]
-		WritePayload{}
-		
 	writeReady
 		[!ctxt.writeEventHeader()]
 		nil {
