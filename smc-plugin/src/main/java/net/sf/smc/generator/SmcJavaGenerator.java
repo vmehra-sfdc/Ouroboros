@@ -132,6 +132,8 @@ public final class SmcJavaGenerator
             _source.println(";");
             _source.println();
         }
+        
+        _source.println("import java.util.logging.Logger;");
 
         // Do user-specified imports now.
         for (String imp: fsm.getImports())
@@ -174,10 +176,16 @@ public final class SmcJavaGenerator
         }
 
         _source.println("{");
+        _source.print("private final static Logger log = Logger.getLogger(");
+        _source.print(fsmClassName);
+        _source.println(".class.getCanonicalName());");
         _source.println(
             "//---------------------------------------------------------------");
         _source.println("// Member methods.");
         _source.println("//");
+        _source.println();
+        
+        _source.println("    public Logger getLog() {return log;}");
         _source.println();
 
         // The state name "map::state" must be changed to

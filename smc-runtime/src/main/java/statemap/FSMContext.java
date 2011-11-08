@@ -75,7 +75,6 @@ public abstract class FSMContext
         _previousState = null;
         _stateStack = null;
         _listeners = new PropertyChangeSupport(this);
-        log = Logger.getLogger(getClass().getCanonicalName());
     } // end of FSMContext(State)
 
     //
@@ -108,7 +107,6 @@ public abstract class FSMContext
 
         // Create an empty listeners list.
         _listeners = new PropertyChangeSupport(this);
-        log = Logger.getLogger(getClass().getCanonicalName());
 
         return;
     } // end of readObject(ObjectInputStream)
@@ -125,9 +123,7 @@ public abstract class FSMContext
      * Returns the logger
      * @return the Logger
      */
-    public Logger getLog() {
-        return log;
-    }
+    abstract public Logger getLog();
 
     /**
      * Returns the FSM name.
@@ -204,9 +200,9 @@ public abstract class FSMContext
      */
     public void setState(State state)
     {
-        if (log.isLoggable(Level.FINEST))
+        if (getLog().isLoggable(Level.FINEST))
         {
-            log.finest(String.format("ENTER STATE     : %s",
+            getLog().finest(String.format("ENTER STATE     : %s",
                                      state.getName()));
         }
 
@@ -248,9 +244,9 @@ public abstract class FSMContext
             throw (new NullPointerException());
         }
 
-        if (log.isLoggable(Level.FINEST))
+        if (getLog().isLoggable(Level.FINEST))
         {
-            log.finest(String.format("PUSH TO STATE   : %s",
+            getLog().finest(String.format("PUSH TO STATE   : %s",
                                      state.getName()));
         }
 
@@ -283,9 +279,9 @@ public abstract class FSMContext
         if (_stateStack == null ||
             _stateStack.isEmpty() == true)
         {
-            if (log.isLoggable(Level.FINEST))
+            if (getLog().isLoggable(Level.FINEST))
             {
-                log.finest(
+                getLog().finest(
                     "POPPING ON EMPTY STATE STACK.");
             }
 
@@ -304,9 +300,9 @@ public abstract class FSMContext
                 _stateStack = null;
             }
 
-            if (log.isLoggable(Level.FINEST))
+            if (getLog().isLoggable(Level.FINEST))
             {
-                log.finest(String.format("POP TO STATE    : %s",
+                getLog().finest(String.format("POP TO STATE    : %s",
                                       _state.getName()));
             }
 
@@ -412,8 +408,6 @@ public abstract class FSMContext
 
     // Stores the property change listeners here.
     transient private PropertyChangeSupport _listeners;
-    
-    transient private Logger log;
 
     //-----------------------------------------------------------
     // Constants.
