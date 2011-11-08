@@ -264,6 +264,13 @@ public class Coordinator implements Member {
                          requester);
     }
 
+    /**
+     * Initiate the rebalancing of the weaver ring.
+     */
+    public void initiateRebalance() {
+        fsm.rebalance();
+    }
+
     @Override
     public void stabilized() {
         fsm.stabilize();
@@ -289,7 +296,7 @@ public class Coordinator implements Member {
 
     protected void filterSystemMembership() {
         members.removeAll(switchboard.getDeadMembers());
-        newMembers.clear();
+        newMembers.removeAll(switchboard.getDeadMembers());
         for (Node node : switchboard.getNewMembers()) {
             if (members.remove(node)) {
                 newMembers.add(node);
@@ -358,6 +365,21 @@ public class Coordinator implements Member {
      */
     protected List<Xerox> rebalance(Map<UUID, Node[]> remapped,
                                     Collection<Node> deadMembers) {
+        Runnable rendezvousAction = new Runnable() {
+            @Override
+            public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Weavers rebalanced on %s", id));
+                }
+                fsm.rebalanced();
+            }
+        };
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Establishment of replicators initiated on %s",
+                                   id));
+        }
+        Rendezvous rendezvous = new Rendezvous(newMembers.size(),
+                                               rendezvousAction);
         List<Xerox> xeroxes = new ArrayList<Xerox>();
         for (Entry<UUID, Node[]> entry : remapped.entrySet()) {
             xeroxes.addAll(weaver.rebalance(entry.getKey(), entry.getValue(),

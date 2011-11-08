@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.Deque;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -37,6 +36,7 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.XeroxContext.XeroxState;
 
 /**
  * This class duplicates a channel state from the primary to the secondary.
@@ -46,26 +46,23 @@ import com.salesforce.ouroboros.Node;
  */
 public class Xerox implements CommunicationsHandler {
 
-    public enum State {
-        COPY, ERROR, FINISHED, HANDSHAKE, INITIALIZED, SEND_CLOSE, SEND_HEADER;
-    }
+    public static final long     MAGIC             = 0x1638L;
+    private static final int     BUFFER_SIZE       = 8 + 8 + 8;
+    private static final int     DEFAULT_TXFR_SIZE = 16 * 1024;
+    private static final Logger  log               = Logger.getLogger(Xerox.class.getCanonicalName());
 
-    public static final long              MAGIC             = 0x1638L;
-    private static final int              BUFFER_SIZE       = 8 + 8 + 8;
-    private static final int              DEFAULT_TXFR_SIZE = 16 * 1024;
-    private static final Logger           log               = Logger.getLogger(Xerox.class.getCanonicalName());
-
-    private final ByteBuffer              buffer            = ByteBuffer.allocate(BUFFER_SIZE);
-    private final UUID                    channelId;
-    private volatile Segment              current;
-    private volatile SocketChannelHandler handler;
-    private CountDownLatch                latch;
-    private final Node                    node;
-    private volatile long                 position;
-    private final Deque<Segment>          segments;
-    private volatile long                 segmentSize;
-    private volatile State                state;
-    private final long                    transferSize;
+    private final ByteBuffer     buffer            = ByteBuffer.allocate(BUFFER_SIZE);
+    private final UUID           channelId;
+    private Segment              current;
+    private SocketChannelHandler handler;
+    private CountDownLatch       latch;
+    private final Node           node;
+    private long                 position;
+    private final Deque<Segment> segments;
+    private long                 segmentSize;
+    private final long           transferSize;
+    private boolean              inError           = false;
+    private final XeroxContext   fsm               = new XeroxContext(this);
 
     public Xerox(Node toNode, UUID channel, Deque<Segment> segments) {
         this(toNode, channel, segments, DEFAULT_TXFR_SIZE);
@@ -77,11 +74,18 @@ public class Xerox implements CommunicationsHandler {
         channelId = channel;
         this.transferSize = transferSize;
         this.segments = segments;
-        state = State.INITIALIZED;
+        buffer.putLong(MAGIC);
+        buffer.putLong(channelId.getMostSignificantBits());
+        buffer.putLong(channelId.getLeastSignificantBits());
+        buffer.flip();
+    }
+
+    public void close() {
+        handler.close();
     }
 
     @Override
-    public void closing(SocketChannel channel) {
+    public void closing() {
     }
 
     /**
@@ -91,58 +95,33 @@ public class Xerox implements CommunicationsHandler {
         return node;
     }
 
-    public State getState() {
-        return state;
+    public XeroxState getState() {
+        return fsm.getState();
     }
 
     @Override
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+    public void accept(SocketChannelHandler handler) {
         throw new UnsupportedOperationException();
     }
 
+    protected void finished() {
+        // TODO
+    }
+
     @Override
-    public void handleConnect(SocketChannel channel, SocketChannelHandler h) {
+    public void connect(SocketChannelHandler h) {
         handler = h;
-        switch (state) {
-            case INITIALIZED: {
-                state = State.HANDSHAKE;
-                buffer.putLong(MAGIC);
-                buffer.putLong(channelId.getMostSignificantBits());
-                buffer.putLong(channelId.getLeastSignificantBits());
-                buffer.flip();
-                handshake(channel);
-                break;
-            }
-            default: {
-                log.warning(String.format("Illegal connect state: %s", state));
-            }
-        }
+        fsm.connect();
     }
 
     @Override
-    public void handleRead(SocketChannel channel) {
+    public void readReady() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void handleWrite(SocketChannel channel) {
-        switch (state) {
-            case HANDSHAKE: {
-                handshake(channel);
-                break;
-            }
-            case SEND_HEADER: {
-                sendHeader(channel);
-                break;
-            }
-            case COPY: {
-                copy(channel);
-                break;
-            }
-            default: {
-                log.warning(String.format("Illegal write state: ", state));
-            }
-        }
+    public void writeReady() {
+        fsm.writeReady();
     }
 
     /**
@@ -153,15 +132,22 @@ public class Xerox implements CommunicationsHandler {
         this.latch = latch;
     }
 
-    private void copy(SocketChannel channel) {
+    protected void writeCopy() {
+        while (copy())
+            ;
+    }
+
+    protected boolean copy() {
         long written;
         try {
-            written = current.transferTo(position, transferSize, channel);
+            written = current.transferTo(position, transferSize,
+                                         handler.getChannel());
         } catch (IOException e) {
-            log.log(Level.WARNING, String.format("Error transfering %s on %s",
-                                                 current, channel), e);
-            terminate(channel);
-            return;
+            log.log(Level.WARNING,
+                    String.format("Error transfering %s on %s", current,
+                                  handler.getChannel()), e);
+            terminate();
+            return false;
         }
         position += written;
         if (position == segmentSize) {
@@ -171,52 +157,49 @@ public class Xerox implements CommunicationsHandler {
                 log.log(Level.FINE,
                         String.format("Error closing: %s", current), e);
             }
-            state = State.SEND_HEADER;
-            sendNextSegment(channel);
+            return true;
         }
+        return false;
     }
 
-    private void handshake(SocketChannel channel) {
+    protected boolean segmentCopied() {
+        return position == segmentSize;
+    }
+
+    protected boolean writeHandshake() {
         try {
-            channel.write(buffer);
+            handler.getChannel().write(buffer);
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Error writing handshake for %s on %s",
-                                  channelId, channel), e);
-            terminate(channel);
-            return;
+                                  channelId, handler.getChannel()), e);
+            terminate();
+            return false;
         }
         if (!buffer.hasRemaining()) {
-            buffer.clear();
-            state = State.SEND_HEADER;
-            sendNextSegment(channel);
+            return true;
         }
-        handler.selectForWrite();
+        return false;
     }
 
-    private void sendHeader(SocketChannel channel) {
+    protected boolean writeHeader() {
         try {
-            channel.write(buffer);
+            handler.getChannel().write(buffer);
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Error writing header for %s on %s", current,
-                                  channel), e);
-            terminate(channel);
-            return;
+                                  handler.getChannel()), e);
+            terminate();
+            return false;
         }
-        if (!buffer.hasRemaining()) {
-            state = State.COPY;
-            copy(channel);
-        }
-        handler.selectForWrite();
+        return !buffer.hasRemaining();
     }
 
-    private void sendNextSegment(SocketChannel channel) {
-        state = State.SEND_HEADER;
+    protected void sendNextSegment() {
         position = 0;
         if (segments.isEmpty()) {
-            state = State.FINISHED;
             latch.countDown();
+            fsm.finished();
             return;
         }
         current = segments.pop();
@@ -225,7 +208,7 @@ public class Xerox implements CommunicationsHandler {
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Error retrieving size of %s", current), e);
-            terminate(channel);
+            terminate();
             return;
         }
         buffer.clear();
@@ -233,16 +216,13 @@ public class Xerox implements CommunicationsHandler {
         buffer.putLong(current.getPrefix());
         buffer.putLong(segmentSize);
         buffer.flip();
-        sendHeader(channel);
+        if (writeHeader()) {
+            fsm.initiateCopy();
+        }
     }
 
-    private void terminate(SocketChannel channel) {
-        state = State.ERROR;
-        try {
-            channel.close();
-        } catch (IOException e1) {
-            log.log(Level.FINE, String.format("Error closing: %s", channel), e1);
-        }
+    private void terminate() {
+        inError = true;
         for (Segment segment : segments) {
             try {
                 segment.close();
@@ -251,5 +231,17 @@ public class Xerox implements CommunicationsHandler {
                         String.format("Error closing: %s", segment), e1);
             }
         }
+    }
+
+    protected boolean inError() {
+        return inError;
+    }
+
+    protected boolean bufferIsWritten() {
+        return !buffer.hasRemaining();
+    }
+
+    protected void selectForWrite() {
+        handler.selectForWrite();
     }
 }

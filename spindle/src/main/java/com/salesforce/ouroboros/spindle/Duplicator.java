@@ -26,7 +26,6 @@
 package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -67,19 +66,18 @@ public final class Duplicator {
         return state.get();
     }
 
-    public void handleConnect(SocketChannel channel,
-                              final SocketChannelHandler handler) {
+    public void connect(SocketChannelHandler handler) {
         this.handler = handler;
     }
 
-    public void handleWrite(SocketChannel channel) {
+    public void writeReady() {
         switch (state.get()) {
             case WRITE_HEADER: {
-                writeHeader(channel);
+                writeHeader();
                 break;
             }
             case WRITE: {
-                writeBatch(channel);
+                writeBatch();
                 break;
             }
             default:
@@ -140,9 +138,10 @@ public final class Duplicator {
         handler.selectForWrite();
     }
 
-    private boolean transferTo(SocketChannel channel) throws IOException {
+    private boolean transferTo() throws IOException {
         long p = position;
-        int written = (int) current.segment.transferTo(p, remaining, channel);
+        int written = (int) current.segment.transferTo(p, remaining,
+                                                       handler.getChannel());
         remaining = remaining - written;
         position = p + written;
         if (remaining == 0) {
@@ -151,9 +150,9 @@ public final class Duplicator {
         return false;
     }
 
-    private void writeBatch(SocketChannel channel) {
+    private void writeBatch() {
         try {
-            if (transferTo(channel)) {
+            if (transferTo()) {
                 state.set(State.WAITING);
                 current.eventChannel.commit(current.header.getOffset());
                 current.acknowledger.acknowledge(current.header.getChannel(),
@@ -169,10 +168,10 @@ public final class Duplicator {
         }
     }
 
-    private void writeHeader(SocketChannel channel) {
+    private void writeHeader() {
         boolean written = false;
         try {
-            written = current.header.write(channel);
+            written = current.header.write(handler.getChannel());
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Unable to write batch header: %s",
@@ -181,7 +180,7 @@ public final class Duplicator {
         }
         if (written) {
             state.set(State.WRITE);
-            writeBatch(channel);
+            writeBatch();
         } else {
             handler.selectForWrite();
         }

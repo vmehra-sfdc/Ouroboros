@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -68,7 +67,7 @@ public class Spindle implements CommunicationsHandler {
     }
 
     @Override
-    public void closing(SocketChannel channel) {
+    public void closing() {
     }
 
     public State getState() {
@@ -76,29 +75,28 @@ public class Spindle implements CommunicationsHandler {
     }
 
     @Override
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+    public void accept(SocketChannelHandler handler) {
         this.handler = handler;
-        acknowledger.handleAccept(channel, handler);
-        appender.handleAccept(channel, handler);
-        readHandshake(channel);
+        acknowledger.connect(handler);
+        appender.accept(handler);
+        readHandshake();
     }
 
     @Override
-    public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler handler) {
+    public void connect(SocketChannelHandler handler) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void handleRead(SocketChannel channel) {
+    public void readReady() {
         final State s = state.get();
         switch (s) {
             case INITIAL: {
-                readHandshake(channel);
+                readHandshake();
                 break;
             }
             case ESTABLISHED: {
-                appender.handleRead(channel);
+                appender.readReady();
                 break;
             }
             default:
@@ -108,13 +106,13 @@ public class Spindle implements CommunicationsHandler {
     }
 
     @Override
-    public void handleWrite(SocketChannel channel) {
-        acknowledger.handleWrite(channel);
+    public void writeReady() {
+        acknowledger.writeReady();
     }
 
-    private void readHandshake(SocketChannel channel) {
+    private void readHandshake() {
         try {
-            channel.read(handshake);
+            handler.getChannel().read(handshake);
         } catch (IOException e) {
             state.set(State.ERROR);
             log.log(Level.WARNING, String.format("Error reading handshake"), e);

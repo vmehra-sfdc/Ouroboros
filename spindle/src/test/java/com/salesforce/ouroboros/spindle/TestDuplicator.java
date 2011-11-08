@@ -144,7 +144,8 @@ public class TestDuplicator {
         Reader reader = new Reader(inbound, payload.length);
         Thread inboundRead = new Thread(reader, "Inbound read thread");
         inboundRead.start();
-        replicator.handleConnect(outbound, handler);
+        when(handler.getChannel()).thenReturn(outbound);
+        replicator.connect(handler);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
 
             @Override
@@ -164,7 +165,7 @@ public class TestDuplicator {
 
             @Override
             public boolean value() {
-                replicator.handleWrite(outbound);
+                replicator.writeReady();
                 return State.WAITING == replicator.getState();
             }
         }, 1000L, 100L);
@@ -243,9 +244,9 @@ public class TestDuplicator {
         assertTrue(inbound.isConnected());
         outbound.configureBlocking(false);
         inbound.configureBlocking(false);
-
-        inboundReplicator.handleAccept(inbound, handler);
-        inboundReplicator.handleRead(inbound);
+        when(handler.getChannel()).thenReturn(inbound);
+        inboundReplicator.accept(handler);
+        inboundReplicator.readReady();
         assertEquals(AbstractAppender.State.READ_BATCH_HEADER,
                      inboundReplicator.getState());
 
@@ -253,7 +254,7 @@ public class TestDuplicator {
             @Override
             public void run() {
                 while (AbstractAppender.State.READY != inboundReplicator.getState()) {
-                    inboundReplicator.handleRead(inbound);
+                    inboundReplicator.readReady();
                     try {
                         Thread.sleep(1);
                     } catch (InterruptedException e) {
@@ -265,7 +266,9 @@ public class TestDuplicator {
         Thread inboundRead = new Thread(reader, "Inbound read thread");
         inboundRead.start();
 
-        outboundDuplicator.handleConnect(outbound, handler);
+        SocketChannelHandler outboundHandler = mock(SocketChannelHandler.class);
+        when(outboundHandler.getChannel()).thenReturn(outbound);
+        outboundDuplicator.connect(outboundHandler);
         outboundDuplicator.replicate(new ReplicatedBatchHeader(batchHeader, 0),
                                      eventChannel, outboundSegment,
                                      outboundAcknowledger);
@@ -273,7 +276,7 @@ public class TestDuplicator {
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
             public boolean value() {
-                outboundDuplicator.handleWrite(outbound);
+                outboundDuplicator.writeReady();
                 return State.WAITING == outboundDuplicator.getState();
             }
         }, 1000L, 100L);

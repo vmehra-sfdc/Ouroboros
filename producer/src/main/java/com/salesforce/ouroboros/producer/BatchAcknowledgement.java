@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.producer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -59,7 +58,7 @@ public class BatchAcknowledgement {
         return !ackBuffer.hasRemaining();
     }
 
-    public void closing(SocketChannel channel) {
+    public void closing() {
         if (!fsm.isInTransition()) {
             fsm.close();
         }
@@ -73,14 +72,13 @@ public class BatchAcknowledgement {
         return fsm.getState();
     }
 
-    public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler handler) {
+    public void connect(SocketChannelHandler handler) {
         this.handler = handler;
         fsm.connect();
     }
 
-    public void handleRead(SocketChannel channel) {
-        fsm.readReady(channel);
+    public void readReady() {
+        fsm.readReady();
     }
 
     protected void close() {
@@ -98,9 +96,9 @@ public class BatchAcknowledgement {
         return inError;
     }
 
-    protected boolean readAcknowledgement(SocketChannel channel) {
+    protected boolean readAcknowledgement() {
         try {
-            channel.read(ackBuffer);
+            handler.getChannel().read(ackBuffer);
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING, "Error reading batch acknowlegement", e);

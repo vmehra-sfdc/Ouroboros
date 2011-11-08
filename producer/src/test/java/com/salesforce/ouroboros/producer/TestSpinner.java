@@ -73,6 +73,7 @@ public class TestSpinner {
     public void testHandshake() throws Exception {
         SocketChannel channel = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        when(handler.getChannel()).thenReturn(channel);
         Coordinator coordinator = mock(Coordinator.class);
         final Node node = new Node(0x1638);
         when(coordinator.getId()).thenReturn(node);
@@ -90,9 +91,9 @@ public class TestSpinner {
         }).when(channel).write(isA(ByteBuffer.class));
 
         assertEquals(State.INITIAL, spinner.getState());
-        spinner.handleConnect(channel, handler);
+        spinner.connect(handler);
         assertEquals(State.INITIAL, spinner.getState());
-        spinner.handleWrite(channel);
+        spinner.writeReady();
         assertEquals(State.ESTABLISHED, spinner.getState());
         verify(channel, new Times(2)).write(isA(ByteBuffer.class));
     }
@@ -101,11 +102,12 @@ public class TestSpinner {
     public void testPush() throws Exception {
         SocketChannel channel = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        when(handler.getChannel()).thenReturn(channel);
         Coordinator coordinator = mock(Coordinator.class);
         Node node = new Node(0x1638);
         when(coordinator.getId()).thenReturn(node);
         Spinner spinner = new Spinner(coordinator);
-        spinner.handleConnect(channel, handler);
+        spinner.connect(handler);
 
         Node mirror = new Node(0x1638);
         @SuppressWarnings("unchecked")
@@ -122,11 +124,12 @@ public class TestSpinner {
     public void testPending() throws Exception {
         SocketChannel outbound = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        when(handler.getChannel()).thenReturn(outbound);
         Coordinator coordinator = mock(Coordinator.class);
         Node node = new Node(0x1638);
         when(coordinator.getId()).thenReturn(node);
         Spinner spinner = new Spinner(coordinator);
-        spinner.handleConnect(outbound, handler);
+        spinner.connect(handler);
 
         long timestamp = 100000L;
         UUID channel = UUID.randomUUID();
@@ -146,7 +149,7 @@ public class TestSpinner {
         assertTrue(spinner.push(batch1));
         assertTrue(spinner.push(batch2));
         assertTrue(spinner.push(batch3));
-        spinner.closing(outbound);
+        spinner.closing();
         assertFalse(spinner.push(batch4));
 
         SortedMap<BatchIdentity, Batch> pending = spinner.getPending(channel);

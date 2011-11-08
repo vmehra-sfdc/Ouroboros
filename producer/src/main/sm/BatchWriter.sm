@@ -24,6 +24,10 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+/**
+ * @author hhildebrand
+ */
 %}
 
 // The FSM for writing event batches to channel buffers.
@@ -31,7 +35,6 @@
 %class BatchWriter
 %package com.salesforce.ouroboros.producer
 %access package
-%import java.nio.channels.SocketChannel
 
 %start BatchWriterFSM::Suspended
 %map BatchWriterFSM
@@ -58,19 +61,19 @@ Waiting {
 }
 
 WriteBatchHeader {
-	writeReady(channel: SocketChannel)
-		[!ctxt.writeBatchHeader(channel)]
-		WriteBatchHeader{
+	writeReady()
+		[!ctxt.writeBatchHeader()]
+		nil {
 			selectForWrite();
 		}
 		
-	writeReady(channel: SocketChannel)
+	writeReady()
 		[ctxt.inError()]
 		Closed{
 			close();
 		}
 		
-	writeReady(channel: SocketChannel)
+	writeReady()
 		[ctxt.batchHeaderWritten()]
 		WriteEventHeader{
 			nextEventHeader();
@@ -79,19 +82,19 @@ WriteBatchHeader {
 } 
 
 WriteEventHeader {
-	writeReady(channel: SocketChannel)
-		[!ctxt.writeEventHeader(channel)]
-		WriteEventHeader{
+	writeReady()
+		[!ctxt.writeEventHeader()]
+		nil {
 			selectForWrite();
 		}
 		
-	writeReady(channel: SocketChannel)
+	writeReady()
 		[ctxt.inError()]
 		Closed{
 			close();
 		}
 		
-	writeReady(channel: SocketChannel)
+	writeReady()
 		[ctxt.eventHeaderWritten()]
 		WritePayload{
 			selectForWrite();
@@ -99,26 +102,26 @@ WriteEventHeader {
 } 
 
 WritePayload {
-	writeReady(channel: SocketChannel)
-		[!ctxt.writePayload(channel)]
-		WritePayload{
+	writeReady()
+		[!ctxt.writePayload()]
+		nil{
 			selectForWrite();
 		}
 		
-	writeReady(channel: SocketChannel)
+	writeReady()
 		[ctxt.inError()]
 		Closed{
 			close();
 		}
 		
-	writeReady(channel: SocketChannel)
+	writeReady()
 		[!ctxt.batch.isEmpty()]
 		WriteEventHeader{
 			nextEventHeader();
 			selectForWrite();
 		}
 		
-	writeReady(channel: SocketChannel)
+	writeReady()
 		[ctxt.batch.isEmpty()]
 		Waiting{}
 }

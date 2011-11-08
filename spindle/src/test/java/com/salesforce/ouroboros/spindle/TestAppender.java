@@ -31,7 +31,6 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -78,8 +77,9 @@ public class TestAppender {
         outbound.connect(server.socket().getLocalSocketAddress());
         final SocketChannel inbound = server.accept();
         inbound.configureBlocking(false);
+        when(handler.getChannel()).thenReturn(inbound);
 
-        appender.handleAccept(inbound, handler);
+        appender.accept(handler);
         assertEquals(State.READY, appender.getState());
 
         Node mirror = new Node(0x1638);
@@ -102,7 +102,7 @@ public class TestAppender {
         Util.waitFor("Header has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                appender.handleRead(inbound);
+                appender.readReady();
                 return appender.getState() == State.APPEND;
             }
         }, 1000, 100);
@@ -113,7 +113,7 @@ public class TestAppender {
         Util.waitFor("Payload has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                appender.handleRead(inbound);
+                appender.readReady();
                 return appender.getState() == State.READY;
             }
         }, 1000, 100);
@@ -140,7 +140,6 @@ public class TestAppender {
                                     eq(writeSegment), isA(Acknowledger.class));
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
-        verifyNoMoreInteractions(handler, bundle, eventChannel);
     }
 
     @Test
@@ -161,8 +160,9 @@ public class TestAppender {
         outbound.connect(server.socket().getLocalSocketAddress());
         final SocketChannel inbound = server.accept();
         inbound.configureBlocking(false);
+        when(handler.getChannel()).thenReturn(inbound);
 
-        appender.handleAccept(inbound, handler);
+        appender.accept(handler);
         assertEquals(State.READY, appender.getState());
 
         Node mirror = new Node(0x1638);
@@ -185,7 +185,7 @@ public class TestAppender {
         Util.waitFor("Header has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                appender.handleRead(inbound);
+                appender.readReady();
                 return appender.getState() == State.DEV_NULL;
             }
         }, 1000, 100);
@@ -196,7 +196,7 @@ public class TestAppender {
         Util.waitFor("Payload has not been fully read", new Util.Condition() {
             @Override
             public boolean value() {
-                appender.handleRead(inbound);
+                appender.readReady();
                 return appender.getState() == State.READY;
             }
         }, 1000, 100);
@@ -210,6 +210,5 @@ public class TestAppender {
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
-        verifyNoMoreInteractions(handler, bundle, eventChannel);
     };
 }

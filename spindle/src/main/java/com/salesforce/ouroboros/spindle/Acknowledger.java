@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -77,14 +76,14 @@ public class Acknowledger {
         return state.get();
     }
 
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+    public void connect(SocketChannelHandler handler) {
         this.handler = handler;
     }
 
-    public void handleWrite(SocketChannel channel) {
+    public void writeReady() {
         switch (state.get()) {
             case WRITE_ACK: {
-                writeAck(channel);
+                writeAck();
                 break;
             }
             default:
@@ -126,9 +125,9 @@ public class Acknowledger {
         handler.selectForWrite();
     }
 
-    private void writeAck(SocketChannel channel) {
+    private void writeAck() {
         try {
-            channel.write(buffer);
+            handler.getChannel().write(buffer);
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Unable to write batch commit acknowledgement: %s",

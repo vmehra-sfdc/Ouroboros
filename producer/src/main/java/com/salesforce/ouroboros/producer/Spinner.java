@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.producer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.NavigableMap;
 import java.util.SortedMap;
 import java.util.UUID;
@@ -116,9 +115,9 @@ public class Spinner implements CommunicationsHandler {
     }
 
     @Override
-    public void closing(SocketChannel channel) {
-        ack.closing(channel);
-        writer.closing(channel);
+    public void closing() {
+        ack.closing();
+        writer.closing();
     }
 
     public void failover() {
@@ -142,33 +141,32 @@ public class Spinner implements CommunicationsHandler {
     }
 
     @Override
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+    public void accept(SocketChannelHandler handler) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler handler) {
+    public void connect(SocketChannelHandler handler) {
         this.handler = handler;
-        ack.handleConnect(channel, handler);
-        writer.handleConnect(channel, handler);
-        writeHandshake(channel);
+        ack.connect(handler);
+        writer.connect(handler);
+        writeHandshake();
     }
 
     @Override
-    public void handleRead(SocketChannel channel) {
-        ack.handleRead(channel);
+    public void readReady() {
+        ack.readReady();
     }
 
     @Override
-    public void handleWrite(SocketChannel channel) {
+    public void writeReady() {
         State s = state.get();
         switch (s) {
             case INITIAL:
-                writeHandshake(channel);
+                writeHandshake();
                 break;
             case ESTABLISHED:
-                writer.handleWrite(channel);
+                writer.writeReady();
                 break;
             default:
                 log.severe(String.format("Illegal state for write: %s", s));
@@ -176,9 +174,9 @@ public class Spinner implements CommunicationsHandler {
         }
     }
 
-    private void writeHandshake(SocketChannel channel) {
+    private void writeHandshake() {
         try {
-            channel.write(handshake);
+            handler.getChannel().write(handshake);
         } catch (IOException e) {
             log.log(Level.WARNING, "Unable to write handshake", e);
             state.set(State.ERROR);

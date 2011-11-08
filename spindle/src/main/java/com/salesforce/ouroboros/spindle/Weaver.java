@@ -183,6 +183,7 @@ public class Weaver implements Bundle {
         }
     }
 
+    @Override
     public void closeReplicator(Node node) {
         Replicator replicator = replicators.remove(node);
         if (replicator != null) {
@@ -308,15 +309,17 @@ public class Weaver implements Bundle {
     public void openReplicator(Node node, ContactInformation info,
                                Rendezvous rendezvous) {
         Replicator replicator = new Replicator(this, node, rendezvous);
-        replicators.put(node, replicator);
+        Replicator previous = replicators.putIfAbsent(node, replicator);
+        assert previous == null : String.format("Replicator already opend on weaver %s to weaver %s");
         if (thisEndInitiatesConnectionsTo(node)) {
             if (log.isLoggable(Level.INFO)) {
-                log.fine(String.format("Initiating connection from weaver %s to new weaver %s",
+                log.fine(String.format("Initiating replication connection from weaver %s to new weaver %s",
                                        id, node));
             }
             try {
                 replicationHandler.connectTo(info.replication, replicator);
             } catch (IOException e) {
+
                 // We be screwed.  Log this #fail and force a repartition event
                 String msg = String.format("Unable to connect to weaver: %s at replicator port: %s",
                                            node, info);
@@ -325,7 +328,7 @@ public class Weaver implements Bundle {
             }
         } else {
             if (log.isLoggable(Level.INFO)) {
-                log.fine(String.format("Waiting for connection to weaver %s from new weaver %s",
+                log.fine(String.format("Waiting for replication inbound connection to weaver %s from new weaver %s",
                                        id, node));
             }
         }

@@ -114,15 +114,16 @@ public class TestSpindle {
         }).when(socketChannel).write(isA(ByteBuffer.class));
 
         when(socketChannel.write(isA(ByteBuffer.class))).thenReturn(0);
-        spindle.handleAccept(socketChannel, handler);
+        when(handler.getChannel()).thenReturn(socketChannel);
+        spindle.accept(handler);
         assertEquals(State.INITIAL, spindle.getState());
-        spindle.handleRead(socketChannel);
+        spindle.readReady();
         assertEquals(State.ESTABLISHED, spindle.getState());
-        spindle.handleRead(socketChannel);
+        spindle.readReady();
         verify(handler, new Times(4)).selectForRead();
         spindle.acknowledger.acknowledge(channel, timestamp);
         verify(segment).transferFrom(socketChannel, 0, event.totalSize());
-        spindle.handleWrite(socketChannel);
+        spindle.writeReady();
         verify(handler).selectForWrite();
         verify(socketChannel).write(isA(ByteBuffer.class));
     }

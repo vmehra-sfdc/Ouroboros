@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -96,7 +95,7 @@ public class Replicator implements CommunicationsHandler {
     }
 
     @Override
-    public void closing(SocketChannel channel) {
+    public void closing() {
         bundle.closeReplicator(partnerId);
     }
 
@@ -126,12 +125,12 @@ public class Replicator implements CommunicationsHandler {
     }
 
     @Override
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+    public void accept(SocketChannelHandler handler) {
         this.handler = handler;
         switch (state) {
             case ESTABLISHED: {
-                duplicator.handleConnect(channel, handler);
-                appender.handleAccept(channel, handler);
+                duplicator.connect(handler);
+                appender.accept(handler);
                 try {
                     rendezvous.meet();
                 } catch (BrokenBarrierException e) {
@@ -150,8 +149,7 @@ public class Replicator implements CommunicationsHandler {
     }
 
     @Override
-    public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler handler) {
+    public void connect(SocketChannelHandler handler) {
         this.handler = handler;
         switch (state) {
             case INITIAL: {
@@ -159,7 +157,7 @@ public class Replicator implements CommunicationsHandler {
                 bundle.getId().serialize(handshake);
                 handshake.flip();
                 state = State.OUTBOUND_HANDSHAKE;
-                writeHandshake(channel);
+                writeHandshake();
                 break;
             }
             default: {
@@ -170,10 +168,10 @@ public class Replicator implements CommunicationsHandler {
     }
 
     @Override
-    public void handleRead(SocketChannel channel) {
+    public void readReady() {
         switch (state) {
             case ESTABLISHED: {
-                appender.handleRead(channel);
+                appender.readReady();
                 break;
             }
             default: {
@@ -184,14 +182,14 @@ public class Replicator implements CommunicationsHandler {
     }
 
     @Override
-    public void handleWrite(SocketChannel channel) {
+    public void writeReady() {
         switch (state) {
             case ESTABLISHED: {
-                duplicator.handleWrite(channel);
+                duplicator.writeReady();
                 break;
             }
             case OUTBOUND_HANDSHAKE: {
-                writeHandshake(channel);
+                writeHandshake();
                 break;
             }
             default: {
@@ -206,13 +204,13 @@ public class Replicator implements CommunicationsHandler {
         duplicator.replicate(header, channel, segment, acknowledger);
     }
 
-    private void writeHandshake(SocketChannel channel) {
+    private void writeHandshake() {
         try {
-            channel.write(handshake);
+            handler.getChannel().write(handshake);
         } catch (IOException e) {
             log.log(Level.WARNING,
-                    String.format("Unable to write handshake from: %s", channel),
-                    e);
+                    String.format("Unable to write handshake from: %s",
+                                  handler.getChannel()), e);
             state = State.ERROR;
             handler.close();
             return;
@@ -220,8 +218,8 @@ public class Replicator implements CommunicationsHandler {
         if (handshake.hasRemaining()) {
             handler.selectForWrite();
         } else {
-            duplicator.handleConnect(channel, handler);
-            appender.handleAccept(channel, handler);
+            duplicator.connect(handler);
+            appender.accept(handler);
             state = State.ESTABLISHED;
             try {
                 rendezvous.meet();

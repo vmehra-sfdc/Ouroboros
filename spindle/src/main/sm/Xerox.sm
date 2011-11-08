@@ -1,3 +1,4 @@
+%{
 /**
  * Copyright (c) 2011, salesforce.com, inc.
  * All rights reserved.
@@ -23,57 +24,112 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
-
-import java.util.UUID;
-
-import com.salesforce.ouroboros.Node;
 
 /**
- * The interface which provides the segments for appending within a channel,
- * based on the new event's header.
- * 
  * @author hhildebrand
- * 
  */
-public interface Bundle {
+%}
 
-    /**
-     * Answer the event channel the event is part of.
-     * 
-     * @param channelId
-     *            - the id of the channel
-     * @return the EventChannel for this event, or null if no such channel
-     *         exists.
-     */
-    public abstract EventChannel eventChannelFor(UUID channelId);
+// The FSM of the Xerox machine originator protocol
 
-    /**
-     * The replicator has been closed.
-     * 
-     * @param replicator
-     *            - the replicator
-     */
-    void closeReplicator(Node partnerId);
+%class Xerox
+%package com.salesforce.ouroboros.spindle
+%access package
 
-    /**
-     * Answer the Acknowledger associated the node
-     * 
-     * @param node
-     * @return the Acknowledger associated with the node
-     */
-    Acknowledger getAcknowledger(Node node);
-
-    /**
-     * @return the Node id of the bundle
-     */
-    Node getId();
-
-    /**
-     * Map the producer node to the acknowledger
-     * 
-     * @param producer
-     * @param acknowledger
-     */
-    void map(Node producer, Acknowledger acknowledger);
+%start XeroxFSM::Suspended
+%map XeroxFSM
+%% 
+Suspended {
+	connect
+		Handshake{}
 }
+
+Copy
+Entry{
+	writeCopy();
+	selectForWrite();
+}
+{
+	writeReady
+		[!ctxt.copy()]
+		nil {
+			selectForWrite();
+		}
+		
+	writeReady
+		[ctxt.inError()]
+		Close{}
+		
+	writeReady
+		[ctxt.segmentCopied()]
+		SendHeader{
+		}
+}
+
+Finished
+Entry {
+	finished();
+}
+{
+} 
+
+Handshake {
+	writeReady
+		[!ctxt.writeHandshake()]
+		nil {
+			selectForWrite();
+		}
+		
+	writeReady
+		[ctxt.inError()]
+		Close{}
+		
+	writeReady
+		[ctxt.bufferIsWritten()]
+		SendHeader{
+		}
+}
+
+Initialized {
+
+}
+
+SendHeader
+Entry {
+	sendNextSegment();
+}
+{
+	writeReady
+		[!ctxt.writeHeader()]
+		nil {
+			selectForWrite();
+		}
+		
+	writeReady
+		[ctxt.inError()]
+		Close{}
+		
+	writeReady
+		[ctxt.bufferIsWritten()]
+		Copy{
+		}
+		
+	initiateCopy
+		Copy{
+		}
+		
+	finished
+		Finished{
+		}
+}
+
+Close
+Entry {
+	close();
+}
+{
+}
+
+Default {
+}
+%%

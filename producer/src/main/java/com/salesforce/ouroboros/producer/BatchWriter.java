@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.producer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.Map;
@@ -63,7 +62,7 @@ public class BatchWriter {
     private final BlockingQueue<Batch>    queued      = new LinkedBlockingQueue<Batch>();
     final Deque<ByteBuffer>               batch       = new LinkedList<ByteBuffer>();
 
-    public void closing(SocketChannel channel) {
+    public void closing() {
         if (!fsm.isInTransition()) {
             fsm.close();
         }
@@ -77,14 +76,13 @@ public class BatchWriter {
         return fsm.getState();
     }
 
-    public void handleConnect(SocketChannel channel,
-                              SocketChannelHandler handler) {
+    public void connect(SocketChannelHandler handler) {
         this.handler = handler;
         fsm.connect();
     }
 
-    public void handleWrite(SocketChannel channel) {
-        fsm.writeReady(channel);
+    public void writeReady() {
+        fsm.writeReady();
     }
 
     public void nextBatch() {
@@ -180,14 +178,14 @@ public class BatchWriter {
         handler.selectForWrite();
     }
 
-    protected boolean writeBatchHeader(SocketChannel channel) {
+    protected boolean writeBatchHeader() {
         try {
-            batchHeader.write(channel);
+            batchHeader.write(handler.getChannel());
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
                         String.format("Unable to write batch header %s on %s",
-                                      batchHeader, channel), e);
+                                      batchHeader, handler.getChannel()), e);
             }
             inError = true;
             return false;
@@ -195,14 +193,14 @@ public class BatchWriter {
         return !batchHeader.hasRemaining();
     }
 
-    protected boolean writeEventHeader(SocketChannel channel) {
+    protected boolean writeEventHeader() {
         try {
-            header.write(channel);
+            header.write(handler.getChannel());
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
                         String.format("Unable to write header %s on %s",
-                                      header, channel), e);
+                                      header, handler.getChannel()), e);
             }
             inError = true;
             return false;
@@ -210,13 +208,13 @@ public class BatchWriter {
         return !header.hasRemaining();
     }
 
-    protected boolean writePayload(SocketChannel channel) {
+    protected boolean writePayload() {
         try {
-            channel.write(batch.peekFirst());
+            handler.getChannel().write(batch.peekFirst());
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
-                        String.format("Unable to write event batch", channel),
+                        String.format("Unable to write event batch %s", handler.getChannel()),
                         e);
             }
             inError = true;

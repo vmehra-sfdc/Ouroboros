@@ -53,10 +53,11 @@ public class TestBatchAcknowledgement {
     public void testAck() throws Exception {
         SocketChannel inbound = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        when(handler.getChannel()).thenReturn(inbound);
         Spinner spinner = mock(Spinner.class);
         BatchAcknowledgement ba = new BatchAcknowledgement(spinner);
         assertEquals(BatchAcknowledgementFSM.Suspended, ba.getState());
-        ba.handleConnect(inbound, handler);
+        ba.connect(handler);
         assertEquals(BatchAcknowledgementFSM.ReadAcknowledgement, ba.getState());
         final BatchIdentity ack1 = new BatchIdentity(UUID.randomUUID(),
                                                      System.currentTimeMillis());
@@ -91,13 +92,13 @@ public class TestBatchAcknowledgement {
 
         when(inbound.read(isA(ByteBuffer.class))).thenAnswer(writeAck1).thenAnswer(readNothing).thenAnswer(writeAck2).thenAnswer(readNothing);
 
-        ba.handleRead(inbound);
+        ba.readReady();
         verify(spinner).acknowledge(ack1);
         assertEquals(BatchAcknowledgementFSM.ReadAcknowledgement, ba.getState());
 
-        ba.handleRead(inbound);
-        
-        ba.handleRead(inbound);
+        ba.readReady();
+
+        ba.readReady();
         verify(spinner).acknowledge(ack2);
         assertEquals(BatchAcknowledgementFSM.ReadAcknowledgement, ba.getState());
 

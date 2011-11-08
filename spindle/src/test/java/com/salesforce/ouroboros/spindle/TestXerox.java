@@ -43,7 +43,7 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.Xerox.State;
+import com.salesforce.ouroboros.spindle.XeroxContext.XeroxFSM;
 
 /**
  * 
@@ -58,6 +58,7 @@ public class TestXerox {
         Segment segment2 = mock(Segment.class);
         SocketChannel socket = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        when(handler.getChannel()).thenReturn(socket);
         Node node = new Node(0x1639, 0x1640, 0x1641);
         CountDownLatch latch = mock(CountDownLatch.class);
 
@@ -112,20 +113,21 @@ public class TestXerox {
         int transferSize = 1024;
         Xerox xerox = new Xerox(node, id, segments, transferSize);
         xerox.setLatch(latch);
-        assertEquals(State.INITIALIZED, xerox.getState());
-        xerox.handleConnect(socket, handler);
-        assertEquals(State.HANDSHAKE, xerox.getState());
+        assertEquals(XeroxFSM.Suspended, xerox.getState());
+        xerox.connect(handler);
+        xerox.writeReady();
+        assertEquals(XeroxFSM.Handshake, xerox.getState());
         verify(handler).selectForWrite();
-        xerox.handleWrite(socket);
-        assertEquals(State.SEND_HEADER, xerox.getState());
-        xerox.handleWrite(socket);
-        assertEquals(State.COPY, xerox.getState());
-        xerox.handleWrite(socket);
-        assertEquals(State.SEND_HEADER, xerox.getState());
-        xerox.handleWrite(socket);
-        assertEquals(State.COPY, xerox.getState());
-        xerox.handleWrite(socket);
-        assertEquals(State.FINISHED, xerox.getState());
+        xerox.writeReady();
+        assertEquals(XeroxFSM.SendHeader, xerox.getState());
+        xerox.writeReady();
+        assertEquals(XeroxFSM.Copy, xerox.getState());
+        xerox.writeReady();
+        assertEquals(XeroxFSM.SendHeader, xerox.getState());
+        xerox.writeReady();
+        assertEquals(XeroxFSM.Copy, xerox.getState());
+        xerox.writeReady();
+        assertEquals(XeroxFSM.Finished, xerox.getState());
         verify(latch).countDown();
     }
 }

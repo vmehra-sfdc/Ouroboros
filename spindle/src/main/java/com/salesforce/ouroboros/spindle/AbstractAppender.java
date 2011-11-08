@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -71,7 +70,7 @@ abstract public class AbstractAppender {
         return state;
     }
 
-    public void handleAccept(SocketChannel channel, SocketChannelHandler handler) {
+    public void accept(SocketChannelHandler handler) {
         assert state == State.INITIALIZED;
         if (log.isLoggable(Level.FINER)) {
             log.finer("ACCEPT");
@@ -81,25 +80,25 @@ abstract public class AbstractAppender {
         this.handler.selectForRead();
     }
 
-    public void handleRead(SocketChannel channel) {
+    public void readReady() {
         if (log.isLoggable(Level.FINER)) {
             log.finer(String.format("READ, state=%s", state));
         }
         switch (state) {
             case READY: {
-                initialRead(channel);
+                initialRead();
                 break;
             }
             case DEV_NULL: {
-                devNull(channel);
+                devNull();
                 break;
             }
             case READ_BATCH_HEADER: {
-                readBatchHeader(channel);
+                readBatchHeader();
                 break;
             }
             case APPEND: {
-                append(channel);
+                append();
                 break;
             }
             case ERROR: {
@@ -121,17 +120,18 @@ abstract public class AbstractAppender {
                + ", remaining=" + remaining + ", position=" + position + "]";
     }
 
-    private void drain(SocketChannel channel) {
+    private void drain() {
         state = State.DEV_NULL;
         segment = null;
         devNull = ByteBuffer.allocate(batchHeader.getBatchByteLength());
-        devNull(channel);
+        devNull();
     }
 
-    protected void append(SocketChannel channel) {
+    protected void append() {
         long written;
         try {
-            written = segment.transferFrom(channel, position, remaining);
+            written = segment.transferFrom(handler.getChannel(), position,
+                                           remaining);
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during append", e);
             error();
@@ -163,10 +163,10 @@ abstract public class AbstractAppender {
 
     abstract protected BatchHeader createBatchHeader();
 
-    protected void devNull(SocketChannel channel) {
+    protected void devNull() {
         long read;
         try {
-            read = channel.read(devNull);
+            read = handler.getChannel().read(devNull);
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during append", e);
             error();
@@ -197,16 +197,16 @@ abstract public class AbstractAppender {
 
     abstract protected AppendSegment getLogicalSegment();
 
-    protected void initialRead(SocketChannel channel) {
+    protected void initialRead() {
         batchHeader.rewind();
         state = State.READ_BATCH_HEADER;
-        readBatchHeader(channel);
+        readBatchHeader();
     }
 
-    protected void readBatchHeader(SocketChannel channel) {
+    protected void readBatchHeader() {
         boolean read;
         try {
-            read = batchHeader.read(channel);
+            read = batchHeader.read(handler.getChannel());
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during batch header read", e);
             error();
@@ -221,7 +221,7 @@ abstract public class AbstractAppender {
             if (eventChannel == null) {
                 log.warning(String.format("No existing event channel for: %s",
                                           batchHeader));
-                drain(channel);
+                drain();
                 return;
             }
             AppendSegment logicalSegment = getLogicalSegment();
@@ -231,11 +231,11 @@ abstract public class AbstractAppender {
             if (eventChannel.isDuplicate(batchHeader)) {
                 log.warning(String.format("Duplicate event batch %s",
                                           batchHeader));
-                drain(channel);
+                drain();
                 return;
             }
             state = State.APPEND;
-            append(channel);
+            append();
         }
     }
 }

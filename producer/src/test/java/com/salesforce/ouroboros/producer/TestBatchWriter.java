@@ -73,12 +73,13 @@ public class TestBatchWriter {
         final UUID channel = UUID.randomUUID();
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel outbound = mock(SocketChannel.class);
+        when(handler.getChannel()).thenReturn(outbound);
 
         SortedMap<BatchIdentity, Batch> pending = new TreeMap<BatchIdentity, Batch>();
 
         BatchWriter batchWriter = new BatchWriter();
         assertEquals(BatchWriterFSM.Suspended, batchWriter.getState());
-        batchWriter.handleConnect(outbound, handler);
+        batchWriter.connect(handler);
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
         Node mirror = new Node(0x1638);
         Batch batch = new Batch(mirror, channel, timestamp,
@@ -161,19 +162,19 @@ public class TestBatchWriter {
             }
         };
         when(outbound.write(isA(ByteBuffer.class))).thenAnswer(readBatchHeader).thenAnswer(readEventHeader0).thenAnswer(readPayload0).thenAnswer(readEventHeader1).thenAnswer(readPayload1).thenAnswer(readEventHeader2).thenAnswer(readPayload2);
-        batchWriter.handleWrite(outbound);
+        batchWriter.writeReady();
         assertEquals(BatchWriterFSM.WriteEventHeader, batchWriter.getState());
-        batchWriter.handleWrite(outbound);
+        batchWriter.writeReady();
         assertEquals(BatchWriterFSM.WritePayload, batchWriter.getState());
-        batchWriter.handleWrite(outbound);
+        batchWriter.writeReady();
         assertEquals(BatchWriterFSM.WriteEventHeader, batchWriter.getState());
-        batchWriter.handleWrite(outbound);
+        batchWriter.writeReady();
         assertEquals(BatchWriterFSM.WritePayload, batchWriter.getState());
-        batchWriter.handleWrite(outbound);
+        batchWriter.writeReady();
         assertEquals(BatchWriterFSM.WriteEventHeader, batchWriter.getState());
-        batchWriter.handleWrite(outbound);
+        batchWriter.writeReady();
         assertEquals(BatchWriterFSM.WritePayload, batchWriter.getState());
-        batchWriter.handleWrite(outbound);
+        batchWriter.writeReady();
         verify(outbound, new Times(7)).write(isA(ByteBuffer.class));
     }
 }

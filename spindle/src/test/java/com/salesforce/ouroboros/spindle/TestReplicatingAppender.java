@@ -100,10 +100,11 @@ public class TestReplicatingAppender {
         assertTrue(inbound.isConnected());
         outbound.configureBlocking(true);
         inbound.configureBlocking(false);
+        when(handler.getChannel()).thenReturn(inbound);
 
-        replicator.handleAccept(inbound, handler);
+        replicator.accept(handler);
         assertEquals(AbstractAppender.State.READY, replicator.getState());
-        replicator.handleRead(inbound);
+        replicator.readReady();
         assertEquals(AbstractAppender.State.READ_BATCH_HEADER,
                      replicator.getState());
 
@@ -111,7 +112,7 @@ public class TestReplicatingAppender {
             @Override
             public void run() {
                 while (AbstractAppender.State.READY != replicator.getState()) {
-                    replicator.handleRead(inbound);
+                    replicator.readReady();
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {
