@@ -372,6 +372,11 @@ public abstract class FSMContext
             STATE_PROPERTY, listener);
         return;
     } // end of removeStateChangeListener(PropertyChangeListener)
+    
+    @Override
+    public String toString() {
+        return String.format("%s[current=%s, previous=%s, stack=%s]", getClass().getCanonicalName(), _state, _previousState, _stateStack);
+    }
 
 //---------------------------------------------------------------
 // Member data
