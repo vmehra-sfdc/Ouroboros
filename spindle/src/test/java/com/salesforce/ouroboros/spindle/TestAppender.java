@@ -49,7 +49,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.AbstractAppender.State;
+import com.salesforce.ouroboros.spindle.AbstractAppenderContext.AbstractAppenderFSM;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 
 /**
@@ -80,7 +80,7 @@ public class TestAppender {
         when(handler.getChannel()).thenReturn(inbound);
 
         appender.accept(handler);
-        assertEquals(State.READY, appender.getState());
+        assertEquals(AbstractAppenderFSM.Ready, appender.getState());
 
         Node mirror = new Node(0x1638);
         int magic = 666;
@@ -103,7 +103,7 @@ public class TestAppender {
             @Override
             public boolean value() {
                 appender.readReady();
-                return appender.getState() == State.APPEND;
+                return appender.getState() == AbstractAppenderFSM.Append;
             }
         }, 1000, 100);
 
@@ -114,7 +114,7 @@ public class TestAppender {
             @Override
             public boolean value() {
                 appender.readReady();
-                return appender.getState() == State.READY;
+                return appender.getState() == AbstractAppenderFSM.ReadBatchHeader;
             }
         }, 1000, 100);
 
@@ -163,7 +163,7 @@ public class TestAppender {
         when(handler.getChannel()).thenReturn(inbound);
 
         appender.accept(handler);
-        assertEquals(State.READY, appender.getState());
+        assertEquals(AbstractAppenderFSM.Ready, appender.getState());
 
         Node mirror = new Node(0x1638);
         int magic = 666;
@@ -186,7 +186,7 @@ public class TestAppender {
             @Override
             public boolean value() {
                 appender.readReady();
-                return appender.getState() == State.DEV_NULL;
+                return appender.getState() == AbstractAppenderFSM.DevNull;
             }
         }, 1000, 100);
 
@@ -197,7 +197,7 @@ public class TestAppender {
             @Override
             public boolean value() {
                 appender.readReady();
-                return appender.getState() == State.READY;
+                return appender.getState() == AbstractAppenderFSM.ReadBatchHeader;
             }
         }, 1000, 100);
 
@@ -206,7 +206,7 @@ public class TestAppender {
         server.close();
 
         assertEquals(0L, tmpFile.length());
-        verify(handler, new Times(3)).selectForRead();
+        verify(handler, new Times(2)).selectForRead();
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));

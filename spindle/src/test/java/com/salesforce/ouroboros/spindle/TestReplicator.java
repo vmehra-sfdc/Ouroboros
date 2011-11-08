@@ -54,6 +54,7 @@ public class TestReplicator {
         Bundle bundle = mock(Bundle.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
+        when(handler.getChannel()).thenReturn(socketChannel);
         Rendezvous rendezvous = mock(Rendezvous.class);
         final Node node = new Node(0x1639, 0x1640, 0x1650);
 
@@ -73,7 +74,6 @@ public class TestReplicator {
         replicator.bindTo(node);
         replicator.accept(handler);
         assertEquals(State.ESTABLISHED, replicator.getState());
-        verify(handler).selectForRead();
     }
 
     @Test
@@ -104,6 +104,5 @@ public class TestReplicator {
         verify(handler).selectForWrite();
         replicator.writeReady();
         assertEquals(State.ESTABLISHED, replicator.getState());
-        verify(handler).selectForRead();
     }
 }

@@ -162,10 +162,6 @@ public class Xerox implements CommunicationsHandler {
         return false;
     }
 
-    protected boolean segmentCopied() {
-        return position == segmentSize;
-    }
-
     protected boolean writeHandshake() {
         try {
             handler.getChannel().write(buffer);
@@ -235,10 +231,6 @@ public class Xerox implements CommunicationsHandler {
 
     protected boolean inError() {
         return inError;
-    }
-
-    protected boolean bufferIsWritten() {
-        return !buffer.hasRemaining();
     }
 
     protected void selectForWrite() {

@@ -32,6 +32,7 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.spindle.AbstractAppenderContext.AbstractAppenderState;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 
 /**
@@ -42,10 +43,7 @@ import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
  * @author hhildebrand
  * 
  */
-abstract public class AbstractAppender {
-    public enum State {
-        APPEND, DEV_NULL, ERROR, INITIALIZED, READ_BATCH_HEADER, READY;
-    }
+abstract public class AbstractAppender { 
 
     private static final Logger             log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
 
@@ -57,8 +55,10 @@ abstract public class AbstractAppender {
     protected volatile long                 offset   = -1L;
     protected volatile long                 position = -1L;
     protected volatile long                 remaining;
-    protected volatile Segment              segment;
-    protected volatile State                state    = State.INITIALIZED;
+    protected volatile Segment              segment; 
+    protected final AbstractAppenderContext fsm      = new AbstractAppenderContext(
+                                                                                   this);
+    protected boolean                       inError  = false;
 
     public AbstractAppender(Bundle bundle) {
         super();
@@ -66,68 +66,31 @@ abstract public class AbstractAppender {
         batchHeader = createBatchHeader();
     }
 
-    public State getState() {
-        return state;
+    public AbstractAppenderState getState() {
+        return fsm.getState();
     }
 
     public void accept(SocketChannelHandler handler) {
-        assert state == State.INITIALIZED;
-        if (log.isLoggable(Level.FINER)) {
-            log.finer("ACCEPT");
-        }
-        state = State.READY;
         this.handler = handler;
-        this.handler.selectForRead();
     }
 
     public void readReady() {
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("READ, state=%s", state));
-        }
-        switch (state) {
-            case READY: {
-                initialRead();
-                break;
-            }
-            case DEV_NULL: {
-                devNull();
-                break;
-            }
-            case READ_BATCH_HEADER: {
-                readBatchHeader();
-                break;
-            }
-            case APPEND: {
-                append();
-                break;
-            }
-            case ERROR: {
-                log.info("Read encountered in ERROR state");
-                return;
-            }
-            default: {
-                log.severe(String.format("Invalid read state: %s", state));
-                error();
-                return;
-            }
-        }
-        handler.selectForRead();
+        fsm.readReady();
     }
 
-    @Override
-    public String toString() {
-        return "Appender [state=" + state + ", segment=" + segment
-               + ", remaining=" + remaining + ", position=" + position + "]";
+    public void close() {
+        handler.close();
     }
 
-    private void drain() {
-        state = State.DEV_NULL;
+    protected void drain() {
         segment = null;
         devNull = ByteBuffer.allocate(batchHeader.getBatchByteLength());
-        devNull();
+        if(devNull()) {
+            fsm.ready();
+        }
     }
 
-    protected void append() {
+    protected boolean append() {
         long written;
         try {
             written = segment.transferFrom(handler.getChannel(), position,
@@ -135,7 +98,7 @@ abstract public class AbstractAppender {
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during append", e);
             error();
-            return;
+            return false;
         }
         position += written;
         remaining -= written;
@@ -151,38 +114,38 @@ abstract public class AbstractAppender {
                         String.format("Cannot determine position in segment: %s",
                                       segment), e);
                 error();
-                return;
+                return false;
             }
             commit();
             segment = null;
-            state = State.READY;
+            return true;
         }
+        return false;
     }
 
     abstract protected void commit();
 
     abstract protected BatchHeader createBatchHeader();
 
-    protected void devNull() {
+    protected boolean devNull() {
         long read;
         try {
             read = handler.getChannel().read(devNull);
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during append", e);
             error();
-            return;
+            return false;
         }
         position += read;
         remaining -= read;
         if (remaining == 0) {
             devNull = null;
-            state = State.READY;
+            return true;
         }
+        return false;
     }
 
     protected void error() {
-        state = State.ERROR;
-        handler.close();
         if (segment != null) {
             try {
                 segment.close();
@@ -197,20 +160,46 @@ abstract public class AbstractAppender {
 
     abstract protected AppendSegment getLogicalSegment();
 
-    protected void initialRead() {
+    protected void nextBatchHeader() {
         batchHeader.rewind();
-        state = State.READ_BATCH_HEADER;
-        readBatchHeader();
+        if (readBatchHeader()) {
+            fsm.append();
+        } else {
+            handler.selectForRead();
+        }
     }
 
-    protected void readBatchHeader() {
+    protected void beginAppend() {
+        if (eventChannel == null) {
+            log.warning(String.format("No existing event channel for: %s",
+                                      batchHeader));
+            fsm.drain();
+            return;
+        }
+        AppendSegment logicalSegment = getLogicalSegment();
+        segment = logicalSegment.segment;
+        offset = position = logicalSegment.offset;
+        remaining = batchHeader.getBatchByteLength();
+        if (eventChannel.isDuplicate(batchHeader)) {
+            log.warning(String.format("Duplicate event batch %s", batchHeader));
+            fsm.drain();
+            return;
+        }
+        if (append()) {
+            fsm.appended();
+        } else {
+            handler.selectForRead();
+        }
+    }
+
+    protected boolean readBatchHeader() {
         boolean read;
         try {
             read = batchHeader.read(handler.getChannel());
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during batch header read", e);
             error();
-            return;
+            return false;
         }
         if (read) {
             if (log.isLoggable(Level.FINER)) {
@@ -218,24 +207,21 @@ abstract public class AbstractAppender {
                                         batchHeader));
             }
             eventChannel = bundle.eventChannelFor(batchHeader.getChannel());
-            if (eventChannel == null) {
-                log.warning(String.format("No existing event channel for: %s",
-                                          batchHeader));
-                drain();
-                return;
-            }
-            AppendSegment logicalSegment = getLogicalSegment();
-            segment = logicalSegment.segment;
-            offset = position = logicalSegment.offset;
-            remaining = batchHeader.getBatchByteLength();
-            if (eventChannel.isDuplicate(batchHeader)) {
-                log.warning(String.format("Duplicate event batch %s",
-                                          batchHeader));
-                drain();
-                return;
-            }
-            state = State.APPEND;
-            append();
+            return true;
+        } else {
+            return false;
         }
+    }
+
+    protected void selectForRead() {
+        handler.selectForRead();
+    }
+
+    protected boolean inError() {
+        return inError;
+    }
+
+    protected boolean batchHeaderWritten() {
+        return !batchHeader.hasRemaining();
     }
 }

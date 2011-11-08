@@ -45,6 +45,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.AbstractAppenderContext.AbstractAppenderFSM;
 
 /**
  * 
@@ -103,15 +104,15 @@ public class TestReplicatingAppender {
         when(handler.getChannel()).thenReturn(inbound);
 
         replicator.accept(handler);
-        assertEquals(AbstractAppender.State.READY, replicator.getState());
+        assertEquals(AbstractAppenderFSM.Ready, replicator.getState());
         replicator.readReady();
-        assertEquals(AbstractAppender.State.READ_BATCH_HEADER,
+        assertEquals(AbstractAppenderFSM.ReadBatchHeader,
                      replicator.getState());
 
         Runnable reader = new Runnable() {
             @Override
             public void run() {
-                while (AbstractAppender.State.READY != replicator.getState()) {
+                while (AbstractAppenderFSM.Ready != replicator.getState()) {
                     replicator.readReady();
                     try {
                         Thread.sleep(10);
@@ -128,7 +129,7 @@ public class TestReplicatingAppender {
         event.rewind();
         event.write(outbound);
         inboundRead.join(4000);
-        assertEquals(AbstractAppender.State.READY, replicator.getState());
+        assertEquals(AbstractAppenderFSM.Ready, replicator.getState());
 
         segment = new Segment(tmpFile);
         Event replicatedEvent = new Event(segment);

@@ -46,6 +46,7 @@ import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.AbstractAppenderContext.AbstractAppenderFSM;
 import com.salesforce.ouroboros.spindle.Duplicator.State;
 
 /**
@@ -247,13 +248,13 @@ public class TestDuplicator {
         when(handler.getChannel()).thenReturn(inbound);
         inboundReplicator.accept(handler);
         inboundReplicator.readReady();
-        assertEquals(AbstractAppender.State.READ_BATCH_HEADER,
+        assertEquals(AbstractAppenderFSM.ReadBatchHeader,
                      inboundReplicator.getState());
 
         Runnable reader = new Runnable() {
             @Override
             public void run() {
-                while (AbstractAppender.State.READY != inboundReplicator.getState()) {
+                while (AbstractAppenderFSM.Ready != inboundReplicator.getState()) {
                     inboundReplicator.readReady();
                     try {
                         Thread.sleep(1);
@@ -282,7 +283,8 @@ public class TestDuplicator {
         }, 1000L, 100L);
         inboundRead.join(4000);
 
-        assertEquals(AbstractAppender.State.READY, inboundReplicator.getState());
+        assertEquals(AbstractAppenderFSM.Ready,
+                     inboundReplicator.getState());
 
         inboundSegment.close();
         outboundSegment.close();

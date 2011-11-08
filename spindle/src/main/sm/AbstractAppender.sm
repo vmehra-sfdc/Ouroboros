@@ -30,94 +30,91 @@
  */
 %}
 
-// The FSM of the Xerox machine originator protocol
+// The FSM of the Appender protocol
 
-%class Xerox
+%class AbstractAppender
 %package com.salesforce.ouroboros.spindle
 %access package
 
-%start XeroxFSM::Suspended
-%map XeroxFSM
+%start AbstractAppenderFSM::Ready
+%map AbstractAppenderFSM
 %% 
-Suspended {
-	connect
-		Handshake{}
+Ready
+{
+	readReady
+		ReadBatchHeader{}
 }
 
-Copy
+Append
+Entry {
+	beginAppend();
+}
+{
+	drain
+		DevNull{}
+		
+	readReady
+		[!ctxt.append()]
+		nil{
+			selectForRead();
+		}
+	readReady
+		[ctxt.inError()]
+		Close{}
+
+	readReady
+		Ready{
+			selectForRead();
+		}
+
+	appended
+		Ready{
+			selectForRead();
+		}
+}
+
+DevNull
+Entry {
+	drain();
+}
+{
+	ready
+		ReadBatchHeader{}
+		
+	readReady
+		[!ctxt.devNull()]
+		nil{
+			selectForRead();
+		}
+	readReady
+		[ctxt.inError()]
+		Close{}
+
+	readReady
+		Ready{
+			selectForRead();
+		}
+}
+
+ReadBatchHeader
 Entry{
-	writeCopy();
-	selectForWrite();
+	nextBatchHeader();
 }
 {
-	writeReady
-		[!ctxt.copy()]
-		nil {
-			selectForWrite();
-		}
+	append
+		Append{} 
 		
-	writeReady
+	readReady
+		[!ctxt.readBatchHeader()]
+		nil{
+			selectForRead();
+		}
+	readReady
 		[ctxt.inError()]
 		Close{}
-		
-	writeReady
-		SendHeader{
-		}
-}
 
-Finished
-Entry {
-	finished();
-}
-{
-} 
-
-Handshake {
-	writeReady
-		[!ctxt.writeHandshake()]
-		nil {
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Close{}
-		
-	writeReady
-		SendHeader{
-		}
-}
-
-Initialized {
-
-}
-
-SendHeader
-Entry {
-	sendNextSegment();
-}
-{
-	writeReady
-		[!ctxt.writeHeader()]
-		nil {
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Close{}
-		
-	writeReady
-		Copy{
-		}
-		
-	initiateCopy
-		Copy{
-		}
-		
-	finished
-		Finished{
-		}
+	readReady
+		Append{}
 }
 
 Close

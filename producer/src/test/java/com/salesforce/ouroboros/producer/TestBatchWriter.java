@@ -157,7 +157,7 @@ public class TestBatchWriter {
                 return b.length;
             }
         };
-        when(outbound.write(isA(ByteBuffer.class))).thenAnswer(readBatchHeader).thenAnswer(readEventHeader0).thenAnswer(readPayload0).thenAnswer(readEventHeader1).thenAnswer(readPayload1).thenAnswer(readEventHeader2).thenAnswer(readPayload2);
+        when(outbound.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readBatchHeader).thenAnswer(readEventHeader0).thenAnswer(readPayload0).thenAnswer(readEventHeader1).thenAnswer(readPayload1).thenAnswer(readEventHeader2).thenAnswer(readPayload2);
 
         batchWriter.push(batch, pending);
         assertEquals(1, pending.size());
@@ -166,6 +166,6 @@ public class TestBatchWriter {
         
         batchWriter.writeReady();
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
-        verify(outbound, new Times(7)).write(isA(ByteBuffer.class));
+        verify(outbound, new Times(8)).write(isA(ByteBuffer.class));
     }
 }

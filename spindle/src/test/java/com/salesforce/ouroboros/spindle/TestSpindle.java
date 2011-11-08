@@ -120,7 +120,7 @@ public class TestSpindle {
         spindle.readReady();
         assertEquals(State.ESTABLISHED, spindle.getState());
         spindle.readReady();
-        verify(handler, new Times(4)).selectForRead();
+        verify(handler, new Times(3)).selectForRead();
         spindle.acknowledger.acknowledge(channel, timestamp);
         verify(segment).transferFrom(socketChannel, 0, event.totalSize());
         spindle.writeReady();
