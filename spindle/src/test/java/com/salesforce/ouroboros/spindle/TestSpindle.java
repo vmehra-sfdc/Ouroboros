@@ -124,7 +124,6 @@ public class TestSpindle {
         spindle.acknowledger.acknowledge(channel, timestamp);
         verify(segment).transferFrom(socketChannel, 0, event.totalSize());
         spindle.writeReady();
-        verify(handler).selectForWrite();
         verify(socketChannel).write(isA(ByteBuffer.class));
     }
 }

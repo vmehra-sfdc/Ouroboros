@@ -30,13 +30,12 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
+import com.salesforce.ouroboros.spindle.AcknowledgerContext.AcknowledgerState;
 
 /**
  * 
@@ -44,20 +43,15 @@ import com.salesforce.ouroboros.BatchIdentity;
  * 
  */
 public class Acknowledger {
-    public enum State {
-        ERROR, INTERRUPTED, PROCESSING, WAITING, WRITE_ACK;
-    }
 
-    private static final int                   POLL_TIMEOUT = 10;
-    private static final TimeUnit              POLL_UNIT    = TimeUnit.MILLISECONDS;
-    static final Logger                        log          = Logger.getLogger(Acknowledger.class.getCanonicalName());
+    static final Logger                log     = Logger.getLogger(Acknowledger.class.getCanonicalName());
 
-    private final ByteBuffer                   buffer       = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
-    private volatile BatchIdentity             current;
-    private volatile SocketChannelHandler      handler;
-    private final BlockingQueue<BatchIdentity> pending      = new LinkedBlockingQueue<BatchIdentity>();
-    private final AtomicReference<State>       state        = new AtomicReference<State>(
-                                                                                         State.WAITING);
+    private final ByteBuffer           buffer  = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
+    private BatchIdentity              current;
+    private final AcknowledgerContext  fsm     = new AcknowledgerContext(this);
+    private SocketChannelHandler       handler;
+    private boolean                    inError;
+    final BlockingQueue<BatchIdentity> pending = new LinkedBlockingQueue<BatchIdentity>();
 
     /**
      * Replicate the event to the mirror
@@ -69,63 +63,60 @@ public class Acknowledger {
      */
     public void acknowledge(UUID channel, long timestamp) {
         pending.add(new BatchIdentity(channel, timestamp));
-        process();
+        if (!fsm.isInTransition()) {
+            fsm.ack();
+        }
     }
 
-    public State getState() {
-        return state.get();
+    public void close() {
+        handler.close();
+        pending.clear();
     }
 
     public void connect(SocketChannelHandler handler) {
         this.handler = handler;
     }
 
+    public AcknowledgerState getState() {
+        return fsm.getState();
+    }
+
     public void writeReady() {
-        switch (state.get()) {
-            case WRITE_ACK: {
-                writeAck();
-                break;
-            }
-            default:
-                log.warning(String.format("Illegal write state: %s", state));
-        }
+        fsm.writeReady();
     }
 
     private void error() {
-        state.set(State.ERROR);
+        inError = true;
         current = null;
-        pending.clear();
     }
 
-    private void process() {
-        if (!state.compareAndSet(State.WAITING, State.PROCESSING)) {
-            return;
-        }
-        BatchIdentity entry;
-        try {
-            entry = pending.poll(POLL_TIMEOUT, POLL_UNIT);
-        } catch (InterruptedException e) {
-            state.set(State.INTERRUPTED);
-            return;
-        }
-        if (entry == null) {
-            state.compareAndSet(State.PROCESSING, State.WAITING);
-            return;
-        }
-        process(entry);
+    protected boolean inError() {
+        return inError;
     }
 
-    private void process(BatchIdentity entry) {
-        if (!state.compareAndSet(State.PROCESSING, State.WRITE_ACK)) {
-            return;
+    protected void processPendingAcks() {
+        while (!pending.isEmpty()) {
+            try {
+                current = pending.take();
+            } catch (InterruptedException e) {
+                inError = true;
+                return;
+            }
+            buffer.rewind();
+            current.serializeOn(buffer);
+            if (!writeAck()) {
+                handler.selectForWrite();
+                return;
+            }
         }
-        current = entry;
-        buffer.rewind();
-        current.serializeOn(buffer);
+        fsm.waiting();
+    }
+
+    protected void selectForWrite() {
         handler.selectForWrite();
     }
 
-    private void writeAck() {
+    protected boolean writeAck() {
         try {
             handler.getChannel().write(buffer);
         } catch (IOException e) {
@@ -133,13 +124,8 @@ public class Acknowledger {
                     String.format("Unable to write batch commit acknowledgement: %s",
                                   current), e);
             error();
-            return;
+            return false;
         }
-        if (buffer.hasRemaining()) {
-            handler.selectForWrite();
-        } else {
-            state.set(State.WAITING);
-            process();
-        }
+        return !buffer.hasRemaining();
     }
 }
