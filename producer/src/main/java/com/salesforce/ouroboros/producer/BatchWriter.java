@@ -97,7 +97,9 @@ public class BatchWriter {
     public boolean push(Batch events, Map<BatchIdentity, Batch> pending) {
         pending.put(events, events);
         queued.add(events);
-        fsm.pushBatch();
+        if (!fsm.isInTransition()) {
+            fsm.pushBatch();
+        }
         if (fsm.getState() == BatchWriterFSM.Closed) {
             queued.clear();
             pending.remove(events);
