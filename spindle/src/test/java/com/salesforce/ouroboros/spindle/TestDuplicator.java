@@ -47,7 +47,7 @@ import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.AbstractAppenderContext.AbstractAppenderFSM;
-import com.salesforce.ouroboros.spindle.Duplicator.State;
+import com.salesforce.ouroboros.spindle.DuplicatorContext.DuplicatorFSM;
 
 /**
  * 
@@ -123,7 +123,7 @@ public class TestDuplicator {
 
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         final Duplicator replicator = new Duplicator();
-        assertEquals(State.WAITING, replicator.getState());
+        assertEquals(DuplicatorFSM.Waiting, replicator.getState());
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);
         options.setReceive_buffer_size(4);
@@ -151,7 +151,7 @@ public class TestDuplicator {
 
             @Override
             public boolean value() {
-                return State.WAITING == replicator.getState();
+                return DuplicatorFSM.Waiting == replicator.getState();
             }
         }, 1000L, 100L);
         Node mirror = new Node(0x1638);
@@ -161,13 +161,12 @@ public class TestDuplicator {
                                                        magic, channel,
                                                        timestamp, 0),
                              eventChannel, segment, acknowledger);
-        assertEquals(State.WRITE_HEADER, replicator.getState());
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
 
             @Override
             public boolean value() {
                 replicator.writeReady();
-                return State.WAITING == replicator.getState();
+                return DuplicatorFSM.Waiting == replicator.getState();
             }
         }, 1000L, 100L);
         inboundRead.join(4000);
@@ -227,7 +226,7 @@ public class TestDuplicator {
         when(inboundEventChannel.segmentFor(offset)).thenReturn(inboundSegment);
 
         final Duplicator outboundDuplicator = new Duplicator();
-        assertEquals(State.WAITING, outboundDuplicator.getState());
+        assertEquals(DuplicatorFSM.Waiting, outboundDuplicator.getState());
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);
         options.setReceive_buffer_size(4);
@@ -273,18 +272,16 @@ public class TestDuplicator {
         outboundDuplicator.replicate(new ReplicatedBatchHeader(batchHeader, 0),
                                      eventChannel, outboundSegment,
                                      outboundAcknowledger);
-        assertEquals(State.WRITE_HEADER, outboundDuplicator.getState());
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
             public boolean value() {
                 outboundDuplicator.writeReady();
-                return State.WAITING == outboundDuplicator.getState();
+                return DuplicatorFSM.Waiting == outboundDuplicator.getState();
             }
         }, 1000L, 100L);
         inboundRead.join(4000);
 
-        assertEquals(AbstractAppenderFSM.Ready,
-                     inboundReplicator.getState());
+        assertEquals(AbstractAppenderFSM.Ready, inboundReplicator.getState());
 
         inboundSegment.close();
         outboundSegment.close();

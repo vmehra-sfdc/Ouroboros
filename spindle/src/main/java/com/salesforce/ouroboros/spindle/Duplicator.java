@@ -28,12 +28,11 @@ package com.salesforce.ouroboros.spindle;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.spindle.DuplicatorContext.DuplicatorState;
 
 /**
  * A duplicator of event streams. The duplicator provides outbound replication
@@ -43,27 +42,22 @@ import com.hellblazer.pinkie.SocketChannelHandler;
  * 
  */
 public final class Duplicator {
-    public enum State {
-        ERROR, INTERRUPTED, PROCESSING, WAITING, WRITE, WRITE_HEADER;
-    }
 
-    static final Logger                     log          = Logger.getLogger(Duplicator.class.getCanonicalName());
-    private static final int                POLL_TIMEOUT = 10;
-    private static final TimeUnit           POLL_UNIT    = TimeUnit.MILLISECONDS;
+    static final Logger             log     = Logger.getLogger(Duplicator.class.getCanonicalName());
 
-    private volatile EventEntry             current;
-    private volatile SocketChannelHandler   handler;
-    private final BlockingQueue<EventEntry> pending      = new LinkedBlockingQueue<EventEntry>();
-    private volatile long                   position;
-    private volatile int                    remaining;
-    private final AtomicReference<State>    state        = new AtomicReference<State>(
-                                                                                      State.WAITING);
+    private EventEntry              current;
+    private SocketChannelHandler    handler;
+    final BlockingQueue<EventEntry> pending = new LinkedBlockingQueue<EventEntry>();
+    private long                    position;
+    private int                     remaining;
+    private boolean                 inError;
+    private final DuplicatorContext fsm     = new DuplicatorContext(this);
 
     /**
      * @return the state of the outbound replicator
      */
-    public State getState() {
-        return state.get();
+    public DuplicatorState getState() {
+        return fsm.getState();
     }
 
     public void connect(SocketChannelHandler handler) {
@@ -71,18 +65,7 @@ public final class Duplicator {
     }
 
     public void writeReady() {
-        switch (state.get()) {
-            case WRITE_HEADER: {
-                writeHeader();
-                break;
-            }
-            case WRITE: {
-                writeBatch();
-                break;
-            }
-            default:
-                log.warning(String.format("Illegal write state: %s", state));
-        }
+        fsm.writeReady();
     }
 
     /**
@@ -92,50 +75,9 @@ public final class Duplicator {
                           EventChannel eventChannel, Segment segment,
                           Acknowledger acknowledger) {
         pending.add(new EventEntry(header, eventChannel, segment, acknowledger));
-        process();
-    }
-
-    private void error() {
-        state.set(State.ERROR);
-        if (current != null) {
-            try {
-                current.segment.close();
-            } catch (IOException e1) {
-                log.log(Level.FINEST, String.format("Error closing segment %s",
-                                                    current.segment), e1);
-            }
+        if (!fsm.isInTransition()) {
+            fsm.replicate();
         }
-        current = null;
-        pending.clear();
-    }
-
-    private void process() {
-        if (!state.compareAndSet(State.WAITING, State.PROCESSING)) {
-            return;
-        }
-        EventEntry entry;
-        try {
-            entry = pending.poll(POLL_TIMEOUT, POLL_UNIT);
-        } catch (InterruptedException e) {
-            state.set(State.INTERRUPTED);
-            return;
-        }
-        if (entry == null) {
-            state.compareAndSet(State.PROCESSING, State.WAITING);
-            return;
-        }
-        process(entry);
-    }
-
-    private void process(EventEntry entry) {
-        if (!state.compareAndSet(State.PROCESSING, State.WRITE_HEADER)) {
-            return;
-        }
-        current = entry;
-        remaining = entry.header.getBatchByteLength();
-        position = entry.header.getOffset();
-        entry.header.rewind();
-        handler.selectForWrite();
     }
 
     private boolean transferTo() throws IOException {
@@ -150,25 +92,25 @@ public final class Duplicator {
         return false;
     }
 
-    private void writeBatch() {
+    protected boolean writeBatch() {
         try {
             if (transferTo()) {
-                state.set(State.WAITING);
                 current.eventChannel.commit(current.header.getOffset());
                 current.acknowledger.acknowledge(current.header.getChannel(),
                                                  current.header.getTimestamp());
-                process();
+                return true;
             }
         } catch (IOException e) {
-            error();
+            inError = true;
             log.log(Level.WARNING,
                     String.format("Unable to replicate payload for event: %s from: %s",
                                   current.header.getOffset(), current.segment),
                     e);
         }
+        return false;
     }
 
-    private void writeHeader() {
+    protected boolean writeHeader() {
         boolean written = false;
         try {
             written = current.header.write(handler.getChannel());
@@ -176,13 +118,55 @@ public final class Duplicator {
             log.log(Level.WARNING,
                     String.format("Unable to write batch header: %s",
                                   current.header), e);
-            error();
+            inError = true;
         }
-        if (written) {
-            state.set(State.WRITE);
-            writeBatch();
+        return written;
+    }
+
+    protected void processBatch() {
+        if (writeBatch()) {
+            fsm.batchWritten();
         } else {
             handler.selectForWrite();
         }
+    }
+
+    protected boolean inError() {
+        return inError;
+    }
+
+    protected void selectForWrite() {
+        handler.selectForWrite();
+    }
+
+    protected void processHeader() {
+        try {
+            current = pending.take();
+        } catch (InterruptedException e) {
+            inError = true;
+            return;
+        }
+        remaining = current.header.getBatchByteLength();
+        position = current.header.getOffset();
+        current.header.rewind();
+        if (writeHeader()) {
+            fsm.headerWritten();
+        } else {
+            handler.selectForWrite();
+        }
+    }
+
+    protected void close() {
+        if (current != null) {
+            try {
+                current.segment.close();
+            } catch (IOException e1) {
+                log.log(Level.FINEST, String.format("Error closing segment %s",
+                                                    current.segment), e1);
+            }
+        }
+        current = null;
+        pending.clear();
+        handler.close();
     }
 }
