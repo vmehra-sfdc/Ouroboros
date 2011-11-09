@@ -34,6 +34,8 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.ReplicatorContext.ReplicatorFSM;
+import com.salesforce.ouroboros.spindle.ReplicatorContext.ReplicatorState;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
@@ -58,10 +60,7 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * @author hhildebrand
  * 
  */
-public class Replicator implements CommunicationsHandler {
-    public enum State {
-        ERROR, ESTABLISHED, INITIAL, OUTBOUND_HANDSHAKE;
-    }
+public class Replicator implements CommunicationsHandler { 
 
     private static final Logger           log            = Logger.getLogger(Replicator.class.getCanonicalName());
 
@@ -71,11 +70,13 @@ public class Replicator implements CommunicationsHandler {
     private final ReplicatingAppender     appender;
     private final Bundle                  bundle;
     private final Duplicator              duplicator;
-    private volatile SocketChannelHandler handler;
+    private final ReplicatorContext       fsm            = new ReplicatorContext(
+                                                                                 this);
+    private SocketChannelHandler handler;
     private final ByteBuffer              handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private volatile Node                 partnerId;
+    private boolean                       inError;
+    private final Node                    partnerId;
     private final Rendezvous              rendezvous;
-    private volatile State                state          = State.INITIAL;
 
     public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
         duplicator = new Duplicator();
@@ -85,9 +86,13 @@ public class Replicator implements CommunicationsHandler {
         this.rendezvous = rendezvous;
     }
 
-    public void bindTo(Node node) {
-        partnerId = node;
-        state = State.ESTABLISHED;
+    @Override
+    public void accept(SocketChannelHandler handler) {
+        this.handler = handler;
+    }
+
+    public void bind() {
+        fsm.established();
     }
 
     public void close() {
@@ -97,6 +102,12 @@ public class Replicator implements CommunicationsHandler {
     @Override
     public void closing() {
         bundle.closeReplicator(partnerId);
+    }
+
+    @Override
+    public void connect(SocketChannelHandler handler) {
+        this.handler = handler;
+        fsm.handshake();
     }
 
     /**
@@ -120,82 +131,14 @@ public class Replicator implements CommunicationsHandler {
     /**
      * @return the state
      */
-    public State getState() {
-        return state;
-    }
-
-    @Override
-    public void accept(SocketChannelHandler handler) {
-        this.handler = handler;
-        switch (state) {
-            case ESTABLISHED: {
-                duplicator.connect(handler);
-                appender.accept(handler);
-                try {
-                    rendezvous.meet();
-                } catch (BrokenBarrierException e) {
-                    log.log(Level.WARNING, "Replication rendezvous cancelled",
-                            e);
-                    handler.close();
-                    return;
-                }
-                break;
-            }
-            default: {
-                log.warning(String.format("Invalid accept state: %s", state));
-                close();
-            }
-        }
-    }
-
-    @Override
-    public void connect(SocketChannelHandler handler) {
-        this.handler = handler;
-        switch (state) {
-            case INITIAL: {
-                handshake.putInt(MAGIC);
-                bundle.getId().serialize(handshake);
-                handshake.flip();
-                state = State.OUTBOUND_HANDSHAKE;
-                writeHandshake();
-                break;
-            }
-            default: {
-                log.warning(String.format("Invalid connect state: %s", state));
-                close();
-            }
-        }
+    public ReplicatorState getState() {
+        return fsm.getState();
     }
 
     @Override
     public void readReady() {
-        switch (state) {
-            case ESTABLISHED: {
-                appender.readReady();
-                break;
-            }
-            default: {
-                log.warning(String.format("Invalid read state: %s", state));
-                close();
-            }
-        }
-    }
-
-    @Override
-    public void writeReady() {
-        switch (state) {
-            case ESTABLISHED: {
-                duplicator.writeReady();
-                break;
-            }
-            case OUTBOUND_HANDSHAKE: {
-                writeHandshake();
-                break;
-            }
-            default: {
-                log.warning(String.format("Invalid write state: %s", state));
-                close();
-            }
+        if (fsm.getState() == ReplicatorFSM.Established) {
+            appender.readReady();
         }
     }
 
@@ -204,30 +147,58 @@ public class Replicator implements CommunicationsHandler {
         duplicator.replicate(header, channel, segment, acknowledger);
     }
 
-    private void writeHandshake() {
+    @Override
+    public void writeReady() {
+        if (fsm.getState() == ReplicatorFSM.Established) {
+            duplicator.writeReady();
+        } else {
+            fsm.writeReady();
+        }
+    }
+
+    protected void established() {
+        duplicator.connect(handler);
+        appender.accept(handler);
+        try {
+            rendezvous.meet();
+        } catch (BrokenBarrierException e) {
+            log.log(Level.WARNING, "Replication rendezvous cancelled", e);
+            handler.close();
+            return;
+        }
+    }
+
+    protected boolean inError() {
+        return inError;
+    }
+
+    protected void processHandshake() {
+        handshake.putInt(MAGIC);
+        bundle.getId().serialize(handshake);
+        handshake.flip();
+        
+        if (writeHandshake()) {
+            fsm.established();
+        } else {
+            handler.selectForWrite();
+        }
+    }
+
+    protected void selectForWrite() {
+        handler.selectForWrite();
+    }
+
+    protected boolean writeHandshake() {
         try {
             handler.getChannel().write(handshake);
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Unable to write handshake from: %s",
                                   handler.getChannel()), e);
-            state = State.ERROR;
-            handler.close();
-            return;
+            inError = true;
+            return false;
         }
-        if (handshake.hasRemaining()) {
-            handler.selectForWrite();
-        } else {
-            duplicator.connect(handler);
-            appender.accept(handler);
-            state = State.ESTABLISHED;
-            try {
-                rendezvous.meet();
-            } catch (BrokenBarrierException e) {
-                log.log(Level.WARNING, "Replication rendezvous cancelled", e);
-                handler.close();
-                return;
-            }
-        }
+
+        return !handshake.hasRemaining();
     }
 }

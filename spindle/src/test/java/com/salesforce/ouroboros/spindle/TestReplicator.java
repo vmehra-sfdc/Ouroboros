@@ -29,7 +29,8 @@ import static junit.framework.Assert.assertEquals;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -40,7 +41,7 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.Replicator.State;
+import com.salesforce.ouroboros.spindle.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
@@ -70,10 +71,10 @@ public class TestReplicator {
             }
         }).when(socketChannel).read(isA(ByteBuffer.class));
 
-        assertEquals(State.INITIAL, replicator.getState());
-        replicator.bindTo(node);
+        assertEquals(ReplicatorFSM.Suspended, replicator.getState());
+        replicator.bind();
         replicator.accept(handler);
-        assertEquals(State.ESTABLISHED, replicator.getState());
+        assertEquals(ReplicatorFSM.Established, replicator.getState());
     }
 
     @Test
@@ -98,11 +99,11 @@ public class TestReplicator {
             }
         }).when(socketChannel).write(isA(ByteBuffer.class));
 
-        assertEquals(State.INITIAL, replicator.getState());
-        replicator.connect(handler);
-        assertEquals(State.OUTBOUND_HANDSHAKE, replicator.getState());
-        verify(handler).selectForWrite();
+        assertEquals(ReplicatorFSM.Suspended, replicator.getState());
+        replicator.connect(handler); 
+        assertEquals(ReplicatorFSM.OutboundHandshake, replicator.getState());
         replicator.writeReady();
-        assertEquals(State.ESTABLISHED, replicator.getState());
+        assertEquals(ReplicatorFSM.Established, replicator.getState());
+        verify(handler).selectForWrite();
     }
 }

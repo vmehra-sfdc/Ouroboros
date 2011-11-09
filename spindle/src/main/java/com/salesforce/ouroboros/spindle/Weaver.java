@@ -86,7 +86,7 @@ public class Weaver implements Bundle {
                 }
             }
             Replicator replicator = replicators.get(node);
-            replicator.bindTo(node);
+            replicator.bind();
             return replicator;
         }
 
