@@ -30,77 +30,18 @@
  */
 %}
 
-// The FSM for the distributed control of the weaver
+// The FSM of the Coordinator for the Ouroboros producer
 
 %class Coordinator
-%package com.salesforce.ouroboros.spindle
+%package com.salesforce.ouroboros.producer
+
 %access package
 
 %start CoordinatorFSM::Unstable
 %map CoordinatorFSM
 %% 
-Unstable
-{ 
-	stabilize 
-		EstablishReplicators{}
-	destabilize
-		nil {}
-}
-
-EstablishReplicators
-Entry {
-	failover();
-	filterSystemMembership();
-	openReplicators();
-}
-{
-	replicatorsEstablished
-		Stable{}
-	
-	replicatorsEstablishmentTimeout
-		nil {
-			destabilizePartition();
-		}
-	destabilize
-		Unstable{
-			cleanUpPendingReplicators();
-		}
-}
-
-Rebalance
-Entry {
-	rebalance();
-}
-{
-	rebalanced
-		AnnounceTakeOver{}
+Unstable{
+	stabilize
 		
-	destabiliize
-		Unstable{
-			cleanUpRebalancing();
-		}
-}
-
-AnnounceTakeOver {
-	takeoverAcknowledged
-		TakeOver{}
-}
-
-TakeOver {
-	commitTakeOver
-		Stable{}
-}
-
-Stable {
-	rebalance
-		Rebalance{}
-}
-
-Shutdown {
-}
-
-Default {
-	destabilize
-		Unstable{}
 }
 %%

@@ -315,11 +315,13 @@ public class TestCoordinator {
         ConsistentHashFunction<Node> newRing = ring.clone();
         newRing.remove(removedMirror);
         newRing.remove(removedPrimary);
-        Map<UUID, Node[]> remapped = coordinator.remap(newRing);
+        Map<UUID, Node[][]> remapped = coordinator.remap(newRing);
         List<Node> deadMembers = Arrays.asList(removedPrimary, removedMirror);
         coordinator.rebalance(remapped, deadMembers);
-        verify(weaver).rebalance(primary, remapped.get(primary), deadMembers);
-        verify(weaver).rebalance(mirror, remapped.get(mirror), deadMembers);
+        verify(weaver).rebalance(primary, remapped.get(primary)[0],
+                                 remapped.get(primary)[1], deadMembers);
+        verify(weaver).rebalance(mirror, remapped.get(mirror)[0],
+                                 remapped.get(mirror)[1], deadMembers);
     }
 
     @Test
@@ -364,7 +366,7 @@ public class TestCoordinator {
         ConsistentHashFunction<Node> newRing = ring.clone();
         newRing.remove(coordinator.getReplicationPair(primary)[1]);
         newRing.remove(coordinator.getReplicationPair(mirror)[0]);
-        Map<UUID, Node[]> remapped = coordinator.remap(newRing);
+        Map<UUID, Node[][]> remapped = coordinator.remap(newRing);
         assertNotNull(remapped);
         assertEquals(2, remapped.size());
         assertNotNull(remapped.get(primary));

@@ -99,6 +99,8 @@ public class Coordinator implements Member {
 
     private final ConcurrentMap<UUID, ChannelState>             channelState      = new ConcurrentHashMap<UUID, ChannelState>();
     private final Controller                                    controller;
+    private final CoordinatorContext                            fsm               = new CoordinatorContext(
+                                                                                                           this);
     private final Map<UUID, Long>                               mirrors           = new ConcurrentHashMap<UUID, Long>();
     private final SortedSet<Node>                               newProducers      = new ConcurrentSkipListSet<Node>();
     private final SortedSet<Node>                               newWeavers        = new ConcurrentSkipListSet<Node>();
@@ -538,55 +540,6 @@ public class Coordinator implements Member {
         spinnerHandler.terminate();
     }
 
-    private void closePublishingGate() throws InterruptedException {
-        publishGate.close();
-        // Wait until all publishing threads are finished
-        while (publishingThreads.get() != 0) {
-            Thread.sleep(1);
-        }
-    }
-
-    /**
-     * Create the spinners to the new set of weavers in the partition.
-     */
-    private void createSpinners() {
-        for (Node n : newWeavers) {
-            ContactInformation info = yellowPages.get(n);
-            assert info != null : String.format("Did not find any connection information for node %s",
-                                                n);
-            Spinner spinner = new Spinner(this);
-            try {
-                spinnerHandler.connectTo(info.spindle, spinner);
-            } catch (IOException e) {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.log(Level.WARNING,
-                            String.format("Cannot connect to spindle on node %s at address %s",
-                                          n, info.spindle), e);
-                }
-            }
-            spinners.put(n, spinner);
-        }
-    }
-
-    /**
-     * Remove all dead members and partition out the new members from the
-     * members that were part of the previous partition
-     */
-    private void filterSystemMembership() {
-        producers.removeAll(switchboard.getDeadMembers());
-        weavers.removeAll(switchboard.getDeadMembers());
-        newProducers.clear();
-        newWeavers.clear();
-        for (Node node : switchboard.getNewMembers()) {
-            if (producers.remove(node)) {
-                newProducers.add(node);
-            }
-            if (weavers.remove(node)) {
-                newProducers.add(node);
-            }
-        }
-    }
-
     /**
      * Answer the channel buffer process pair responsible for the channel
      * 
@@ -643,7 +596,56 @@ public class Coordinator implements Member {
         }
     }
 
-    private void openPublishingGate() {
+    protected void closePublishingGate() throws InterruptedException {
+        publishGate.close();
+        // Wait until all publishing threads are finished
+        while (publishingThreads.get() != 0) {
+            Thread.sleep(1);
+        }
+    }
+
+    /**
+     * Create the spinners to the new set of weavers in the partition.
+     */
+    protected void createSpinners() {
+        for (Node n : newWeavers) {
+            ContactInformation info = yellowPages.get(n);
+            assert info != null : String.format("Did not find any connection information for node %s",
+                                                n);
+            Spinner spinner = new Spinner(this);
+            try {
+                spinnerHandler.connectTo(info.spindle, spinner);
+            } catch (IOException e) {
+                if (log.isLoggable(Level.WARNING)) {
+                    log.log(Level.WARNING,
+                            String.format("Cannot connect to spindle on node %s at address %s",
+                                          n, info.spindle), e);
+                }
+            }
+            spinners.put(n, spinner);
+        }
+    }
+
+    /**
+     * Remove all dead members and partition out the new members from the
+     * members that were part of the previous partition
+     */
+    protected void filterSystemMembership() {
+        producers.removeAll(switchboard.getDeadMembers());
+        weavers.removeAll(switchboard.getDeadMembers());
+        newProducers.clear();
+        newWeavers.clear();
+        for (Node node : switchboard.getNewMembers()) {
+            if (producers.remove(node)) {
+                newProducers.add(node);
+            }
+            if (weavers.remove(node)) {
+                newProducers.add(node);
+            }
+        }
+    }
+
+    protected void openPublishingGate() {
         publishGate.open();
     }
 }

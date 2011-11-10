@@ -187,6 +187,13 @@ public class Switchboard {
         }
     }
 
+    /**
+     * Force the partition to destabilize
+     */
+    public void destabilize() {
+        partition.destabilize();
+    }
+
     public void dispatchToMember(ChannelMessage type, Node sender,
                                  Serializable payload, long time) {
         member.dispatch(type, sender, payload, time);

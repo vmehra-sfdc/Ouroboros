@@ -210,6 +210,13 @@ public class Coordinator implements Member {
     }
 
     /**
+     * Initiate the rebalancing of the weaver ring.
+     */
+    public void initiateRebalance() {
+        fsm.rebalance();
+    }
+
+    /**
      * Open the new channel if this node is a primary or mirror of the new
      * channel.
      * 
@@ -264,16 +271,23 @@ public class Coordinator implements Member {
                          requester);
     }
 
-    /**
-     * Initiate the rebalancing of the weaver ring.
-     */
-    public void initiateRebalance() {
-        fsm.rebalance();
-    }
-
     @Override
     public void stabilized() {
         fsm.stabilize();
+    }
+
+    protected void cleanUpPendingReplicators() {
+        // TODO Auto-generated method stub
+
+    }
+
+    protected void cleanUpRebalancing() {
+        // TODO Auto-generated method stub
+
+    }
+
+    protected void destabilizePartition() {
+        switchboard.destabilize();
     }
 
     /**
@@ -354,6 +368,10 @@ public class Coordinator implements Member {
         return rendezvous;
     }
 
+    protected void rebalance() {
+        rebalance(remap(nextRing()), switchboard.getDeadMembers());
+    }
+
     /**
      * Rebalance the channels which this node has responsibility for
      * 
@@ -363,7 +381,7 @@ public class Coordinator implements Member {
      *            - the weaver nodes that have failed and are no longer part of
      *            the partition
      */
-    protected List<Xerox> rebalance(Map<UUID, Node[]> remapped,
+    protected List<Xerox> rebalance(Map<UUID, Node[][]> remapped,
                                     Collection<Node> deadMembers) {
         Runnable rendezvousAction = new Runnable() {
             @Override
@@ -378,12 +396,12 @@ public class Coordinator implements Member {
             log.info(String.format("Establishment of replicators initiated on %s",
                                    id));
         }
-        Rendezvous rendezvous = new Rendezvous(newMembers.size(),
-                                               rendezvousAction);
+        new Rendezvous(newMembers.size(), rendezvousAction);
         List<Xerox> xeroxes = new ArrayList<Xerox>();
-        for (Entry<UUID, Node[]> entry : remapped.entrySet()) {
-            xeroxes.addAll(weaver.rebalance(entry.getKey(), entry.getValue(),
-                                            deadMembers));
+        for (Entry<UUID, Node[][]> entry : remapped.entrySet()) {
+            xeroxes.addAll(weaver.rebalance(entry.getKey(),
+                                            entry.getValue()[0],
+                                            entry.getValue()[1], deadMembers));
         }
         return xeroxes;
     }
@@ -396,8 +414,8 @@ public class Coordinator implements Member {
      * @return the remapping of channels hosted on this node that have changed
      *         their primary or mirror in the new hash ring
      */
-    protected Map<UUID, Node[]> remap(ConsistentHashFunction<Node> newRing) {
-        Map<UUID, Node[]> remapped = new HashMap<UUID, Node[]>();
+    protected Map<UUID, Node[][]> remap(ConsistentHashFunction<Node> newRing) {
+        Map<UUID, Node[][]> remapped = new HashMap<UUID, Node[][]>();
         for (UUID channel : channels) {
             long channelPoint = point(channel);
             List<Node> newPair = newRing.hash(channelPoint, 2);
@@ -406,7 +424,11 @@ public class Coordinator implements Member {
                 if (!oldPair.get(0).equals(newPair.get(0))
                     || !oldPair.get(1).equals(newPair.get(1))) {
                     remapped.put(channel,
-                                 new Node[] { newPair.get(0), newPair.get(1) });
+                                 new Node[][] {
+                                         new Node[] { oldPair.get(0),
+                                                 oldPair.get(1) },
+                                         new Node[] { newPair.get(0),
+                                                 newPair.get(1) } });
                 }
             }
         }
@@ -421,9 +443,5 @@ public class Coordinator implements Member {
      */
     protected void updateRing(ConsistentHashFunction<Node> ring) {
         weaverRing.set(ring);
-    }
-
-    protected void rebalance() {
-        rebalance(remap(nextRing()), switchboard.getDeadMembers());
     }
 }
