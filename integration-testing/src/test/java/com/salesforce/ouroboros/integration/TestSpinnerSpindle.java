@@ -154,8 +154,7 @@ public class TestSpinnerSpindle {
         Util.waitFor("Handshake did not complete", new Util.Condition() {
             @Override
             public boolean value() {
-                return spindle.isEstablished()
-                       && Spinner.State.ESTABLISHED == spinner.getState();
+                return spindle.isEstablished() && spinner.isEstablished();
             }
         }, 4000, 100);
 

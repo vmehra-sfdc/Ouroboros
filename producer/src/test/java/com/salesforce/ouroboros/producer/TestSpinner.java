@@ -53,7 +53,7 @@ import org.mockito.stubbing.Answer;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.producer.Spinner.State;
+import com.salesforce.ouroboros.producer.SpinnerContext.SpinnerFSM;
 
 /**
  * 
@@ -90,11 +90,11 @@ public class TestSpinner {
             }
         }).when(channel).write(isA(ByteBuffer.class));
 
-        assertEquals(State.INITIAL, spinner.getState());
+        assertEquals(SpinnerFSM.Suspended, spinner.getState());
         spinner.connect(handler);
-        assertEquals(State.INITIAL, spinner.getState());
+        assertEquals(SpinnerFSM.Handshake, spinner.getState());
         spinner.writeReady();
-        assertEquals(State.ESTABLISHED, spinner.getState());
+        assertEquals(SpinnerFSM.Established, spinner.getState());
         verify(channel, new Times(2)).write(isA(ByteBuffer.class));
     }
 

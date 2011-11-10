@@ -31,7 +31,6 @@ import java.util.NavigableMap;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,6 +38,8 @@ import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.producer.SpinnerContext.SpinnerFSM;
+import com.salesforce.ouroboros.producer.SpinnerContext.SpinnerState;
 
 /**
  * 
@@ -47,21 +48,18 @@ import com.salesforce.ouroboros.Node;
  */
 public class Spinner implements CommunicationsHandler {
 
-    public enum State {
-        ERROR, ESTABLISHED, INITIAL;
-    }
-
     public static final int                          HANDSHAKE_BYTE_SIZE = Node.BYTE_LENGTH + 4;
     public static final int                          MAGIC               = 0x1638;
     private final static Logger                      log                 = Logger.getLogger(Spinner.class.getCanonicalName());
 
     private final BatchAcknowledgement               ack;
     private final Coordinator                        coordinator;
+    private final SpinnerContext                     fsm                 = new SpinnerContext(
+                                                                                              this);
     private SocketChannelHandler                     handler;
     private ByteBuffer                               handshake           = ByteBuffer.allocate(HANDSHAKE_BYTE_SIZE);
+    private boolean                                  inError;
     private final NavigableMap<BatchIdentity, Batch> pending;
-    private final AtomicReference<State>             state               = new AtomicReference<State>(
-                                                                                                      State.INITIAL);
     private final BatchWriter                        writer;
 
     public Spinner(Coordinator coordinator) {
@@ -72,6 +70,11 @@ public class Spinner implements CommunicationsHandler {
         handshake.putInt(MAGIC);
         coordinator.getId().serialize(handshake);
         handshake.flip();
+    }
+
+    @Override
+    public void accept(SocketChannelHandler handler) {
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -120,6 +123,14 @@ public class Spinner implements CommunicationsHandler {
         writer.closing();
     }
 
+    @Override
+    public void connect(SocketChannelHandler handler) {
+        this.handler = handler;
+        ack.connect(handler);
+        writer.connect(handler);
+        fsm.handshake();
+    }
+
     public void failover() {
         writer.failover();
         ack.failover();
@@ -140,56 +151,12 @@ public class Spinner implements CommunicationsHandler {
                               new BatchIdentity(channel, Long.MAX_VALUE));
     }
 
-    @Override
-    public void accept(SocketChannelHandler handler) {
-        throw new UnsupportedOperationException();
+    public SpinnerState getState() {
+        return fsm.getState();
     }
 
-    @Override
-    public void connect(SocketChannelHandler handler) {
-        this.handler = handler;
-        ack.connect(handler);
-        writer.connect(handler);
-        writeHandshake();
-    }
-
-    @Override
-    public void readReady() {
-        ack.readReady();
-    }
-
-    @Override
-    public void writeReady() {
-        State s = state.get();
-        switch (s) {
-            case INITIAL:
-                writeHandshake();
-                break;
-            case ESTABLISHED:
-                writer.writeReady();
-                break;
-            default:
-                log.severe(String.format("Illegal state for write: %s", s));
-                handler.close();
-        }
-    }
-
-    private void writeHandshake() {
-        try {
-            handler.getChannel().write(handshake);
-        } catch (IOException e) {
-            log.log(Level.WARNING, "Unable to write handshake", e);
-            state.set(State.ERROR);
-            handler.close();
-            handshake = null;
-            return;
-        }
-        if (!handshake.hasRemaining()) {
-            state.set(State.ESTABLISHED);
-            handshake = null;
-        } else {
-            handler.selectForWrite();
-        }
+    public boolean isEstablished() {
+        return fsm.getState() == SpinnerFSM.Established;
     }
 
     /**
@@ -204,7 +171,45 @@ public class Spinner implements CommunicationsHandler {
         return writer.push(events, pending);
     }
 
-    public State getState() {
-        return state.get();
+    @Override
+    public void readReady() {
+        ack.readReady();
+    }
+
+    @Override
+    public void writeReady() {
+        if (fsm.getState() == SpinnerFSM.Established) {
+            writer.writeReady();
+        } else {
+            fsm.writeReady();
+        }
+    }
+
+    protected boolean inError() {
+        return inError;
+    }
+
+    protected void processHandshake() {
+        if (writeHandshake()) {
+            fsm.established();
+        } else {
+            handler.selectForWrite();
+        }
+    }
+
+    protected void selectForWrite() {
+        handler.selectForWrite();
+    }
+
+    protected boolean writeHandshake() {
+        try {
+            handler.getChannel().write(handshake);
+        } catch (IOException e) {
+            log.log(Level.WARNING, "Unable to write handshake", e);
+            inError = true;
+            handshake = null;
+            return false;
+        }
+        return !handshake.hasRemaining();
     }
 }
