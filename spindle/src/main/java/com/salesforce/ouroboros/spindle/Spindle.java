@@ -88,6 +88,10 @@ public class Spindle implements CommunicationsHandler {
         return fsm.getState();
     }
 
+    public boolean isEstablished() {
+        return fsm.getState() == SpindleFSM.Established;
+    }
+
     @Override
     public void readReady() {
         if (fsm.getState() == SpindleFSM.Established) {
@@ -115,7 +119,7 @@ public class Spindle implements CommunicationsHandler {
         }
         bundle.map(new Node(handshake), acknowledger);
         handshake = null;
-        handler.selectForWrite();
+        handler.selectForRead();
     }
 
     protected boolean inError() {
@@ -125,6 +129,8 @@ public class Spindle implements CommunicationsHandler {
     protected void processHandshake() {
         if (readHandshake()) {
             fsm.established();
+        } else {
+            handler.selectForRead();
         }
     }
 
