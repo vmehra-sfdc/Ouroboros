@@ -27,13 +27,14 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.SpindleContext.SpindleFSM;
+import com.salesforce.ouroboros.spindle.SpindleContext.SpindleState;
 
 /**
  * The communications wrapper that ties together the appender and the
@@ -44,21 +45,17 @@ import com.salesforce.ouroboros.Node;
  */
 public class Spindle implements CommunicationsHandler {
 
-    public enum State {
-        ERROR, ESTABLISHED, INITIAL;
-    }
+    public static final Integer  HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
+    public final static int      MAGIC          = 0x1638;
+    private final static Logger  log            = Logger.getLogger(Spindle.class.getCanonicalName());
 
-    public static final Integer          HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
-    public final static int              MAGIC          = 0x1638;
-    private final static Logger          log            = Logger.getLogger(Spindle.class.getCanonicalName());
-
-    private final Bundle                 bundle;
-    private SocketChannelHandler         handler;
-    private ByteBuffer                   handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private final AtomicReference<State> state          = new AtomicReference<State>(
-                                                                                     State.INITIAL);
-    final Acknowledger                   acknowledger;
-    final Appender                       appender;
+    private final Bundle         bundle;
+    private final SpindleContext fsm            = new SpindleContext(this);
+    private SocketChannelHandler handler;
+    private ByteBuffer           handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private boolean              inError;
+    final Acknowledger           acknowledger;
+    final Appender               appender;
 
     public Spindle(Bundle bundle) {
         acknowledger = new Acknowledger();
@@ -67,19 +64,19 @@ public class Spindle implements CommunicationsHandler {
     }
 
     @Override
-    public void closing() {
-    }
-
-    public State getState() {
-        return state.get();
-    }
-
-    @Override
     public void accept(SocketChannelHandler handler) {
         this.handler = handler;
         acknowledger.connect(handler);
         appender.accept(handler);
-        readHandshake();
+        fsm.handshake();
+    }
+
+    public void close() {
+        handler.close();
+    }
+
+    @Override
+    public void closing() {
     }
 
     @Override
@@ -87,21 +84,16 @@ public class Spindle implements CommunicationsHandler {
         throw new UnsupportedOperationException();
     }
 
+    public SpindleState getState() {
+        return fsm.getState();
+    }
+
     @Override
     public void readReady() {
-        final State s = state.get();
-        switch (s) {
-            case INITIAL: {
-                readHandshake();
-                break;
-            }
-            case ESTABLISHED: {
-                appender.readReady();
-                break;
-            }
-            default:
-                state.set(State.ERROR);
-                log.warning(String.format("Invalid state for read: %s", s));
+        if (fsm.getState() == SpindleFSM.Established) {
+            appender.readReady();
+        } else {
+            fsm.readReady();
         }
     }
 
@@ -110,29 +102,44 @@ public class Spindle implements CommunicationsHandler {
         acknowledger.writeReady();
     }
 
-    private void readHandshake() {
+    protected void established() {
+        handshake.flip();
+        int magic = handshake.getInt();
+        if (magic != MAGIC) {
+            inError = true;
+            log.warning(String.format("Invalid handshake magic: %s", magic));
+            handler.close();
+            handshake = null;
+            close();
+            return;
+        }
+        bundle.map(new Node(handshake), acknowledger);
+        handshake = null;
+        handler.selectForWrite();
+    }
+
+    protected boolean inError() {
+        return inError;
+    }
+
+    protected void processHandshake() {
+        if (readHandshake()) {
+            fsm.established();
+        }
+    }
+
+    protected boolean readHandshake() {
         try {
             handler.getChannel().read(handshake);
         } catch (IOException e) {
-            state.set(State.ERROR);
+            inError = true;
             log.log(Level.WARNING, String.format("Error reading handshake"), e);
-            handler.close();
+            return false;
         }
-        if (!handshake.hasRemaining()) {
-            handshake.flip();
-            int magic = handshake.getInt();
-            if (magic != MAGIC) {
-                state.set(State.ERROR);
-                log.warning(String.format("Invalid handshak magic: %s", magic));
-                handler.close();
-                handshake = null;
-                return;
-            }
-            Node producer = new Node(handshake);
-            handshake = null;
-            bundle.map(producer, acknowledger);
-            state.set(State.ESTABLISHED);
-        }
+        return !handshake.hasRemaining();
+    }
+
+    protected void selectForRead() {
         handler.selectForRead();
     }
 }

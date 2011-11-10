@@ -48,7 +48,7 @@ import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
-import com.salesforce.ouroboros.spindle.Spindle.State;
+import com.salesforce.ouroboros.spindle.SpindleContext.SpindleFSM;
 
 /**
  * 
@@ -61,7 +61,7 @@ public class TestSpindle {
     public void testEstablish() throws Exception {
         Bundle bundle = mock(Bundle.class);
         Spindle spindle = new Spindle(bundle);
-        assertEquals(State.INITIAL, spindle.getState());
+        assertEquals(SpindleFSM.Suspended, spindle.getState());
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
         Segment segment = mock(Segment.class);
@@ -115,12 +115,13 @@ public class TestSpindle {
 
         when(socketChannel.write(isA(ByteBuffer.class))).thenReturn(0);
         when(handler.getChannel()).thenReturn(socketChannel);
+        assertEquals(SpindleFSM.Suspended, spindle.getState());
         spindle.accept(handler);
-        assertEquals(State.INITIAL, spindle.getState());
+        assertEquals(SpindleFSM.Handshake, spindle.getState());
         spindle.readReady();
-        assertEquals(State.ESTABLISHED, spindle.getState());
+        assertEquals(SpindleFSM.Established, spindle.getState());
         spindle.readReady();
-        verify(handler, new Times(3)).selectForRead();
+        verify(handler, new Times(1)).selectForRead();
         spindle.acknowledger.acknowledge(channel, timestamp);
         verify(segment).transferFrom(socketChannel, 0, event.totalSize());
         spindle.writeReady();
