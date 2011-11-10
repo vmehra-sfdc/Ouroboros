@@ -50,17 +50,17 @@ import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterState;
  */
 public class BatchWriter {
 
-    private static final Logger           log         = Logger.getLogger(BatchWriter.class.getCanonicalName());
-    private static final int              MAGIC       = 0x1638;
+    private static final Logger        log         = Logger.getLogger(BatchWriter.class.getCanonicalName());
+    private static final int           MAGIC       = 0x1638;
 
-    private final BatchHeader             batchHeader = new BatchHeader();
-    private final BatchWriterContext      fsm         = new BatchWriterContext(
-                                                                               this);
-    private volatile SocketChannelHandler handler;
-    private final EventHeader             header      = new EventHeader();
-    private boolean                       inError     = false;
-    private final BlockingQueue<Batch>    queued      = new LinkedBlockingQueue<Batch>();
-    final Deque<ByteBuffer>               batch       = new LinkedList<ByteBuffer>();
+    private final BatchHeader          batchHeader = new BatchHeader();
+    private final BatchWriterContext   fsm         = new BatchWriterContext(
+                                                                            this);
+    private SocketChannelHandler       handler;
+    private final EventHeader          header      = new EventHeader();
+    private boolean                    inError     = false;
+    private final BlockingQueue<Batch> queued      = new LinkedBlockingQueue<Batch>();
+    final Deque<ByteBuffer>            batch       = new LinkedList<ByteBuffer>();
 
     public void closing() {
         if (!fsm.isInTransition()) {

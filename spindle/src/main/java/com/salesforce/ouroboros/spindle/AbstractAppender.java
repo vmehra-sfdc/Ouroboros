@@ -43,19 +43,19 @@ import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
  * @author hhildebrand
  * 
  */
-abstract public class AbstractAppender { 
+abstract public class AbstractAppender {
 
     private static final Logger             log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
 
     protected final BatchHeader             batchHeader;
     protected final Bundle                  bundle;
-    protected volatile ByteBuffer           devNull;
-    protected volatile EventChannel         eventChannel;
-    protected volatile SocketChannelHandler handler;
-    protected volatile long                 offset   = -1L;
-    protected volatile long                 position = -1L;
-    protected volatile long                 remaining;
-    protected volatile Segment              segment; 
+    protected ByteBuffer                    devNull;
+    protected EventChannel                  eventChannel;
+    protected SocketChannelHandler          handler;
+    protected long                          offset   = -1L;
+    protected long                          position = -1L;
+    protected long                          remaining;
+    protected Segment                       segment;
     protected final AbstractAppenderContext fsm      = new AbstractAppenderContext(
                                                                                    this);
     protected boolean                       inError  = false;
@@ -85,7 +85,7 @@ abstract public class AbstractAppender {
     protected void drain() {
         segment = null;
         devNull = ByteBuffer.allocate(batchHeader.getBatchByteLength());
-        if(devNull()) {
+        if (devNull()) {
             fsm.ready();
         }
     }

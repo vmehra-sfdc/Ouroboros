@@ -46,7 +46,7 @@ public class BatchAcknowledgement {
     private final ByteBuffer                  ackBuffer = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
     private final BatchAcknowledgementContext fsm       = new BatchAcknowledgementContext(
                                                                                           this);
-    private volatile SocketChannelHandler     handler;
+    private SocketChannelHandler              handler;
     private boolean                           inError   = false;
     private final Spinner                     spinner;
 
@@ -84,13 +84,13 @@ public class BatchAcknowledgement {
     protected void close() {
         handler.close();
     }
-    
-    protected boolean readAcknowledgements() { 
+
+    protected boolean readAcknowledgements() {
         while (readAcknowledgement()) {
             ackBuffer.flip();
             BatchIdentity ack = new BatchIdentity(ackBuffer);
             ackBuffer.rewind();
-            spinner.acknowledge(ack); 
+            spinner.acknowledge(ack);
         }
         return false;
     }

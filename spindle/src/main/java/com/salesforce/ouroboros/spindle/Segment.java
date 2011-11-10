@@ -57,7 +57,7 @@ import java.nio.channels.WritableByteChannel;
 public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         GatheringByteChannel, ScatteringByteChannel, Cloneable {
 
-    private volatile FileChannel   channel;
+    private final FileChannel      channel;
     private final File             file;
     private final RandomAccessFile raf;
 

@@ -63,9 +63,6 @@ Entry {
 	
 	replicatorsEstablishmentTimeout
 		Unstable{}
-	
-	destabilize
-		Unstable{}
 }
 
 Rebalance
@@ -75,17 +72,11 @@ Entry {
 {
 	rebalanced
 		AnnounceTakeOver{}
-	
-	destabilize
-		Unstable{}
 }
 
 AnnounceTakeOver {
 	takeoverAcknowledged
 		TakeOver{}
-		
-	destabilize
-		Unstable{}
 }
 
 TakeOver {
