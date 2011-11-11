@@ -79,6 +79,9 @@ Entry {
 		
 	batchHeaderWritten
 		WriteEventHeader{}
+		
+	queuedEmpty
+		Waiting{}
 } 
 
 WriteEventHeader

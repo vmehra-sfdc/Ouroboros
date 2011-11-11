@@ -26,13 +26,13 @@
 package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.Queue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.spindle.DuplicatorContext.DuplicatorState;
+import com.salesforce.ouroboros.util.LockFreeQueue;
 
 /**
  * A duplicator of event streams. The duplicator provides outbound replication
@@ -47,7 +47,7 @@ public final class Duplicator {
 
     private EventEntry              current;
     private SocketChannelHandler    handler;
-    final BlockingQueue<EventEntry> pending = new LinkedBlockingQueue<EventEntry>();
+    final Queue<EventEntry>         pending = new LockFreeQueue<EventEntry>();
     private long                    position;
     private int                     remaining;
     private boolean                 inError;
@@ -140,11 +140,9 @@ public final class Duplicator {
     }
 
     protected void processHeader() {
-        try {
-            current = pending.take();
-        } catch (InterruptedException e) {
-            inError = true;
-            return;
+        current = pending.poll();
+        if (current == null) {
+            fsm.pendingEmpty();
         }
         remaining = current.header.getBatchByteLength();
         position = current.header.getOffset();

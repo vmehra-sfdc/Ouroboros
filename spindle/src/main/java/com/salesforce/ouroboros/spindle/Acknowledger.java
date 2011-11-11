@@ -27,15 +27,15 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.spindle.AcknowledgerContext.AcknowledgerState;
+import com.salesforce.ouroboros.util.LockFreeQueue;
 
 /**
  * 
@@ -44,14 +44,14 @@ import com.salesforce.ouroboros.spindle.AcknowledgerContext.AcknowledgerState;
  */
 public class Acknowledger {
 
-    static final Logger                log     = Logger.getLogger(Acknowledger.class.getCanonicalName());
+    static final Logger               log     = Logger.getLogger(Acknowledger.class.getCanonicalName());
 
-    private final ByteBuffer           buffer  = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
-    private BatchIdentity              current;
-    private final AcknowledgerContext  fsm     = new AcknowledgerContext(this);
-    private SocketChannelHandler       handler;
-    private boolean                    inError;
-    final BlockingQueue<BatchIdentity> pending = new LinkedBlockingQueue<BatchIdentity>();
+    private final ByteBuffer          buffer  = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
+    private BatchIdentity             current;
+    private final AcknowledgerContext fsm     = new AcknowledgerContext(this);
+    private SocketChannelHandler      handler;
+    private boolean                   inError;
+    final Queue<BatchIdentity>        pending = new LockFreeQueue<BatchIdentity>();
 
     /**
      * Replicate the event to the mirror
@@ -95,19 +95,15 @@ public class Acknowledger {
     }
 
     protected void processPendingAcks() {
-        while (!pending.isEmpty()) {
-            try {
-                current = pending.take();
-            } catch (InterruptedException e) {
-                inError = true;
-                return;
-            }
+        current = pending.poll();
+        while (current != null) {
             buffer.rewind();
             current.serializeOn(buffer);
             if (!writeAck()) {
                 handler.selectForWrite();
                 return;
             }
+            current = pending.poll();
         }
         fsm.waiting();
     }

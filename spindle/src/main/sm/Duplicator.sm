@@ -67,6 +67,9 @@ Entry {
 		
 	headerWritten
 		WriteBatch{}
+		
+	pendingEmpty
+		Waiting{}
 }
 
 WriteBatch

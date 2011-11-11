@@ -30,8 +30,7 @@ import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.Queue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -41,6 +40,7 @@ import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterFSM;
 import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterState;
+import com.salesforce.ouroboros.util.LockFreeQueue;
 
 /**
  * The event action context for the batch writing protocol FSM
@@ -50,17 +50,16 @@ import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterState;
  */
 public class BatchWriter {
 
-    private static final Logger        log         = Logger.getLogger(BatchWriter.class.getCanonicalName());
-    private static final int           MAGIC       = 0x1638;
+    private static final Logger      log         = Logger.getLogger(BatchWriter.class.getCanonicalName());
+    private static final int         MAGIC       = 0x1638;
 
-    private final BatchHeader          batchHeader = new BatchHeader();
-    private final BatchWriterContext   fsm         = new BatchWriterContext(
-                                                                            this);
-    private SocketChannelHandler       handler;
-    private final EventHeader          header      = new EventHeader();
-    private boolean                    inError     = false;
-    private final BlockingQueue<Batch> queued      = new LinkedBlockingQueue<Batch>();
-    final Deque<ByteBuffer>            batch       = new LinkedList<ByteBuffer>();
+    private final BatchHeader        batchHeader = new BatchHeader();
+    private final BatchWriterContext fsm         = new BatchWriterContext(this);
+    private SocketChannelHandler     handler;
+    private final EventHeader        header      = new EventHeader();
+    private boolean                  inError     = false;
+    private final Queue<Batch>       queued      = new LockFreeQueue<Batch>();
+    final Deque<ByteBuffer>          batch       = new LinkedList<ByteBuffer>();
 
     public void closing() {
         if (!fsm.isInTransition()) {
@@ -137,11 +136,9 @@ public class BatchWriter {
     }
 
     protected void nextBatch() {
-        Batch entry;
-        try {
-            entry = queued.take();
-        } catch (InterruptedException e) {
-            inError = true;
+        Batch entry = queued.poll();
+        if (entry == null) {
+            fsm.queuedEmpty();
             return;
         }
         int totalSize = 0;

@@ -81,6 +81,7 @@ public class Coordinator implements Member {
                                                                                                                                     new ConsistentHashFunction<Node>());
     private final Map<Node, ContactInformation>                 yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
     final SortedSet<Node>                                       newMembers      = new ConcurrentSkipListSet<Node>();
+    private boolean                                             isLeader        = false;
 
     public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
                        Weaver weaver) {
