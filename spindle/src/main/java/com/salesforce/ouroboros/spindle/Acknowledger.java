@@ -35,7 +35,7 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.spindle.AcknowledgerContext.AcknowledgerState;
-import com.salesforce.ouroboros.util.LockFreeQueue;
+import com.salesforce.ouroboros.util.lockfree.LockFreeQueue;
 
 /**
  * 

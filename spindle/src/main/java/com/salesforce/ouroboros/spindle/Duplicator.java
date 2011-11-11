@@ -32,7 +32,7 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.spindle.DuplicatorContext.DuplicatorState;
-import com.salesforce.ouroboros.util.LockFreeQueue;
+import com.salesforce.ouroboros.util.lockfree.LockFreeQueue;
 
 /**
  * A duplicator of event streams. The duplicator provides outbound replication

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.salesforce.ouroboros.util;
+package com.salesforce.ouroboros.util.lockfree;
 
 import java.util.AbstractQueue;
 import java.util.Collection;
@@ -59,54 +59,6 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
  *            type of element in the queue
  */
 public class LockFreeQueue<E> extends AbstractQueue<E> implements Queue<E> {
-    private static final boolean                                          IF_BACKOFF       = false;
-    private static final int                                              WAIT_FOR_BACKOFF = 10;
-
-    // head and tail pointer of queue
-    private volatile Node<E>                                              head;
-    private volatile Node<E>                                              tail;
-
-    private Node<E>                                                       dummy;
-
-    /*
-     * tailUpater and headUpdater is used with AtomicReferenceFieldUpdater to
-     * update its value atomiclly
-     */
-    @SuppressWarnings("rawtypes")
-    private static final AtomicReferenceFieldUpdater<LockFreeQueue, Node> TAIL_UPDATER     = AtomicReferenceFieldUpdater.newUpdater(LockFreeQueue.class,
-                                                                                                                                    Node.class,
-                                                                                                                                    "tail");
-    @SuppressWarnings("rawtypes")
-    private static final AtomicReferenceFieldUpdater<LockFreeQueue, Node> HEAD_UPDATER     = AtomicReferenceFieldUpdater.newUpdater(LockFreeQueue.class,
-                                                                                                                                    Node.class,
-                                                                                                                                    "head");
-
-    /**
-     * update tail's value atomically using compare and swap.
-     * 
-     * @param cmp
-     *            expected value
-     * @param val
-     *            new value
-     * @return true if cas is successful, otherwise false
-     */
-    private boolean casTail(Node<E> cmp, Node<E> val) {
-        return TAIL_UPDATER.compareAndSet(this, cmp, val);
-    }
-
-    /**
-     * update head's value atomically using compare and swap.
-     * 
-     * @param cmp
-     *            expected value
-     * @param val
-     *            new value
-     * @return true if cas is successful, otherwise false
-     */
-    private boolean casHead(Node<E> cmp, Node<E> val) {
-        return HEAD_UPDATER.compareAndSet(this, cmp, val);
-    }
-
     /**
      * Internal node definition of queue.
      * 
@@ -114,12 +66,12 @@ public class LockFreeQueue<E> extends AbstractQueue<E> implements Queue<E> {
      *            type of element in node
      */
     private static class Node<E> {
-        // value stored in the node
-        E value;
-
         // next pointer point to next node in the queue
         // prev pointer point to previous node in the queue
         Node<E> next, prev;
+
+        // value stored in the node
+        E       value;
 
         /**
          * default constructor.
@@ -151,6 +103,110 @@ public class LockFreeQueue<E> extends AbstractQueue<E> implements Queue<E> {
     }
 
     /**
+     * iterator definition of queue.
+     * 
+     */
+    private class QueueItr implements Iterator<E> {
+        /**
+         * value in the next n.
+         */
+        private E       nextItem;
+        /**
+         * next node.
+         */
+        private Node<E> nextNode;
+
+        /**
+         * default constructor.
+         */
+        QueueItr() {
+            advance();
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean hasNext() {
+            return nextNode != null;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public E next() {
+            if (nextNode == null) {
+                throw new NoSuchElementException();
+            }
+            return advance();
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+
+        /**
+         * Moves to next valid node and returns item to return for next(), or
+         * null if no such.
+         * 
+         * @return value of next node
+         */
+        private E advance() {
+            // value of next node
+            E x = nextItem;
+
+            // p point to next valid node
+            Node<E> p = nextNode == null ? first() : nextNode.getNext();
+            while (true) {
+                // reach the end
+                if (p == null) {
+                    nextNode = null;
+                    nextItem = null;
+                    return x;
+                }
+                E item = p.value;
+                if (item != null) {
+                    // p is a valid node
+                    nextNode = p;
+                    nextItem = item;
+                    return x;
+                } else {
+                    // skip over nulls
+                    p = p.getNext();
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static final AtomicReferenceFieldUpdater<LockFreeQueue, Node> HEAD_UPDATER     = AtomicReferenceFieldUpdater.newUpdater(LockFreeQueue.class,
+                                                                                                                                    Node.class,
+                                                                                                                                    "head");
+    private static final boolean                                          IF_BACKOFF       = false;
+
+    /*
+     * tailUpater and headUpdater is used with AtomicReferenceFieldUpdater to
+     * update its value atomiclly
+     */
+    @SuppressWarnings("rawtypes")
+    private static final AtomicReferenceFieldUpdater<LockFreeQueue, Node> TAIL_UPDATER     = AtomicReferenceFieldUpdater.newUpdater(LockFreeQueue.class,
+                                                                                                                                    Node.class,
+                                                                                                                                    "tail");
+
+    private static final int                                              WAIT_FOR_BACKOFF = 10;
+    private Node<E>                                                       dummy;
+
+    // head and tail pointer of queue
+    private volatile Node<E>                                              head;
+
+    private volatile Node<E>                                              tail;
+
+    /**
      * default constructor.
      */
     public LockFreeQueue() {
@@ -173,43 +229,10 @@ public class LockFreeQueue<E> extends AbstractQueue<E> implements Queue<E> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isEmpty() {
-        return (head.value == null) && (tail.value == null);
+        return head.value == null && tail.value == null;
         // or return first() == null;
-    }
-
-    /**
-     * fix the list if a bad ordering of events causes them to be inconsistent.
-     * 
-     * If a prev pointer is found to be inconsistent, we run a fixList method
-     * along the chain of next pointers which is guaranteed to be consistent.
-     * Since prev pointers become inconsistent as a result of long delays, not
-     * as a result of contention, the frequency of calls to fixList is low.
-     * 
-     * @param tail
-     *            tail node
-     * @param head
-     *            head node
-     */
-    private void fixList(Node<E> tail, Node<E> head) {
-        /*
-         * set current node to tail. The chain of next pointers is guaranteed to
-         * be consistent. Fix the inconsistent previous pointers from tail to
-         * head.
-         */
-        Node<E> curNode = tail;
-        while ((head == this.head) && (curNode != head)) {
-            Node<E> curNodeNext = curNode.next;
-            if (curNodeNext == null)
-                break;
-            Node<E> nextNodePrev = curNodeNext.prev;
-
-            // Fix the inconsistent previous pointers
-            if (nextNodePrev != curNode) {
-                curNodeNext.prev = curNode;
-            }
-            curNode = curNodeNext;
-        }
     }
 
     /**
@@ -221,144 +244,9 @@ public class LockFreeQueue<E> extends AbstractQueue<E> implements Queue<E> {
     }
 
     /**
-     * iterator definition of queue.
-     * 
-     */
-    private class QueueItr implements Iterator<E> {
-        /**
-         * next node.
-         */
-        private Node<E> nextNode;
-        /**
-         * value in the next n.
-         */
-        private E       nextItem;
-
-        /**
-         * default constructor.
-         */
-        QueueItr() {
-            advance();
-        }
-
-        /**
-         * Moves to next valid node and returns item to return for next(), or
-         * null if no such.
-         * 
-         * @return value of next node
-         */
-        private E advance() {
-            // value of next node
-            E x = nextItem;
-
-            // p point to next valid node
-            Node<E> p = (nextNode == null) ? first() : nextNode.getNext();
-            while (true) {
-                // reach the end
-                if (p == null) {
-                    nextNode = null;
-                    nextItem = null;
-                    return x;
-                }
-                E item = p.value;
-                if (item != null) {
-                    // p is a valid node
-                    nextNode = p;
-                    nextItem = item;
-                    return x;
-                } else
-                    // skip over nulls
-                    p = p.getNext();
-            }
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public boolean hasNext() {
-            return nextNode != null;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public E next() {
-            if (nextNode == null)
-                throw new NoSuchElementException();
-            return advance();
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public void remove() {
-            throw new UnsupportedOperationException();
-        }
-    }
-
-    /**
      * {@inheritDoc}
-     * 
      */
     @Override
-    public int size() {
-        // size is computed on the fly when it is called since size() is assumed
-        // to be
-        // called infrequently. If not, use a atomic int to record the size and
-        // update it whenever offer and poll.
-        int count = 0;
-        Node<E> cur;
-        for (cur = first(); cur != null && cur.value != null; cur = cur.prev) {
-            if (++count == Integer.MAX_VALUE)
-                break;
-        }
-        return count;
-    }
-
-    /**
-     * get first node of queue.
-     * 
-     * @return first node of queue
-     */
-    private Node<E> first() {
-        while (true) {
-            Node<E> header = this.head;
-            if (header.value != null)
-                return header;
-
-            Node<E> tail = this.tail;
-
-            if (header == this.head) {
-                /*
-                 * In our algorithm, a dummy node is a special node with a dummy
-                 * value. It is created and inserted to the queue when it
-                 * becomes empty as explained above. Since a dummy node does not
-                 * contain a real value, it must be skipped when nodes are
-                 * deleted from the queue. The steps for skipping a dummy node
-                 * are similar to those of a regular dequeue, except that no
-                 * value is returned. When a dequeue method identifies that the
-                 * head points to a dummy node and the tail does not, as in
-                 * Figure 6 Part B in the paper, it modifies the head using a
-                 * CAS to point to the node pointed by the prev pointer of this
-                 * dummy node. Then it can continue to dequeue nodes.
-                 */
-                if (tail == header) {
-                    return null;
-                } else {
-                    Node<E> fstNodePrev = header.prev;
-                    if (null == fstNodePrev) {
-                        fixList(tail, header);
-                        continue;
-                    }
-                    casHead(header, fstNodePrev);
-                }
-            }
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public boolean offer(E e) {
         /*
          * To insert a value, the enqueue method creates a new node that
@@ -369,8 +257,9 @@ public class LockFreeQueue<E> extends AbstractQueue<E> implements Queue<E> {
          * its new node using a CAS operation. If the CAS succeeded, the new
          * node was inserted into the queue. Otherwise the enqueue retries.
          */
-        if (e == null)
+        if (e == null) {
             throw new IllegalArgumentException();
+        }
 
         Node<E> node = new Node<E>(e);
         while (true) {
@@ -395,11 +284,13 @@ public class LockFreeQueue<E> extends AbstractQueue<E> implements Queue<E> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public E peek() {
         while (true) {
             Node<E> header = this.head;
-            if (header.value != null)
+            if (header.value != null) {
                 return header.value;
+            }
 
             Node<E> tail = this.tail;
 
@@ -434,6 +325,7 @@ public class LockFreeQueue<E> extends AbstractQueue<E> implements Queue<E> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public E poll() {
         // comment is similiar to first()
         // TODO refactor duplicate code with first()
@@ -470,8 +362,9 @@ public class LockFreeQueue<E> extends AbstractQueue<E> implements Queue<E> {
                     } else {
                         if (null != fstNodePrev) {
                             casHead(head, fstNodePrev);
-                        } else
+                        } else {
                             fixList(tail, head);
+                        }
                     }
                 }
             }
@@ -482,6 +375,129 @@ public class LockFreeQueue<E> extends AbstractQueue<E> implements Queue<E> {
                 } catch (Exception exp) {
                 }
             }
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     */
+    @Override
+    public int size() {
+        // size is computed on the fly when it is called since size() is assumed
+        // to be
+        // called infrequently. If not, use a atomic int to record the size and
+        // update it whenever offer and poll.
+        int count = 0;
+        Node<E> cur;
+        for (cur = first(); cur != null && cur.value != null; cur = cur.prev) {
+            if (++count == Integer.MAX_VALUE) {
+                break;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * update head's value atomically using compare and swap.
+     * 
+     * @param cmp
+     *            expected value
+     * @param val
+     *            new value
+     * @return true if cas is successful, otherwise false
+     */
+    private boolean casHead(Node<E> cmp, Node<E> val) {
+        return HEAD_UPDATER.compareAndSet(this, cmp, val);
+    }
+
+    /**
+     * update tail's value atomically using compare and swap.
+     * 
+     * @param cmp
+     *            expected value
+     * @param val
+     *            new value
+     * @return true if cas is successful, otherwise false
+     */
+    private boolean casTail(Node<E> cmp, Node<E> val) {
+        return TAIL_UPDATER.compareAndSet(this, cmp, val);
+    }
+
+    /**
+     * get first node of queue.
+     * 
+     * @return first node of queue
+     */
+    private Node<E> first() {
+        while (true) {
+            Node<E> header = this.head;
+            if (header.value != null) {
+                return header;
+            }
+
+            Node<E> tail = this.tail;
+
+            if (header == this.head) {
+                /*
+                 * In our algorithm, a dummy node is a special node with a dummy
+                 * value. It is created and inserted to the queue when it
+                 * becomes empty as explained above. Since a dummy node does not
+                 * contain a real value, it must be skipped when nodes are
+                 * deleted from the queue. The steps for skipping a dummy node
+                 * are similar to those of a regular dequeue, except that no
+                 * value is returned. When a dequeue method identifies that the
+                 * head points to a dummy node and the tail does not, as in
+                 * Figure 6 Part B in the paper, it modifies the head using a
+                 * CAS to point to the node pointed by the prev pointer of this
+                 * dummy node. Then it can continue to dequeue nodes.
+                 */
+                if (tail == header) {
+                    return null;
+                } else {
+                    Node<E> fstNodePrev = header.prev;
+                    if (null == fstNodePrev) {
+                        fixList(tail, header);
+                        continue;
+                    }
+                    casHead(header, fstNodePrev);
+                }
+            }
+        }
+    }
+
+    /**
+     * fix the list if a bad ordering of events causes them to be inconsistent.
+     * 
+     * If a prev pointer is found to be inconsistent, we run a fixList method
+     * along the chain of next pointers which is guaranteed to be consistent.
+     * Since prev pointers become inconsistent as a result of long delays, not
+     * as a result of contention, the frequency of calls to fixList is low.
+     * 
+     * @param tail
+     *            tail node
+     * @param head
+     *            head node
+     */
+    private void fixList(Node<E> tail, Node<E> head) {
+        /*
+         * set current node to tail. The chain of next pointers is guaranteed to
+         * be consistent. Fix the inconsistent previous pointers from tail to
+         * head.
+         */
+        Node<E> curNode = tail;
+        while (head == this.head && curNode != head) {
+            Node<E> curNodeNext = curNode.next;
+            if (curNodeNext == null) {
+                break;
+            }
+            Node<E> nextNodePrev = curNodeNext.prev;
+
+            // Fix the inconsistent previous pointers
+            if (nextNodePrev != curNode) {
+                curNodeNext.prev = curNode;
+            }
+            curNode = curNodeNext;
         }
     }
 }

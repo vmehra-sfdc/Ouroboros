@@ -40,7 +40,7 @@ import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterFSM;
 import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterState;
-import com.salesforce.ouroboros.util.LockFreeQueue;
+import com.salesforce.ouroboros.util.lockfree.LockFreeQueue;
 
 /**
  * The event action context for the batch writing protocol FSM

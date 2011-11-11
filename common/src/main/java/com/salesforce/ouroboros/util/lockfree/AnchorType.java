@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.salesforce.ouroboros.util;
+package com.salesforce.ouroboros.util.lockfree;
 
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
@@ -53,7 +53,7 @@ class AnchorType<E> {
      * Number of elements inside the Deque.
      */
     int                                                        numElements;
-    
+
     /**
      * Right or tail node in the deque.
      */

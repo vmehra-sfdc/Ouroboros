@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.salesforce.ouroboros.util;
+package com.salesforce.ouroboros.util.lockfree;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -64,20 +64,23 @@ public class LockFreeSet<E> implements Set<E> {
                         holder.cur = holder.prev.getReference();
                 }
 
+                @Override
                 public boolean hasNext() {
                         return null != holder.cur;
                 }
 
+                @Override
                 public HashLinkNode<E> next() {
                         HashLinkNode<E> result = advance();
 
-                        if (null == result)
-                                throw new NoSuchElementException();
-                        else {
+                        if (null == result) {
+                            throw new NoSuchElementException();
+                        } else {
                                 return result;
                         }
                 }
 
+                @Override
                 public void remove() {
                         throw new UnsupportedOperationException();
                 }
@@ -116,6 +119,7 @@ public class LockFreeSet<E> implements Set<E> {
                         current = null;
                 }
 
+                @Override
                 public boolean hasNext() {
 
                         while (iter.hasNext()) {
@@ -129,12 +133,15 @@ public class LockFreeSet<E> implements Set<E> {
                         return false;
                 }
 
+                @Override
                 public E next() {
-                        if (current == null)
-                                throw new NoSuchElementException();
+                        if (current == null) {
+                            throw new NoSuchElementException();
+                        }
                         return current;
                 }
 
+                @Override
                 public void remove() {
                         iter.remove();
                 }
@@ -222,11 +229,13 @@ public class LockFreeSet<E> implements Set<E> {
         public LockFreeSet(int expectedSize, float loadFactor) {
                 this.loadFactor = loadFactor;
 
-                if (expectedSize < MINIMAL_SIZE)
-                        expectedSize = MINIMAL_SIZE;
+                if (expectedSize < MINIMAL_SIZE) {
+                    expectedSize = MINIMAL_SIZE;
+                }
                 segmentSize = Integer.highestOneBit(expectedSize);
-                if (segmentSize < expectedSize)
-                        segmentSize = segmentSize << 1;
+                if (segmentSize < expectedSize) {
+                    segmentSize = segmentSize << 1;
+                }
                 segmentBit = Integer.numberOfTrailingZeros(segmentSize);
 
                 initInternal();
@@ -236,6 +245,7 @@ public class LockFreeSet<E> implements Set<E> {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean add(E e) {
                 int hash = HashLinkNode.hash(e);
                 AtomicMarkableReference<HashLinkNode<E>> bucket = bucketAt(hash);
@@ -247,8 +257,9 @@ public class LockFreeSet<E> implements Set<E> {
 
                         // expand number of dummy nodes
                         if (totalElement.get() > cSize * loadFactor
-                                        && cSize < N_SEGMENT * segmentSize)
-                                bucketSizeLog2.compareAndSet(bSize, bSize + 1);
+                                        && cSize < N_SEGMENT * segmentSize) {
+                            bucketSizeLog2.compareAndSet(bSize, bSize + 1);
+                        }
                         return true;
                 }
 
@@ -258,13 +269,15 @@ public class LockFreeSet<E> implements Set<E> {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean addAll(Collection<? extends E> c) {
                 boolean res = false;
 
-                for (Iterator iterator = c.iterator(); iterator.hasNext();) {
-                        E item = (E) iterator.next();
-                        if (add(item))
-                                res = true;
+                for (Object element : c) {
+                        E item = (E) element;
+                        if (add(item)) {
+                            res = true;
+                        }
                 }
 
                 return res;
@@ -273,6 +286,7 @@ public class LockFreeSet<E> implements Set<E> {
         /**
          * {@inheritDoc}
          */
+        @Override
         public void clear() {
                 initInternal();
         }
@@ -280,6 +294,7 @@ public class LockFreeSet<E> implements Set<E> {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean contains(Object o) {
                 int hash = HashLinkNode.hash(o);
                 AtomicMarkableReference<HashLinkNode<E>> bucket = bucketAt(hash);
@@ -290,15 +305,18 @@ public class LockFreeSet<E> implements Set<E> {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean containsAll(Collection<?> c) {
-                for (Iterator iterator = c.iterator(); iterator.hasNext();) {
-                        E item = (E) iterator.next();
-                        if (!contains(item))
-                                return false;
+                for (Object element : c) {
+                        E item = (E) element;
+                        if (!contains(item)) {
+                            return false;
+                        }
                 }
                 return true;
         }
 
+        @Override
         public boolean isEmpty() {
                 return totalElement.intValue() == 0;
         }
@@ -306,6 +324,7 @@ public class LockFreeSet<E> implements Set<E> {
         /**
          * {@inheritDoc}
          */
+        @Override
         public Iterator<E> iterator() {
                 return new SetIterator(new CrudeItr());
         }
@@ -313,6 +332,7 @@ public class LockFreeSet<E> implements Set<E> {
         /**
          * {@inheritDoc}
          */ 
+        @Override
         public boolean remove(Object o) {
                 int hash = HashLinkNode.hash(o);
 
@@ -328,12 +348,14 @@ public class LockFreeSet<E> implements Set<E> {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean removeAll(Collection<?> c) {
                 boolean res = false;
-                for (Iterator iterator = c.iterator(); iterator.hasNext();) {
-                        E item = (E) iterator.next();
-                        if (remove(item))
-                                res = true;
+                for (Object element : c) {
+                        E item = (E) element;
+                        if (remove(item)) {
+                            res = true;
+                        }
                 }
 
                 return res;
@@ -347,13 +369,15 @@ public class LockFreeSet<E> implements Set<E> {
          *            collection containing elements to be retained in this set
          * @return true if this set changed as a result of the call
          */
+        @Override
         public boolean retainAll(Collection<?> c) {
                 boolean mod = false;
-                for (Iterator<?> iterator = c.iterator(); iterator.hasNext();) {
-                        Object item = iterator.next();
-                        if (!c.contains(item))
-                                if (remove(item))
-                                        mod = true;
+                for (Object item : c) {
+                        if (!c.contains(item)) {
+                            if (remove(item)) {
+                                mod = true;
+                            }
+                        }
                 }
 
                 return mod;
@@ -362,6 +386,7 @@ public class LockFreeSet<E> implements Set<E> {
         /**
          * {@inheritDoc}
          */ 
+        @Override
         public int size() {
                 return totalElement.get();
         }
@@ -374,14 +399,16 @@ public class LockFreeSet<E> implements Set<E> {
          * 
          * @return an array containing all the elements in this set
          */ 
+        @Override
         public Object[] toArray() {
                 Object[] array = new Object[totalElement.get()];
                 Iterator<E> iter = iterator();
 
                 int index = 0;
                 while (iter.hasNext()) {
-                        if (index >= array.length)
-                                break;
+                        if (index >= array.length) {
+                            break;
+                        }
                         array[index++] = iter.next();
                 }
 
@@ -391,6 +418,7 @@ public class LockFreeSet<E> implements Set<E> {
         /**
          * {@inheritDoc}
          */
+        @Override
         public <T> T[] toArray(T[] a) {
                 if (a.length < totalElement.get()) {
                         a = (T[]) new Object[totalElement.get()];
@@ -399,13 +427,15 @@ public class LockFreeSet<E> implements Set<E> {
                 Iterator<E> iter = iterator();
                 int index = 0;
                 while (iter.hasNext()) {
-                        if (index >= a.length)
-                                break;
+                        if (index >= a.length) {
+                            break;
+                        }
                         a[index++] = (T) iter.next();
                 }
 
-                if (a.length > index)
-                        a[index] = null;
+                if (a.length > index) {
+                    a[index] = null;
+                }
 
                 return a;
         }
@@ -422,13 +452,13 @@ public class LockFreeSet<E> implements Set<E> {
         private AtomicMarkableReference<HashLinkNode<E>> bucketAt(int hash) {
                 int bSize = bucketSizeLog2.get();
                 // We only need several bits of the hash value.
-                int bucket = hash & (0x80000000 >> bSize);
+                int bucket = hash & 0x80000000 >> bSize;
                 bucket = Integer.reverse(bucket);
 
                 // Work out the index of the segment
                 int segment = bucket >> segmentBit;
                 // Work out the index inside the segment
-                int bkptr = bucket & (segmentSize - 1);
+                int bkptr = bucket & segmentSize - 1;
 
                 // Get the segment or create a segment if it's null.
                 AtomicReferenceArray<AtomicMarkableReference<HashLinkNode<E>>> seg = segments
@@ -450,14 +480,15 @@ public class LockFreeSet<E> implements Set<E> {
                 do {
                         parent = getParent(parent, bSize);
                         ps = parent >> segmentBit;
-                        pk = parent & (segmentSize - 1);
+                        pk = parent & segmentSize - 1;
 
                         // Get segment of parent
                         pseg = segments.get(ps);
                         if (pseg != null) {
                                 pSegPos = pseg.get(pk);
-                                if (pSegPos != null)
-                                        break;
+                                if (pSegPos != null) {
+                                    break;
+                                }
                         }
                 } while (true);
 
@@ -473,8 +504,9 @@ public class LockFreeSet<E> implements Set<E> {
                                 seg = segments.get(segment);
                         }
                 }
-                if (seg.get(bkptr) == null)
-                        seg.compareAndSet(bkptr, null, dummyNode.next);
+                if (seg.get(bkptr) == null) {
+                    seg.compareAndSet(bkptr, null, dummyNode.next);
+                }
 
                 return seg.get(bkptr);
 
@@ -521,9 +553,9 @@ public class LockFreeSet<E> implements Set<E> {
                                 if (!nextprt.isMarked()) {
                                         int cr = cur.compareToElement(regKey);
 
-                                        if (cr < 0)
-                                                prev = nextprt;
-                                        else if (cr > 0) {
+                                        if (cr < 0) {
+                                            prev = nextprt;
+                                        } else if (cr > 0) {
                                                 holder.found = false;
                                                 holder.cur = cur;
                                                 holder.prev = prev;
@@ -535,8 +567,9 @@ public class LockFreeSet<E> implements Set<E> {
                                                 holder.prev = prev;
                                                 holder.next = nextprt.getReference();
                                                 return holder;
-                                        } else
-                                                prev = nextprt;
+                                        } else {
+                                            prev = nextprt;
+                                        }
                                 } else {
                                         // Physically removing element which has a deletion mark
                                         if (!prev.compareAndSet(cur, nextprt.getReference(), false,
@@ -576,16 +609,17 @@ public class LockFreeSet<E> implements Set<E> {
                                         // modify by Jinping Chen. some key may has the same value
                                         int cr = cur2.compareTo(o);
 
-                                        if (cr < 0)
-                                                holder.prev = cur2.next;
-                                        else if (cr > 0) {
+                                        if (cr < 0) {
+                                            holder.prev = cur2.next;
+                                        } else if (cr > 0) {
                                                 holder.found = false;
                                                 return holder;
                                         } else if (cr == 0 && cur2.equals(o)) {
                                                 holder.found = true;
                                                 return holder;
-                                        } else
-                                                holder.prev = cur2.next;
+                                        } else {
+                                            holder.prev = cur2.next;
+                                        }
                                 } else {
                                         // help remove a marked node
                                         if (!holder.prev.compareAndSet(cur2, holder.next, false,
@@ -626,8 +660,9 @@ public class LockFreeSet<E> implements Set<E> {
                         insert(dummyNode, segment.get(i ^ Integer.highestOneBit(i)));
                         segment.set(i, dummyNode.next);
 
-                        if (segment.get(i) == null)
-                                throw new NullPointerException();
+                        if (segment.get(i) == null) {
+                            throw new NullPointerException();
+                        }
                 }
         }
 
@@ -660,8 +695,9 @@ public class LockFreeSet<E> implements Set<E> {
                                 node = new HashLinkNode<E>(e, hash);
                                 node.next = new AtomicMarkableReference<HashLinkNode<E>>(cur2,
                                                 false);
-                        } else
-                                node.next.set(cur2, false);
+                        } else {
+                            node.next.set(cur2, false);
+                        }
                         // Set prev->next = newNode
                         if (holder.prev.compareAndSet(cur2, node, false, false)) {
                                 return true;
@@ -692,14 +728,16 @@ public class LockFreeSet<E> implements Set<E> {
                                 sb.append(Integer.toBinaryString(startRef.brKey));
                                 realNode++;
                         }
-                        if (startRef.next != null)
-                                startRef = startRef.next.getReference();
-                        else
-                                break;
+                        if (startRef.next != null) {
+                            startRef = startRef.next.getReference();
+                        } else {
+                            break;
+                        }
                 }
                 float rate = realNode / (float) dummyCount;
-                if (rate > 2)
-                        System.out.println(sb.toString());
+                if (rate > 2) {
+                    System.out.println(sb.toString());
+                }
                 return rate;
         }
 
@@ -732,9 +770,9 @@ public class LockFreeSet<E> implements Set<E> {
 
                                         int cr = cur.compareToElement(regKey);
 
-                                        if (cr < 0)
-                                                prev = nextprt;
-                                        else if (cr > 0) {
+                                        if (cr < 0) {
+                                            prev = nextprt;
+                                        } else if (cr > 0) {
                                                 return false;
                                         } else if (cr == 0 && cur.equalsElement(o)) {
                                                 if (nextprt.isMarked()) {
@@ -744,10 +782,12 @@ public class LockFreeSet<E> implements Set<E> {
                                                                         nextprt.getReference(), false, false)) {
                                                                 continue try_again;
                                                         }
-                                                } else
-                                                        return true;
-                                        } else
-                                                prev = nextprt;
+                                                } else {
+                                                    return true;
+                                                }
+                                        } else {
+                                            prev = nextprt;
+                                        }
 
                                         cur = nextprt.getReference();
                                 }
@@ -797,8 +837,9 @@ public class LockFreeSet<E> implements Set<E> {
          */
         HashLinkNode<E> insert(HashLinkNode<E> e,
                         AtomicMarkableReference<HashLinkNode<E>> start) {
-                if (null == e || null == start)
-                        throw new NullPointerException();
+                if (null == e || null == start) {
+                    throw new NullPointerException();
+                }
 
                 CompositeStateHolder<E> holder = new CompositeStateHolder<E>();
                 while (true) {
@@ -922,7 +963,7 @@ class HashLinkNode<E> implements Comparable<HashLinkNode<E>> {
          */
         static int hash(Object obj) {
                 int h = obj.hashCode();
-                h ^= (h << 30) ^ (h << 28) ^ (h << 24) ^ (h << 16);
+                h ^= h << 30 ^ h << 28 ^ h << 24 ^ h << 16;
                 return h;
         }
 
@@ -964,18 +1005,21 @@ class HashLinkNode<E> implements Comparable<HashLinkNode<E>> {
         /**
          * {@inheritDoc}
          */
+        @Override
         public int compareTo(HashLinkNode<E> hn) {
-                if (this == hn)
-                        return 0;
+                if (this == hn) {
+                    return 0;
+                }
 
                 long c1 = brKey & MARK_ALL_BITS;
                 long c2 = hn.brKey & MARK_ALL_BITS;
-                if (c1 < c2)
-                        return -1;
-                else if (c1 > c2)
-                        return 1;
-                else
-                        return 0;
+                if (c1 < c2) {
+                    return -1;
+                } else if (c1 > c2) {
+                    return 1;
+                } else {
+                    return 0;
+                }
         }
 
         /**
@@ -986,17 +1030,19 @@ class HashLinkNode<E> implements Comparable<HashLinkNode<E>> {
          * @return Same as compareTo() method
          */
         public int compareToElement(E hn) {
-                if (hn == key)
-                        return 0;
+                if (hn == key) {
+                    return 0;
+                }
                 long c1 = brKey & MARK_ALL_BITS;
                 long c2 = (hash(hn) | 1) & MARK_ALL_BITS;
 
-                if (c1 < c2)
-                        return -1;
-                else if (c1 > c2)
-                        return 1;
-                else
-                        return 0;
+                if (c1 < c2) {
+                    return -1;
+                } else if (c1 > c2) {
+                    return 1;
+                } else {
+                    return 0;
+                }
         }
 
         /**
@@ -1010,20 +1056,21 @@ class HashLinkNode<E> implements Comparable<HashLinkNode<E>> {
                 int c1 = brKey >>> 1;
                 int c2 = objKey >>> 1;
 
-                if (c1 < c2)
-                        return -1;
-                else if (c1 > c2)
-                        return 1;
-                else {
+                if (c1 < c2) {
+                    return -1;
+                } else if (c1 > c2) {
+                    return 1;
+                } else {
                         c1 = brKey & 0x1;
                         c2 = objKey & 0x1;
 
-                        if (c1 < c2)
-                                return -1;
-                        else if (c1 > c2)
-                                return 1;
-                        else
-                                return 0;
+                        if (c1 < c2) {
+                            return -1;
+                        } else if (c1 > c2) {
+                            return 1;
+                        } else {
+                            return 0;
+                        }
                 }
         }
 
@@ -1036,12 +1083,13 @@ class HashLinkNode<E> implements Comparable<HashLinkNode<E>> {
          */
         public int compareToElement(long objKey) {
                 long c1 = brKey & MARK_ALL_BITS;
-                if (c1 < objKey)
-                        return -1;
-                else if (c1 > objKey)
-                        return 1;
-                else
-                        return 0;
+                if (c1 < objKey) {
+                    return -1;
+                } else if (c1 > objKey) {
+                    return 1;
+                } else {
+                    return 0;
+                }
         }
 
         /**
@@ -1052,12 +1100,13 @@ class HashLinkNode<E> implements Comparable<HashLinkNode<E>> {
                 if (obj instanceof HashLinkNode) {
                         HashLinkNode hn1 = (HashLinkNode) obj;
 
-                        if (hn1.brKey != brKey)
-                                return false;
-                        else if (hn1.key == null)
-                                return key == null && (hn1.key == key || hn1.brKey == brKey);
-                        else
-                                return hn1.key == key || hn1.key.equals(key);
+                        if (hn1.brKey != brKey) {
+                            return false;
+                        } else if (hn1.key == null) {
+                            return key == null && (hn1.key == key || hn1.brKey == brKey);
+                        } else {
+                            return hn1.key == key || hn1.key.equals(key);
+                        }
                 }
                 return false;
         }

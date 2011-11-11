@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.salesforce.ouroboros.util;
+package com.salesforce.ouroboros.util.lockfree;
 
 import java.util.concurrent.atomic.AtomicReference;
 
