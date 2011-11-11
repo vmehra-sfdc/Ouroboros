@@ -285,9 +285,8 @@ public class TestProducerChannelBuffer {
         controller.cardinality = 2;
         controller.latch = initialLatch;
         producerContext = new AnnotationConfigApplicationContext(
-                                                                 WeaverCfg.class);
-        weaverContext = new AnnotationConfigApplicationContext(
-                                                               ProducerCfg.class);
+                                                                 ProducerCfg.class);
+        weaverContext = new AnnotationConfigApplicationContext(WeaverCfg.class);
         log.info("Awaiting initial partition stability");
         boolean success = false;
         try {
@@ -358,6 +357,9 @@ public class TestProducerChannelBuffer {
                 return weaverSwitchboard.isStable();
             }
         }, 3000, 200);
+
+        com.salesforce.ouroboros.producer.Coordinator producer = producerContext.getBean(com.salesforce.ouroboros.producer.Coordinator.class);
+        com.salesforce.ouroboros.spindle.Coordinator weaver = weaverContext.getBean(com.salesforce.ouroboros.spindle.Coordinator.class);
 
     }
 }

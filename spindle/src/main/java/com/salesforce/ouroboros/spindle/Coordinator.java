@@ -81,7 +81,6 @@ public class Coordinator implements Member {
                                                                                                                                     new ConsistentHashFunction<Node>());
     private final Map<Node, ContactInformation>                 yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
     final SortedSet<Node>                                       newMembers      = new ConcurrentSkipListSet<Node>();
-    private boolean                                             isLeader        = false;
 
     public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
                        Weaver weaver) {
@@ -319,6 +318,10 @@ public class Coordinator implements Member {
         }
     }
 
+    protected boolean isLeader() {
+        return id.compareTo(members.last()) >= 0;
+    }
+
     protected ConsistentHashFunction<Node> nextRing() {
         ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
         for (Node node : members) {
@@ -336,6 +339,10 @@ public class Coordinator implements Member {
      * @return - the Rendezvous used to synchronize with replication connections
      */
     protected Rendezvous openReplicators() {
+        if (newMembers.isEmpty()) {
+            fsm.replicatorsEstablished();
+            return null;
+        }
         Runnable rendezvousAction = new Runnable() {
             @Override
             public void run() {

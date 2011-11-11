@@ -37,9 +37,30 @@
 
 %access package
 
-%start CoordinatorFSM::Unstable
+%start CoordinatorFSM::Suspended
 %map CoordinatorFSM
-%% 
-Unstable{
+%%
+Suspended{
+	stabilized
+		Stable{}
+		
+	destabilized
+		Unstable{}
 }
+
+Unstable{
+	stabilized
+		Stable{}
+		
+	destabilized
+		nil{}
+}
+
+Stable
+Entry {
+	filterSystemMembership();
+	createSpinners();
+	failover();
+}
+{}
 %%

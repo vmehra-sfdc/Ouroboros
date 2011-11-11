@@ -199,6 +199,7 @@ public class Coordinator implements Member {
 
     @Override
     public void destabilize() {
+        fsm.destabilized();
     }
 
     @Override
@@ -240,90 +241,6 @@ public class Coordinator implements Member {
     @Override
     public void dispatch(MemberDispatch type, Node sender,
                          Serializable payload, long time) {
-    }
-
-    /**
-     * Perform the failover for this node. Failover to the channel mirrors and
-     * assume primary producer responsibility for channels this node was
-     * mirroring
-     * 
-     * @param deadMembers
-     *            - the deceased
-     * @return the Map of channel ids and their last committed timestamp that
-     *         this node is now serving as the primary producer
-     * @throws InterruptedException
-     *             - if the thread is interrupted
-     */
-    public Map<UUID, Long> failover(Collection<Node> deadMembers)
-                                                                 throws InterruptedException {
-        // Coordinate the failover with the publishing threads
-        closePublishingGate();
-
-        // Initiate the failover procedure for the dead spinners
-        for (Entry<Node, Spinner> entry : spinners.entrySet()) {
-            if (deadMembers.contains(entry.getKey())) {
-                entry.getValue().failover();
-            }
-        }
-
-        // Failover mirror channels for which this node is now the primary
-        Map<UUID, Long> newPrimaries = new HashMap<UUID, Long>();
-        for (Iterator<Entry<UUID, Long>> mirrored = mirrors.entrySet().iterator(); mirrored.hasNext();) {
-            Entry<UUID, Long> entry = mirrored.next();
-            UUID channel = entry.getKey();
-            Node[] producerPair = getProducerReplicationPair(channel);
-            if (deadMembers.contains(producerPair[0])) {
-                newPrimaries.put(channel, entry.getValue());
-                mirrored.remove();
-
-                // Map the spinner for this channel
-                Node[] channelPair = getChannelBufferReplicationPair(channel);
-                Spinner spinner = spinners.get(channelPair[0]);
-                if (spinner == null) { // primary is dead, so get mirror
-                    spinner = spinners.get(channelPair[1]);
-                }
-                ChannelState previous = channelState.put(channel,
-                                                         new ChannelState(
-                                                                          spinner,
-                                                                          entry.getValue()));
-                assert previous == null : String.format("Apparently node %s is already primary for %");
-            }
-        }
-
-        // Assign failover mirror for dead primaries
-        for (Entry<UUID, ChannelState> entry : channelState.entrySet()) {
-            Node[] pair = getChannelBufferReplicationPair(entry.getKey());
-            if (deadMembers.contains(pair[0])) {
-                Spinner newPrimary = spinners.get(entry.getKey());
-                if (newPrimary == null) {
-                    if (log.isLoggable(Level.WARNING)) {
-                        log.warning(String.format("Both the primary and the secondary for %s have failed!",
-                                                  entry.getKey()));
-                    }
-                } else {
-                    ChannelState failedPrimary = entry.getValue();
-                    // Fail over to the new primary
-                    for (Batch batch : failedPrimary.spinner.getPending(entry.getKey()).values()) {
-                        newPrimary.push(batch);
-                    }
-                    failedPrimary.spinner = newPrimary;
-                }
-            }
-        }
-
-        // Remove dead spinners
-        for (Iterator<Entry<Node, Spinner>> entries = spinners.entrySet().iterator(); entries.hasNext();) {
-            Entry<Node, Spinner> entry = entries.next();
-            if (deadMembers.contains(entry.getKey())) {
-                entry.getValue().close();
-                entries.remove();
-            }
-        }
-
-        // Let any publishing threads preceed
-        openPublishingGate();
-
-        return newPrimaries;
     }
 
     /**
@@ -444,7 +361,7 @@ public class Coordinator implements Member {
 
     /**
      * Remap the producers by incorporating the set of new producers into the
-     * consistent hash ring of producers. This remappming may result in event
+     * consistent hash ring of producers. This remapping may result in event
      * channels that this node is serving as the primary have now been moved to
      * a new primary.
      * 
@@ -513,17 +430,7 @@ public class Coordinator implements Member {
 
     @Override
     public void stabilized() {
-        filterSystemMembership();
-        createSpinners();
-        Map<UUID, Long> newPrimaries;
-        try {
-            newPrimaries = failover(switchboard.getDeadMembers());
-        } catch (InterruptedException e) {
-            return;
-        }
-        if (newPrimaries.size() != 0) {
-            source.assumePrimary(newPrimaries);
-        }
+        fsm.stabilized();
     }
 
     /**
@@ -538,6 +445,90 @@ public class Coordinator implements Member {
      */
     public void terminate() {
         spinnerHandler.terminate();
+    }
+
+    /**
+     * Perform the failover for this node. Failover to the channel mirrors and
+     * assume primary producer responsibility for channels this node was
+     * mirroring
+     * 
+     * @param deadMembers
+     *            - the deceased
+     * @return the Map of channel ids and their last committed timestamp that
+     *         this node is now serving as the primary producer
+     * @throws InterruptedException
+     *             - if the thread is interrupted
+     */
+    private Map<UUID, Long> failover(Collection<Node> deadMembers)
+                                                                 throws InterruptedException {
+        // Coordinate the failover with the publishing threads
+        closePublishingGate();
+
+        // Initiate the failover procedure for the dead spinners
+        for (Entry<Node, Spinner> entry : spinners.entrySet()) {
+            if (deadMembers.contains(entry.getKey())) {
+                entry.getValue().failover();
+            }
+        }
+
+        // Failover mirror channels for which this node is now the primary
+        Map<UUID, Long> newPrimaries = new HashMap<UUID, Long>();
+        for (Iterator<Entry<UUID, Long>> mirrored = mirrors.entrySet().iterator(); mirrored.hasNext();) {
+            Entry<UUID, Long> entry = mirrored.next();
+            UUID channel = entry.getKey();
+            Node[] producerPair = getProducerReplicationPair(channel);
+            if (deadMembers.contains(producerPair[0])) {
+                newPrimaries.put(channel, entry.getValue());
+                mirrored.remove();
+
+                // Map the spinner for this channel
+                Node[] channelPair = getChannelBufferReplicationPair(channel);
+                Spinner spinner = spinners.get(channelPair[0]);
+                if (spinner == null) { // primary is dead, so get mirror
+                    spinner = spinners.get(channelPair[1]);
+                }
+                ChannelState previous = channelState.put(channel,
+                                                         new ChannelState(
+                                                                          spinner,
+                                                                          entry.getValue()));
+                assert previous == null : String.format("Apparently node %s is already primary for %");
+            }
+        }
+
+        // Assign failover mirror for dead primaries
+        for (Entry<UUID, ChannelState> entry : channelState.entrySet()) {
+            Node[] pair = getChannelBufferReplicationPair(entry.getKey());
+            if (deadMembers.contains(pair[0])) {
+                Spinner newPrimary = spinners.get(entry.getKey());
+                if (newPrimary == null) {
+                    if (log.isLoggable(Level.WARNING)) {
+                        log.warning(String.format("Both the primary and the secondary for %s have failed!",
+                                                  entry.getKey()));
+                    }
+                } else {
+                    ChannelState failedPrimary = entry.getValue();
+                    // Fail over to the new primary
+                    for (Batch batch : failedPrimary.spinner.getPending(entry.getKey()).values()) {
+                        newPrimary.push(batch);
+                    }
+                    failedPrimary.spinner = newPrimary;
+                }
+            }
+        }
+
+        // Remove dead spinners
+        for (Iterator<Entry<Node, Spinner>> entries = spinners.entrySet().iterator(); entries.hasNext();) {
+            Entry<Node, Spinner> entry = entries.next();
+            if (deadMembers.contains(entry.getKey())) {
+                entry.getValue().close();
+                entries.remove();
+            }
+        }
+
+        // Let any publishing threads preceed
+        openPublishingGate();
+
+        return newPrimaries;
     }
 
     /**
@@ -623,6 +614,18 @@ public class Coordinator implements Member {
                 }
             }
             spinners.put(n, spinner);
+        }
+    }
+
+    protected void failover() {
+        Map<UUID, Long> newPrimaries;
+        try {
+            newPrimaries = failover(switchboard.getDeadMembers());
+        } catch (InterruptedException e) {
+            return;
+        }
+        if (newPrimaries.size() != 0) {
+            source.assumePrimary(newPrimaries);
         }
     }
 
