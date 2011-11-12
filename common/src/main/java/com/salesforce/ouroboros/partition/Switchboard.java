@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.partition;
 
 import java.io.Serializable;
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -125,19 +126,19 @@ public class Switchboard {
     }
 
     static final Logger                 log             = Logger.getLogger(Switchboard.class.getCanonicalName());
-    private final SortedSet<Node>       deadMembers     = new TreeSet<Node>();
+    private final ArrayList<Node>       deadMembers     = new ArrayList<Node>();
     private final SwitchboardContext    fsm             = new SwitchboardContext(
                                                                                  this);
     private boolean                     leader          = false;
+    private Member                              member;
     private SortedSet<Node>             members         = new ConcurrentSkipListSet<Node>();
     private final Executor              messageProcessor;
     private final PartitionNotification notification    = new Notification();
     private final Partition             partition;
-    private SortedSet<Node>             previousMembers = new ConcurrentSkipListSet<Node>();
+    private ArrayList<Node>             previousMembers = new ArrayList<Node>();
     private NodeIdSet                   previousView;
     private final Node                  self;
-    protected NodeIdSet                 view;
-    Member                              member;
+    private NodeIdSet                 view;
 
     public Switchboard(Node node, Partition p) {
         self = node;
@@ -314,12 +315,6 @@ public class Switchboard {
         partition.deregister(notification);
     }
 
-    private Node getRightNeighbor(SortedSet<Node> ring) {
-        Iterator<Node> tail = ring.tailSet(self).iterator();
-        tail.next();
-        return tail.hasNext() ? tail.next() : ring.first();
-    }
-
     protected void advertise() {
         member.advertise();
     }
@@ -328,7 +323,7 @@ public class Switchboard {
      * Stabilize the partition
      * 
      * @param v
-     *            - the stable view of the partition
+     *            - the stable view of the partitionê
      * @param leader
      *            - the leader
      */
@@ -458,5 +453,11 @@ public class Switchboard {
         } else {
             fsm.destabilize(view, leaderNode);
         }
+    }
+
+    private Node getRightNeighbor(SortedSet<Node> ring) {
+        Iterator<Node> tail = ring.tailSet(self).iterator();
+        tail.next();
+        return tail.hasNext() ? tail.next() : ring.first();
     }
 }

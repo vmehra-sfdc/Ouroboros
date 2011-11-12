@@ -41,16 +41,27 @@
 %% 
 Unstable
 { 
-	stabilize 
-		EstablishReplicators{}
+	stabilize
+		EstablishReplicators{
+			failover();
+			filterSystemMembership();
+		}
+
 	destabilize
+		nil {}
+}
+
+Stable {
+	rebalance
+		[ctxt.isLeader()]
+		Rebalance/push(ControllerFSM::CoordinateRebalance) {}
+	
+	rebalance
 		nil {}
 }
 
 EstablishReplicators
 Entry {
-	failover();
-	filterSystemMembership();
 	openReplicators();
 }
 {
@@ -73,7 +84,7 @@ Entry {
 }
 {
 	rebalanced
-		AnnounceTakeOver{}
+		AwaitingTakeOver{}
 		
 	destabiliize
 		Unstable{
@@ -81,9 +92,14 @@ Entry {
 		}
 }
 
-AnnounceTakeOver {
-	takeoverAcknowledged
-		TakeOver{}
+AwaitingTakeOver {
+	commitTakeOver
+		Stable{}
+	
+	destabilize
+		Unstable {
+			cleanUpRebalancing();
+		}
 }
 
 TakeOver {
@@ -91,16 +107,74 @@ TakeOver {
 		Stable{}
 }
 
-Stable {
-	rebalance
-		Rebalance{}
-}
-
 Shutdown {
+	destabilized
+		nil {}
 }
 
 Default {
 	destabilize
 		Unstable{}
+}
+%%
+%map ControllerFSM
+%%
+CoordinateReplicators
+Entry{
+	establishReplicators();
+}
+{
+	replicatorsEstablished
+		[ctxt.tallyComplete()]
+		pop(established) {}
+		
+	replicatorsEstablished
+		nil {}
+		
+	destabilize
+		pop(destablize) {}
+}
+
+CoordinateRebalance
+Entry{
+	triggerRebalance();
+	rebalance();
+}
+{
+	rebalanced
+		nil {}
+		
+	memberRebalanced
+		[ctxt.tallyComplete()]
+		CoordinateTakeOver{}
+		
+	memberRebalanced
+		nil {}
+		
+	destabilized
+		pop(destabilize) {
+			revertRebalancing();
+		}
+		
+}
+
+CoordinateTakeOver
+Entry{
+	triggerTakeOver();
+}
+{
+	memberTakeOverComplete
+		[ctxt.tallyComplete()]
+		pop(takoverComplete) {
+			switchProducers();
+		}
+		
+	memberTakeOverComplete
+		nil {}
+		
+	destabilize
+		pop(destablize) {
+			revertRebalancing();
+		}
 }
 %%

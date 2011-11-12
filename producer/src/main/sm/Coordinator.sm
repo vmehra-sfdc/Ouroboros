@@ -43,9 +43,6 @@
 Suspended{
 	stabilized
 		Stable{}
-		
-	destabilized
-		Unstable{}
 }
 
 Unstable{
@@ -63,4 +60,9 @@ Entry {
 	failover();
 }
 {}
+
+Default {
+	destabilized
+		Unstable{}
+}
 %%

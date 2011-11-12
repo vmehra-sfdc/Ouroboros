@@ -111,7 +111,8 @@ public class TestCoordinator {
         ring.add(node1, 1);
         ring.add(node2, 1);
         ring.add(node3, 1);
-        coordinator.updateRing(ring);
+        coordinator.setNextRing(ring);
+        coordinator.commitNextRing();
         UUID primary = null;
         while (primary == null) {
             UUID test = UUID.randomUUID();
@@ -206,7 +207,8 @@ public class TestCoordinator {
         ring.add(node1, 1);
         ring.add(node2, 1);
         ring.add(node3, 1);
-        coordinator.updateRing(ring);
+        coordinator.setNextRing(ring);
+        coordinator.commitNextRing();
         UUID primary = null;
         while (primary == null) {
             UUID test = UUID.randomUUID();
@@ -260,7 +262,7 @@ public class TestCoordinator {
                              contactInformation2, 0);
         coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node3,
                              contactInformation3, 0);
-        coordinator.newMembers.addAll(Arrays.asList(node1, node2, node3));
+        coordinator.getNewMembers().addAll(Arrays.asList(node1, node2, node3));
         Rendezvous rendezvous = coordinator.openReplicators();
         assertNotNull(rendezvous);
         assertEquals(3, rendezvous.getParties());
@@ -290,7 +292,8 @@ public class TestCoordinator {
         ring.add(node1, 1);
         ring.add(node2, 1);
         ring.add(node3, 1);
-        coordinator.updateRing(ring);
+        coordinator.setNextRing(ring);
+        coordinator.commitNextRing();
         UUID primary = null;
         while (primary == null) {
             UUID test = UUID.randomUUID();
@@ -315,7 +318,8 @@ public class TestCoordinator {
         ConsistentHashFunction<Node> newRing = ring.clone();
         newRing.remove(removedMirror);
         newRing.remove(removedPrimary);
-        Map<UUID, Node[][]> remapped = coordinator.remap(newRing);
+        coordinator.setNextRing(newRing);
+        Map<UUID, Node[][]> remapped = coordinator.remap();
         List<Node> deadMembers = Arrays.asList(removedPrimary, removedMirror);
         coordinator.rebalance(remapped, deadMembers);
         verify(weaver).rebalance(primary, remapped.get(primary)[0],
@@ -344,7 +348,8 @@ public class TestCoordinator {
         ring.add(node1, 1);
         ring.add(node2, 1);
         ring.add(node3, 1);
-        coordinator.updateRing(ring);
+        coordinator.setNextRing(ring);
+        coordinator.commitNextRing();
         UUID primary = null;
         while (primary == null) {
             UUID test = UUID.randomUUID();
@@ -366,7 +371,8 @@ public class TestCoordinator {
         ConsistentHashFunction<Node> newRing = ring.clone();
         newRing.remove(coordinator.getReplicationPair(primary)[1]);
         newRing.remove(coordinator.getReplicationPair(mirror)[0]);
-        Map<UUID, Node[][]> remapped = coordinator.remap(newRing);
+        coordinator.setNextRing(newRing);
+        Map<UUID, Node[][]> remapped = coordinator.remap();
         assertNotNull(remapped);
         assertEquals(2, remapped.size());
         assertNotNull(remapped.get(primary));

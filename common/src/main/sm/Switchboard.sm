@@ -44,7 +44,7 @@ Unstable {
 	stabilized(view: View, leader: int)
 		Advertising{
 			stabilize(view, leader);
-			member.advertise();
+			advertise();
 		}
 	unstable
 		nil{}

@@ -42,7 +42,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -57,6 +56,7 @@ import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.util.Association;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
+import com.salesforce.ouroboros.util.lockfree.LockFreeSet;
 
 /**
  * The distributed coordinator for the channel buffer process group.
@@ -65,22 +65,23 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * 
  */
 public class Coordinator implements Member {
-    private final static Logger                                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
-    static final int                                            DEFAULT_TIMEOUT = 1;
-    static final TimeUnit                                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
+    static final int                            DEFAULT_TIMEOUT = 1;
+    static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
+    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
 
-    private final Set<UUID>                                     channels        = new HashSet<UUID>();
-    private final CoordinatorContext                            fsm             = new CoordinatorContext(
-                                                                                                         this);
-    private final Node                                          id;
-    private final SortedSet<Node>                               members         = new ConcurrentSkipListSet<Node>();
-    private final Switchboard                                   switchboard;
-    private final ScheduledExecutorService                      timer;
-    private final Weaver                                        weaver;
-    private final AtomicReference<ConsistentHashFunction<Node>> weaverRing      = new AtomicReference<ConsistentHashFunction<Node>>(
-                                                                                                                                    new ConsistentHashFunction<Node>());
-    private final Map<Node, ContactInformation>                 yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
-    final SortedSet<Node>                                       newMembers      = new ConcurrentSkipListSet<Node>();
+    private final Set<UUID>                     channels        = new HashSet<UUID>();
+    private final CoordinatorContext            fsm             = new CoordinatorContext(
+                                                                                         this);
+    private final Node                          id;
+    private final SortedSet<Node>               members         = new ConcurrentSkipListSet<Node>();
+    private final ArrayList<Node>               newMembers      = new ArrayList<Node>();
+    private ConsistentHashFunction<Node>        nextRing;
+    private final Switchboard                   switchboard;
+    private final LockFreeSet<Node>             tally           = new LockFreeSet<Node>();
+    private final ScheduledExecutorService      timer;
+    private final Weaver                        weaver;
+    private ConsistentHashFunction<Node>        weaverRing      = new ConsistentHashFunction<Node>();
+    private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
                        Weaver weaver) {
@@ -205,7 +206,7 @@ public class Coordinator implements Member {
      * @return the tuple of primary and mirror nodes for this channel
      */
     public Node[] getReplicationPair(UUID channel) {
-        List<Node> pair = weaverRing.get().hash(point(channel), 2);
+        List<Node> pair = weaverRing.hash(point(channel), 2);
         return new Node[] { pair.get(0), pair.get(1) };
     }
 
@@ -286,8 +287,18 @@ public class Coordinator implements Member {
 
     }
 
+    protected void commitNextRing() {
+        weaverRing = nextRing;
+        nextRing = null;
+    }
+
     protected void destabilizePartition() {
         switchboard.destabilize();
+    }
+
+    protected void establishReplicators() {
+        // TODO Auto-generated method stub
+
     }
 
     /**
@@ -322,7 +333,11 @@ public class Coordinator implements Member {
         return id.compareTo(members.last()) >= 0;
     }
 
-    protected ConsistentHashFunction<Node> nextRing() {
+    /**
+     * Calculate the next ring based on the current member set and the new
+     * member set
+     */
+    protected void calculateNextRing() {
         ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
         for (Node node : members) {
             newRing.add(node, node.capacity);
@@ -330,7 +345,7 @@ public class Coordinator implements Member {
         for (Node node : newMembers) {
             newRing.add(node, node.capacity);
         }
-        return newRing;
+        nextRing = newRing;
     }
 
     /**
@@ -377,7 +392,8 @@ public class Coordinator implements Member {
     }
 
     protected void rebalance() {
-        rebalance(remap(nextRing()), switchboard.getDeadMembers());
+        calculateNextRing();
+        rebalance(remap(), switchboard.getDeadMembers());
     }
 
     /**
@@ -415,19 +431,17 @@ public class Coordinator implements Member {
     }
 
     /**
-     * Answer the remapped primary/mirror pairs given the new ring
+     * Answer the remapped primary/mirror pairs using the nextRing
      * 
-     * @param newRing
-     *            - the new consistent hash ring of nodes
      * @return the remapping of channels hosted on this node that have changed
      *         their primary or mirror in the new hash ring
      */
-    protected Map<UUID, Node[][]> remap(ConsistentHashFunction<Node> newRing) {
+    protected Map<UUID, Node[][]> remap() {
         Map<UUID, Node[][]> remapped = new HashMap<UUID, Node[][]>();
         for (UUID channel : channels) {
             long channelPoint = point(channel);
-            List<Node> newPair = newRing.hash(channelPoint, 2);
-            List<Node> oldPair = weaverRing.get().hash(channelPoint, 2);
+            List<Node> newPair = nextRing.hash(channelPoint, 2);
+            List<Node> oldPair = weaverRing.hash(channelPoint, 2);
             if (oldPair.contains(id)) {
                 if (!oldPair.get(0).equals(newPair.get(0))
                     || !oldPair.get(1).equals(newPair.get(1))) {
@@ -443,13 +457,46 @@ public class Coordinator implements Member {
         return remapped;
     }
 
+    protected void revertRebalancing() {
+        // TODO Auto-generated method stub
+
+    }
+
+    protected void switchProducers() {
+        // TODO Auto-generated method stub
+
+    }
+
+    protected boolean tallyComplete() {
+        return tally.size() == members.size();
+    }
+
+    protected void triggerRebalance() {
+        // TODO Auto-generated method stub
+        tally.clear();
+    }
+
+    protected void triggerTakeOver() {
+        // TODO Auto-generated method stub
+        tally.clear();
+    }
+
     /**
-     * Update the consistent hash function for the weaver processs ring.
+     * Test access
+     * 
+     * @return the list of new membersê
+     */
+    List<Node> getNewMembers() {
+        return newMembers;
+    }
+
+    /**
+     * Set the consistent hash function for the next weaver processs ring.
      * 
      * @param ring
      *            - the updated consistent hash function
      */
-    protected void updateRing(ConsistentHashFunction<Node> ring) {
-        weaverRing.set(ring);
+    void setNextRing(ConsistentHashFunction<Node> ring) {
+        nextRing = ring;
     }
 }
