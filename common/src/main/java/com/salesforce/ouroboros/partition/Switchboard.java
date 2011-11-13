@@ -130,7 +130,7 @@ public class Switchboard {
     private final SwitchboardContext    fsm             = new SwitchboardContext(
                                                                                  this);
     private boolean                     leader          = false;
-    private Member                              member;
+    private Member                      member;
     private SortedSet<Node>             members         = new ConcurrentSkipListSet<Node>();
     private final Executor              messageProcessor;
     private final PartitionNotification notification    = new Notification();
@@ -138,7 +138,7 @@ public class Switchboard {
     private ArrayList<Node>             previousMembers = new ArrayList<Node>();
     private NodeIdSet                   previousView;
     private final Node                  self;
-    private NodeIdSet                 view;
+    private NodeIdSet                   view;
 
     public Switchboard(Node node, Partition p) {
         self = node;
@@ -207,6 +207,10 @@ public class Switchboard {
 
     public Collection<Node> getDeadMembers() {
         return deadMembers;
+    }
+
+    public Member getMember() {
+        return member;
     }
 
     public Collection<Node> getMembers() {

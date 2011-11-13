@@ -45,6 +45,7 @@ Unstable
 		EstablishReplicators{
 			failover();
 			filterSystemMembership();
+			closeDeadReplicators();
 		}
 
 	destabilize
@@ -58,13 +59,12 @@ Stable {
 	
 	rebalance
 		nil {}
+		
+    establishReplicators
+        EstablishReplicators{}
 }
 
-EstablishReplicators
-Entry {
-	openReplicators();
-}
-{
+EstablishReplicators {
 	replicatorsEstablished
 		Stable{}
 	
@@ -84,16 +84,16 @@ Entry {
 }
 {
 	rebalanced
-		AwaitingTakeOver{}
+		AwaitingTakeover{}
 		
-	destabiliize
+	destabilize
 		Unstable{
 			cleanUpRebalancing();
 		}
 }
 
-AwaitingTakeOver {
-	commitTakeOver
+AwaitingTakeover {
+	commitTakeover
 		Stable{}
 	
 	destabilize
@@ -102,9 +102,12 @@ AwaitingTakeOver {
 		}
 }
 
-TakeOver {
-	commitTakeOver
+Takeover {
+	commitTakeover
 		Stable{}
+		
+    takeoverComplete
+        Stable{}
 }
 
 Shutdown {
@@ -121,23 +124,23 @@ Default {
 %%
 CoordinateReplicators
 Entry{
-	establishReplicators();
+	coordinateReplicators();
 }
 {
 	replicatorsEstablished
 		[ctxt.tallyComplete()]
-		pop(established) {}
+		pop(replicatorsEstablished) {}
 		
 	replicatorsEstablished
 		nil {}
 		
 	destabilize
-		pop(destablize) {}
+		pop(destabilize) {}
 }
 
 CoordinateRebalance
 Entry{
-	triggerRebalance();
+	coordinateRebalance();
 	rebalance();
 }
 {
@@ -146,7 +149,7 @@ Entry{
 		
 	memberRebalanced
 		[ctxt.tallyComplete()]
-		CoordinateTakeOver{}
+		CoordinateTakeover{}
 		
 	memberRebalanced
 		nil {}
@@ -158,22 +161,22 @@ Entry{
 		
 }
 
-CoordinateTakeOver
+CoordinateTakeover
 Entry{
-	triggerTakeOver();
+	coordinateTakeover();
 }
 {
-	memberTakeOverComplete
+	memberTakeoverComplete
 		[ctxt.tallyComplete()]
-		pop(takoverComplete) {
+		pop(takeoverComplete) {
 			switchProducers();
 		}
 		
-	memberTakeOverComplete
+	memberTakeoverComplete
 		nil {}
 		
 	destabilize
-		pop(destablize) {
+		pop(destabilize) {
 			revertRebalancing();
 		}
 }

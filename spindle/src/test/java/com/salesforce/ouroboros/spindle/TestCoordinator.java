@@ -239,6 +239,7 @@ public class TestCoordinator {
         when(weaver.getId()).thenReturn(new Node(0, 0, 0));
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
         Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        Node node = new Node(0, 0, 0);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -263,7 +264,7 @@ public class TestCoordinator {
         coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node3,
                              contactInformation3, 0);
         coordinator.getNewMembers().addAll(Arrays.asList(node1, node2, node3));
-        Rendezvous rendezvous = coordinator.openReplicators();
+        Rendezvous rendezvous = coordinator.openReplicators(node);
         assertNotNull(rendezvous);
         assertEquals(3, rendezvous.getParties());
 

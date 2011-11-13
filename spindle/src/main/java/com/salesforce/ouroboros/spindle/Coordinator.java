@@ -53,6 +53,7 @@ import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
+import com.salesforce.ouroboros.spindle.messages.ReplicatorMessage;
 import com.salesforce.ouroboros.util.Association;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
@@ -82,6 +83,7 @@ public class Coordinator implements Member {
     private final Weaver                        weaver;
     private ConsistentHashFunction<Node>        weaverRing      = new ConsistentHashFunction<Node>();
     private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
+    private int                                 targetTally;
 
     public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
                        Weaver weaver) {
@@ -272,9 +274,80 @@ public class Coordinator implements Member {
                          requester);
     }
 
+    /**
+     * Open the replicators to the the new members
+     * 
+     * @param controller
+     *            - the controller for the group
+     * 
+     * @return - the Rendezvous used to synchronize with replication connections
+     */
+    public Rendezvous openReplicators(final Node controller) {
+        Runnable rendezvousAction = new Runnable() {
+            @Override
+            public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Replicators established on %s", id));
+                }
+                fsm.replicatorsEstablished();
+                switchboard.send(new Message(
+                                             id,
+                                             ReplicatorMessage.REPLICATORS_ESTABLISHED),
+                                 controller);
+            }
+        };
+        if (newMembers.isEmpty()) {
+            rendezvousAction.run();
+            return null;
+        }
+        Runnable timeoutAction = new Runnable() {
+            @Override
+            public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Replicator establishment timed out on %s",
+                                           id));
+                }
+                fsm.replicatorsEstablishmentTimeout();
+            }
+        };
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Establishment of replicators initiated on %s",
+                                   id));
+        }
+        Rendezvous rendezvous = new Rendezvous(newMembers.size(),
+                                               rendezvousAction);
+        for (Node member : newMembers) {
+            weaver.openReplicator(member, yellowPages.get(member), rendezvous);
+        }
+        rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer,
+                                        timeoutAction);
+        return rendezvous;
+    }
+
+    public void replicatorsEstablished(Node sender) {
+        assert isLeader() : "Replicator established method must only be sent to the group leader";
+        tally.add(sender);
+        fsm.replicatorsEstablished();
+    }
+
     @Override
     public void stabilized() {
         fsm.stabilize();
+    }
+
+    /**
+     * Calculate the next ring based on the current member set and the new
+     * member set
+     */
+    protected void calculateNextRing() {
+        ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
+        for (Node node : members) {
+            newRing.add(node, node.capacity);
+        }
+        for (Node node : newMembers) {
+            newRing.add(node, node.capacity);
+        }
+        nextRing = newRing;
     }
 
     protected void cleanUpPendingReplicators() {
@@ -287,18 +360,55 @@ public class Coordinator implements Member {
 
     }
 
+    protected void closeDeadReplicators() {
+        for (Node node : switchboard.getDeadMembers()) {
+            weaver.closeReplicator(node);
+        }
+    }
+
+    /**
+     * Commit the calculated next ring as the current weaver ring
+     */
     protected void commitNextRing() {
+        assert nextRing != null : "Next ring has not been calculated";
         weaverRing = nextRing;
         nextRing = null;
     }
 
-    protected void destabilizePartition() {
-        switchboard.destabilize();
+    /**
+     * The
+     */
+    protected void coordinateRebalance() {
+        assert isLeader() : "Must be leader to coordinate the rebalance";
+        // TODO Auto-generated method stub
+        tally.clear();
     }
 
-    protected void establishReplicators() {
-        // TODO Auto-generated method stub
+    /**
+     * The receiver is the coordinator for the group. Coordinate the
+     * establishment of the replicators on the members and new members of the
+     * group
+     */
+    protected void coordinateReplicators() {
+        assert isLeader() : "Must be leader to coordinate the establishment of replicators";
+        tally.clear();
+        targetTally = members.size() + newMembers.size();
+        Message message = new Message(id, ReplicatorMessage.OPEN_REPLICATORS);
+        switchboard.broadcast(message, members);
+        switchboard.broadcast(message, newMembers);
+    }
 
+    protected void coordinateTakeover() {
+        assert isLeader() : "Must be leader to coordinate the takeover";
+        // TODO Auto-generated method stub
+        tally.clear();
+    }
+
+    /**
+     * A fatal state exception occurred, so destabilize the partition
+     */
+    protected void destabilizePartition() {
+        switchboard.destabilize();
     }
 
     /**
@@ -329,66 +439,13 @@ public class Coordinator implements Member {
         }
     }
 
+    /**
+     * Answer true if the receiver is the leader of the group
+     * 
+     * @return
+     */
     protected boolean isLeader() {
         return id.compareTo(members.last()) >= 0;
-    }
-
-    /**
-     * Calculate the next ring based on the current member set and the new
-     * member set
-     */
-    protected void calculateNextRing() {
-        ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
-        for (Node node : members) {
-            newRing.add(node, node.capacity);
-        }
-        for (Node node : newMembers) {
-            newRing.add(node, node.capacity);
-        }
-        nextRing = newRing;
-    }
-
-    /**
-     * Open the replicators to the the new members
-     * 
-     * @return - the Rendezvous used to synchronize with replication connections
-     */
-    protected Rendezvous openReplicators() {
-        if (newMembers.isEmpty()) {
-            fsm.replicatorsEstablished();
-            return null;
-        }
-        Runnable rendezvousAction = new Runnable() {
-            @Override
-            public void run() {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Replicators established on %s", id));
-                }
-                fsm.replicatorsEstablished();
-            }
-        };
-        Runnable timeoutAction = new Runnable() {
-            @Override
-            public void run() {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Replicator establishment timed out on %s",
-                                           id));
-                }
-                fsm.replicatorsEstablishmentTimeout();
-            }
-        };
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Establishment of replicators initiated on %s",
-                                   id));
-        }
-        Rendezvous rendezvous = new Rendezvous(newMembers.size(),
-                                               rendezvousAction);
-        for (Node member : newMembers) {
-            weaver.openReplicator(member, yellowPages.get(member), rendezvous);
-        }
-        rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer,
-                                        timeoutAction);
-        return rendezvous;
     }
 
     protected void rebalance() {
@@ -467,18 +524,11 @@ public class Coordinator implements Member {
 
     }
 
+    /**
+     * @return true if the tally is equal to the required size
+     */
     protected boolean tallyComplete() {
-        return tally.size() == members.size();
-    }
-
-    protected void triggerRebalance() {
-        // TODO Auto-generated method stub
-        tally.clear();
-    }
-
-    protected void triggerTakeOver() {
-        // TODO Auto-generated method stub
-        tally.clear();
+        return tally.size() == targetTally;
     }
 
     /**
