@@ -59,7 +59,7 @@
 					</execution>
 				</executions>
 				<configuration>
-					<goalPrefix>smc-plugin</goalPrefix>
+					<goalPrefix>smc</goalPrefix>
 				</configuration>
 			</plugin>
 			<plugin>
