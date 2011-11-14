@@ -534,7 +534,7 @@ public class Coordinator implements Member {
     /**
      * Test access
      * 
-     * @return the list of new membersê
+     * @return the list of new members
      */
     List<Node> getNewMembers() {
         return newMembers;
