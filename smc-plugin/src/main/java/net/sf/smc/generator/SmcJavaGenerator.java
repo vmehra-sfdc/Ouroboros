@@ -34,9 +34,13 @@
 
 package net.sf.smc.generator;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+
 import net.sf.smc.model.SmcAction;
 import net.sf.smc.model.SmcElement;
 import net.sf.smc.model.SmcElement.TransType;
@@ -61,6 +65,9 @@ import net.sf.smc.model.SmcVisitor;
 public final class SmcJavaGenerator
     extends SmcCodeGenerator
 {
+    
+    private boolean requiresPush = false;
+    
 //---------------------------------------------------------------
 // Member methods
 //
@@ -133,7 +140,9 @@ public final class SmcJavaGenerator
             _source.println();
         }
         
-        _source.println("import java.util.logging.Logger;");
+        _source.println("import java.util.logging.*;"); 
+        _source.println("import statemap.*;");
+        _source.println("import java.util.*;");
 
         // Do user-specified imports now.
         for (String imp: fsm.getImports())
@@ -167,7 +176,7 @@ public final class SmcJavaGenerator
         _source.print(" class ");
         _source.print(fsmClassName);
         _source.println("");
-        _source.println("    extends statemap.FSMContext");
+        _source.println("    extends FSMContext");
 
         if (_serialFlag == true)
         {
@@ -416,82 +425,6 @@ public final class SmcJavaGenerator
             _source.println();
         }
 
-        // If serialization is turned on, then output the
-        // writeObject and readObject methods.
-        if (_serialFlag == true)
-        {
-            _source.print(
-                "    private void writeObject(");
-            _source.println(
-                "java.io.ObjectOutputStream ostream)");
-            _source.println(
-                "        throws java.io.IOException");
-            _source.println("    {");
-            _source.println(
-                "        int size =");
-            _source.print("            ");
-            _source.println(
-                "(_stateStack == null ? 0 : _stateStack.size());");
-            _source.println("        int i;");
-            _source.println();
-            _source.println(
-                "        ostream.writeInt(size);");
-            _source.println();
-            _source.println(
-                "        for (i = 0; i < size; ++i)");
-            _source.println("        {");
-            _source.println("            ostream.writeInt(");
-            _source.print("                ((");
-            _source.print(context);
-            _source.println(
-                "State) _stateStack.get(i)).getId());");
-            _source.println("        }");
-            _source.println();
-            _source.println(
-                "        ostream.writeInt(_state.getId());");
-            _source.println();
-            _source.println("        return;");
-            _source.println("    }");
-            _source.println();
-            _source.print("    private void readObject(");
-            _source.println(
-                "java.io.ObjectInputStream istream)");
-            _source.println(
-                "        throws java.io.IOException");
-            _source.println("    {");
-            _source.println("        int size;");
-            _source.println();
-            _source.println("        size = istream.readInt();");
-            _source.println();
-            _source.println("        if (size == 0)");
-            _source.println("        {");
-            _source.println("            _stateStack = null;");
-            _source.println("        }");
-            _source.println("        else");
-            _source.println("        {");
-            _source.println("            int i;");
-            _source.println();
-            _source.println("            _stateStack =");
-            _source.println(
-                "                new java.util.Stack<statemap.State>();");
-            _source.println();
-            _source.println(
-                "            for (i = 0; i < size; ++i)");
-            _source.println("            {");
-            _source.print(
-                "                _stateStack.add(i, _States[");
-            _source.println("istream.readInt()]);");
-            _source.println("            }");
-            _source.println("        }");
-            _source.println();
-            _source.println(
-                "        _state = _States[istream.readInt()];");
-            _source.println();
-            _source.println("        return;");
-            _source.println("    }");
-            _source.println();
-        }
-
         // Declare member data.
         _source.println(
             "//---------------------------------------------------------------");
@@ -672,6 +605,50 @@ public final class SmcJavaGenerator
             map.accept(this);
         }
 
+
+        // If serialization is turned on, then output the
+        // writeObject and readObject methods.
+        if (_serialFlag == true)
+        {
+            _source.print(
+                "    private void writeObject(");
+            _source.println(
+                "java.io.ObjectOutputStream ostream)");
+            _source.println(
+                "        throws java.io.IOException");
+            _source.println("    {");
+            if (requiresPush) {
+                generateWritePushSupport(context);
+            }
+            _source.println();
+            _source.println(
+                "        ostream.writeInt(_state.getId());");
+            _source.println();
+            _source.println("        return;");
+            _source.println("    }");
+            _source.println();
+            _source.print("    private void readObject(");
+            _source.println(
+                "java.io.ObjectInputStream istream)");
+            _source.println(
+                "        throws java.io.IOException");
+            _source.println("    {");
+            if (requiresPush) {
+                generateReadPushSupport();
+            }
+            _source.println();
+            _source.println(
+                "        _state = _States[istream.readInt()];");
+            _source.println();
+            _source.println("        return;");
+            _source.println("    }");
+            _source.println();
+        }
+        
+        if (requiresPush) {
+            generatePushSupport();
+        }
+
         // End of context class.
         _source.println("}");
 
@@ -684,6 +661,55 @@ public final class SmcJavaGenerator
 
         return;
     } // end of visit(SmcFSM)
+
+    private void generateWritePushSupport(String context) {
+        _source.println(
+                "        int size =");
+            _source.print("            ");
+            _source.println(
+                "(_stateStack == null ? 0 : _stateStack.size());");
+            _source.println("        int i;");
+            _source.println();
+            _source.println(
+                "        ostream.writeInt(size);");
+            _source.println();
+            _source.println(
+                "        for (i = 0; i < size; ++i)");
+            _source.println("        {");
+            _source.println("            ostream.writeInt(");
+            _source.print("                ((");
+            _source.print(context);
+            _source.println(
+                "State) _stateStack.get(i)).getId());");
+            _source.println("        }");
+    }
+    
+    private void generateReadPushSupport() { 
+        _source.println("        int size;");
+        _source.println();
+        _source.println("        size = istream.readInt();");
+        _source.println();
+        _source.println("        if (size == 0)");
+        _source.println("        {");
+        _source.println("            _stateStack = null;");
+        _source.println("        }");
+        _source.println("        else");
+        _source.println("        {");
+        _source.println("            int i;");
+        _source.println();
+        _source.println("            _stateStack =");
+        _source.println(
+            "                new java.util.Stack<statemap.State>();");
+        _source.println();
+        _source.println(
+            "            for (i = 0; i < size; ++i)");
+        _source.println("            {");
+        _source.print(
+            "                _stateStack.add(i, _States[");
+        _source.println("istream.readInt()]);");
+        _source.println("            }");
+        _source.println("        }");
+    }
 
     /**
      * Emits Java code for the FSM map.
@@ -1640,6 +1666,7 @@ public final class SmcJavaGenerator
         }
         else if (transType == TransType.TRANS_PUSH)
         {
+            requiresPush=true;
             // Set the next state so this it can be pushed
             // onto the state stack. But only do so if a clear
             // state was done.
@@ -1854,6 +1881,20 @@ public final class SmcJavaGenerator
 
         return;
     } // end of reflectionSets(List<String>, List<SmcMap>)
+    
+    private void generatePushSupport() {
+        InputStream is = (getClass().getResourceAsStream("pushSupport.txt"));
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        try {
+            for (int read = is.read(buffer); read != -1; read = is.read(buffer)) {
+                baos.write( buffer, 0, read);
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Cannot write push support");
+        }
+        _source.println(baos.toString());
+    }
 
 //---------------------------------------------------------------
 // Member data

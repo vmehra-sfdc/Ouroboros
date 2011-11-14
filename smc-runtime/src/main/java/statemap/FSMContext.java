@@ -33,8 +33,6 @@
 
 package statemap;
 
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyChangeSupport;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -69,12 +67,9 @@ public abstract class FSMContext
      */
     protected FSMContext(State initState)
     {
-        _name = "FSMContext";
         _state = initState;
         _transition = "";
         _previousState = null;
-        _stateStack = null;
-        _listeners = new PropertyChangeSupport(this);
     } // end of FSMContext(State)
 
     //
@@ -105,9 +100,6 @@ public abstract class FSMContext
     {
         istream.defaultReadObject();
 
-        // Create an empty listeners list.
-        _listeners = new PropertyChangeSupport(this);
-
         return;
     } // end of readObject(ObjectInputStream)
 
@@ -124,15 +116,6 @@ public abstract class FSMContext
      * @return the Logger
      */
     abstract public Logger getLog();
-
-    /**
-     * Returns the FSM name.
-     * @return the FSM name.
-     */
-    public String getName()
-    {
-        return (_name);
-    } // end of getName()
 
     /**
      * Returns {@code true} if this FSM is in a transition and
@@ -179,22 +162,6 @@ public abstract class FSMContext
     //
 
     /**
-     * Sets the FSM name.
-     * @param name The finite state machine name.
-     */
-    public void setName(String name)
-    {
-        if (name != null &&
-            name.length() > 0 &&
-            name.equals(_name) == false)
-        {
-            _name = name;
-        }
-
-        return;
-    } // end of setName(String)
-
-    /**
      * Sets the current state to the given value.
      * @param state The current state.
      */
@@ -207,11 +174,6 @@ public abstract class FSMContext
         }
 
         _state = state;
-
-        // Inform any and all listeners about this state
-        // change.
-        _listeners.firePropertyChange(
-            STATE_PROPERTY, _previousState, _state);
 
         return;
     } // end of setState(State)
@@ -228,164 +190,31 @@ public abstract class FSMContext
         return;
     } // end of clearState()
 
-    /**
-     * Pushes the current state on top of the state stack and
-     * sets the current state to {@code state}.
-     * @param state The new current state.
-     * @exception NullPointerException
-     * if {@code state} is {@code null}.
-     */
-    public void pushState(State state)
-    {
-        State previousState = _state;
-
-        if (_state == null)
-        {
-            throw (new NullPointerException());
-        }
-
-        if (getLog().isLoggable(Level.FINEST))
-        {
-            getLog().finest(String.format("PUSH TO STATE   : %s",
-                                     state.getName()));
-        }
-
-        if (_stateStack == null)
-        {
-            _stateStack = new java.util.Stack<State>();
-        }
-
-        _stateStack.push(_state);
-        _state = state;
-
-        // Inform any and all listeners about this state
-        // change.
-        _listeners.firePropertyChange(
-            STATE_PROPERTY, previousState, _state);
-
-        return;
-    } // end of pushState(State)
-
-    /**
-     * Sets the previous state to the current state and pops
-     * the top state off the stack and places it into the
-     * current state.
-     * @exception EmptyStackException
-     * if the state stack is empty.
-     */
+    public void pushState(State state) {
+        throw new UnsupportedOperationException("Push support has not been generated for this FSM Context");
+    }
+    
     public void popState()
-        throws EmptyStackException
-    {
-        if (_stateStack == null ||
-            _stateStack.isEmpty() == true)
-        {
-            if (getLog().isLoggable(Level.FINEST))
-            {
-                getLog().finest(
-                    "POPPING ON EMPTY STATE STACK.");
-            }
-
-            throw (new EmptyStackException());
-        }
-        else
-        {
-            State previousState = _state;
-
-            // The pop method removes the top element
-            // from the stack and returns it.
-            _state = _stateStack.pop();
-
-            if (_stateStack.isEmpty() == true)
-            {
-                _stateStack = null;
-            }
-
-            if (getLog().isLoggable(Level.FINEST))
-            {
-                getLog().finest(String.format("POP TO STATE    : %s",
-                                      _state.getName()));
-            }
-
-            // Inform any and all listeners about this state
-            // change.
-            _listeners.firePropertyChange(
-                STATE_PROPERTY, previousState, _state);
-        }
-
-        return;
-    } // end of popState()
-
-    /**
-     * Empties the state stack.
-     */
-    public void emptyStateStack()
-    {
-        if (_stateStack != null)
-        {
-            _stateStack.clear();
-            _stateStack = null;
-        }
-
-        return;
-    } // end of emptyStateStack()
+            throws EmptyStackException {
+        throw new UnsupportedOperationException("Push support has not been generated for this FSM Context");
+    }
+    public void emptyStateStack() {
+        throw new UnsupportedOperationException("Push support has not been generated for this FSM Context");
+    }
 
     //
     // end of Set methods.
     //-----------------------------------------------------------
 
-    // The following methods allow listeners to watch this
-    // finite state machine for state changes.
-    // Note: if a transition does not cause a state change,
-    // then no state change event is fired.
-
-    /**
-     * Adds a PropertyChangeListener to the listener list. The
-     * listener is registered for state property changes only.
-     * The same listener may be added more than once. For each
-     * state change, the listener will be invoked the number of
-     * times it was added. If {@code listener} is {@code null},
-     * no exception is thrown and no action is taken.
-     * @param listener The PropertyChangeListener to be added.
-     */
-    public void
-        addStateChangeListener(PropertyChangeListener listener)
-    {
-        _listeners.addPropertyChangeListener(
-            STATE_PROPERTY, listener);
-        return;
-    }
-
-    /**
-     * Removes a PropertyChangeListener for the state change
-     * property. If {@code listener} was added more than once
-     * to the same event source, it will be notified one less
-     * time after being removed. If {@code listener} is
-     * {@code null} or was never added, no exception is thrown
-     * and no action is taken.
-     * @param listener The PropertyChangeListener to be removed.
-     */
-    public void
-        removeStateChangeListener(
-            PropertyChangeListener listener)
-    {
-        _listeners.removePropertyChangeListener(
-            STATE_PROPERTY, listener);
-        return;
-    } // end of removeStateChangeListener(PropertyChangeListener)
     
     @Override
     public String toString() {
-        return String.format("%s[current=%s, previous=%s, stack=%s]", getClass().getCanonicalName(), _state, _previousState, _stateStack);
+        return String.format("%s[current=%s, previous=%s, transition=%s]", getClass().getCanonicalName(), _state, _previousState, _transition);
     }
 
 //---------------------------------------------------------------
 // Member data
 //
-
-    /**
-     * The FSM name.
-     */
-    transient protected String _name;
 
     /**
      * The current state. Will be {@code null} while in
@@ -405,20 +234,10 @@ public abstract class FSMContext
      */
     transient volatile protected State _previousState;
 
-    /**
-     * This stack is used to store the current state when a push
-     * transition is taken.
-     */
-    transient protected java.util.Stack<State> _stateStack;
-
-    // Stores the property change listeners here.
-    transient private PropertyChangeSupport _listeners;
-
     //-----------------------------------------------------------
     // Constants.
     //
     private static final long serialVersionUID = 0x060000L;
-    private static final String STATE_PROPERTY = "State";
 } // end of class FSMContext
 
 //
