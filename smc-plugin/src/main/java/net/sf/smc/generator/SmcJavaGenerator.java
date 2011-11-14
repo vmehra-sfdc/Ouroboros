@@ -142,7 +142,6 @@ public final class SmcJavaGenerator
         
         _source.println("import java.util.logging.*;"); 
         _source.println("import statemap.*;");
-        _source.println("import java.util.*;");
 
         // Do user-specified imports now.
         for (String imp: fsm.getImports())

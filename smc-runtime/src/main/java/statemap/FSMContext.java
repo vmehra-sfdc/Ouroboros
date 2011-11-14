@@ -36,7 +36,6 @@ package statemap;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
-import java.util.EmptyStackException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -194,8 +193,7 @@ public abstract class FSMContext
         throw new UnsupportedOperationException("Push support has not been generated for this FSM Context");
     }
     
-    public void popState()
-            throws EmptyStackException {
+    public void popState() {
         throw new UnsupportedOperationException("Push support has not been generated for this FSM Context");
     }
     public void emptyStateStack() {

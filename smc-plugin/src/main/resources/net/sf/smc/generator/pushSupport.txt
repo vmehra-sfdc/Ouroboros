@@ -36,11 +36,9 @@
      * Sets the previous state to the current state and pops
      * the top state off the stack and places it into the
      * current state.
-     * @exception EmptyStackException
      * if the state stack is empty.
      */
     public void popState()
-        throws EmptyStackException
     {
         if (_stateStack == null ||
             _stateStack.isEmpty() == true)
@@ -51,7 +49,7 @@
                     "POPPING ON EMPTY STATE STACK.");
             }
 
-            throw (new EmptyStackException());
+            throw (new RuntimeException("Empty Stack"));
         }
         else
         {
