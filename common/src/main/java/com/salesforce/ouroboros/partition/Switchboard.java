@@ -327,7 +327,7 @@ public class Switchboard {
      * Stabilize the partition
      * 
      * @param v
-     *            - the stable view of the partitionê
+     *            - the stable view of the partition
      * @param leader
      *            - the leader
      */
