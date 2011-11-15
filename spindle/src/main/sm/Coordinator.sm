@@ -52,21 +52,23 @@ Unstable
 		nil {}
 }
 
-Stable {
+Stable{
+    establishReplicators
+        EstablishReplicators{}
+}
+
+ReplicatorsEstablished {
 	rebalance
 		[ctxt.isLeader()]
 		Rebalance/push(ControllerFSM::CoordinateRebalance) {}
 	
 	rebalance
 		nil {}
-		
-    establishReplicators
-        EstablishReplicators{}
 }
 
 EstablishReplicators {
 	replicatorsEstablished
-		Stable{}
+		ReplicatorsEstablished{}
 	
 	replicatorsEstablishmentTimeout
 		nil {
