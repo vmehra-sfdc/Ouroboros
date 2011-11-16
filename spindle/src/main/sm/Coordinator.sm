@@ -42,6 +42,10 @@
 Unstable
 { 
 	stabilize
+		[ctxt.isLeader()]
+	EstablishReplicators/push(ControllerFSM::CoordinateReplicators) {}
+		
+	stabilize
 		EstablishReplicators{
 			failover();
 			filterSystemMembership();
@@ -66,7 +70,8 @@ ReplicatorsEstablished {
 		nil {}
 }
 
-EstablishReplicators {
+EstablishReplicators
+{
 	replicatorsEstablished
 		ReplicatorsEstablished{}
 	

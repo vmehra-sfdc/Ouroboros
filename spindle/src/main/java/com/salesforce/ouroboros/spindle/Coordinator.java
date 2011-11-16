@@ -57,7 +57,6 @@ import com.salesforce.ouroboros.spindle.messages.ReplicatorMessage;
 import com.salesforce.ouroboros.util.Association;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
-import com.salesforce.ouroboros.util.lockfree.LockFreeSet;
 
 /**
  * The distributed coordinator for the channel buffer process group.
@@ -75,10 +74,10 @@ public class Coordinator implements Member {
                                                                                          this);
     private final Node                          id;
     private final SortedSet<Node>               members         = new ConcurrentSkipListSet<Node>();
-    private final ArrayList<Node>               newMembers      = new ArrayList<Node>();
+    private final Collection<Node>              newMembers      = new ArrayList<Node>();
     private ConsistentHashFunction<Node>        nextRing;
     private final Switchboard                   switchboard;
-    private final LockFreeSet<Node>             tally           = new LockFreeSet<Node>();
+    private final Collection<Node>              tally           = new ConcurrentSkipListSet<Node>();
     private final ScheduledExecutorService      timer;
     private final Weaver                        weaver;
     private ConsistentHashFunction<Node>        weaverRing      = new ConsistentHashFunction<Node>();
@@ -289,7 +288,9 @@ public class Coordinator implements Member {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Replicators established on %s", id));
                 }
-                fsm.replicatorsEstablished();
+                if (!isLeader()) {
+                    fsm.replicatorsEstablished();
+                }
                 switchboard.send(new Message(
                                              id,
                                              ReplicatorMessage.REPLICATORS_ESTABLISHED),
@@ -326,6 +327,10 @@ public class Coordinator implements Member {
 
     public void replicatorsEstablished(Node sender) {
         assert isLeader() : "Replicator established method must only be sent to the group leader";
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Replicators reported established on: %s",
+                                   sender));
+        }
         tally.add(sender);
         fsm.replicatorsEstablished();
     }
@@ -536,7 +541,7 @@ public class Coordinator implements Member {
      * 
      * @return the list of new members
      */
-    List<Node> getNewMembers() {
+    Collection<Node> getNewMembers() {
         return newMembers;
     }
 

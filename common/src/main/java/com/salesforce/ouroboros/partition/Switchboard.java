@@ -30,7 +30,6 @@ import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -112,16 +111,6 @@ public class Switchboard {
         @Override
         public void partitionNotification(final View view, final int leader) {
             partitionEvent(view, leader);
-        }
-
-        private void processMessage(final Message message, int sender,
-                                    final long time) {
-            if (log.isLoggable(Level.FINE)) {
-                log.fine(String.format("Processing inbound %s on: %s", message,
-                                       self));
-            }
-            message.type.dispatch(Switchboard.this, message.sender,
-                                  message.payload, time);
         }
     }
 
@@ -254,15 +243,7 @@ public class Switchboard {
                                        self));
             }
         }
-        MessageConnection connection = partition.connect(neighbor);
-        if (connection == null) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
-                                          message, neighbor, self));
-            }
-        } else {
-            connection.sendObject(message);
-        }
+        send(message, neighbor);
     }
 
     /**
@@ -284,7 +265,7 @@ public class Switchboard {
             }
             return;
         }
-        send(message, getRightNeighbor(ring));
+        send(message, self.getRightNeighbor(ring));
     }
 
     /**
@@ -295,16 +276,8 @@ public class Switchboard {
      * @param node
      *            - the receiver of the message
      */
-    public void send(Message msg, Node node) {
-        MessageConnection connection = partition.connect(node.processId);
-        if (connection == null) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
-                                          msg, node, self));
-            }
-        } else {
-            connection.sendObject(msg);
-        }
+    public void send(final Message msg, final Node node) {
+        send(msg, node.processId);
     }
 
     public void setMember(Member m) {
@@ -317,6 +290,53 @@ public class Switchboard {
 
     public void terminate() {
         partition.deregister(notification);
+    }
+
+    private void processMessage(final Message message, int sender,
+                                final long time) {
+        if (log.isLoggable(Level.FINE)) {
+            log.fine(String.format("Processing inbound %s on: %s", message,
+                                   self));
+        }
+        message.type.dispatch(Switchboard.this, message.sender,
+                              message.payload, time);
+    }
+
+    /**
+     * Send a message to a specific node
+     * 
+     * @param msg
+     *            - the message to send
+     * @param node
+     *            - the process id of the receiver of the message
+     */
+    private void send(final Message msg, final int node) {
+        if (node == self.processId) {
+            try {
+                messageProcessor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        processMessage(msg, self.processId,
+                                       System.currentTimeMillis());
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                if (log.isLoggable(Level.FINEST)) {
+                    log.finest(String.format("rejecting message %s due to shutdown on %s",
+                                             msg, self));
+                }
+            }
+            return;
+        }
+        MessageConnection connection = partition.connect(node);
+        if (connection == null) {
+            if (log.isLoggable(Level.WARNING)) {
+                log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
+                                          msg, node, self));
+            }
+        } else {
+            connection.sendObject(msg);
+        }
     }
 
     protected void advertise() {
@@ -457,11 +477,5 @@ public class Switchboard {
         } else {
             fsm.destabilize(view, leaderNode);
         }
-    }
-
-    private Node getRightNeighbor(SortedSet<Node> ring) {
-        Iterator<Node> tail = ring.tailSet(self).iterator();
-        tail.next();
-        return tail.hasNext() ? tail.next() : ring.first();
     }
 }
