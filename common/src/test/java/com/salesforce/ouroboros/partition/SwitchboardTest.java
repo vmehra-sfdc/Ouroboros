@@ -213,7 +213,6 @@ public class SwitchboardTest {
         switchboard.broadcast(new Message(node,
                                           GlobalMessageType.DISCOVERY_COMPLETE));
         verify(connection1).sendObject(isA(Message.class));
-        verify(connection2).sendObject(isA(Message.class));
 
     }
 
