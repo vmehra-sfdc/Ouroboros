@@ -7,7 +7,4 @@ Ouroboros is built using Maven 2.x.  You can build the project by cd'ing into th
 
 	$ mvn clean install
 	
-Until I get off my lazy ass and publish the dependencies for this project in a public Maven repo, you'll have to live with the unimaginable insult of pulling and manually building the dependencies in your local environment.  These dependencies for this project are:
-
-	Pinkie - https://github.com/Hellblazer/Pinkie.git
-	Jackal - https://github.com/Hellblazer/Jackal.git
+Dendencies are now pulled from the Ouroboros project's continuous build, so this project can be built without any additional preconditions.
