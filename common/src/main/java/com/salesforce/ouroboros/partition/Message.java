@@ -35,21 +35,22 @@ import com.salesforce.ouroboros.Node;
  * 
  */
 public class Message implements Serializable {
-    private static final long  serialVersionUID = 1L;
+    private static final long        serialVersionUID = 1L;
 
-    public final Serializable payload;
-    public final Node         sender;
-    public final SwitchboardDispatch  type;
+    public final Serializable[]      arguments;
+    public final Node                sender;
+    public final SwitchboardDispatch type;
 
     public Message(Node sender, SwitchboardDispatch type) {
         this.sender = sender;
         this.type = type;
-        this.payload = null;
+        this.arguments = null;
     }
 
-    public Message(Node sender, SwitchboardDispatch type, Serializable body) {
+    public Message(Node sender, SwitchboardDispatch type,
+                   Serializable... arguments) {
         this.sender = sender;
         this.type = type;
-        this.payload = body;
+        this.arguments = arguments;
     }
 }

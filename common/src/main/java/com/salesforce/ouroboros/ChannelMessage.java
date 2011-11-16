@@ -40,8 +40,8 @@ public enum ChannelMessage implements MemberDispatch {
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
-                         Serializable payload, long time) {
-        switchboard.dispatchToMember(this, sender, payload, time);
+                         Serializable[] arguments, long time) {
+        switchboard.dispatchToMember(this, sender, arguments, time);
     }
 
 }

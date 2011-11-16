@@ -77,7 +77,7 @@ public class Switchboard {
                       long time);
 
         void dispatch(GlobalMessageType type, Node sender,
-                      Serializable payload, long time);
+                      Serializable[] arguments, long time);
 
         void dispatch(MemberDispatch type, Node sender, Serializable payload,
                       long time);
@@ -299,7 +299,7 @@ public class Switchboard {
                                    self));
         }
         message.type.dispatch(Switchboard.this, message.sender,
-                              message.payload, time);
+                              message.arguments, time);
     }
 
     /**
@@ -431,18 +431,18 @@ public class Switchboard {
      * 
      * @param type
      * @param sender
-     * @param payload
+     * @param arguments
      * @param time
      */
-    void dispatch(GlobalMessageType type, Node sender, Serializable payload,
-                  long time) {
+    void dispatch(GlobalMessageType type, Node sender,
+                  Serializable[] arguments, long time) {
         if (self.equals(sender)) {
             if (log.isLoggable(Level.FINER)) {
                 log.fine(String.format("Complete ring traversal of %s from %s",
                                        type, self));
             }
         } else {
-            ringCast(new Message(sender, type, payload));
+            ringCast(new Message(sender, type, arguments));
         }
         switch (type) {
             case DISCOVERY_COMPLETE:
@@ -457,7 +457,7 @@ public class Switchboard {
                                            type));
                 }
                 discover(sender);
-                member.dispatch(type, sender, payload, time);
+                member.dispatch(type, sender, arguments, time);
                 break;
         }
     }

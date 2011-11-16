@@ -43,7 +43,7 @@ public enum ReplicatorMessage implements MemberDispatch {
 
         @Override
         public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable payload, long time) {
+                             Serializable[] arguments, long time) {
             if (!(switchboard.getMember() instanceof Coordinator)) {
                 log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
                                           this, switchboard.getMember()));
@@ -56,7 +56,7 @@ public enum ReplicatorMessage implements MemberDispatch {
 
         @Override
         public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable payload, long time) {
+                             Serializable[] arguments, long time) {
             if (!(switchboard.getMember() instanceof Coordinator)) {
                 log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
                                           this, switchboard.getMember()));

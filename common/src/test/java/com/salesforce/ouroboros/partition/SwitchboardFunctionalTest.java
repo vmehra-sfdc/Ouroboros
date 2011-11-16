@@ -134,7 +134,7 @@ public class SwitchboardFunctionalTest {
         @Override
         public void dispatch(GlobalMessageType type,
                              com.salesforce.ouroboros.Node sender,
-                             Serializable payload, long time) {
+                             Serializable[] arguments, long time) {
             // TODO Auto-generated method stub
 
         }

@@ -39,7 +39,7 @@ public enum GlobalMessageType implements SwitchboardDispatch {
     DISCOVERY_COMPLETE;
 
     public void dispatch(Switchboard switchboard, Node sender,
-                         Serializable payload, long time) {
-        switchboard.dispatch(this, sender, payload, time);
+                         Serializable[] arguments, long time) {
+        switchboard.dispatch(this, sender, arguments, time);
     }
 }

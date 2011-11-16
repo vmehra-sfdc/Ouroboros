@@ -73,6 +73,7 @@ public class Coordinator implements Member {
     private final CoordinatorContext            fsm             = new CoordinatorContext(
                                                                                          this);
     private final Node                          id;
+    private boolean                             isActive        = false;
     private final SortedSet<Node>               members         = new ConcurrentSkipListSet<Node>();
     private final Collection<Node>              newMembers      = new ArrayList<Node>();
     private ConsistentHashFunction<Node>        nextRing;
@@ -179,11 +180,11 @@ public class Coordinator implements Member {
 
     @Override
     public void dispatch(GlobalMessageType type, Node sender,
-                         Serializable payload, long time) {
+                         Serializable[] arguments, long time) {
         switch (type) {
             case ADVERTISE_CHANNEL_BUFFER:
                 members.add(sender);
-                yellowPages.put(sender, (ContactInformation) payload);
+                yellowPages.put(sender, (ContactInformation) arguments[0]);
                 break;
             default:
                 break;
@@ -297,11 +298,11 @@ public class Coordinator implements Member {
                                  controller);
             }
         };
-        
+
         // Can't replicate back to self
         ArrayList<Node> contacts = new ArrayList<Node>(newMembers);
         contacts.remove(id);
-        
+
         if (contacts.isEmpty()) {
             rendezvousAction.run();
             return null;
@@ -560,7 +561,7 @@ public class Coordinator implements Member {
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
     }
-    
+
     CoordinatorContext getFsm() {
         return fsm;
     }

@@ -168,8 +168,7 @@ public class Coordinator implements Member {
     @Override
     public void advertise() {
         switchboard.ringCast(new Message(self,
-                                         GlobalMessageType.ADVERTISE_PRODUCER,
-                                         null));
+                                         GlobalMessageType.ADVERTISE_PRODUCER));
     }
 
     /**
@@ -224,11 +223,11 @@ public class Coordinator implements Member {
 
     @Override
     public void dispatch(GlobalMessageType type, Node sender,
-                         Serializable payload, long time) {
+                         Serializable[] arguments, long time) {
         switch (type) {
             case ADVERTISE_CHANNEL_BUFFER:
                 weavers.add(sender);
-                yellowPages.put(sender, (ContactInformation) payload);
+                yellowPages.put(sender, (ContactInformation) arguments[0]);
                 break;
             case ADVERTISE_PRODUCER:
                 producers.add(sender);
