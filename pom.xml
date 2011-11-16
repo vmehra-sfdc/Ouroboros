@@ -26,6 +26,14 @@
         <module>producer</module>
         <module>integration-testing</module>
     </modules>
+    
+    <repositories>
+    	<repository>
+    		<id>Ouroboros-CI</id>
+    		<name>Ouroboros Jenkins Maven Repo</name>
+    		<url>http://107.20.139.173:8080/plugin/repository/everything/</url>
+    	</repository>
+    </repositories>
 
     <build>
         <plugins>
