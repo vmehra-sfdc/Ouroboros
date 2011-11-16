@@ -40,17 +40,9 @@
 %map CoordinatorFSM
 %% 
 Unstable
-{ 
+{
 	stabilize
-		[ctxt.isLeader()]
-	EstablishReplicators/push(ControllerFSM::CoordinateReplicators) {}
-		
-	stabilize
-		EstablishReplicators{
-			failover();
-			filterSystemMembership();
-			closeDeadReplicators();
-		}
+		EstablishReplicators{}
 
 	destabilize
 		nil {}
@@ -61,7 +53,8 @@ Stable{
         EstablishReplicators{}
 }
 
-ReplicatorsEstablished {
+ReplicatorsEstablished{
+		
 	rebalance
 		[ctxt.isLeader()]
 		Rebalance/push(ControllerFSM::CoordinateRebalance) {}
@@ -71,7 +64,13 @@ ReplicatorsEstablished {
 }
 
 EstablishReplicators
+Entry{
+	failover();
+}
 {
+	coordinateReplicators
+		push(ControllerFSM::CoordinateReplicators) {}
+		
 	replicatorsEstablished
 		ReplicatorsEstablished{}
 	

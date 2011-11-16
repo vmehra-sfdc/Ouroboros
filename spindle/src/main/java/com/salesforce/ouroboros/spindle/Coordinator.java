@@ -297,7 +297,12 @@ public class Coordinator implements Member {
                                  controller);
             }
         };
-        if (newMembers.isEmpty()) {
+        
+        // Can't replicate back to self
+        ArrayList<Node> contacts = new ArrayList<Node>(newMembers);
+        contacts.remove(id);
+        
+        if (contacts.isEmpty()) {
             rendezvousAction.run();
             return null;
         }
@@ -315,9 +320,9 @@ public class Coordinator implements Member {
             log.info(String.format("Establishment of replicators initiated on %s",
                                    id));
         }
-        Rendezvous rendezvous = new Rendezvous(newMembers.size(),
+        Rendezvous rendezvous = new Rendezvous(contacts.size(),
                                                rendezvousAction);
-        for (Node member : newMembers) {
+        for (Node member : contacts) {
             weaver.openReplicator(member, yellowPages.get(member), rendezvous);
         }
         rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer,
@@ -363,12 +368,6 @@ public class Coordinator implements Member {
     protected void cleanUpRebalancing() {
         // TODO Auto-generated method stub
 
-    }
-
-    protected void closeDeadReplicators() {
-        for (Node node : switchboard.getDeadMembers()) {
-            weaver.closeReplicator(node);
-        }
     }
 
     /**
@@ -432,6 +431,10 @@ public class Coordinator implements Member {
             weaver.closeReplicator(node);
         }
         weaver.failover(deadMembers);
+        filterSystemMembership();
+        if (isLeader()) {
+            fsm.coordinateReplicators();
+        }
     }
 
     protected void filterSystemMembership() {
@@ -450,6 +453,9 @@ public class Coordinator implements Member {
      * @return
      */
     protected boolean isLeader() {
+        if (members.size() == 0) {
+            return false;
+        }
         return id.compareTo(members.last()) >= 0;
     }
 
@@ -553,5 +559,9 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
+    }
+    
+    CoordinatorContext getFsm() {
+        return fsm;
     }
 }

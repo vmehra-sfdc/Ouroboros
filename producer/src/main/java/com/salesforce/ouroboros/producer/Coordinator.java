@@ -460,7 +460,7 @@ public class Coordinator implements Member {
      *             - if the thread is interrupted
      */
     private Map<UUID, Long> failover(Collection<Node> deadMembers)
-                                                                 throws InterruptedException {
+                                                                  throws InterruptedException {
         // Coordinate the failover with the publishing threads
         closePublishingGate();
 

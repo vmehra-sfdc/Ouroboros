@@ -50,6 +50,7 @@ import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
 import com.salesforce.ouroboros.util.Utils;
@@ -177,6 +178,7 @@ public class TestCoordinator {
         newMembers.put(node3, contactInformation3);
         Set<Node> deadMembers = newMembers.keySet();
         when(switchboard.getDeadMembers()).thenReturn(deadMembers);
+        coordinator.getFsm().setState(CoordinatorFSM.EstablishReplicators);
         coordinator.failover();
 
         verify(weaver).failover(deadMembers);

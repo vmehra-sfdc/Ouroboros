@@ -310,10 +310,11 @@ public class Weaver implements Bundle {
                                Rendezvous rendezvous) {
         Replicator replicator = new Replicator(this, node, rendezvous);
         Replicator previous = replicators.putIfAbsent(node, replicator);
-        assert previous == null : String.format("Replicator already opend on weaver %s to weaver %s");
+        assert previous == null : String.format("Replicator already opend on weaver %s to weaver %s",
+                                                id, node);
         if (thisEndInitiatesConnectionsTo(node)) {
             if (log.isLoggable(Level.INFO)) {
-                log.fine(String.format("Initiating replication connection from weaver %s to new weaver %s",
+                log.info(String.format("Initiating replication connection from weaver %s to new weaver %s",
                                        id, node));
             }
             try {
@@ -328,7 +329,7 @@ public class Weaver implements Bundle {
             }
         } else {
             if (log.isLoggable(Level.INFO)) {
-                log.fine(String.format("Waiting for replication inbound connection to weaver %s from new weaver %s",
+                log.info(String.format("Waiting for replication inbound connection to weaver %s from new weaver %s",
                                        id, node));
             }
         }
