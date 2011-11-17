@@ -69,13 +69,13 @@ public class Coordinator implements Member {
     static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
     private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
 
+    private boolean                             active          = false;
     private final Set<UUID>                     channels        = new HashSet<UUID>();
     private final CoordinatorContext            fsm             = new CoordinatorContext(
                                                                                          this);
     private final Node                          id;
-    private boolean                             isActive        = false;
-    private final SortedSet<Node>               members         = new ConcurrentSkipListSet<Node>();
-    private final Collection<Node>              newMembers      = new ArrayList<Node>();
+    private final SortedSet<Node>               activeMembers   = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
     private ConsistentHashFunction<Node>        nextRing;
     private final Switchboard                   switchboard;
     private final Collection<Node>              tally           = new ConcurrentSkipListSet<Node>();
@@ -102,7 +102,7 @@ public class Coordinator implements Member {
         switchboard.ringCast(new Message(
                                          weaver.getId(),
                                          GlobalMessageType.ADVERTISE_CHANNEL_BUFFER,
-                                         info));
+                                         info, active));
     }
 
     /**
@@ -115,7 +115,7 @@ public class Coordinator implements Member {
     public void close(UUID channel, Node requester) {
         channels.remove(channel);
         Node[] pair = getReplicationPair(channel);
-        if (members.contains(pair[0])) {
+        if (activeMembers.contains(pair[0])) {
             switchboard.send(new Message(id, ChannelMessage.CLOSE_MIRROR,
                                          new Association<Node, UUID>(requester,
                                                                      channel)),
@@ -183,7 +183,11 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case ADVERTISE_CHANNEL_BUFFER:
-                members.add(sender);
+                if ((Boolean) arguments[1]) {
+                    activeMembers.add(sender);
+                } else {
+                    inactiveMembers.add(sender);
+                }
                 yellowPages.put(sender, (ContactInformation) arguments[0]);
                 break;
             default:
@@ -233,7 +237,7 @@ public class Coordinator implements Member {
                 log.finer(String.format("Channel is already opened %s", channel));
             }
             return;
-        } else if (members.contains(pair[1])) {
+        } else if (activeMembers.contains(pair[1])) {
             switchboard.send(new Message(id, ChannelMessage.OPEN_MIRROR,
                                          new Association<Node, UUID>(requester,
                                                                      channel)),
@@ -300,7 +304,7 @@ public class Coordinator implements Member {
         };
 
         // Can't replicate back to self
-        ArrayList<Node> contacts = new ArrayList<Node>(newMembers);
+        ArrayList<Node> contacts = new ArrayList<Node>(inactiveMembers);
         contacts.remove(id);
 
         if (contacts.isEmpty()) {
@@ -352,10 +356,10 @@ public class Coordinator implements Member {
      */
     protected void calculateNextRing() {
         ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
-        for (Node node : members) {
+        for (Node node : activeMembers) {
             newRing.add(node, node.capacity);
         }
-        for (Node node : newMembers) {
+        for (Node node : inactiveMembers) {
             newRing.add(node, node.capacity);
         }
         nextRing = newRing;
@@ -396,11 +400,15 @@ public class Coordinator implements Member {
      */
     protected void coordinateReplicators() {
         assert isLeader() : "Must be leader to coordinate the establishment of replicators";
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Coordinating establishment of the replicators on %s",
+                                   id));
+        }
         tally.clear();
-        targetTally = members.size() + newMembers.size();
+        targetTally = activeMembers.size() + inactiveMembers.size();
         Message message = new Message(id, ReplicatorMessage.OPEN_REPLICATORS);
-        switchboard.broadcast(message, members);
-        switchboard.broadcast(message, newMembers);
+        switchboard.broadcast(message, activeMembers);
+        switchboard.broadcast(message, inactiveMembers);
     }
 
     protected void coordinateTakeover() {
@@ -439,13 +447,12 @@ public class Coordinator implements Member {
     }
 
     protected void filterSystemMembership() {
-        members.removeAll(switchboard.getDeadMembers());
-        newMembers.removeAll(switchboard.getDeadMembers());
-        for (Node node : switchboard.getNewMembers()) {
-            if (members.remove(node)) {
-                newMembers.add(node);
-            }
-        }
+        activeMembers.removeAll(switchboard.getDeadMembers());
+        inactiveMembers.removeAll(switchboard.getDeadMembers());
+    }
+
+    protected boolean isActive() {
+        return active;
     }
 
     /**
@@ -454,10 +461,12 @@ public class Coordinator implements Member {
      * @return
      */
     protected boolean isLeader() {
-        if (members.size() == 0) {
-            return false;
+        if (active) {
+            return activeMembers.size() == 0 ? true
+                                            : activeMembers.last().equals(id);
         }
-        return id.compareTo(members.last()) >= 0;
+        return inactiveMembers.size() == 0 ? true
+                                          : inactiveMembers.last().equals(id);
     }
 
     protected void rebalance() {
@@ -489,7 +498,7 @@ public class Coordinator implements Member {
             log.info(String.format("Establishment of replicators initiated on %s",
                                    id));
         }
-        new Rendezvous(newMembers.size(), rendezvousAction);
+        new Rendezvous(inactiveMembers.size(), rendezvousAction);
         List<Xerox> xeroxes = new ArrayList<Xerox>();
         for (Entry<UUID, Node[][]> entry : remapped.entrySet()) {
             xeroxes.addAll(weaver.rebalance(entry.getKey(),
@@ -543,13 +552,17 @@ public class Coordinator implements Member {
         return tally.size() == targetTally;
     }
 
+    CoordinatorContext getFsm() {
+        return fsm;
+    }
+
     /**
      * Test access
      * 
      * @return the list of new members
      */
     Collection<Node> getNewMembers() {
-        return newMembers;
+        return inactiveMembers;
     }
 
     /**
@@ -560,9 +573,5 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
-    }
-
-    CoordinatorContext getFsm() {
-        return fsm;
     }
 }

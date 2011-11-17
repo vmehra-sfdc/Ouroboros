@@ -26,6 +26,7 @@
 package com.salesforce.ouroboros.partition;
 
 import java.io.Serializable;
+import java.util.Arrays;
 
 import com.salesforce.ouroboros.Node;
 
@@ -52,5 +53,13 @@ public class Message implements Serializable {
         this.sender = sender;
         this.type = type;
         this.arguments = arguments;
+    }
+
+    public String toString() {
+        return String.format("Message: %s arguments:%s from: %s",
+                             type,
+                             arguments == null ? "null"
+                                              : Arrays.asList(arguments),
+                             sender);
     }
 }

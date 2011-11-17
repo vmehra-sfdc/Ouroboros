@@ -115,6 +115,19 @@ public class Node implements Comparable<Node>, Serializable {
         return ((Node) o).processId == processId;
     }
 
+    /**
+     * Answer the right neighber of the receiver in the ring
+     * 
+     * @param ring
+     *            - the sorted set of nodes that compose the ring.
+     * @return the right neighbor of the receiver
+     */
+    public Node getRightNeighbor(SortedSet<Node> ring) {
+        Iterator<Node> tail = ring.tailSet(this).iterator();
+        tail.next();
+        return tail.hasNext() ? tail.next() : ring.first();
+    }
+
     @Override
     public int hashCode() {
         return processId;
@@ -131,18 +144,5 @@ public class Node implements Comparable<Node>, Serializable {
     public String toString() {
         return "Node [processId=" + processId + ", machineId=" + machineId
                + ", rackId=" + rackId + ", capacity=" + capacity + "]";
-    }
-
-    /**
-     * Answer the right neighber of the receiver in the ring
-     * 
-     * @param ring
-     *            - the sorted set of nodes that compose the ring.
-     * @return the right neighbor of the receiver
-     */
-    public Node getRightNeighbor(SortedSet<Node> ring) {
-        Iterator<Node> tail = ring.tailSet(this).iterator();
-        tail.next();
-        return tail.hasNext() ? tail.next() : ring.first();
     }
 }

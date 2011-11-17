@@ -261,11 +261,14 @@ public class TestCoordinator {
                                                                         address,
                                                                         address);
         coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node1,
-                             new Serializable[] { contactInformation1 }, 0);
+                             new Serializable[] { contactInformation1, true },
+                             0);
         coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node2,
-                             new Serializable[] { contactInformation2 }, 0);
+                             new Serializable[] { contactInformation2, true },
+                             0);
         coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node3,
-                             new Serializable[] { contactInformation3 }, 0);
+                             new Serializable[] { contactInformation3, true },
+                             0);
         coordinator.getNewMembers().addAll(Arrays.asList(node1, node2, node3));
         Rendezvous rendezvous = coordinator.openReplicators(node);
         assertNotNull(rendezvous);

@@ -37,6 +37,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -127,6 +128,8 @@ public class Switchboard {
     private ArrayList<Node>             previousMembers = new ArrayList<Node>();
     private NodeIdSet                   previousView;
     private final Node                  self;
+    private final AtomicBoolean         stable          = new AtomicBoolean(
+                                                                            false);
     private NodeIdSet                   view;
 
     public Switchboard(Node node, Partition p) {
@@ -294,8 +297,15 @@ public class Switchboard {
 
     private void processMessage(final Message message, int sender,
                                 final long time) {
-        if (log.isLoggable(Level.FINE)) {
-            log.fine(String.format("Processing inbound %s on: %s", message,
+        if (!stable.get()) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Partition is not stable, ignoring inbound %s on: %s",
+                                       message, self));
+            }
+            return;
+        }
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Processing inbound %s on: %s", message,
                                    self));
         }
         message.type.dispatch(Switchboard.this, message.sender,
@@ -311,7 +321,17 @@ public class Switchboard {
      *            - the process id of the receiver of the message
      */
     private void send(final Message msg, final int node) {
+        if (!stable.get()) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Partition is unstable, not sending message %s to %s",
+                                       msg, node));
+            }
+            return;
+        }
         if (node == self.processId) {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Sending %s to self", msg));
+            }
             try {
                 messageProcessor.execute(new Runnable() {
                     @Override
@@ -335,6 +355,9 @@ public class Switchboard {
                                           msg, node, self));
             }
         } else {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Sending %s to %s", msg, node));
+            }
             connection.sendObject(msg);
         }
     }
@@ -364,6 +387,7 @@ public class Switchboard {
             }
         }
         previousMembers.clear();
+        stable.set(true);
     }
 
     protected void stabilized() {
@@ -388,6 +412,7 @@ public class Switchboard {
      *            - the leader
      */
     void destabilize(View view, int leader) {
+        stable.set(false);
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Destabilizing partition on: %s, view: %s, leader: %s",
                                    self, view, leader));
