@@ -73,14 +73,14 @@ public class Switchboard {
          */
         void destabilize();
 
-        void dispatch(ChannelMessage type, Node sender, Serializable payload,
-                      long time);
+        void dispatch(ChannelMessage type, Node sender,
+                      Serializable[] arguments, long time);
 
         void dispatch(GlobalMessageType type, Node sender,
                       Serializable[] arguments, long time);
 
-        void dispatch(MemberDispatch type, Node sender, Serializable payload,
-                      long time);
+        void dispatch(MemberDispatch type, Node sender,
+                      Serializable[] arguments, long time);
 
         void stabilized();
 
@@ -185,13 +185,13 @@ public class Switchboard {
     }
 
     public void dispatchToMember(ChannelMessage type, Node sender,
-                                 Serializable payload, long time) {
-        member.dispatch(type, sender, payload, time);
+                                 Serializable[] arguments, long time) {
+        member.dispatch(type, sender, arguments, time);
     }
 
     public void dispatchToMember(MemberDispatch type, Node sender,
-                                 Serializable payload, long time) {
-        member.dispatch(type, sender, payload, time);
+                                 Serializable[] arguments, long time) {
+        member.dispatch(type, sender, arguments, time);
     }
 
     public Collection<Node> getDeadMembers() {

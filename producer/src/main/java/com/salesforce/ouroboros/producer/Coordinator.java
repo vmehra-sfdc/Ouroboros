@@ -203,10 +203,10 @@ public class Coordinator implements Member {
 
     @Override
     public void dispatch(ChannelMessage type, Node sender,
-                         Serializable payload, long time) {
+                         Serializable[] arguments, long time) {
         switch (type) {
             case OPENED: {
-                opened((UUID) payload);
+                opened((UUID) arguments[0]);
                 break;
             }
             case CLOSED: {
@@ -239,7 +239,7 @@ public class Coordinator implements Member {
 
     @Override
     public void dispatch(MemberDispatch type, Node sender,
-                         Serializable payload, long time) {
+                         Serializable[] arguments, long time) {
     }
 
     /**

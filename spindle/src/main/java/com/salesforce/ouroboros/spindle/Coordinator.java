@@ -148,25 +148,25 @@ public class Coordinator implements Member {
 
     @Override
     public void dispatch(ChannelMessage type, Node sender,
-                         Serializable payload, long time) {
+                         Serializable[] arguments, long time) {
         switch (type) {
             case OPEN: {
-                open((UUID) payload, sender);
+                open((UUID) arguments[0], sender);
                 break;
             }
             case OPEN_MIRROR: {
                 @SuppressWarnings("unchecked")
-                Association<Node, UUID> ass = (Association<Node, UUID>) payload;
+                Association<Node, UUID> ass = (Association<Node, UUID>) arguments[0];
                 openMirror(ass.value, ass.key);
                 break;
             }
             case CLOSE: {
-                close((UUID) payload, sender);
+                close((UUID) arguments[0], sender);
                 break;
             }
             case CLOSE_MIRROR: {
                 @SuppressWarnings("unchecked")
-                Association<Node, UUID> ass = (Association<Node, UUID>) payload;
+                Association<Node, UUID> ass = (Association<Node, UUID>) arguments[0];
                 closeMirror(ass.value, ass.key);
             }
             default: {
@@ -196,7 +196,7 @@ public class Coordinator implements Member {
      */
     @Override
     public void dispatch(MemberDispatch type, Node sender,
-                         Serializable payload, long time) {
+                         Serializable[] arguments, long time) {
     }
 
     /**
