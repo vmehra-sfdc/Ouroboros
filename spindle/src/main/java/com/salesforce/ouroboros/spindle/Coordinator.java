@@ -65,25 +65,25 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * 
  */
 public class Coordinator implements Member {
+    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     static final int                            DEFAULT_TIMEOUT = 1;
     static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
-    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
 
     private boolean                             active          = false;
+    private final SortedSet<Node>               activeMembers   = new ConcurrentSkipListSet<Node>();
     private final Set<UUID>                     channels        = new HashSet<UUID>();
     private final CoordinatorContext            fsm             = new CoordinatorContext(
                                                                                          this);
     private final Node                          id;
-    private final SortedSet<Node>               activeMembers   = new ConcurrentSkipListSet<Node>();
     private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
     private ConsistentHashFunction<Node>        nextRing;
     private final Switchboard                   switchboard;
     private final Collection<Node>              tally           = new ConcurrentSkipListSet<Node>();
+    private int                                 targetTally;
     private final ScheduledExecutorService      timer;
     private final Weaver                        weaver;
     private ConsistentHashFunction<Node>        weaverRing      = new ConsistentHashFunction<Node>();
     private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
-    private int                                 targetTally;
 
     public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
                        Weaver weaver) {
@@ -552,16 +552,20 @@ public class Coordinator implements Member {
         return tally.size() == targetTally;
     }
 
+    /**
+     * Test access
+     * 
+     * @return the list of active members
+     */
+    Collection<Node> getActiveMembers() {
+        return activeMembers;
+    }
+
     CoordinatorContext getFsm() {
         return fsm;
     }
 
-    /**
-     * Test access
-     * 
-     * @return the list of new members
-     */
-    Collection<Node> getNewMembers() {
+    SortedSet<Node> getInactiveMembers() {
         return inactiveMembers;
     }
 

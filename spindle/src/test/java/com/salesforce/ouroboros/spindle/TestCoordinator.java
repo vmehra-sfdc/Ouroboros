@@ -269,7 +269,8 @@ public class TestCoordinator {
         coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node3,
                              new Serializable[] { contactInformation3, true },
                              0);
-        coordinator.getNewMembers().addAll(Arrays.asList(node1, node2, node3));
+        coordinator.getInactiveMembers().addAll(Arrays.asList(node1, node2,
+                                                              node3));
         Rendezvous rendezvous = coordinator.openReplicators(node);
         assertNotNull(rendezvous);
         assertEquals(3, rendezvous.getParties());
