@@ -227,7 +227,7 @@ public class Switchboard {
     }
 
     public boolean isStable() {
-        return fsm.getState() == SwitchboardFSM.Stable;
+        return stable.get();
     }
 
     /**
@@ -304,9 +304,9 @@ public class Switchboard {
             }
             return;
         }
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Processing inbound %s on: %s", message,
-                                   self));
+        if (log.isLoggable(Level.FINEST)) {
+            log.finest(String.format("Processing inbound %s on: %s", message,
+                                     self));
         }
         message.type.dispatch(Switchboard.this, message.sender,
                               message.arguments, time);

@@ -97,16 +97,18 @@ public class Coordinator implements Member {
 
     private final static Logger                                 log               = Logger.getLogger(Coordinator.class.getCanonicalName());
 
+    private boolean                                             active            = false;
+    private final SortedSet<Node>                               activeMembers     = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>                               activeWeavers     = new ConcurrentSkipListSet<Node>();
     private final ConcurrentMap<UUID, ChannelState>             channelState      = new ConcurrentHashMap<UUID, ChannelState>();
     private final Controller                                    controller;
     private final CoordinatorContext                            fsm               = new CoordinatorContext(
                                                                                                            this);
+    private final SortedSet<Node>                               inactiveMembers   = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>                               inactiveWeavers   = new ConcurrentSkipListSet<Node>();
     private final Map<UUID, Long>                               mirrors           = new ConcurrentHashMap<UUID, Long>();
-    private final SortedSet<Node>                               newProducers      = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>                               newWeavers        = new ConcurrentSkipListSet<Node>();
     private final AtomicReference<ConsistentHashFunction<Node>> producerRing      = new AtomicReference<ConsistentHashFunction<Node>>(
                                                                                                                                       new ConsistentHashFunction<Node>());
-    private final SortedSet<Node>                               producers         = new ConcurrentSkipListSet<Node>();
     private final Gate                                          publishGate       = new Gate();
     private final AtomicInteger                                 publishingThreads = new AtomicInteger(
                                                                                                       0);
@@ -117,7 +119,6 @@ public class Coordinator implements Member {
     private final Switchboard                                   switchboard;
     private final AtomicReference<ConsistentHashFunction<Node>> weaverRing        = new AtomicReference<ConsistentHashFunction<Node>>(
                                                                                                                                       new ConsistentHashFunction<Node>());
-    private final SortedSet<Node>                               weavers           = new ConcurrentSkipListSet<Node>();
     private final Map<Node, ContactInformation>                 yellowPages       = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(Node self, Switchboard switchboard, EventSource source,
@@ -168,7 +169,8 @@ public class Coordinator implements Member {
     @Override
     public void advertise() {
         switchboard.ringCast(new Message(self,
-                                         GlobalMessageType.ADVERTISE_PRODUCER));
+                                         GlobalMessageType.ADVERTISE_PRODUCER,
+                                         active));
     }
 
     /**
@@ -180,7 +182,7 @@ public class Coordinator implements Member {
     public void close(UUID channel) {
         Node[] pair = getChannelBufferReplicationPair(channel);
         Node primary;
-        if (weavers.contains(pair[0])) {
+        if (activeWeavers.contains(pair[0])) {
             primary = pair[0];
         } else {
             primary = pair[1];
@@ -226,11 +228,19 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case ADVERTISE_CHANNEL_BUFFER:
-                weavers.add(sender);
+                if ((Boolean) arguments[1]) {
+                    activeWeavers.add(sender);
+                } else {
+                    inactiveWeavers.add(sender);
+                }
                 yellowPages.put(sender, (ContactInformation) arguments[0]);
                 break;
             case ADVERTISE_PRODUCER:
-                producers.add(sender);
+                if ((Boolean) arguments[0]) {
+                    activeMembers.add(sender);
+                } else {
+                    inactiveMembers.add(sender);
+                }
                 break;
             default:
                 break;
@@ -268,7 +278,7 @@ public class Coordinator implements Member {
                 log.info(String.format("%s is primary for channel %s, opening",
                                        self, channel));
             }
-        } else if (!producers.contains(producerPair[0])
+        } else if (!activeMembers.contains(producerPair[0])
                    && self.equals(producerPair[1])) {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("%s is mirror for channel %s, primary %s does not exist, opening",
@@ -281,7 +291,7 @@ public class Coordinator implements Member {
         }
         Node[] pair = getChannelBufferReplicationPair(channel);
         Node primary;
-        if (weavers.contains(pair[0])) {
+        if (activeWeavers.contains(pair[0])) {
             primary = pair[0];
         } else {
             primary = pair[1];
@@ -369,17 +379,17 @@ public class Coordinator implements Member {
      */
     public Map<Node, List<UpdateState>> remapProducers() {
         ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
-        for (Node producer : producers) {
+        for (Node producer : activeMembers) {
             newRing.add(producer, producer.capacity);
         }
-        for (Node producer : producers) {
+        for (Node producer : activeMembers) {
             newRing.add(producer, producer.capacity);
         }
-        for (Node producer : newProducers) {
-            producers.add(producer);
+        for (Node producer : inactiveMembers) {
+            activeMembers.add(producer);
             newRing.add(producer, producer.capacity);
         }
-        newProducers.clear();
+        inactiveMembers.clear();
         HashMap<Node, List<UpdateState>> remapped = new HashMap<Node, List<UpdateState>>();
         for (Iterator<Entry<UUID, ChannelState>> mappings = channelState.entrySet().iterator(); mappings.hasNext();) {
             Entry<UUID, ChannelState> mapping = mappings.next();
@@ -407,14 +417,14 @@ public class Coordinator implements Member {
      */
     public void remapWeavers() {
         ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
-        for (Node weaver : weavers) {
+        for (Node weaver : activeWeavers) {
             newRing.add(weaver, weaver.capacity);
         }
-        for (Node weaver : newWeavers) {
-            weavers.add(weaver);
+        for (Node weaver : inactiveWeavers) {
+            activeWeavers.add(weaver);
             newRing.add(weaver, weaver.capacity);
         }
-        newWeavers.clear();
+        inactiveWeavers.clear();
         for (Entry<UUID, ChannelState> mapping : channelState.entrySet()) {
             Spinner remapped = spinners.get(newRing.hash(point(mapping.getKey())));
             if (remapped != mapping.getValue().spinner) {
@@ -598,7 +608,7 @@ public class Coordinator implements Member {
      * Create the spinners to the new set of weavers in the partition.
      */
     protected void createSpinners() {
-        for (Node n : newWeavers) {
+        for (Node n : inactiveWeavers) {
             ContactInformation info = yellowPages.get(n);
             assert info != null : String.format("Did not find any connection information for node %s",
                                                 n);
@@ -633,18 +643,28 @@ public class Coordinator implements Member {
      * members that were part of the previous partition
      */
     protected void filterSystemMembership() {
-        producers.removeAll(switchboard.getDeadMembers());
-        weavers.removeAll(switchboard.getDeadMembers());
-        newProducers.clear();
-        newWeavers.clear();
-        for (Node node : switchboard.getNewMembers()) {
-            if (producers.remove(node)) {
-                newProducers.add(node);
-            }
-            if (weavers.remove(node)) {
-                newProducers.add(node);
-            }
+        activeMembers.removeAll(switchboard.getDeadMembers());
+        activeWeavers.removeAll(switchboard.getDeadMembers());
+        inactiveMembers.removeAll(switchboard.getDeadMembers());
+        inactiveWeavers.removeAll(switchboard.getDeadMembers());
+    }
+
+    protected boolean isActive() {
+        return active;
+    }
+
+    /**
+     * Answer true if the receiver is the leader of the group
+     * 
+     * @return
+     */
+    protected boolean isLeader() {
+        if (active) {
+            return activeMembers.size() == 0 ? true
+                                            : activeMembers.last().equals(self);
         }
+        return inactiveMembers.size() == 0 ? true
+                                          : inactiveMembers.last().equals(self);
     }
 
     protected void openPublishingGate() {
