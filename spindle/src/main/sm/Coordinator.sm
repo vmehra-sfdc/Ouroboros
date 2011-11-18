@@ -146,6 +146,14 @@ Entry{
 CoordinateRebalance
 Entry{
 	coordinateRebalance();
+}
+{
+	beginRebalance
+		Rebalance{}
+}
+
+Rebalance
+Entry {
 	rebalance();
 }
 {

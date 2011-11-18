@@ -52,20 +52,18 @@ public class Spinner implements CommunicationsHandler {
     public static final int                          MAGIC               = 0x1638;
     private final static Logger                      log                 = Logger.getLogger(Spinner.class.getCanonicalName());
 
-    private final BatchAcknowledgement               ack;
+    private final BatchAcknowledgement               ack                 = new BatchAcknowledgement(
+                                                                                                    this);
     private final Coordinator                        coordinator;
     private final SpinnerContext                     fsm                 = new SpinnerContext(
                                                                                               this);
     private SocketChannelHandler                     handler;
     private ByteBuffer                               handshake           = ByteBuffer.allocate(HANDSHAKE_BYTE_SIZE);
     private boolean                                  inError;
-    private final NavigableMap<BatchIdentity, Batch> pending;
-    private final BatchWriter                        writer;
+    private final NavigableMap<BatchIdentity, Batch> pending             = new ConcurrentSkipListMap<BatchIdentity, Batch>();
+    private final BatchWriter                        writer              = new BatchWriter();
 
     public Spinner(Coordinator coordinator) {
-        writer = new BatchWriter();
-        ack = new BatchAcknowledgement(this);
-        pending = new ConcurrentSkipListMap<BatchIdentity, Batch>();
         this.coordinator = coordinator;
         handshake.putInt(MAGIC);
         coordinator.getId().serialize(handshake);
