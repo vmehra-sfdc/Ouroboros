@@ -56,6 +56,7 @@ import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.api.producer.UnknownChannelException;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
+import com.salesforce.ouroboros.partition.LeaderNotification;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -534,10 +535,21 @@ public class Coordinator implements Member {
             }
         }
 
-        // Let any publishing threads preceed
+        // Let any publishing threads precede
         openPublishingGate();
 
         return newPrimaries;
+    }
+
+    /**
+     * Remove all dead members and partition out the new members from the
+     * members that were part of the previous partition
+     */
+    private void filterSystemMembership() {
+        activeMembers.removeAll(switchboard.getDeadMembers());
+        activeWeavers.removeAll(switchboard.getDeadMembers());
+        inactiveMembers.removeAll(switchboard.getDeadMembers());
+        inactiveWeavers.removeAll(switchboard.getDeadMembers());
     }
 
     /**
@@ -596,6 +608,56 @@ public class Coordinator implements Member {
         }
     }
 
+    /**
+     * Notify the leader of the weaver group of the leader of producer group
+     */
+    private void notifyWeaversOfLeader() {
+        if (!isLeader()) {
+            return;
+        }
+        if (active) {
+            if (activeWeavers.size() > 0) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Notifying active weaver %s that %s is the active group leader",
+                                           activeWeavers.last(), self));
+                }
+                switchboard.send(new Message(
+                                             self,
+                                             LeaderNotification.NOTIFY_PRODUCER_LEADER),
+                                 activeWeavers.last());
+            } else if (inactiveWeavers.size() > 0) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Notifying inactive weaver %s that %s is the active group leader",
+                                           inactiveWeavers.last(), self));
+                }
+                switchboard.send(new Message(
+                                             self,
+                                             LeaderNotification.NOTIFY_PRODUCER_LEADER),
+                                 inactiveWeavers.last());
+            }
+        } else if (activeMembers.size() == 0) {
+            if (activeWeavers.size() > 0) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Notifying active weaver %s that %s is the inactive group leader",
+                                           activeWeavers.last(), self));
+                }
+                switchboard.send(new Message(
+                                             self,
+                                             LeaderNotification.NOTIFY_PRODUCER_LEADER),
+                                 activeWeavers.last());
+            } else if (inactiveWeavers.size() > 0) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Notifying inactive weaver %s that %s is the inactive group leader",
+                                           inactiveWeavers.last(), self));
+                }
+                switchboard.send(new Message(
+                                             self,
+                                             LeaderNotification.NOTIFY_PRODUCER_LEADER),
+                                 inactiveWeavers.last());
+            }
+        }
+    }
+
     protected void closePublishingGate() throws InterruptedException {
         publishGate.close();
         // Wait until all publishing threads are finished
@@ -626,7 +688,14 @@ public class Coordinator implements Member {
         }
     }
 
+    /**
+     * Failover the process, assuming primary role for any failed primaries this
+     * process is serving as the mirror
+     */
     protected void failover() {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Initiating failover on %s", self));
+        }
         Map<UUID, Long> newPrimaries;
         try {
             newPrimaries = failover(switchboard.getDeadMembers());
@@ -636,17 +705,9 @@ public class Coordinator implements Member {
         if (newPrimaries.size() != 0) {
             source.assumePrimary(newPrimaries);
         }
-    }
-
-    /**
-     * Remove all dead members and partition out the new members from the
-     * members that were part of the previous partition
-     */
-    protected void filterSystemMembership() {
-        activeMembers.removeAll(switchboard.getDeadMembers());
-        activeWeavers.removeAll(switchboard.getDeadMembers());
-        inactiveMembers.removeAll(switchboard.getDeadMembers());
-        inactiveWeavers.removeAll(switchboard.getDeadMembers());
+        filterSystemMembership();
+        createSpinners();
+        notifyWeaversOfLeader();
     }
 
     protected boolean isActive() {
@@ -669,5 +730,12 @@ public class Coordinator implements Member {
 
     protected void openPublishingGate() {
         publishGate.open();
+    }
+
+    @Override
+    public void dispatch(LeaderNotification type, Node sender,
+                         Serializable[] arguments, long time) {
+        // TODO Auto-generated method stub
+        
     }
 }

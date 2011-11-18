@@ -152,6 +152,13 @@ public class SwitchboardFunctionalTest {
             stabilized = true;
         }
 
+        @Override
+        public void dispatch(LeaderNotification type, Node sender,
+                             Serializable[] arguments, long time) {
+            // TODO Auto-generated method stub
+            
+        }
+
     }
 
     @Configuration

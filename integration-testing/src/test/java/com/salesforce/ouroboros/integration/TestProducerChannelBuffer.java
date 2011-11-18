@@ -349,14 +349,14 @@ public class TestProducerChannelBuffer {
             public boolean value() {
                 return producerSwitchboard.isStable();
             }
-        }, 3000, 200);
+        }, 30000, 200);
 
         Util.waitFor("weaver did not stabilize", new Util.Condition() {
             @Override
             public boolean value() {
                 return weaverSwitchboard.isStable();
             }
-        }, 3000, 200);
+        }, 30000, 200);
 
         com.salesforce.ouroboros.producer.Coordinator producer = producerContext.getBean(com.salesforce.ouroboros.producer.Coordinator.class);
         com.salesforce.ouroboros.spindle.Coordinator weaver = weaverContext.getBean(com.salesforce.ouroboros.spindle.Coordinator.class);

@@ -49,6 +49,7 @@ import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
+import com.salesforce.ouroboros.partition.LeaderNotification;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -84,6 +85,7 @@ public class Coordinator implements Member {
     private final Weaver                        weaver;
     private ConsistentHashFunction<Node>        weaverRing      = new ConsistentHashFunction<Node>();
     private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
+    private volatile Node                       producerLeader;
 
     public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
                        Weaver weaver) {
@@ -189,6 +191,20 @@ public class Coordinator implements Member {
                     inactiveMembers.add(sender);
                 }
                 yellowPages.put(sender, (ContactInformation) arguments[0]);
+                break;
+            default:
+                break;
+        }
+    }
+
+    @Override
+    public void dispatch(LeaderNotification type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case NOTIFY_PRODUCER_LEADER:
+                assert isLeader() : String.format("Producer group considers this node %s the leader, but is not",
+                                                  id);
+                fsm.producerLeaderEstablished();
                 break;
             default:
                 break;
@@ -373,6 +389,10 @@ public class Coordinator implements Member {
     protected void cleanUpRebalancing() {
         // TODO Auto-generated method stub
 
+    }
+
+    protected void clearState() {
+        producerLeader = null;
     }
 
     /**

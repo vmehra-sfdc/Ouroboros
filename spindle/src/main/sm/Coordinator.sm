@@ -40,6 +40,9 @@
 %map CoordinatorFSM
 %% 
 Unstable
+Entry{
+	clearState();
+}
 {
 	stabilize
 		EstablishReplicators{}
@@ -69,7 +72,7 @@ Entry{
 }
 {
 	coordinateReplicators
-		push(ControllerFSM::CoordinateReplicators) {}
+		push(ControllerFSM::WaitForProducerLeader) {}
 		
 	replicatorsEstablished
 		ReplicatorsEstablished{}
@@ -133,12 +136,23 @@ Entry{
 	coordinateReplicators();
 }
 {
+	producerLeaderSet
+		nil {}
+		
 	replicatorsEstablished
 		[ctxt.tallyComplete()]
 		pop(replicatorsEstablished) {}
 		
 	replicatorsEstablished
 		nil {}
+		
+	destabilize
+		pop(destabilize) {}
+}
+
+WaitForProducerLeader { 
+	producerLeaderEstablished
+		CoordinateReplicators {}
 		
 	destabilize
 		pop(destabilize) {}

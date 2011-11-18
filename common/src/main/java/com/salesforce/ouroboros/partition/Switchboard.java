@@ -47,9 +47,10 @@ import org.smartfrog.services.anubis.partition.comms.MessageConnection;
 import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 import org.smartfrog.services.anubis.partition.views.View;
 
+import statemap.StateUndefinedException;
+
 import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardFSM;
 import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardState;
 
 /**
@@ -81,6 +82,9 @@ public class Switchboard {
                       Serializable[] arguments, long time);
 
         void dispatch(MemberDispatch type, Node sender,
+                      Serializable[] arguments, long time);
+
+        void dispatch(LeaderNotification type, Node sender,
                       Serializable[] arguments, long time);
 
         void stabilized();
@@ -192,6 +196,11 @@ public class Switchboard {
         member.dispatch(type, sender, arguments, time);
     }
 
+    public void dispatchToMember(LeaderNotification type, Node sender,
+                                 Serializable[] arguments, long time) {
+        member.dispatch(type, sender, arguments, time);
+    }
+
     public void dispatchToMember(MemberDispatch type, Node sender,
                                  Serializable[] arguments, long time) {
         member.dispatch(type, sender, arguments, time);
@@ -227,7 +236,11 @@ public class Switchboard {
     }
 
     public boolean isStable() {
-        return stable.get();
+        try {
+            return fsm.getState() == SwitchboardContext.SwitchboardFSM.Stable;
+        } catch (StateUndefinedException e) {
+            return false;
+        }
     }
 
     /**
