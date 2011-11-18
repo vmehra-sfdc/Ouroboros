@@ -51,6 +51,7 @@ import statemap.StateUndefinedException;
 
 import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.RebalanceMessage;
 import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardState;
 
 /**
@@ -82,6 +83,9 @@ public class Switchboard {
                       Serializable[] arguments, long time);
 
         void dispatch(MemberDispatch type, Node sender,
+                      Serializable[] arguments, long time);
+
+        void dispatch(RebalanceMessage type, Node sender,
                       Serializable[] arguments, long time);
 
         void stabilized();
@@ -194,6 +198,11 @@ public class Switchboard {
     }
 
     public void dispatchToMember(MemberDispatch type, Node sender,
+                                 Serializable[] arguments, long time) {
+        member.dispatch(type, sender, arguments, time);
+    }
+
+    public void dispatchToMember(RebalanceMessage type, Node sender,
                                  Serializable[] arguments, long time) {
         member.dispatch(type, sender, arguments, time);
     }

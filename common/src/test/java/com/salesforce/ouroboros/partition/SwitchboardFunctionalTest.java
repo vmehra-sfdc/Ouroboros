@@ -50,6 +50,7 @@ import org.springframework.context.annotation.Configuration;
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.RebalanceMessage;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.partition.Util.Condition;
 
@@ -147,6 +148,12 @@ public class SwitchboardFunctionalTest {
         @Override
         public void stabilized() {
             stabilized = true;
+        }
+
+        @Override
+        public void dispatch(RebalanceMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+            
         }
 
     }

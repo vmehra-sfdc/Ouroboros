@@ -52,6 +52,7 @@ import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.RebalanceMessage;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.api.producer.UnknownChannelException;
@@ -678,5 +679,12 @@ public class Coordinator implements Member {
 
     protected void openPublishingGate() {
         publishGate.open();
+    }
+
+    @Override
+    public void dispatch(RebalanceMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        // TODO Auto-generated method stub
+        
     }
 }

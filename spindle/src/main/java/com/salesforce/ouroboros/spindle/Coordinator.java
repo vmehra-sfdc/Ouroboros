@@ -42,12 +42,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.RebalanceMessage;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
@@ -78,7 +80,7 @@ public class Coordinator implements Member {
     private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
     private ConsistentHashFunction<Node>        nextRing;
     private final Switchboard                   switchboard;
-    private final Collection<Node>              tally           = new ConcurrentSkipListSet<Node>();
+    private final AtomicInteger                 tally           = new AtomicInteger();
     private int                                 targetTally;
     private final ScheduledExecutorService      timer;
     private final Weaver                        weaver;
@@ -341,7 +343,7 @@ public class Coordinator implements Member {
             log.info(String.format("Replicators reported established on: %s",
                                    sender));
         }
-        tally.add(sender);
+        tally.incrementAndGet();
         fsm.replicatorsEstablished();
     }
 
@@ -390,7 +392,7 @@ public class Coordinator implements Member {
     protected void coordinateRebalance() {
         assert isLeader() : "Must be leader to coordinate the rebalance";
         // TODO Auto-generated method stub
-        tally.clear();
+        tally.set(0);
     }
 
     /**
@@ -404,7 +406,7 @@ public class Coordinator implements Member {
             log.info(String.format("Coordinating establishment of the replicators on %s",
                                    id));
         }
-        tally.clear();
+        tally.set(0);
         targetTally = activeMembers.size() + inactiveMembers.size();
         Message message = new Message(id, ReplicatorMessage.OPEN_REPLICATORS);
         switchboard.broadcast(message, activeMembers);
@@ -414,7 +416,7 @@ public class Coordinator implements Member {
     protected void coordinateTakeover() {
         assert isLeader() : "Must be leader to coordinate the takeover";
         // TODO Auto-generated method stub
-        tally.clear();
+        tally.set(0);
     }
 
     /**
@@ -549,7 +551,7 @@ public class Coordinator implements Member {
      * @return true if the tally is equal to the required size
      */
     protected boolean tallyComplete() {
-        return tally.size() == targetTally;
+        return tally.intValue() == targetTally;
     }
 
     /**
@@ -577,5 +579,12 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
+    }
+
+    @Override
+    public void dispatch(RebalanceMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        // TODO Auto-generated method stub
+        
     }
 }

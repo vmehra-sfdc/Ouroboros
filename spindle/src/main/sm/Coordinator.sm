@@ -53,7 +53,6 @@ Stable{
 }
 
 ReplicatorsEstablished{
-		
 	rebalance
 		[ctxt.isLeader()]
 		Rebalance/push(ControllerFSM::CoordinateRebalance) {}
@@ -132,8 +131,6 @@ Entry{
 	coordinateReplicators();
 }
 {
-	producerLeaderSet
-		nil {}
 		
 	replicatorsEstablished
 		[ctxt.tallyComplete()]
