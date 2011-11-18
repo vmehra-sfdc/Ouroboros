@@ -127,7 +127,6 @@ public class SwitchboardFunctionalTest {
         @Override
         public void dispatch(ChannelMessage type, Node sender,
                              Serializable[] arguments, long time) {
-            // TODO Auto-generated method stub
             
         }
 
@@ -135,7 +134,6 @@ public class SwitchboardFunctionalTest {
         public void dispatch(GlobalMessageType type,
                              com.salesforce.ouroboros.Node sender,
                              Serializable[] arguments, long time) {
-            // TODO Auto-generated method stub
 
         }
 
@@ -143,20 +141,12 @@ public class SwitchboardFunctionalTest {
         public void dispatch(MemberDispatch type,
                              com.salesforce.ouroboros.Node sender,
                              Serializable[] arguments, long time) {
-            // TODO Auto-generated method stub
 
         }
 
         @Override
         public void stabilized() {
             stabilized = true;
-        }
-
-        @Override
-        public void dispatch(LeaderNotification type, Node sender,
-                             Serializable[] arguments, long time) {
-            // TODO Auto-generated method stub
-            
         }
 
     }

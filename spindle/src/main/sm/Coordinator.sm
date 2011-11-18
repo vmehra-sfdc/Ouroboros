@@ -39,11 +39,7 @@
 %start CoordinatorFSM::Unstable
 %map CoordinatorFSM
 %% 
-Unstable
-Entry{
-	clearState();
-}
-{
+Unstable {
 	stabilize
 		EstablishReplicators{}
 
@@ -72,7 +68,7 @@ Entry{
 }
 {
 	coordinateReplicators
-		push(ControllerFSM::WaitForProducerLeader) {}
+		push(ControllerFSM::CoordinateReplicators) {}
 		
 	replicatorsEstablished
 		ReplicatorsEstablished{}
@@ -145,14 +141,6 @@ Entry{
 		
 	replicatorsEstablished
 		nil {}
-		
-	destabilize
-		pop(destabilize) {}
-}
-
-WaitForProducerLeader { 
-	producerLeaderEstablished
-		CoordinateReplicators {}
 		
 	destabilize
 		pop(destabilize) {}

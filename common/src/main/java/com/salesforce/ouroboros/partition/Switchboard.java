@@ -84,9 +84,6 @@ public class Switchboard {
         void dispatch(MemberDispatch type, Node sender,
                       Serializable[] arguments, long time);
 
-        void dispatch(LeaderNotification type, Node sender,
-                      Serializable[] arguments, long time);
-
         void stabilized();
 
     }
@@ -192,11 +189,6 @@ public class Switchboard {
     }
 
     public void dispatchToMember(ChannelMessage type, Node sender,
-                                 Serializable[] arguments, long time) {
-        member.dispatch(type, sender, arguments, time);
-    }
-
-    public void dispatchToMember(LeaderNotification type, Node sender,
                                  Serializable[] arguments, long time) {
         member.dispatch(type, sender, arguments, time);
     }

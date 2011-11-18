@@ -56,7 +56,6 @@ import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.api.producer.UnknownChannelException;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
-import com.salesforce.ouroboros.partition.LeaderNotification;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -608,56 +607,6 @@ public class Coordinator implements Member {
         }
     }
 
-    /**
-     * Notify the leader of the weaver group of the leader of producer group
-     */
-    private void notifyWeaversOfLeader() {
-        if (!isLeader()) {
-            return;
-        }
-        if (active) {
-            if (activeWeavers.size() > 0) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Notifying active weaver %s that %s is the active group leader",
-                                           activeWeavers.last(), self));
-                }
-                switchboard.send(new Message(
-                                             self,
-                                             LeaderNotification.NOTIFY_PRODUCER_LEADER),
-                                 activeWeavers.last());
-            } else if (inactiveWeavers.size() > 0) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Notifying inactive weaver %s that %s is the active group leader",
-                                           inactiveWeavers.last(), self));
-                }
-                switchboard.send(new Message(
-                                             self,
-                                             LeaderNotification.NOTIFY_PRODUCER_LEADER),
-                                 inactiveWeavers.last());
-            }
-        } else if (activeMembers.size() == 0) {
-            if (activeWeavers.size() > 0) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Notifying active weaver %s that %s is the inactive group leader",
-                                           activeWeavers.last(), self));
-                }
-                switchboard.send(new Message(
-                                             self,
-                                             LeaderNotification.NOTIFY_PRODUCER_LEADER),
-                                 activeWeavers.last());
-            } else if (inactiveWeavers.size() > 0) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Notifying inactive weaver %s that %s is the inactive group leader",
-                                           inactiveWeavers.last(), self));
-                }
-                switchboard.send(new Message(
-                                             self,
-                                             LeaderNotification.NOTIFY_PRODUCER_LEADER),
-                                 inactiveWeavers.last());
-            }
-        }
-    }
-
     protected void closePublishingGate() throws InterruptedException {
         publishGate.close();
         // Wait until all publishing threads are finished
@@ -707,7 +656,6 @@ public class Coordinator implements Member {
         }
         filterSystemMembership();
         createSpinners();
-        notifyWeaversOfLeader();
     }
 
     protected boolean isActive() {
@@ -730,12 +678,5 @@ public class Coordinator implements Member {
 
     protected void openPublishingGate() {
         publishGate.open();
-    }
-
-    @Override
-    public void dispatch(LeaderNotification type, Node sender,
-                         Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-        
     }
 }
