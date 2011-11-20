@@ -67,12 +67,13 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * 
  */
 public class Coordinator implements Member {
-    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     static final int                            DEFAULT_TIMEOUT = 1;
     static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
+    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
 
     private boolean                             active          = false;
     private final SortedSet<Node>               activeMembers   = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>               allMembers      = new ConcurrentSkipListSet<Node>();
     private final Set<UUID>                     channels        = new HashSet<UUID>();
     private final CoordinatorContext            fsm             = new CoordinatorContext(
                                                                                          this);
@@ -185,6 +186,7 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case ADVERTISE_CHANNEL_BUFFER:
+                allMembers.add(sender);
                 if ((Boolean) arguments[1]) {
                     activeMembers.add(sender);
                 } else {
@@ -203,6 +205,33 @@ public class Coordinator implements Member {
     @Override
     public void dispatch(MemberDispatch type, Node sender,
                          Serializable[] arguments, long time) {
+    }
+
+    @Override
+    public void dispatch(RebalanceMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        // TODO Auto-generated method stub
+
+    }
+
+    public void dispatch(ReplicatorMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case REPLICATORS_ESTABLISHED:
+                if (isLeader()) {
+                    replicatorsEstablished(sender);
+                } else {
+                    switchboard.ringCast(new Message(sender, type, arguments),
+                                         allMembers);
+                }
+                break;
+            case OPEN_REPLICATORS:
+                if (!isLeader()) {
+                    switchboard.ringCast(new Message(sender, type, arguments),
+                                         allMembers);
+                    openReplicators();
+                }
+        }
     }
 
     /**
@@ -280,73 +309,6 @@ public class Coordinator implements Member {
                          requester);
     }
 
-    /**
-     * Open the replicators to the the new members
-     * 
-     * @param controller
-     *            - the controller for the group
-     * 
-     * @return - the Rendezvous used to synchronize with replication connections
-     */
-    public Rendezvous openReplicators(final Node controller) {
-        Runnable rendezvousAction = new Runnable() {
-            @Override
-            public void run() {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Replicators established on %s", id));
-                }
-                if (!isLeader()) {
-                    fsm.replicatorsEstablished();
-                }
-                switchboard.send(new Message(
-                                             id,
-                                             ReplicatorMessage.REPLICATORS_ESTABLISHED),
-                                 controller);
-            }
-        };
-
-        // Can't replicate back to self
-        ArrayList<Node> contacts = new ArrayList<Node>(inactiveMembers);
-        contacts.remove(id);
-
-        if (contacts.isEmpty()) {
-            rendezvousAction.run();
-            return null;
-        }
-        Runnable timeoutAction = new Runnable() {
-            @Override
-            public void run() {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Replicator establishment timed out on %s",
-                                           id));
-                }
-                fsm.replicatorsEstablishmentTimeout();
-            }
-        };
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Establishment of replicators initiated on %s",
-                                   id));
-        }
-        Rendezvous rendezvous = new Rendezvous(contacts.size(),
-                                               rendezvousAction);
-        for (Node member : contacts) {
-            weaver.openReplicator(member, yellowPages.get(member), rendezvous);
-        }
-        rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer,
-                                        timeoutAction);
-        return rendezvous;
-    }
-
-    public void replicatorsEstablished(Node sender) {
-        assert isLeader() : "Replicator established method must only be sent to the group leader";
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Replicators reported established on: %s",
-                                   sender));
-        }
-        tally.incrementAndGet();
-        fsm.replicatorsEstablished();
-    }
-
     @Override
     public void stabilized() {
         fsm.stabilize();
@@ -387,6 +349,15 @@ public class Coordinator implements Member {
     }
 
     /**
+     * Commit the takeover of the new primaries and secondaries.
+     */
+    protected void commitTakeover() {
+        assert isLeader() : "Must be leader to commit takeover";
+        // TODO Auto-generated method stub
+
+    }
+
+    /**
      * The
      */
     protected void coordinateRebalance() {
@@ -407,10 +378,10 @@ public class Coordinator implements Member {
                                    id));
         }
         tally.set(0);
-        targetTally = activeMembers.size() + inactiveMembers.size();
+        targetTally = allMembers.size();
         Message message = new Message(id, ReplicatorMessage.OPEN_REPLICATORS);
-        switchboard.broadcast(message, activeMembers);
-        switchboard.broadcast(message, inactiveMembers);
+        switchboard.ringCast(message, allMembers);
+        openReplicators();
     }
 
     protected void coordinateTakeover() {
@@ -449,8 +420,10 @@ public class Coordinator implements Member {
     }
 
     protected void filterSystemMembership() {
-        activeMembers.removeAll(switchboard.getDeadMembers());
-        inactiveMembers.removeAll(switchboard.getDeadMembers());
+        Collection<Node> deadMembers = switchboard.getDeadMembers();
+        allMembers.removeAll(deadMembers);
+        activeMembers.removeAll(deadMembers);
+        inactiveMembers.removeAll(deadMembers);
     }
 
     protected boolean isActive() {
@@ -469,6 +442,65 @@ public class Coordinator implements Member {
         }
         return inactiveMembers.size() == 0 ? true
                                           : inactiveMembers.last().equals(id);
+    }
+
+    /**
+     * Open the replicators to the the new members
+     * 
+     * @param controller
+     *            - the controller for the group
+     * 
+     * @return - the Rendezvous used to synchronize with replication connections
+     */
+    protected Rendezvous openReplicators() {
+        Runnable rendezvousAction = new Runnable() {
+            @Override
+            public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Replicators established on %s", id));
+                }
+                if (isLeader()) {
+                    tally.incrementAndGet();
+                } else {
+                    switchboard.ringCast(new Message(
+                                                     id,
+                                                     ReplicatorMessage.REPLICATORS_ESTABLISHED),
+                                         allMembers);
+                }
+                fsm.replicatorsEstablished();
+            }
+        };
+
+        // Can't replicate back to self
+        ArrayList<Node> contacts = new ArrayList<Node>(inactiveMembers);
+        contacts.remove(id);
+
+        if (contacts.isEmpty()) {
+            rendezvousAction.run();
+            return null;
+        }
+        Runnable timeoutAction = new Runnable() {
+            @Override
+            public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Replicator establishment timed out on %s",
+                                           id));
+                }
+                fsm.replicatorsEstablishmentTimeout();
+            }
+        };
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Establishment of replicators initiated on %s",
+                                   id));
+        }
+        Rendezvous rendezvous = new Rendezvous(contacts.size(),
+                                               rendezvousAction);
+        for (Node member : contacts) {
+            weaver.openReplicator(member, yellowPages.get(member), rendezvous);
+        }
+        rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer,
+                                        timeoutAction);
+        return rendezvous;
     }
 
     protected void rebalance() {
@@ -537,12 +569,12 @@ public class Coordinator implements Member {
         return remapped;
     }
 
-    protected void revertRebalancing() {
-        // TODO Auto-generated method stub
-
+    protected void replicatorsEstablished(Node member) {
+        tally.incrementAndGet();
+        fsm.replicatorsEstablished();
     }
 
-    protected void switchProducers() {
+    protected void revertRebalancing() {
         // TODO Auto-generated method stub
 
     }
@@ -579,12 +611,5 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
-    }
-
-    @Override
-    public void dispatch(RebalanceMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-        
     }
 }

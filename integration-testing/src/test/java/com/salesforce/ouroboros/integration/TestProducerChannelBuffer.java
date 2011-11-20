@@ -351,7 +351,7 @@ public class TestProducerChannelBuffer {
             }
         }, 30000, 200);
 
-        Util.waitFor("weaver did not stabilize", new Util.Condition() {
+        Util.waitFor("weaver did not establish replicators", new Util.Condition() {
             @Override
             public boolean value() {
                 return weaverSwitchboard.isStable();

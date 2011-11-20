@@ -52,15 +52,6 @@ Stable{
         EstablishReplicators{}
 }
 
-ReplicatorsEstablished{
-	rebalance
-		[ctxt.isLeader()]
-		Rebalance/push(ControllerFSM::CoordinateRebalance) {}
-	
-	rebalance
-		nil {}
-}
-
 EstablishReplicators
 Entry{
 	failover();
@@ -82,9 +73,18 @@ Entry{
 		}
 }
 
+ReplicatorsEstablished{
+    rebalance
+        [ctxt.isLeader()]
+        AwaitingTakeover/push(ControllerFSM::CoordinateRebalance) {}
+    
+    rebalance
+        Rebalance{}
+}
+
 Rebalance
 Entry {
-	rebalance();
+    rebalance();
 }
 {
 	rebalanced
@@ -99,6 +99,9 @@ Entry {
 AwaitingTakeover {
 	commitTakeover
 		Stable{}
+        
+    takeoverComplete
+        Stable{}
 	
 	destabilize
 		Unstable {
@@ -106,16 +109,8 @@ AwaitingTakeover {
 		}
 }
 
-Takeover {
-	commitTakeover
-		Stable{}
-		
-    takeoverComplete
-        Stable{}
-}
-
 Shutdown {
-	destabilized
+	destabilize
 		nil {}
 }
 
@@ -131,7 +126,6 @@ Entry{
 	coordinateReplicators();
 }
 {
-		
 	replicatorsEstablished
 		[ctxt.tallyComplete()]
 		pop(replicatorsEstablished) {}
@@ -148,7 +142,7 @@ Entry{
 	coordinateRebalance();
 }
 {
-	beginRebalance
+	rebalance
 		Rebalance{}
 }
 
@@ -167,7 +161,7 @@ Entry {
 	memberRebalanced
 		nil {}
 		
-	destabilized
+	destabilize
 		pop(destabilize) {
 			revertRebalancing();
 		}
@@ -182,7 +176,7 @@ Entry{
 	memberTakeoverComplete
 		[ctxt.tallyComplete()]
 		pop(takeoverComplete) {
-			switchProducers();
+			commitTakeover();
 		}
 		
 	memberTakeoverComplete

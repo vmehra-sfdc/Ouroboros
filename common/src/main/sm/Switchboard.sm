@@ -50,14 +50,16 @@ Unstable {
 		nil{}
 }
 
-Stable {
+Stable
+Entry{
+    stabilized();
+}
+{
 } 
 
 Advertising {
 	discoveryComplete
-		Stable{
-			stabilized();
-		}
+		Stable{}
 }
 
 Stopped {

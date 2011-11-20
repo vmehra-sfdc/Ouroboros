@@ -242,7 +242,6 @@ public class TestCoordinator {
         when(weaver.getId()).thenReturn(new Node(0, 0, 0));
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
         Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
-        Node node = new Node(0, 0, 0);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -271,7 +270,7 @@ public class TestCoordinator {
                              0);
         coordinator.getInactiveMembers().addAll(Arrays.asList(node1, node2,
                                                               node3));
-        Rendezvous rendezvous = coordinator.openReplicators(node);
+        Rendezvous rendezvous = coordinator.openReplicators();
         assertNotNull(rendezvous);
         assertEquals(3, rendezvous.getParties());
 

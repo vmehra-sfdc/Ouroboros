@@ -39,32 +39,18 @@ import com.salesforce.ouroboros.spindle.Coordinator;
  * 
  */
 public enum ReplicatorMessage implements MemberDispatch {
-    OPEN_REPLICATORS {
+    OPEN_REPLICATORS, REPLICATORS_ESTABLISHED;
 
-        @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable[] arguments, long time) {
-            if (!(switchboard.getMember() instanceof Coordinator)) {
-                log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
-                                          this, switchboard.getMember()));
-            }
-            Coordinator coordinator = (Coordinator) switchboard.getMember();
-            coordinator.openReplicators(sender);
+    @Override
+    public void dispatch(Switchboard switchboard, Node sender,
+                         Serializable[] arguments, long time) {
+        if (!(switchboard.getMember() instanceof Coordinator)) {
+            log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
+                                      this, switchboard.getMember()));
         }
-    },
-    REPLICATORS_ESTABLISHED {
-
-        @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable[] arguments, long time) {
-            if (!(switchboard.getMember() instanceof Coordinator)) {
-                log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
-                                          this, switchboard.getMember()));
-            }
-            Coordinator coordinator = (Coordinator) switchboard.getMember();
-            coordinator.replicatorsEstablished(sender);
-        }
-    };
+        Coordinator coordinator = (Coordinator) switchboard.getMember();
+        coordinator.dispatch(this, sender, arguments, time);
+    }
 
     private final static Logger log = Logger.getLogger(ReplicatorMessage.class.getCanonicalName());
 }
