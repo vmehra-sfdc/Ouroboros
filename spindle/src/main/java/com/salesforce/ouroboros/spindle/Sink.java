@@ -36,6 +36,7 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.spindle.SinkContext.SinkState;
 
 /**
  * The inbound half of the Xerox, which receives the bulk transfer from the
@@ -64,6 +65,7 @@ public class Sink implements CommunicationsHandler {
     @Override
     public void accept(SocketChannelHandler handler) {
         this.handler = handler;
+        fsm.accept();
     }
 
     @Override
@@ -87,6 +89,10 @@ public class Sink implements CommunicationsHandler {
         throw new UnsupportedOperationException();
     }
 
+    public SinkState getState() {
+        return fsm.getState();
+    }
+
     @Override
     public void readReady() {
         fsm.readReady();
@@ -103,8 +109,9 @@ public class Sink implements CommunicationsHandler {
 
     protected boolean copy() {
         try {
-            current.transferFrom(handler.getChannel(), bytesWritten,
-                                 segmentSize - bytesWritten);
+            bytesWritten += current.transferFrom(handler.getChannel(),
+                                                 bytesWritten, segmentSize
+                                                               - bytesWritten);
         } catch (IOException e) {
             error = true;
             if (log.isLoggable(Level.WARNING)) {
@@ -139,7 +146,7 @@ public class Sink implements CommunicationsHandler {
     }
 
     protected void nextHandshake() {
-        buffer.reset();
+        buffer.rewind();
         if (readHandshake()) {
             fsm.readHeader();
         } else {
@@ -148,7 +155,7 @@ public class Sink implements CommunicationsHandler {
     }
 
     protected void nextHeader() {
-        buffer.reset();
+        buffer.rewind();
         if (readHeader()) {
             fsm.copy();
         } else {
@@ -192,7 +199,7 @@ public class Sink implements CommunicationsHandler {
                 return false;
             }
             if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Sink started for channel % on %s",
+                log.info(String.format("Sink started for channel %s on %s",
                                        channelId, bundle.getId()));
             }
             return true;
@@ -229,7 +236,7 @@ public class Sink implements CommunicationsHandler {
             segmentSize = buffer.getLong();
             bytesWritten = 0;
             if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Sink segment %s copy started % on %s",
+                log.info(String.format("Sink segment %s copy started on %s",
                                        current, bundle.getId()));
             }
             return true;

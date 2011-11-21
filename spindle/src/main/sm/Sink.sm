@@ -41,10 +41,10 @@
 %% 
 Suspended {
 	accept
-		Handshake{}
+		ReadHandshake{}
 }
 
-Handshake
+ReadHandshake
 Entry {
 	nextHandshake();
 }
@@ -94,7 +94,7 @@ Entry {
 }
 {
 	copyFinished
-		Handshake{}
+		ReadHandshake{}
 		
 	readReady
 		[!ctxt.copy()]
@@ -107,7 +107,7 @@ Entry {
 		Close{}
 
 	readReady
-		Handshake{}
+		ReadHandshake{}
 }
 
 Close
