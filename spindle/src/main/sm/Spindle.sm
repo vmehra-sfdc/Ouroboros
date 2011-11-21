@@ -64,7 +64,7 @@ Entry{
 		
 	readReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 		
 	readReady
 		Established{}
@@ -73,7 +73,7 @@ Entry{
 		Established{}
 }
 
-Close
+Closed
 Entry {
 	close();
 }

@@ -44,35 +44,14 @@ Suspended {
 		Handshake{}
 }
 
-Copy
+Handshake
 Entry{
-	writeCopy();
-	selectForWrite();
+	handshake();
 }
 {
-	writeReady
-		[!ctxt.copy()]
-		nil {
-			selectForWrite();
-		}
+	handshakeWritten
+		SendHeader{}
 		
-	writeReady
-		[ctxt.inError()]
-		Close{}
-		
-	writeReady
-		SendHeader{
-		}
-}
-
-Finished
-Entry {
-	finished();
-}
-{
-} 
-
-Handshake {
 	writeReady
 		[!ctxt.writeHandshake()]
 		nil {
@@ -81,20 +60,15 @@ Handshake {
 		
 	writeReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 		
 	writeReady
-		SendHeader{
-		}
-}
-
-Initialized {
-
+		SendHeader{}
 }
 
 SendHeader
 Entry {
-	sendNextSegment();
+	nextHeader();
 }
 {
 	writeReady
@@ -105,7 +79,7 @@ Entry {
 		
 	writeReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 		
 	writeReady
 		Copy{
@@ -116,11 +90,33 @@ Entry {
 		}
 		
 	finished
-		Finished{
+		Closed{
 		}
 }
 
-Close
+Copy
+Entry{
+	copySegment();
+}
+{
+	copied
+		SendHeader{}
+		
+	writeReady
+		[!ctxt.copy()]
+		nil {
+			selectForWrite();
+		}
+		
+	writeReady
+		[ctxt.inError()]
+		Closed{}
+		
+	writeReady
+		SendHeader{}
+}
+
+Closed
 Entry {
 	close();
 }

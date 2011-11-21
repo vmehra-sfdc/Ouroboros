@@ -42,6 +42,9 @@
 Suspended {
 	accept
 		ReadHandshake{}
+
+	readReady
+		ReadHandshake{}
 }
 
 ReadHandshake
@@ -60,7 +63,7 @@ Entry {
 		
 	readReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 
 	readReady
 		ReadHeader{}
@@ -82,7 +85,7 @@ Entry {
 		
 	readReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 
 	readReady
 		Copy{}
@@ -94,7 +97,7 @@ Entry {
 }
 {
 	copyFinished
-		ReadHandshake{}
+		Suspended{}
 		
 	readReady
 		[!ctxt.copy()]
@@ -104,13 +107,13 @@ Entry {
 		
 	readReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 
 	readReady
-		ReadHandshake{}
+		Suspended{}
 }
 
-Close
+Closed
 Entry {
 	close();
 }

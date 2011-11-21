@@ -233,6 +233,14 @@ public class Sink implements CommunicationsHandler {
             }
             long offset = buffer.getLong();
             current = channel.segmentFor(offset);
+            if (current == null) {
+                error = true;
+                if (log.isLoggable(Level.WARNING)) {
+                    log.warning(String.format("No segment for offset %s in channel %s",
+                                              offset, channel));
+                }
+                return false;
+            }
             segmentSize = buffer.getLong();
             bytesWritten = 0;
             if (log.isLoggable(Level.INFO)) {

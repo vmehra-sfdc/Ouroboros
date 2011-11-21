@@ -60,7 +60,7 @@ Entry {
 		
 	writeReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 		
 	writeReady 
 		WriteBatch{}
@@ -85,7 +85,7 @@ Entry {
 		
 	writeReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 		
 	writeReady
 		[!ctxt.pending.isEmpty()]
@@ -95,7 +95,7 @@ Entry {
 		Waiting{}
 }
 
-Close
+Closed
 Entry {
 	close();
 }

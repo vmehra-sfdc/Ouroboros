@@ -60,7 +60,7 @@ Entry {
 		}
 	readReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 
 	readReady
 		Ready{
@@ -88,7 +88,7 @@ Entry {
 		}
 	readReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 
 	readReady
 		Ready{
@@ -111,13 +111,13 @@ Entry{
 		}
 	readReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 
 	readReady
 		Append{}
 }
 
-Close
+Closed
 Entry {
 	close();
 }

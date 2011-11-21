@@ -26,15 +26,22 @@
 package com.salesforce.ouroboros.spindle;
 
 import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 import org.junit.Test;
 import org.mockito.internal.verification.Times;
@@ -42,7 +49,11 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.Event;
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.SinkContext.SinkFSM;
+import com.salesforce.ouroboros.spindle.XeroxContext.XeroxFSM;
 
 /**
  * 
@@ -182,11 +193,107 @@ public class TestSink {
         sink.readReady();
         sink.readReady();
 
-        verify(socket, new Times(6)).read(isA(ByteBuffer.class));
+        verify(socket, new Times(5)).read(isA(ByteBuffer.class));
         verify(segment, new Times(2)).transferFrom(isA(ReadableByteChannel.class),
                                                    isA(Long.class),
                                                    isA(Long.class));
         assertEquals(SinkFSM.ReadHandshake, sink.getState());
 
+    }
+
+    @Test
+    public void testXeroxSink() throws Exception {
+        SocketChannelHandler inboundHandler = mock(SocketChannelHandler.class);
+        File inboundTmpFile = File.createTempFile("sink", ".tst");
+        inboundTmpFile.delete();
+        inboundTmpFile.deleteOnExit();
+        Segment inboundSegment = new Segment(inboundTmpFile);
+        EventChannel inboundEventChannel = mock(EventChannel.class);
+        Bundle inboundBundle = mock(Bundle.class);
+
+        long prefix = 0x1600;
+        SocketChannelHandler outboundHandler = mock(SocketChannelHandler.class);
+        File tmpOutboundFile = new File(Long.toHexString(prefix)
+                                        + EventChannel.SEGMENT_SUFFIX);
+        tmpOutboundFile.delete();
+        tmpOutboundFile.deleteOnExit();
+        Segment outboundSegment = new Segment(tmpOutboundFile);
+
+        Node toNode = new Node(0, 0, 0);
+        UUID channel = UUID.randomUUID();
+
+        SocketOptions options = new SocketOptions();
+        options.setSend_buffer_size(4);
+        options.setReceive_buffer_size(4);
+        options.setTimeout(100);
+        ServerSocketChannel server = ServerSocketChannel.open();
+        server.configureBlocking(true);
+        server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
+        final SocketChannel outbound = SocketChannel.open();
+        options.configure(outbound.socket());
+        outbound.configureBlocking(true);
+        outbound.connect(server.socket().getLocalSocketAddress());
+        final SocketChannel inbound = server.accept();
+        options.configure(inbound.socket());
+        inbound.configureBlocking(true);
+        assertTrue(inbound.isConnected());
+        outbound.configureBlocking(false);
+        inbound.configureBlocking(false);
+
+        when(inboundHandler.getChannel()).thenReturn(inbound);
+        when(outboundHandler.getChannel()).thenReturn(outbound);
+
+        when(inboundBundle.createEventChannelFor(channel)).thenReturn(inboundEventChannel);
+        when(inboundEventChannel.segmentFor(prefix)).thenReturn(inboundSegment);
+
+        final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
+        ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
+        Event event = new Event(666, payloadBuffer);
+
+        event.rewind();
+        event.write(outboundSegment);
+        outboundSegment.write(payloadBuffer);
+        outboundSegment.force(false);
+
+        CountDownLatch latch = mock(CountDownLatch.class);
+        final Xerox xerox = new Xerox(
+                                      toNode,
+                                      channel,
+                                      new LinkedList<Segment>(
+                                                              Arrays.asList(outboundSegment)));
+        xerox.setLatch(latch);
+        
+        final Sink sink = new Sink(inboundBundle);
+
+        sink.accept(inboundHandler);
+        xerox.connect(outboundHandler);
+
+        Runnable reader = new Runnable() {
+            @Override
+            public void run() {
+                while (SinkFSM.ReadHeader != sink.getState()) {
+                    sink.readReady();
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+            }
+        };
+        Thread inboundRead = new Thread(reader, "Inbound read thread");
+        inboundRead.start();
+
+        Util.waitFor("Never achieved Closed state", new Util.Condition() {
+            @Override
+            public boolean value() {
+                if (XeroxFSM.Closed == xerox.getState()) {
+                    return true;
+                }
+                xerox.writeReady();
+                return false;
+            }
+        }, 1000L, 100L);
+        inboundRead.join(4000);
     }
 }

@@ -60,7 +60,7 @@ Entry{
 		
 	writeReady
 		[ctxt.inError()]
-		Close{}
+		Closed{}
 		
 	writeReady
 		Established{}
@@ -69,7 +69,7 @@ Entry{
 		Established{}
 }
 
-Close
+Closed
 Entry {
 	close();
 }

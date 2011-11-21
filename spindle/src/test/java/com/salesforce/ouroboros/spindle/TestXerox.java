@@ -115,7 +115,6 @@ public class TestXerox {
         xerox.setLatch(latch);
         assertEquals(XeroxFSM.Suspended, xerox.getState());
         xerox.connect(handler);
-        xerox.writeReady();
         assertEquals(XeroxFSM.Handshake, xerox.getState());
         verify(handler).selectForWrite();
         xerox.writeReady();
@@ -127,7 +126,7 @@ public class TestXerox {
         xerox.writeReady();
         assertEquals(XeroxFSM.Copy, xerox.getState());
         xerox.writeReady();
-        assertEquals(XeroxFSM.Finished, xerox.getState());
+        assertEquals(XeroxFSM.Closed, xerox.getState());
         verify(latch).countDown();
     }
 }
