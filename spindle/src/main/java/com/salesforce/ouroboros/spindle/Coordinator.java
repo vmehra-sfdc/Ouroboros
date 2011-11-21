@@ -210,8 +210,21 @@ public class Coordinator implements Member {
     @Override
     public void dispatch(RebalanceMessage type, Node sender,
                          Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-
+        switch (type) {
+            case PREPARE_FOR_REBALANCE:
+                if (isLeader()) {
+                    fsm.rebalance();
+                }
+                break;
+            case INITIATE_REBALANCE:
+                break;
+            case REBALANCE_COMPLETE:
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Invalid rebalance message %s",
+                                                              type));
+        }
     }
 
     public void dispatch(ReplicatorMessage type, Node sender,
@@ -358,16 +371,20 @@ public class Coordinator implements Member {
     }
 
     /**
-     * The
+     * The receiver is the controller for the group. Coordinate the rebalancing
+     * of the system by including the new members.
      */
     protected void coordinateRebalance() {
         assert isLeader() : "Must be leader to coordinate the rebalance";
-        // TODO Auto-generated method stub
-        tally.set(0);
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Coordinating rebalancing on %s", id));
+        }
+        switchboard.ringCast(new Message(id,
+                                         RebalanceMessage.PREPARE_FOR_REBALANCE));
     }
 
     /**
-     * The receiver is the coordinator for the group. Coordinate the
+     * The receiver is the controller for the group. Coordinate the
      * establishment of the replicators on the members and new members of the
      * group
      */

@@ -1,3 +1,4 @@
+%{
 /**
  * Copyright (c) 2011, salesforce.com, inc.
  * All rights reserved.
@@ -23,65 +24,97 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
-
-import java.util.UUID;
-
-import com.salesforce.ouroboros.Node;
 
 /**
- * The interface which provides the segments for appending within a channel,
- * based on the new event's header.
- * 
  * @author hhildebrand
- * 
  */
-public interface Bundle {
+%}
 
-    /**
-     * The replicator has been closed.
-     * 
-     * @param replicator
-     *            - the replicator
-     */
-    void closeReplicator(Node partnerId);
+// The FSM of the Sink machine appender protocol
 
-    /**
-     * Answer the created event channel corresponding to the channel id
-     * 
-     * @param channelId
-     *            - the id of the channel
-     * @return the create EventChannel for this id
-     */
-    EventChannel createEventChannelFor(UUID channelId);
+%class Sink
+%package com.salesforce.ouroboros.spindle
+%access package
 
-    /**
-     * Answer the event channel corresponding to the channel id
-     * 
-     * @param channelId
-     *            - the id of the channel
-     * @return the EventChannel for this id, or null if no such channel exists.
-     */
-    EventChannel eventChannelFor(UUID channelId);
-
-    /**
-     * Answer the Acknowledger associated the node
-     * 
-     * @param node
-     * @return the Acknowledger associated with the node
-     */
-    Acknowledger getAcknowledger(Node node);
-
-    /**
-     * @return the Node id of the bundle
-     */
-    Node getId();
-
-    /**
-     * Map the producer node to the acknowledger
-     * 
-     * @param producer
-     * @param acknowledger
-     */
-    void map(Node producer, Acknowledger acknowledger);
+%start SinkFSM::Suspended
+%map SinkFSM
+%% 
+Suspended {
+	accept
+		Handshake{}
 }
+
+Handshake
+Entry {
+	nextHandshake();
+}
+{
+	readHeader
+		ReadHeader{}
+		
+	readReady
+		[!ctxt.readHandshake()]
+		nil{
+			selectForRead();
+		}
+		
+	readReady
+		[ctxt.inError()]
+		Close{}
+
+	readReady
+		ReadHeader{}
+}
+
+ReadHeader
+Entry {
+	nextHeader();
+}
+{
+	copy
+		Copy{}
+		
+	readReady
+		[!ctxt.readHeader()]
+		nil{
+			selectForRead();
+		}
+		
+	readReady
+		[ctxt.inError()]
+		Close{}
+
+	readReady
+		Copy{}
+}
+
+Copy
+Entry {
+	startCopy();
+}
+{
+	copyFinished
+		Handshake{}
+		
+	readReady
+		[!ctxt.copy()]
+		nil{
+			selectForRead();
+		}
+		
+	readReady
+		[ctxt.inError()]
+		Close{}
+
+	readReady
+		Handshake{}
+}
+
+Close
+Entry {
+	close();
+}
+{
+}
+ 
+%%

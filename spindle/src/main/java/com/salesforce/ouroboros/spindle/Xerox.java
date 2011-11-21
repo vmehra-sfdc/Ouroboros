@@ -47,7 +47,7 @@ import com.salesforce.ouroboros.spindle.XeroxContext.XeroxState;
 public class Xerox implements CommunicationsHandler {
 
     public static final long     MAGIC             = 0x1638L;
-    private static final int     BUFFER_SIZE       = 8 + 8 + 8;
+    public static final int      BUFFER_SIZE       = 8 + 8 + 8;
     private static final int     DEFAULT_TXFR_SIZE = 16 * 1024;
     private static final Logger  log               = Logger.getLogger(Xerox.class.getCanonicalName());
 

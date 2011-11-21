@@ -41,7 +41,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.salesforce.ouroboros.ContactInformation;
@@ -89,26 +88,6 @@ public class Weaver implements Bundle {
             replicator.bind();
             return replicator;
         }
-
-        private Node readHandshake(SocketChannel channel) {
-            ByteBuffer handshake = ByteBuffer.allocate(Replicator.HANDSHAKE_SIZE);
-            try {
-                channel.read(handshake);
-            } catch (IOException e) {
-                log.log(Level.WARNING,
-                        String.format("Unable to read handshake from: %s",
-                                      channel), e);
-                return null;
-            }
-            handshake.flip();
-            int magic = handshake.getInt();
-            if (Replicator.MAGIC != magic) {
-                log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
-                                          channel, magic));
-                return null;
-            }
-            return new Node(handshake);
-        }
     }
 
     private class SpindleFactory implements CommunicationsHandlerFactory {
@@ -117,11 +96,19 @@ public class Weaver implements Bundle {
             return new Spindle(Weaver.this);
         }
     }
+    private class SinkFactory implements CommunicationsHandlerFactory {
+        @Override
+        public Sink createCommunicationsHandler(SocketChannel channel) {
+            return new Sink(Weaver.this);
+        }
+    }
 
     private static final Logger                     log               = Logger.getLogger(Weaver.class.getCanonicalName());
     private static final String                     WEAVER_REPLICATOR = "Weaver Replicator";
     private static final String                     WEAVER_SPINDLE    = "Weaver Spindle";
     private static final String                     WEAVER_XEROX      = "Weaver Xerox";
+    static final int                                HANDSHAKE_SIZE    = Node.BYTE_LENGTH + 4;
+    static final int                                MAGIC             = 0x1638;
 
     private final ConcurrentMap<Node, Acknowledger> acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
     private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
@@ -133,7 +120,27 @@ public class Weaver implements Bundle {
     private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
     private final ConsistentHashFunction<File>      roots             = new ConsistentHashFunction<File>();
     private final ServerSocketChannelHandler        spindleHandler;
-    private final ChannelHandler                    xeroxHandler;
+    private final ServerSocketChannelHandler        xeroxHandler;
+
+    private Node readHandshake(SocketChannel channel) {
+        ByteBuffer handshake = ByteBuffer.allocate(HANDSHAKE_SIZE);
+        try {
+            channel.read(handshake);
+        } catch (IOException e) {
+            log.log(Level.WARNING,
+                    String.format("Unable to read handshake from: %s", channel),
+                    e);
+            return null;
+        }
+        handshake.flip();
+        int magic = handshake.getInt();
+        if (MAGIC != magic) {
+            log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
+                                      channel, magic));
+            return null;
+        }
+        return new Node(handshake);
+    }
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
@@ -154,10 +161,13 @@ public class Weaver implements Bundle {
             }
         }
         maxSegmentSize = configuration.getMaxSegmentSize();
-        xeroxHandler = new ChannelHandler(
-                                          WEAVER_XEROX,
-                                          configuration.getXeroxSocketOptions(),
-                                          configuration.getXeroxes());
+
+        xeroxHandler = new ServerSocketChannelHandler(
+                                                      WEAVER_XEROX,
+                                                      configuration.getXeroxSocketOptions(),
+                                                      configuration.getXeroxAddress(),
+                                                      configuration.getXeroxes(),
+                                                      new SinkFactory());
         replicationHandler = new ServerSocketChannelHandler(
                                                             WEAVER_REPLICATOR,
                                                             configuration.getReplicationSocketOptions(),
@@ -445,5 +455,19 @@ public class Weaver implements Bundle {
      */
     private boolean thisEndInitiatesConnectionsTo(Node target) {
         return id.compareTo(target) < 0;
+    }
+
+    @Override
+    public EventChannel createEventChannelFor(UUID channel) {
+        // This node is the primary for the event channel
+        if (log.isLoggable(Level.INFO)) {
+            log.fine(String.format(" Weaver[%s] created a new channel for %s",
+                                   id, channel));
+        }
+        EventChannel ec = new EventChannel(channel,
+                                           roots.hash(point(channel)),
+                                           maxSegmentSize);
+        channels.put(channel, ec);
+        return ec;
     }
 }

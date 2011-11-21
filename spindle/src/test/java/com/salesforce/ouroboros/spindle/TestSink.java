@@ -25,63 +25,25 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import java.util.UUID;
+import static junit.framework.Assert.*;
+import static org.mockito.Mockito.*;
 
-import com.salesforce.ouroboros.Node;
+import java.nio.channels.SocketChannel;
+
+import org.junit.Test;
 
 /**
- * The interface which provides the segments for appending within a channel,
- * based on the new event's header.
  * 
  * @author hhildebrand
  * 
  */
-public interface Bundle {
+public class TestSink {
+    @Test
+    public void testHandshake() {
+        Bundle bundle = mock(Bundle.class);
+        SocketChannel socket = mock(SocketChannel.class);
 
-    /**
-     * The replicator has been closed.
-     * 
-     * @param replicator
-     *            - the replicator
-     */
-    void closeReplicator(Node partnerId);
+        Sink sink = new Sink(bundle);
 
-    /**
-     * Answer the created event channel corresponding to the channel id
-     * 
-     * @param channelId
-     *            - the id of the channel
-     * @return the create EventChannel for this id
-     */
-    EventChannel createEventChannelFor(UUID channelId);
-
-    /**
-     * Answer the event channel corresponding to the channel id
-     * 
-     * @param channelId
-     *            - the id of the channel
-     * @return the EventChannel for this id, or null if no such channel exists.
-     */
-    EventChannel eventChannelFor(UUID channelId);
-
-    /**
-     * Answer the Acknowledger associated the node
-     * 
-     * @param node
-     * @return the Acknowledger associated with the node
-     */
-    Acknowledger getAcknowledger(Node node);
-
-    /**
-     * @return the Node id of the bundle
-     */
-    Node getId();
-
-    /**
-     * Map the producer node to the acknowledger
-     * 
-     * @param producer
-     * @param acknowledger
-     */
-    void map(Node producer, Acknowledger acknowledger);
+    }
 }

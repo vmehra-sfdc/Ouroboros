@@ -155,6 +155,10 @@ public class EventChannel {
         this.replicator = replicator;
     }
 
+    public EventChannel(UUID channel, File root, long maxSegmentSize) {
+        this(Role.PRIMARY, channel, root, maxSegmentSize, null);
+    }
+
     /**
      * Mark the appending of the event at the offset in the channel
      * 
