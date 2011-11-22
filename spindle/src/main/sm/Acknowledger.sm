@@ -33,8 +33,8 @@
 // The FSM of the Acknowledger protocol
 
 %class Acknowledger
-%package com.salesforce.ouroboros.spindle
-%access package
+%package com.salesforce.ouroboros.spindle.source
+%access public
 
 %start AcknowledgerFSM::Waiting
 %map AcknowledgerFSM

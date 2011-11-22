@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -32,8 +32,11 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
-import com.salesforce.ouroboros.spindle.AbstractAppenderContext.AbstractAppenderState;
+import com.salesforce.ouroboros.spindle.Bundle;
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
+import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderState;
 
 /**
  * The abstract appender of events. Instances of this class are responsible for

@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -34,7 +34,7 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
-import com.salesforce.ouroboros.spindle.AcknowledgerContext.AcknowledgerState;
+import com.salesforce.ouroboros.spindle.source.AcknowledgerContext.AcknowledgerState;
 import com.salesforce.ouroboros.util.lockfree.LockFreeQueue;
 
 /**

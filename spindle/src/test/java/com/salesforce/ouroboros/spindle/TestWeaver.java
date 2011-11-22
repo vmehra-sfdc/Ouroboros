@@ -45,6 +45,7 @@ import org.junit.Test;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**

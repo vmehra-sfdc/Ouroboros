@@ -34,7 +34,7 @@
 
 %class Switchboard
 %package com.salesforce.ouroboros.partition
-%access package
+%access public
 %import org.smartfrog.services.anubis.partition.views.View
 
 %start SwitchboardFSM::Unstable

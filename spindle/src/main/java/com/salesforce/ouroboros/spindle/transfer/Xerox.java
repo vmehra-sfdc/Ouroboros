@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.transfer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -36,7 +36,8 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.XeroxContext.XeroxState;
+import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.transfer.XeroxContext.XeroxState;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**

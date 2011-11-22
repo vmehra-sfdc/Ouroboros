@@ -38,6 +38,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
+import com.salesforce.ouroboros.spindle.replication.Replicator;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
  * The representation of the event channel. A channel is a logical collection of

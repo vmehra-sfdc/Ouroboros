@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.spindle;
 import java.util.UUID;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
  * The interface which provides the segments for appending within a channel,

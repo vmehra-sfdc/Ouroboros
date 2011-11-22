@@ -23,38 +23,58 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.replication;
+
+import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
+import com.salesforce.ouroboros.spindle.source.AbstractAppender;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
+ * The appender for receiving duplicated events from the primary.
  * 
  * @author hhildebrand
  * 
  */
-public class Appender extends AbstractAppender {
+public class ReplicatingAppender extends AbstractAppender {
 
-    private final Acknowledger acknowledger;
+    private static final Logger log = Logger.getLogger(ReplicatingAppender.class.getCanonicalName());
 
-    public Appender(Bundle bundle, Acknowledger acknowledger) {
+    public ReplicatingAppender(final Bundle bundle) {
         super(bundle);
-        this.acknowledger = acknowledger;
     }
 
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.AbstractAppender#commit()
+     */
     @Override
     protected void commit() {
-        eventChannel.append(new ReplicatedBatchHeader(batchHeader, offset),
-                            segment, acknowledger);
+        eventChannel.append(batchHeader, offset);
+        Node node = batchHeader.getProducerMirror();
+        Acknowledger acknowledger = bundle.getAcknowledger(node);
+        if (acknowledger == null) {
+            log.warning(String.format("Could not find an acknowledger for %s",
+                                      node));
+            return;
+        }
+        acknowledger.acknowledge(batchHeader.getChannel(),
+                                 batchHeader.getTimestamp());
     }
 
     @Override
     protected BatchHeader createBatchHeader() {
-        return new BatchHeader();
+        return new ReplicatedBatchHeader();
     }
 
     @Override
     protected AppendSegment getLogicalSegment() {
-        return eventChannel.segmentFor(batchHeader);
+        ReplicatedBatchHeader replicatedBatchHeader = (ReplicatedBatchHeader) batchHeader;
+        return new AppendSegment(
+                                 eventChannel.segmentFor(replicatedBatchHeader.getOffset()),
+                                 replicatedBatchHeader.getOffset());
     }
 }

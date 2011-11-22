@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -33,8 +33,9 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.SpindleContext.SpindleFSM;
-import com.salesforce.ouroboros.spindle.SpindleContext.SpindleState;
+import com.salesforce.ouroboros.spindle.Bundle;
+import com.salesforce.ouroboros.spindle.source.SpindleContext.SpindleFSM;
+import com.salesforce.ouroboros.spindle.source.SpindleContext.SpindleState;
 
 /**
  * The communications wrapper that ties together the appender and the

@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.replication;
 
 import java.io.IOException;
 import java.util.Queue;
@@ -31,7 +31,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.spindle.DuplicatorContext.DuplicatorState;
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorState;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.util.lockfree.LockFreeQueue;
 
 /**

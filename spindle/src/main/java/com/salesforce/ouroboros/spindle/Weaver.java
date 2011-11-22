@@ -47,6 +47,11 @@ import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.WeaverConfigation.RootDirectory;
+import com.salesforce.ouroboros.spindle.replication.Replicator;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
+import com.salesforce.ouroboros.spindle.source.Spindle;
+import com.salesforce.ouroboros.spindle.transfer.Sink;
+import com.salesforce.ouroboros.spindle.transfer.Xerox;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
 

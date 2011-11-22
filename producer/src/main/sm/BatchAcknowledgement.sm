@@ -34,7 +34,7 @@
 
 %class BatchAcknowledgement
 %package com.salesforce.ouroboros.producer
-%access package
+%access public
 
 %start BatchAcknowledgementFSM::Suspended
 %map BatchAcknowledgementFSM

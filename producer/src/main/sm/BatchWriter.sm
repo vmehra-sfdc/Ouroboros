@@ -34,7 +34,7 @@
 
 %class BatchWriter
 %package com.salesforce.ouroboros.producer
-%access package
+%access public
 
 %start BatchWriterFSM::Suspended
 %map BatchWriterFSM

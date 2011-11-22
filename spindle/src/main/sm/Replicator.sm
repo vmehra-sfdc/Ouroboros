@@ -33,9 +33,9 @@
 // The FSM of the Replicator handshake protocol
 
 %class Replicator
-%package com.salesforce.ouroboros.spindle
+%package com.salesforce.ouroboros.spindle.replication
 
-%access package
+%access public
 
 %start ReplicatorFSM::Suspended
 %map ReplicatorFSM

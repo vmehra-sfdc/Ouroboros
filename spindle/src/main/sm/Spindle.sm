@@ -33,9 +33,9 @@
 // The FSM of the Spindle handshake protocol
 
 %class Spindle
-%package com.salesforce.ouroboros.spindle
+%package com.salesforce.ouroboros.spindle.source
 
-%access package
+%access public
 
 %start SpindleFSM::Suspended
 %map SpindleFSM

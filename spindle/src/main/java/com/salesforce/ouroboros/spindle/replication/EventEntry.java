@@ -23,7 +23,11 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.replication;
+
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
  * The entry representing the appending of an event.

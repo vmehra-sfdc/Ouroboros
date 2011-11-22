@@ -23,10 +23,10 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.transfer;
 
-import static com.salesforce.ouroboros.spindle.Xerox.BUFFER_SIZE;
-import static com.salesforce.ouroboros.spindle.Xerox.MAGIC;
+import static com.salesforce.ouroboros.spindle.transfer.Xerox.BUFFER_SIZE;
+import static com.salesforce.ouroboros.spindle.transfer.Xerox.MAGIC;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -36,7 +36,10 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.spindle.SinkContext.SinkState;
+import com.salesforce.ouroboros.spindle.Bundle;
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.transfer.SinkContext.SinkState;
 
 /**
  * The inbound half of the Xerox, which receives the bulk transfer from the

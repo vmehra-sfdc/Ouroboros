@@ -33,8 +33,8 @@
 // The FSM of the Duplicator protocol
 
 %class Duplicator
-%package com.salesforce.ouroboros.spindle
-%access package
+%package com.salesforce.ouroboros.spindle.replication
+%access public
 
 %start DuplicatorFSM::Waiting
 %map DuplicatorFSM

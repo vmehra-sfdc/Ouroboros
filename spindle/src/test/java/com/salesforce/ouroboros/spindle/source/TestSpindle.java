@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.source;
 
 import static junit.framework.Assert.assertEquals;
 import static org.mockito.Matchers.eq;
@@ -47,8 +47,12 @@ import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.Bundle;
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
-import com.salesforce.ouroboros.spindle.SpindleContext.SpindleFSM;
+import com.salesforce.ouroboros.spindle.source.Spindle;
+import com.salesforce.ouroboros.spindle.source.SpindleContext.SpindleFSM;
 
 /**
  * 

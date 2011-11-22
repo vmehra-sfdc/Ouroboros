@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.replication;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
@@ -46,8 +46,13 @@ import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.AbstractAppenderContext.AbstractAppenderFSM;
-import com.salesforce.ouroboros.spindle.DuplicatorContext.DuplicatorFSM;
+import com.salesforce.ouroboros.spindle.Bundle;
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.Util;
+import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorFSM;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
+import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
 
 /**
  * 

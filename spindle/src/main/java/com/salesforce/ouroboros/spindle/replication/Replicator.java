@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.replication;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -34,8 +34,12 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.ReplicatorContext.ReplicatorFSM;
-import com.salesforce.ouroboros.spindle.ReplicatorContext.ReplicatorState;
+import com.salesforce.ouroboros.spindle.Bundle;
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
+import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorState;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
@@ -64,8 +68,8 @@ public class Replicator implements CommunicationsHandler {
 
     private static final Logger       log            = Logger.getLogger(Replicator.class.getCanonicalName());
 
-    static final int                  HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
-    static final int                  MAGIC          = 0x1638;
+    public static final int           HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
+    public static final int           MAGIC          = 0x1638;
 
     private final ReplicatingAppender appender;
     private final Bundle              bundle;

@@ -34,7 +34,7 @@
 
 %class Coordinator
 %package com.salesforce.ouroboros.spindle
-%access package
+%access public
 
 %start CoordinatorFSM::Unstable
 %map CoordinatorFSM
