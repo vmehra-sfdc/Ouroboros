@@ -35,7 +35,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
@@ -44,6 +43,7 @@ import org.mockito.stubbing.Answer;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.XeroxContext.XeroxFSM;
+import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
  * 
@@ -60,7 +60,7 @@ public class TestXerox {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(socket);
         Node node = new Node(0x1639, 0x1640, 0x1641);
-        CountDownLatch latch = mock(CountDownLatch.class);
+        Rendezvous rendezvous = mock(Rendezvous.class);
 
         final UUID id = UUID.randomUUID();
         final long prefix1 = 77L;
@@ -113,7 +113,7 @@ public class TestXerox {
 
         int transferSize = 1024;
         Xerox xerox = new Xerox(node, id, segments, transferSize);
-        xerox.setLatch(latch);
+        xerox.setRendezvous(rendezvous);
         assertEquals(XeroxFSM.Suspended, xerox.getState());
         xerox.connect(handler);
         assertEquals(XeroxFSM.Handshake, xerox.getState());
@@ -128,6 +128,6 @@ public class TestXerox {
         assertEquals(XeroxFSM.Copy, xerox.getState());
         xerox.writeReady();
         assertEquals(XeroxFSM.Closed, xerox.getState());
-        verify(latch).countDown();
+        verify(rendezvous).meet();
     }
 }

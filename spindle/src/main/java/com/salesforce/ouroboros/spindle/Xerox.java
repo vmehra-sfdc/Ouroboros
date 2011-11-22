@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,6 +37,7 @@ import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.XeroxContext.XeroxState;
+import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
  * This class duplicates a channel state from the primary to the secondary.
@@ -57,9 +58,9 @@ public class Xerox implements CommunicationsHandler {
     private final XeroxContext   fsm               = new XeroxContext(this);
     private SocketChannelHandler handler;
     private boolean              inError           = false;
-    private CountDownLatch       latch;
     private final Node           node;
     private long                 position;
+    private Rendezvous           rendezvous;
     private final Deque<Segment> segments;
     private long                 segmentSize;
     private final long           transferSize;
@@ -125,11 +126,11 @@ public class Xerox implements CommunicationsHandler {
     }
 
     /**
-     * @param latch
-     *            the latch to set
+     * @param rendezvous
+     *            the redezvous to set
      */
-    public void setLatch(CountDownLatch latch) {
-        this.latch = latch;
+    public void setRendezvous(Rendezvous rendezvous) {
+        this.rendezvous = rendezvous;
     }
 
     @Override
@@ -186,7 +187,13 @@ public class Xerox implements CommunicationsHandler {
     protected void nextHeader() {
         position = 0;
         if (segments.isEmpty()) {
-            latch.countDown();
+            try {
+                rendezvous.meet();
+            } catch (BrokenBarrierException e) {
+                log.log(Level.SEVERE,
+                        String.format("Rendezvous has already been met in xeroxing channel %s to %s",
+                                      channelId, node), e);
+            }
             fsm.finished();
             return;
         }

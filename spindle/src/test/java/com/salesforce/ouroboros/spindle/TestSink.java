@@ -41,7 +41,6 @@ import java.nio.channels.SocketChannel;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 
 import org.junit.Test;
 import org.mockito.internal.verification.Times;
@@ -54,6 +53,7 @@ import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.SinkContext.SinkFSM;
 import com.salesforce.ouroboros.spindle.XeroxContext.XeroxFSM;
+import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
  * 
@@ -279,14 +279,14 @@ public class TestSink {
         event2.write(outboundSegment2);
         outboundSegment2.force(false);
 
-        CountDownLatch latch = mock(CountDownLatch.class);
+        Rendezvous rendezvous = mock(Rendezvous.class);
         final Xerox xerox = new Xerox(
                                       toNode,
                                       channel,
                                       new LinkedList<Segment>(
                                                               Arrays.asList(outboundSegment1,
                                                                             outboundSegment2)));
-        xerox.setLatch(latch);
+        xerox.setRendezvous(rendezvous);
 
         final Sink sink = new Sink(inboundBundle);
 
