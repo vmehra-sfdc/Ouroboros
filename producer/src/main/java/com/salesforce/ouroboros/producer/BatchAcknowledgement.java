@@ -54,14 +54,15 @@ public class BatchAcknowledgement {
         this.spinner = spinner;
     }
 
-    protected boolean acknowledgementRead() {
-        return !ackBuffer.hasRemaining();
-    }
-
     public void closing() {
         if (!fsm.isInTransition()) {
             fsm.close();
         }
+    }
+
+    public void connect(SocketChannelHandler handler) {
+        this.handler = handler;
+        fsm.connect();
     }
 
     public void failover() {
@@ -72,31 +73,8 @@ public class BatchAcknowledgement {
         return fsm.getState();
     }
 
-    public void connect(SocketChannelHandler handler) {
-        this.handler = handler;
-        fsm.connect();
-    }
-
     public void readReady() {
         fsm.readReady();
-    }
-
-    protected void close() {
-        handler.close();
-    }
-
-    protected boolean readAcknowledgements() {
-        while (readAcknowledgement()) {
-            ackBuffer.flip();
-            BatchIdentity ack = new BatchIdentity(ackBuffer);
-            ackBuffer.rewind();
-            spinner.acknowledge(ack);
-        }
-        return false;
-    }
-
-    protected boolean inError() {
-        return inError;
     }
 
     private boolean readAcknowledgement() {
@@ -110,6 +88,28 @@ public class BatchAcknowledgement {
             return false;
         }
         return !ackBuffer.hasRemaining();
+    }
+
+    protected boolean acknowledgementRead() {
+        return !ackBuffer.hasRemaining();
+    }
+
+    protected void close() {
+        handler.close();
+    }
+
+    protected boolean inError() {
+        return inError;
+    }
+
+    protected boolean readAcknowledgements() {
+        while (readAcknowledgement()) {
+            ackBuffer.flip();
+            BatchIdentity ack = new BatchIdentity(ackBuffer);
+            ackBuffer.rewind();
+            spinner.acknowledge(ack);
+        }
+        return false;
     }
 
     protected void selectForRead() {

@@ -51,14 +51,14 @@ abstract public class AbstractAppender {
     protected final Bundle                  bundle;
     protected ByteBuffer                    devNull;
     protected EventChannel                  eventChannel;
+    protected final AbstractAppenderContext fsm      = new AbstractAppenderContext(
+                                                                                   this);
     protected SocketChannelHandler          handler;
+    protected boolean                       inError  = false;
     protected long                          offset   = -1L;
     protected long                          position = -1L;
     protected long                          remaining;
     protected Segment                       segment;
-    protected final AbstractAppenderContext fsm      = new AbstractAppenderContext(
-                                                                                   this);
-    protected boolean                       inError  = false;
 
     public AbstractAppender(Bundle bundle) {
         super();
@@ -66,28 +66,20 @@ abstract public class AbstractAppender {
         batchHeader = createBatchHeader();
     }
 
-    public AbstractAppenderState getState() {
-        return fsm.getState();
-    }
-
     public void accept(SocketChannelHandler handler) {
         this.handler = handler;
-    }
-
-    public void readReady() {
-        fsm.readReady();
     }
 
     public void close() {
         handler.close();
     }
 
-    protected void drain() {
-        segment = null;
-        devNull = ByteBuffer.allocate(batchHeader.getBatchByteLength());
-        if (devNull()) {
-            fsm.ready();
-        }
+    public AbstractAppenderState getState() {
+        return fsm.getState();
+    }
+
+    public void readReady() {
+        fsm.readReady();
     }
 
     protected boolean append() {
@@ -123,6 +115,33 @@ abstract public class AbstractAppender {
         return false;
     }
 
+    protected boolean batchHeaderWritten() {
+        return !batchHeader.hasRemaining();
+    }
+
+    protected void beginAppend() {
+        if (eventChannel == null) {
+            log.warning(String.format("No existing event channel for: %s",
+                                      batchHeader));
+            fsm.drain();
+            return;
+        }
+        AppendSegment logicalSegment = getLogicalSegment();
+        segment = logicalSegment.segment;
+        offset = position = logicalSegment.offset;
+        remaining = batchHeader.getBatchByteLength();
+        if (eventChannel.isDuplicate(batchHeader)) {
+            log.warning(String.format("Duplicate event batch %s", batchHeader));
+            fsm.drain();
+            return;
+        }
+        if (append()) {
+            fsm.appended();
+        } else {
+            handler.selectForRead();
+        }
+    }
+
     abstract protected void commit();
 
     abstract protected BatchHeader createBatchHeader();
@@ -145,6 +164,14 @@ abstract public class AbstractAppender {
         return false;
     }
 
+    protected void drain() {
+        segment = null;
+        devNull = ByteBuffer.allocate(batchHeader.getBatchByteLength());
+        if (devNull()) {
+            fsm.ready();
+        }
+    }
+
     protected void error() {
         if (segment != null) {
             try {
@@ -160,33 +187,14 @@ abstract public class AbstractAppender {
 
     abstract protected AppendSegment getLogicalSegment();
 
+    protected boolean inError() {
+        return inError;
+    }
+
     protected void nextBatchHeader() {
         batchHeader.rewind();
         if (readBatchHeader()) {
             fsm.append();
-        } else {
-            handler.selectForRead();
-        }
-    }
-
-    protected void beginAppend() {
-        if (eventChannel == null) {
-            log.warning(String.format("No existing event channel for: %s",
-                                      batchHeader));
-            fsm.drain();
-            return;
-        }
-        AppendSegment logicalSegment = getLogicalSegment();
-        segment = logicalSegment.segment;
-        offset = position = logicalSegment.offset;
-        remaining = batchHeader.getBatchByteLength();
-        if (eventChannel.isDuplicate(batchHeader)) {
-            log.warning(String.format("Duplicate event batch %s", batchHeader));
-            fsm.drain();
-            return;
-        }
-        if (append()) {
-            fsm.appended();
         } else {
             handler.selectForRead();
         }
@@ -215,13 +223,5 @@ abstract public class AbstractAppender {
 
     protected void selectForRead() {
         handler.selectForRead();
-    }
-
-    protected boolean inError() {
-        return inError;
-    }
-
-    protected boolean batchHeaderWritten() {
-        return !batchHeader.hasRemaining();
     }
 }

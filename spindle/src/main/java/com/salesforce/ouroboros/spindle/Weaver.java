@@ -90,16 +90,17 @@ public class Weaver implements Bundle {
         }
     }
 
-    private class SpindleFactory implements CommunicationsHandlerFactory {
-        @Override
-        public Spindle createCommunicationsHandler(SocketChannel channel) {
-            return new Spindle(Weaver.this);
-        }
-    }
     private class SinkFactory implements CommunicationsHandlerFactory {
         @Override
         public Sink createCommunicationsHandler(SocketChannel channel) {
             return new Sink(Weaver.this);
+        }
+    }
+
+    private class SpindleFactory implements CommunicationsHandlerFactory {
+        @Override
+        public Spindle createCommunicationsHandler(SocketChannel channel) {
+            return new Spindle(Weaver.this);
         }
     }
 
@@ -121,26 +122,6 @@ public class Weaver implements Bundle {
     private final ConsistentHashFunction<File>      roots             = new ConsistentHashFunction<File>();
     private final ServerSocketChannelHandler        spindleHandler;
     private final ServerSocketChannelHandler        xeroxHandler;
-
-    private Node readHandshake(SocketChannel channel) {
-        ByteBuffer handshake = ByteBuffer.allocate(HANDSHAKE_SIZE);
-        try {
-            channel.read(handshake);
-        } catch (IOException e) {
-            log.log(Level.WARNING,
-                    String.format("Unable to read handshake from: %s", channel),
-                    e);
-            return null;
-        }
-        handshake.flip();
-        int magic = handshake.getInt();
-        if (MAGIC != magic) {
-            log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
-                                      channel, magic));
-            return null;
-        }
-        return new Node(handshake);
-    }
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
@@ -199,6 +180,19 @@ public class Weaver implements Bundle {
         if (replicator != null) {
             replicator.close();
         }
+    }
+
+    @Override
+    public EventChannel createEventChannelFor(UUID channel) {
+        // This node is the primary for the event channel
+        if (log.isLoggable(Level.INFO)) {
+            log.fine(String.format(" Weaver[%s] created a new channel for %s",
+                                   id, channel));
+        }
+        EventChannel ec = new EventChannel(channel, roots.hash(point(channel)),
+                                           maxSegmentSize);
+        channels.put(channel, ec);
+        return ec;
     }
 
     @Override
@@ -446,6 +440,26 @@ public class Weaver implements Bundle {
                              replicationHandler.getLocalAddress());
     }
 
+    private Node readHandshake(SocketChannel channel) {
+        ByteBuffer handshake = ByteBuffer.allocate(HANDSHAKE_SIZE);
+        try {
+            channel.read(handshake);
+        } catch (IOException e) {
+            log.log(Level.WARNING,
+                    String.format("Unable to read handshake from: %s", channel),
+                    e);
+            return null;
+        }
+        handshake.flip();
+        int magic = handshake.getInt();
+        if (MAGIC != magic) {
+            log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
+                                      channel, magic));
+            return null;
+        }
+        return new Node(handshake);
+    }
+
     /**
      * indicates which end initiates a connection
      * 
@@ -455,19 +469,5 @@ public class Weaver implements Bundle {
      */
     private boolean thisEndInitiatesConnectionsTo(Node target) {
         return id.compareTo(target) < 0;
-    }
-
-    @Override
-    public EventChannel createEventChannelFor(UUID channel) {
-        // This node is the primary for the event channel
-        if (log.isLoggable(Level.INFO)) {
-            log.fine(String.format(" Weaver[%s] created a new channel for %s",
-                                   id, channel));
-        }
-        EventChannel ec = new EventChannel(channel,
-                                           roots.hash(point(channel)),
-                                           maxSegmentSize);
-        channels.put(channel, ec);
-        return ec;
     }
 }

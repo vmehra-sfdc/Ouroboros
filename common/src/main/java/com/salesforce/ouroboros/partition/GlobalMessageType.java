@@ -38,6 +38,7 @@ public enum GlobalMessageType implements SwitchboardDispatch {
     ADVERTISE_CHANNEL_BUFFER, ADVERTISE_CONSUMER, ADVERTISE_PRODUCER,
     DISCOVERY_COMPLETE;
 
+    @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
         switchboard.dispatch(this, sender, arguments, time);

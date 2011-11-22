@@ -50,6 +50,26 @@ import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardFSM;
 public class SwitchboardTest {
 
     @Test
+    public void testAdvertise() {
+        Node node = new Node(0, 0, 0);
+        Node testNode = new Node(1, 0, 0);
+        Partition partition = mock(Partition.class);
+        Member member = mock(Member.class);
+        MessageConnection connection = mock(MessageConnection.class);
+        when(partition.connect(testNode.processId)).thenReturn(connection);
+        BitView view = new BitView();
+        view.add(node.processId);
+        view.add(testNode.processId);
+        view.stablize();
+
+        Switchboard switchboard = new Switchboard(node, partition);
+        switchboard.setMember(member);
+        switchboard.partitionEvent(view, 0);
+        assertEquals(SwitchboardFSM.Advertising, switchboard.getState());
+        verify(member).advertise();
+    }
+
+    @Test
     public void testBasic() {
         Node node = new Node(0, 0, 0);
         Partition partition = mock(Partition.class);
@@ -61,6 +81,44 @@ public class SwitchboardTest {
         verify(partition).register(isA(PartitionNotification.class));
         switchboard.terminate();
         verify(partition).deregister(isA(PartitionNotification.class));
+    }
+
+    @Test
+    public void testBroadcast() {
+        Node node = new Node(0, 0, 0);
+        Node testNode = new Node(1, 0, 0);
+        Partition partition = mock(Partition.class);
+        Member member = mock(Member.class);
+        MessageConnection connection1 = mock(MessageConnection.class);
+        when(partition.connect(testNode.processId)).thenReturn(connection1);
+        MessageConnection connection2 = mock(MessageConnection.class);
+        when(partition.connect(node.processId)).thenReturn(connection2);
+        BitView view = new BitView();
+        view.add(node.processId);
+        view.add(testNode.processId);
+        view.stablize();
+
+        Switchboard switchboard = new Switchboard(node, partition);
+        switchboard.setMember(member);
+        switchboard.partitionEvent(view, 0);
+        switchboard.add(node);
+        switchboard.add(testNode);
+
+        Answer<Void> answer = new Answer<Void>() {
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                Message message = (Message) invocation.getArguments()[0];
+                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE, message.type);
+                return null;
+            }
+        };
+        doAnswer(answer).when(connection1).sendObject(isA(Message.class));
+        doAnswer(answer).when(connection2).sendObject(isA(Message.class));
+
+        switchboard.broadcast(new Message(node,
+                                          GlobalMessageType.DISCOVERY_COMPLETE));
+        verify(connection1).sendObject(isA(Message.class));
+
     }
 
     @Test
@@ -179,44 +237,6 @@ public class SwitchboardTest {
     }
 
     @Test
-    public void testBroadcast() {
-        Node node = new Node(0, 0, 0);
-        Node testNode = new Node(1, 0, 0);
-        Partition partition = mock(Partition.class);
-        Member member = mock(Member.class);
-        MessageConnection connection1 = mock(MessageConnection.class);
-        when(partition.connect(testNode.processId)).thenReturn(connection1);
-        MessageConnection connection2 = mock(MessageConnection.class);
-        when(partition.connect(node.processId)).thenReturn(connection2);
-        BitView view = new BitView();
-        view.add(node.processId);
-        view.add(testNode.processId);
-        view.stablize();
-
-        Switchboard switchboard = new Switchboard(node, partition);
-        switchboard.setMember(member);
-        switchboard.partitionEvent(view, 0);
-        switchboard.add(node);
-        switchboard.add(testNode);
-
-        Answer<Void> answer = new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                Message message = (Message) invocation.getArguments()[0];
-                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE, message.type);
-                return null;
-            }
-        };
-        doAnswer(answer).when(connection1).sendObject(isA(Message.class));
-        doAnswer(answer).when(connection2).sendObject(isA(Message.class));
-
-        switchboard.broadcast(new Message(node,
-                                          GlobalMessageType.DISCOVERY_COMPLETE));
-        verify(connection1).sendObject(isA(Message.class));
-
-    }
-
-    @Test
     public void testSend() {
         View v = mock(View.class);
         Node node = new Node(0, 0, 0);
@@ -236,26 +256,6 @@ public class SwitchboardTest {
                                   GlobalMessageType.DISCOVERY_COMPLETE);
         switchboard.send(msg, testNode);
         verify(connection).sendObject(msg);
-    }
-
-    @Test
-    public void testAdvertise() {
-        Node node = new Node(0, 0, 0);
-        Node testNode = new Node(1, 0, 0);
-        Partition partition = mock(Partition.class);
-        Member member = mock(Member.class);
-        MessageConnection connection = mock(MessageConnection.class);
-        when(partition.connect(testNode.processId)).thenReturn(connection);
-        BitView view = new BitView();
-        view.add(node.processId);
-        view.add(testNode.processId);
-        view.stablize();
-
-        Switchboard switchboard = new Switchboard(node, partition);
-        switchboard.setMember(member);
-        switchboard.partitionEvent(view, 0);
-        assertEquals(SwitchboardFSM.Advertising, switchboard.getState());
-        verify(member).advertise();
     }
 
     @Test
@@ -285,7 +285,8 @@ public class SwitchboardTest {
         switchboard.partitionEvent(view, 0);
         switchboard.discover(node);
         switchboard.discover(testNode);
-        switchboard.dispatch(GlobalMessageType.DISCOVERY_COMPLETE, node, null, -1);
+        switchboard.dispatch(GlobalMessageType.DISCOVERY_COMPLETE, node, null,
+                             -1);
         assertEquals(SwitchboardFSM.Stable, switchboard.getState());
         verify(member).stabilized();
         verify(connection).sendObject(isA(Message.class));

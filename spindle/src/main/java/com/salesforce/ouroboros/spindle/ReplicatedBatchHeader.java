@@ -40,24 +40,6 @@ public class ReplicatedBatchHeader extends BatchHeader {
     private static final int BATCH_OFFSET_OFFSET = BatchHeader.HEADER_BYTE_SIZE;
     public static final int  HEADER_SIZE         = BATCH_OFFSET_OFFSET + 8;
 
-    public ReplicatedBatchHeader(BatchHeader header, long offset) {
-        this(fromBatchHeader(header.getBytes(), offset));
-    }
-
-    public ReplicatedBatchHeader() {
-        super();
-    }
-
-    public ReplicatedBatchHeader(ByteBuffer b) {
-        super(b);
-    }
-
-    public ReplicatedBatchHeader(Node mirror, int batchByteLength, int magic,
-                                 UUID channel, long timestamp, long batchOffset) {
-        super(mirror, batchByteLength, magic, channel, timestamp);
-        getBytes().putLong(BATCH_OFFSET_OFFSET, batchOffset);
-    }
-
     private static ByteBuffer fromBatchHeader(ByteBuffer headerBytes,
                                               long offset) {
         headerBytes.rewind();
@@ -68,16 +50,22 @@ public class ReplicatedBatchHeader extends BatchHeader {
         return replicatedHeader;
     }
 
-    public long getOffset() {
-        return getBytes().getLong(BATCH_OFFSET_OFFSET);
+    public ReplicatedBatchHeader() {
+        super();
     }
 
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.BatchHeader#getHeaderSize()
-     */
-    @Override
-    protected int getHeaderSize() {
-        return HEADER_SIZE;
+    public ReplicatedBatchHeader(BatchHeader header, long offset) {
+        this(fromBatchHeader(header.getBytes(), offset));
+    }
+
+    public ReplicatedBatchHeader(ByteBuffer b) {
+        super(b);
+    }
+
+    public ReplicatedBatchHeader(Node mirror, int batchByteLength, int magic,
+                                 UUID channel, long timestamp, long batchOffset) {
+        super(mirror, batchByteLength, magic, channel, timestamp);
+        getBytes().putLong(BATCH_OFFSET_OFFSET, batchOffset);
     }
 
     /* (non-Javadoc)
@@ -94,5 +82,17 @@ public class ReplicatedBatchHeader extends BatchHeader {
                    && b.getChannel().equals(getChannel());
         }
         return false;
+    }
+
+    public long getOffset() {
+        return getBytes().getLong(BATCH_OFFSET_OFFSET);
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.BatchHeader#getHeaderSize()
+     */
+    @Override
+    protected int getHeaderSize() {
+        return HEADER_SIZE;
     }
 }

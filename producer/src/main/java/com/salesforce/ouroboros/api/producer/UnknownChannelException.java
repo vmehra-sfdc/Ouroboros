@@ -37,12 +37,12 @@ public class UnknownChannelException extends Exception {
         super();
     }
 
-    public UnknownChannelException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
     public UnknownChannelException(String message) {
         super(message);
+    }
+
+    public UnknownChannelException(String message, Throwable cause) {
+        super(message, cause);
     }
 
     public UnknownChannelException(Throwable cause) {

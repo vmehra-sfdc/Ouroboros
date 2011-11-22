@@ -35,11 +35,11 @@ import com.salesforce.ouroboros.util.rate.Predicate;
  * 
  */
 public class RateLimiter implements Predicate {
-    private int        maxTokens;
     private double     currentTokens;
-    private double     regenerationTime;
     private long       last;
+    private int        maxTokens;
     private final long minimumRegenerationTime;
+    private double     regenerationTime;
 
     /**
      * @param targetRate
@@ -55,9 +55,10 @@ public class RateLimiter implements Predicate {
         assert minRegenerationTime >= 0;
         assert tokenLimit > 0;
         minimumRegenerationTime = minRegenerationTime;
-        regenerationTime = (1.0 / targetRate) * 1.0e3;
-        if (regenerationTime < 1)
+        regenerationTime = 1.0 / targetRate * 1.0e3;
+        if (regenerationTime < 1) {
             regenerationTime = 1;
+        }
         maxTokens = tokenLimit;
         currentTokens = tokenLimit * 1.0;
         last = System.currentTimeMillis();
@@ -98,17 +99,21 @@ public class RateLimiter implements Predicate {
     }
 
     /**
+     * @return the size of the token bucket
+     */
+    public int getCurrentTokens() {
+        return (int) currentTokens;
+    }
+
+    /**
      * @return the current depth of the bucket
      */
     public int getMaxTokens() {
         return maxTokens;
     }
 
-    /**
-     * @return the size of the token bucket
-     */
-    public int getCurrentTokens() {
-        return (int) currentTokens;
+    public double getRegenerationTime() {
+        return regenerationTime;
     }
 
     /**
@@ -117,17 +122,14 @@ public class RateLimiter implements Predicate {
      * @param depth
      */
     public synchronized void setMaxTokens(int depth) {
-        this.maxTokens = depth;
+        maxTokens = depth;
     }
 
     @Override
     public synchronized void setTargetRate(double targetRate) {
-        regenerationTime = (1.0 / targetRate) * 1.0e3;
-        if (regenerationTime < 1)
+        regenerationTime = 1.0 / targetRate * 1.0e3;
+        if (regenerationTime < 1) {
             regenerationTime = 1;
-    }
-
-    public double getRegenerationTime() {
-        return regenerationTime;
+        }
     }
 }

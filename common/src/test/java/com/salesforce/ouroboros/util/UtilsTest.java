@@ -25,10 +25,11 @@
  */
 package com.salesforce.ouroboros.util;
 
+import static junit.framework.Assert.assertEquals;
+
 import java.util.UUID;
 
 import org.junit.Test;
-import static junit.framework.Assert.*;
 
 /**
  * 

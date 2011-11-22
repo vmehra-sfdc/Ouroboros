@@ -67,9 +67,9 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * 
  */
 public class Coordinator implements Member {
+    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     static final int                            DEFAULT_TIMEOUT = 1;
     static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
-    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
 
     private boolean                             active          = false;
     private final SortedSet<Node>               activeMembers   = new ConcurrentSkipListSet<Node>();
@@ -379,8 +379,11 @@ public class Coordinator implements Member {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating rebalancing on %s", id));
         }
-        switchboard.ringCast(new Message(id,
-                                         RebalanceMessage.PREPARE_FOR_REBALANCE));
+        Serializable newMembers = new ArrayList<Node>(inactiveMembers).toArray(new Node[inactiveMembers.size()]);
+        switchboard.ringCast(new Message(
+                                         id,
+                                         RebalanceMessage.PREPARE_FOR_REBALANCE,
+                                         newMembers));
     }
 
     /**

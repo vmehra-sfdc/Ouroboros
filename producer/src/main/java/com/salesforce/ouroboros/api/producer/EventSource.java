@@ -46,19 +46,19 @@ public interface EventSource {
     void assumePrimary(Map<UUID, Long> newPrimaries);
 
     /**
-     * The channel has been opened.
-     * 
-     * @param channel
-     *            the id of the channel
-     */
-    void opened(UUID channel);
-
-    /**
      * The channel has been closed.
      * 
      * @param channel
      *            the id of the channel
      */
     void closed(UUID channel);
+
+    /**
+     * The channel has been opened.
+     * 
+     * @param channel
+     *            the id of the channel
+     */
+    void opened(UUID channel);
 
 }

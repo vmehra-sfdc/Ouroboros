@@ -163,7 +163,7 @@ public class TestBatchWriter {
         assertEquals(1, pending.size());
         assertEquals(batch, pending.get(batch));
         assertEquals(BatchWriterFSM.WriteBatchHeader, batchWriter.getState());
-        
+
         batchWriter.writeReady();
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
         verify(outbound, new Times(8)).write(isA(ByteBuffer.class));

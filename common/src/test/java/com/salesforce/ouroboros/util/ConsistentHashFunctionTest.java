@@ -191,7 +191,7 @@ public class ConsistentHashFunctionTest {
                                             Math.min(chf.getBuckets().size(),
                                                      r.nextInt(3) + 2));
             log.finest("Chances for " + sample + " are " + chances + " out of "
-                      + chf.getBuckets());
+                       + chf.getBuckets());
             for (String chance : chances) {
                 assertEquals(chf.hash(sample) + " != " + chance,
                              chf.hash(sample), chance);

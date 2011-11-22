@@ -41,6 +41,8 @@ import com.salesforce.ouroboros.spindle.Coordinator;
 public enum ReplicatorMessage implements MemberDispatch {
     OPEN_REPLICATORS, REPLICATORS_ESTABLISHED;
 
+    private final static Logger log = Logger.getLogger(ReplicatorMessage.class.getCanonicalName());
+
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
@@ -51,6 +53,4 @@ public enum ReplicatorMessage implements MemberDispatch {
         Coordinator coordinator = (Coordinator) switchboard.getMember();
         coordinator.dispatch(this, sender, arguments, time);
     }
-
-    private final static Logger log = Logger.getLogger(ReplicatorMessage.class.getCanonicalName());
 }

@@ -99,28 +99,6 @@ public class TestSpinner {
     }
 
     @Test
-    public void testPush() throws Exception {
-        SocketChannel channel = mock(SocketChannel.class);
-        SocketChannelHandler handler = mock(SocketChannelHandler.class);
-        when(handler.getChannel()).thenReturn(channel);
-        Coordinator coordinator = mock(Coordinator.class);
-        Node node = new Node(0x1638);
-        when(coordinator.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(coordinator);
-        spinner.connect(handler);
-
-        Node mirror = new Node(0x1638);
-        @SuppressWarnings("unchecked")
-        Batch batch = new Batch(mirror, UUID.randomUUID(), 0L,
-                                Collections.EMPTY_LIST);
-        spinner.push(batch);
-        Thread.sleep(10);
-        spinner.acknowledge(batch);
-        verify(coordinator).acknowledge(captor.capture());
-        assertTrue(10 <= captor.getValue().interval());
-    }
-
-    @Test
     public void testPending() throws Exception {
         SocketChannel outbound = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
@@ -160,5 +138,27 @@ public class TestSpinner {
         assertEquals(batch3, pending.get(batch3));
         assertEquals(batch1, pending.firstKey());
         assertEquals(batch3, pending.lastKey());
+    }
+
+    @Test
+    public void testPush() throws Exception {
+        SocketChannel channel = mock(SocketChannel.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        when(handler.getChannel()).thenReturn(channel);
+        Coordinator coordinator = mock(Coordinator.class);
+        Node node = new Node(0x1638);
+        when(coordinator.getId()).thenReturn(node);
+        Spinner spinner = new Spinner(coordinator);
+        spinner.connect(handler);
+
+        Node mirror = new Node(0x1638);
+        @SuppressWarnings("unchecked")
+        Batch batch = new Batch(mirror, UUID.randomUUID(), 0L,
+                                Collections.EMPTY_LIST);
+        spinner.push(batch);
+        Thread.sleep(10);
+        spinner.acknowledge(batch);
+        verify(coordinator).acknowledge(captor.capture());
+        assertTrue(10 <= captor.getValue().interval());
     }
 }

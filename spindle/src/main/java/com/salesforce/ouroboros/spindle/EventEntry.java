@@ -32,10 +32,10 @@ package com.salesforce.ouroboros.spindle;
  * 
  */
 public class EventEntry {
+    public final Acknowledger          acknowledger;
     public final EventChannel          eventChannel;
     public final ReplicatedBatchHeader header;
     public final Segment               segment;
-    public final Acknowledger          acknowledger;
 
     public EventEntry(ReplicatedBatchHeader header, EventChannel eventChannel,
                       Segment segment, Acknowledger acknowledger) {

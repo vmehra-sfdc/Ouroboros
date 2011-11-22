@@ -36,7 +36,7 @@ import com.salesforce.ouroboros.Node;
  */
 public interface SwitchboardDispatch {
 
-    void dispatch(Switchboard switchboard, Node sender, Serializable[] arguments,
-                  long time);
+    void dispatch(Switchboard switchboard, Node sender,
+                  Serializable[] arguments, long time);
 
 }

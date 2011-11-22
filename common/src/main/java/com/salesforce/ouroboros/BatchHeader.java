@@ -112,6 +112,10 @@ public class BatchHeader {
         return bytes.getInt(MAGIC_OFFSET);
     }
 
+    public Node getProducerMirror() {
+        return new Node(bytes.getInt(PRODUCER_MIRROR_OFFSET));
+    }
+
     public long getTimestamp() {
         return bytes.getLong(TIMESTAMP_OFFSET);
     }
@@ -179,9 +183,5 @@ public class BatchHeader {
 
     protected int getHeaderSize() {
         return HEADER_BYTE_SIZE;
-    }
-
-    public Node getProducerMirror() {
-        return new Node(bytes.getInt(PRODUCER_MIRROR_OFFSET));
     }
 }

@@ -57,8 +57,8 @@ import com.salesforce.ouroboros.spindle.DuplicatorContext.DuplicatorFSM;
 public class TestDuplicator {
 
     private class Reader implements Runnable {
-        private final SocketChannel         inbound;
         private final ReplicatedBatchHeader header = new ReplicatedBatchHeader();
+        private final SocketChannel         inbound;
         final ByteBuffer                    replicated;
 
         public Reader(final SocketChannel inbound, final int payloadLength) {

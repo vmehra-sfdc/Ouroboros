@@ -45,7 +45,7 @@ public class Message implements Serializable {
     public Message(Node sender, SwitchboardDispatch type) {
         this.sender = sender;
         this.type = type;
-        this.arguments = null;
+        arguments = null;
     }
 
     public Message(Node sender, SwitchboardDispatch type,
@@ -55,6 +55,7 @@ public class Message implements Serializable {
         this.arguments = arguments;
     }
 
+    @Override
     public String toString() {
         return String.format("Message: %s arguments:%s from: %s",
                              type,

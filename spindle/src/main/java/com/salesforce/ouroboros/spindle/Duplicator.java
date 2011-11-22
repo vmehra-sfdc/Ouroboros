@@ -46,26 +46,22 @@ public final class Duplicator {
     static final Logger             log     = Logger.getLogger(Duplicator.class.getCanonicalName());
 
     private EventEntry              current;
+    private final DuplicatorContext fsm     = new DuplicatorContext(this);
     private SocketChannelHandler    handler;
-    final Queue<EventEntry>         pending = new LockFreeQueue<EventEntry>();
+    private boolean                 inError;
     private long                    position;
     private int                     remaining;
-    private boolean                 inError;
-    private final DuplicatorContext fsm     = new DuplicatorContext(this);
+    final Queue<EventEntry>         pending = new LockFreeQueue<EventEntry>();
+
+    public void connect(SocketChannelHandler handler) {
+        this.handler = handler;
+    }
 
     /**
      * @return the state of the outbound replicator
      */
     public DuplicatorState getState() {
         return fsm.getState();
-    }
-
-    public void connect(SocketChannelHandler handler) {
-        this.handler = handler;
-    }
-
-    public void writeReady() {
-        fsm.writeReady();
     }
 
     /**
@@ -80,6 +76,10 @@ public final class Duplicator {
         }
     }
 
+    public void writeReady() {
+        fsm.writeReady();
+    }
+
     private boolean transferTo() throws IOException {
         long p = position;
         int written = (int) current.segment.transferTo(p, remaining,
@@ -90,6 +90,51 @@ public final class Duplicator {
             return true;
         }
         return false;
+    }
+
+    protected void close() {
+        if (current != null) {
+            try {
+                current.segment.close();
+            } catch (IOException e1) {
+                log.log(Level.FINEST, String.format("Error closing segment %s",
+                                                    current.segment), e1);
+            }
+        }
+        current = null;
+        pending.clear();
+        handler.close();
+    }
+
+    protected boolean inError() {
+        return inError;
+    }
+
+    protected void processBatch() {
+        if (writeBatch()) {
+            fsm.batchWritten();
+        } else {
+            handler.selectForWrite();
+        }
+    }
+
+    protected void processHeader() {
+        current = pending.poll();
+        if (current == null) {
+            fsm.pendingEmpty();
+        }
+        remaining = current.header.getBatchByteLength();
+        position = current.header.getOffset();
+        current.header.rewind();
+        if (writeHeader()) {
+            fsm.headerWritten();
+        } else {
+            handler.selectForWrite();
+        }
+    }
+
+    protected void selectForWrite() {
+        handler.selectForWrite();
     }
 
     protected boolean writeBatch() {
@@ -121,50 +166,5 @@ public final class Duplicator {
             inError = true;
         }
         return written;
-    }
-
-    protected void processBatch() {
-        if (writeBatch()) {
-            fsm.batchWritten();
-        } else {
-            handler.selectForWrite();
-        }
-    }
-
-    protected boolean inError() {
-        return inError;
-    }
-
-    protected void selectForWrite() {
-        handler.selectForWrite();
-    }
-
-    protected void processHeader() {
-        current = pending.poll();
-        if (current == null) {
-            fsm.pendingEmpty();
-        }
-        remaining = current.header.getBatchByteLength();
-        position = current.header.getOffset();
-        current.header.rewind();
-        if (writeHeader()) {
-            fsm.headerWritten();
-        } else {
-            handler.selectForWrite();
-        }
-    }
-
-    protected void close() {
-        if (current != null) {
-            try {
-                current.segment.close();
-            } catch (IOException e1) {
-                log.log(Level.FINEST, String.format("Error closing segment %s",
-                                                    current.segment), e1);
-            }
-        }
-        current = null;
-        pending.clear();
-        handler.close();
     }
 }

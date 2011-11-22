@@ -70,6 +70,6 @@ public class SampleWindowTest {
             reference[index++] = i;
         }
         Arrays.sort(reference);
-        assertEquals(reference[(windowSize / 2)], (int) window.getMedian());
+        assertEquals(reference[windowSize / 2], (int) window.getMedian());
     }
 }

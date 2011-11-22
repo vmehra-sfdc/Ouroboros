@@ -60,23 +60,23 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * @author hhildebrand
  * 
  */
-public class Replicator implements CommunicationsHandler { 
+public class Replicator implements CommunicationsHandler {
 
-    private static final Logger           log            = Logger.getLogger(Replicator.class.getCanonicalName());
+    private static final Logger       log            = Logger.getLogger(Replicator.class.getCanonicalName());
 
-    static final int                      HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
-    static final int                      MAGIC          = 0x1638;
+    static final int                  HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
+    static final int                  MAGIC          = 0x1638;
 
-    private final ReplicatingAppender     appender;
-    private final Bundle                  bundle;
-    private final Duplicator              duplicator;
-    private final ReplicatorContext       fsm            = new ReplicatorContext(
-                                                                                 this);
-    private SocketChannelHandler handler;
-    private final ByteBuffer              handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private boolean                       inError;
-    private final Node                    partnerId;
-    private final Rendezvous              rendezvous;
+    private final ReplicatingAppender appender;
+    private final Bundle              bundle;
+    private final Duplicator          duplicator;
+    private final ReplicatorContext   fsm            = new ReplicatorContext(
+                                                                             this);
+    private SocketChannelHandler      handler;
+    private final ByteBuffer          handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private boolean                   inError;
+    private final Node                partnerId;
+    private final Rendezvous          rendezvous;
 
     public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
         duplicator = new Duplicator();
@@ -176,7 +176,7 @@ public class Replicator implements CommunicationsHandler {
         handshake.putInt(MAGIC);
         bundle.getId().serialize(handshake);
         handshake.flip();
-        
+
         if (writeHandshake()) {
             fsm.established();
         } else {

@@ -106,8 +106,7 @@ public class TestReplicatingAppender {
         replicator.accept(handler);
         assertEquals(AbstractAppenderFSM.Ready, replicator.getState());
         replicator.readReady();
-        assertEquals(AbstractAppenderFSM.ReadBatchHeader,
-                     replicator.getState());
+        assertEquals(AbstractAppenderFSM.ReadBatchHeader, replicator.getState());
 
         Runnable reader = new Runnable() {
             @Override

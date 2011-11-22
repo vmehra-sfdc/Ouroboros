@@ -37,12 +37,12 @@ public class RateLimiteExceededException extends Exception {
         super();
     }
 
-    public RateLimiteExceededException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
     public RateLimiteExceededException(String message) {
         super(message);
+    }
+
+    public RateLimiteExceededException(String message, Throwable cause) {
+        super(message, cause);
     }
 
     public RateLimiteExceededException(Throwable cause) {

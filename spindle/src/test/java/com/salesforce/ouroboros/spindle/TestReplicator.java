@@ -100,7 +100,7 @@ public class TestReplicator {
         }).when(socketChannel).write(isA(ByteBuffer.class));
 
         assertEquals(ReplicatorFSM.Suspended, replicator.getState());
-        replicator.connect(handler); 
+        replicator.connect(handler);
         assertEquals(ReplicatorFSM.OutboundHandshake, replicator.getState());
         replicator.writeReady();
         assertEquals(ReplicatorFSM.Established, replicator.getState());

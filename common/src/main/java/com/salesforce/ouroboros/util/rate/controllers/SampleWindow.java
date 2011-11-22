@@ -42,14 +42,6 @@ public class SampleWindow extends Window {
         window = windowSize;
     }
 
-    public void sample(double sample) {
-        sorted.add(sample);
-        if (count == samples.length) {
-            sorted.remove(removeFirst());
-        }
-        addLast(sample);
-    }
-
     public double getMedian() {
         if (count == 0) {
             throw new IllegalStateException(
@@ -68,5 +60,13 @@ public class SampleWindow extends Window {
 
     public int getWindow() {
         return window;
+    }
+
+    public void sample(double sample) {
+        sorted.add(sample);
+        if (count == samples.length) {
+            sorted.remove(removeFirst());
+        }
+        addLast(sample);
     }
 }

@@ -86,19 +86,19 @@ public class RateController implements Controller {
     }
 
     public double getAdditiveIncrease() {
-        return this.additiveIncrease;
+        return additiveIncrease;
     }
 
     public double getHighWaterMark() {
-        return this.highWaterMark;
+        return highWaterMark;
     }
 
     public double getLowWaterMark() {
-        return this.lowWaterMark;
+        return lowWaterMark;
     }
 
     public double getMaximum() {
-        return this.maximum;
+        return maximum;
     }
 
     @Override
@@ -107,11 +107,11 @@ public class RateController implements Controller {
     }
 
     public double getMinimum() {
-        return this.minimum;
+        return minimum;
     }
 
     public double getMultiplicativeDecrease() {
-        return this.multiplicativeDecrease;
+        return multiplicativeDecrease;
     }
 
     @Override
@@ -120,11 +120,11 @@ public class RateController implements Controller {
     }
 
     public long getSampleRate() {
-        return this.sampleRate;
+        return sampleRate;
     }
 
     public double getSmoothConstant() {
-        return this.smoothConstant;
+        return smoothConstant;
     }
 
     @Override
@@ -151,16 +151,16 @@ public class RateController implements Controller {
         try {
             long curtime = System.currentTimeMillis();
 
-            if ((curtime - lastSampled) < sampleRate) {
+            if (curtime - lastSampled < sampleRate) {
                 return;
             }
             window.sample(sample);
             lastSampled = curtime;
             double ninetieth = window.getPercentile(0.9);
 
-            if (ninetieth < (lowWaterMark * target)) {
+            if (ninetieth < lowWaterMark * target) {
                 increaseRate();
-            } else if (ninetieth > (highWaterMark * target)) {
+            } else if (ninetieth > highWaterMark * target) {
                 decreaseRate();
             }
         } finally {
@@ -209,18 +209,20 @@ public class RateController implements Controller {
     protected void decreaseRate() {
         if (target > minimum) {
             target /= multiplicativeDecrease;
-            if (target < minimum)
+            if (target < minimum) {
                 target = minimum;
-            predicate.setTargetRate(this.target);
+            }
+            predicate.setTargetRate(target);
         }
     }
 
     protected void increaseRate() {
         if (target < maximum) {
             target += additiveIncrease;
-            if (target > maximum)
+            if (target > maximum) {
                 target = maximum;
-            predicate.setTargetRate(this.target);
+            }
+            predicate.setTargetRate(target);
         }
     }
 }

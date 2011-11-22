@@ -46,23 +46,23 @@ import com.salesforce.ouroboros.spindle.XeroxContext.XeroxState;
  */
 public class Xerox implements CommunicationsHandler {
 
-    public static final int      MAGIC             = 0x1638;
     public static final int      BUFFER_SIZE       = 8 + 8 + 8;
+    public static final int      MAGIC             = 0x1638;
     private static final int     DEFAULT_TXFR_SIZE = 16 * 1024;
     private static final Logger  log               = Logger.getLogger(Xerox.class.getCanonicalName());
 
     private final ByteBuffer     buffer            = ByteBuffer.allocate(BUFFER_SIZE);
     private final UUID           channelId;
     private Segment              current;
+    private final XeroxContext   fsm               = new XeroxContext(this);
     private SocketChannelHandler handler;
+    private boolean              inError           = false;
     private CountDownLatch       latch;
     private final Node           node;
     private long                 position;
     private final Deque<Segment> segments;
     private long                 segmentSize;
     private final long           transferSize;
-    private boolean              inError           = false;
-    private final XeroxContext   fsm               = new XeroxContext(this);
 
     public Xerox(Node toNode, UUID channel, Deque<Segment> segments) {
         this(toNode, channel, segments, DEFAULT_TXFR_SIZE);
@@ -81,6 +81,11 @@ public class Xerox implements CommunicationsHandler {
         buffer.flip();
     }
 
+    @Override
+    public void accept(SocketChannelHandler handler) {
+        throw new UnsupportedOperationException();
+    }
+
     public void close() {
         handler.close();
     }
@@ -97,6 +102,12 @@ public class Xerox implements CommunicationsHandler {
         }
     }
 
+    @Override
+    public void connect(SocketChannelHandler h) {
+        handler = h;
+        fsm.connect();
+    }
+
     /**
      * @return the node
      */
@@ -109,24 +120,8 @@ public class Xerox implements CommunicationsHandler {
     }
 
     @Override
-    public void accept(SocketChannelHandler handler) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void connect(SocketChannelHandler h) {
-        handler = h;
-        fsm.connect();
-    }
-
-    @Override
     public void readReady() {
         throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void writeReady() {
-        fsm.writeReady();
     }
 
     /**
@@ -137,12 +132,9 @@ public class Xerox implements CommunicationsHandler {
         this.latch = latch;
     }
 
-    protected void copySegment() {
-        if (copy()) {
-            fsm.copied();
-        } else {
-            handler.selectForWrite();
-        }
+    @Override
+    public void writeReady() {
+        fsm.writeReady();
     }
 
     protected boolean copy() {
@@ -171,33 +163,24 @@ public class Xerox implements CommunicationsHandler {
         return false;
     }
 
-    protected boolean writeHandshake() {
-        try {
-            handler.getChannel().write(buffer);
-        } catch (IOException e) {
-            log.log(Level.WARNING,
-                    String.format("Error writing handshake for %s on %s",
-                                  channelId, handler.getChannel()), e);
-            inError = true;
-            return false;
+    protected void copySegment() {
+        if (copy()) {
+            fsm.copied();
+        } else {
+            handler.selectForWrite();
         }
-        if (!buffer.hasRemaining()) {
-            return true;
-        }
-        return false;
     }
 
-    protected boolean writeHeader() {
-        try {
-            handler.getChannel().write(buffer);
-        } catch (IOException e) {
-            log.log(Level.WARNING,
-                    String.format("Error writing header for %s on %s", current,
-                                  handler.getChannel()), e);
-            inError = true;
-            return false;
+    protected void handshake() {
+        if (writeHandshake()) {
+            fsm.handshakeWritten();
+        } else {
+            handler.selectForWrite();
         }
-        return !buffer.hasRemaining();
+    }
+
+    protected boolean inError() {
+        return inError;
     }
 
     protected void nextHeader() {
@@ -229,19 +212,36 @@ public class Xerox implements CommunicationsHandler {
         }
     }
 
-    protected boolean inError() {
-        return inError;
-    }
-
     protected void selectForWrite() {
         handler.selectForWrite();
     }
 
-    protected void handshake() {
-        if (writeHandshake()) {
-            fsm.handshakeWritten();
-        } else {
-            handler.selectForWrite();
+    protected boolean writeHandshake() {
+        try {
+            handler.getChannel().write(buffer);
+        } catch (IOException e) {
+            log.log(Level.WARNING,
+                    String.format("Error writing handshake for %s on %s",
+                                  channelId, handler.getChannel()), e);
+            inError = true;
+            return false;
         }
+        if (!buffer.hasRemaining()) {
+            return true;
+        }
+        return false;
+    }
+
+    protected boolean writeHeader() {
+        try {
+            handler.getChannel().write(buffer);
+        } catch (IOException e) {
+            log.log(Level.WARNING,
+                    String.format("Error writing header for %s on %s", current,
+                                  handler.getChannel()), e);
+            inError = true;
+            return false;
+        }
+        return !buffer.hasRemaining();
     }
 }

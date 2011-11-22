@@ -253,6 +253,13 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
     }
 
+    @Override
+    public void dispatch(RebalanceMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        // TODO Auto-generated method stub
+
+    }
+
     /**
      * Answer the node represting this coordinator's id
      * 
@@ -679,12 +686,5 @@ public class Coordinator implements Member {
 
     protected void openPublishingGate() {
         publishGate.open();
-    }
-
-    @Override
-    public void dispatch(RebalanceMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-        
     }
 }
