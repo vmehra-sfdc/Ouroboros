@@ -114,13 +114,6 @@ public class Plugin extends AbstractMojo {
     private int          graphLevel      = -1;
 
     /**
-     * Package of the generated files
-     * 
-     * @parameter
-     */
-    private String       packageName;
-
-    /**
      * Project instance.
      * 
      * @parameter default-value="${project}"
@@ -263,15 +256,8 @@ public class Plugin extends AbstractMojo {
             }
         }
 
-        args.add("-d");
-        if (packageName == null) {
+        args.add("-d"); 
             args.add(targetDir.getAbsolutePath());
-        } else {
-            packageName = packageName.replace('.', '/');
-            File packageDir = new File(targetDir, packageName);
-            packageDir.mkdirs();
-            args.add(packageDir.getAbsolutePath());
-        }
         args.add("-" + target);
         args.addAll(sources);
 
@@ -360,14 +346,6 @@ public class Plugin extends AbstractMojo {
      */
     public void setGraphLevel(int graphLevel) {
         this.graphLevel = graphLevel;
-    }
-
-    /**
-     * @param packageName
-     *            the packageName to set
-     */
-    public void setPackageName(String packageName) {
-        this.packageName = packageName;
     }
 
     /**

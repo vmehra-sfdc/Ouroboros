@@ -66,9 +66,8 @@ public class TestPlugin {
             plugin.setTarget("java");
             plugin.setTargetDirectory(targetDirectory);
             plugin.setVerbose(true);
-            String packageName = "smc_ex5";
-            plugin.setPackageName(packageName);
 
+            String packageName = "smc_ex5";
             File targetDir = new File(tempDir, targetDirectory);
             File packageDir = new File(targetDir, packageName);
             File docDir = new File(tempDir, docDirectory);
