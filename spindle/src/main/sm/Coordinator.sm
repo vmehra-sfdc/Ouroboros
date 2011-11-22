@@ -67,10 +67,6 @@ Entry{
 		nil {
 			destabilizePartition();
 		}
-	destabilize
-		Unstable{
-			cleanUpPendingReplicators();
-		}
 }
 
 ReplicatorsEstablished{
@@ -89,11 +85,6 @@ Entry {
 {
 	rebalanced
 		AwaitingTakeover{}
-		
-	destabilize
-		Unstable{
-			cleanUpRebalancing();
-		}
 }
 
 AwaitingTakeover {
@@ -102,11 +93,6 @@ AwaitingTakeover {
         
     takeoverComplete
         Stable{}
-	
-	destabilize
-		Unstable {
-			cleanUpRebalancing();
-		}
 }
 
 Shutdown {

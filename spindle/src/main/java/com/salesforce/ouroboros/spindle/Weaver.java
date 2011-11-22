@@ -310,8 +310,8 @@ public class Weaver implements Bundle {
      * @param rendezvous
      *            - the rendezvous used to sychronize connectivity
      */
-    public void openReplicator(Node node, ContactInformation info,
-                               Rendezvous rendezvous) {
+    public Replicator openReplicator(Node node, ContactInformation info,
+                                     Rendezvous rendezvous) {
         Replicator replicator = new Replicator(this, node, rendezvous);
         Replicator previous = replicators.putIfAbsent(node, replicator);
         assert previous == null : String.format("Replicator already opend on weaver %s to weaver %s",
@@ -337,6 +337,7 @@ public class Weaver implements Bundle {
                                        id, node));
             }
         }
+        return replicator;
     }
 
     /**

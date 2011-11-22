@@ -44,26 +44,26 @@ import java.util.concurrent.TimeUnit;
  */
 public class Rendezvous {
     private final Runnable     action;
+    private final Runnable     cancellationAction;
     private boolean            cancelled = false;
     private int                count;
     private final Object       mutex     = new Object();
     private final int          parties;
     private ScheduledFuture<?> scheduled;
 
-    public Rendezvous(int parties, Runnable action) {
+    public Rendezvous(int parties, Runnable action,
+                      final Runnable cancellationAction) {
         this.parties = parties;
         this.action = action;
+        this.cancellationAction = cancellationAction;
         count = parties;
     }
 
     /**
-     * Cancel the rendezvous.
-     * 
-     * @return true if this call cancelled the rendezvous. Return false if the
-     *         rendezvous has already been cancelled, or if the rendezvous has
-     *         already been completed.
+     * Cancel the rendezvous. If the rendezvous has not been previously
+     * cancelled, then run the cancellation action.
      */
-    public boolean cancel() {
+    public void cancel() {
         synchronized (mutex) {
             if (count != 0 && !cancelled) {
                 cancelled = true;
@@ -71,9 +71,10 @@ public class Rendezvous {
                     scheduled.cancel(true);
                 }
                 scheduled = null;
-                return true;
+                if (cancellationAction != null) {
+                    cancellationAction.run();
+                }
             }
-            return false;
         }
     }
 
@@ -129,7 +130,7 @@ public class Rendezvous {
             if (cancelled) {
                 throw new BrokenBarrierException();
             }
-            if (count-- == 0) {
+            if (--count == 0) {
                 if (scheduled != null) {
                     scheduled.cancel(true);
                 }
@@ -138,7 +139,9 @@ public class Rendezvous {
             }
         }
         if (run) {
-            action.run();
+            if (action != null) {
+                action.run();
+            }
         }
     }
 
@@ -152,8 +155,7 @@ public class Rendezvous {
      *            - the timer to schedule the cancellation
      */
     public void scheduleCancellation(long timeout, TimeUnit unit,
-                                     ScheduledExecutorService timer,
-                                     final Runnable timeoutAction) {
+                                     ScheduledExecutorService timer) {
         synchronized (mutex) {
             if (scheduled != null) {
                 throw new IllegalStateException(
@@ -169,11 +171,7 @@ public class Rendezvous {
             scheduled = timer.schedule(new Runnable() {
                 @Override
                 public void run() {
-                    if (cancel()) {
-                        if (timeoutAction != null) {
-                            timeoutAction.run();
-                        }
-                    }
+                    cancel();
                 }
             }, timeout, unit);
         }

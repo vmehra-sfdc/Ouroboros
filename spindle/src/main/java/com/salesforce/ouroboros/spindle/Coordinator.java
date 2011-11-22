@@ -55,6 +55,7 @@ import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
+import com.salesforce.ouroboros.spindle.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.messages.ReplicatorMessage;
 import com.salesforce.ouroboros.util.Association;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
@@ -80,6 +81,7 @@ public class Coordinator implements Member {
     private final Node                          id;
     private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
     private ConsistentHashFunction<Node>        nextRing;
+    private Rendezvous                          rendezvous;
     private final Switchboard                   switchboard;
     private final AtomicInteger                 tally           = new AtomicInteger();
     private int                                 targetTally;
@@ -342,16 +344,6 @@ public class Coordinator implements Member {
         nextRing = newRing;
     }
 
-    protected void cleanUpPendingReplicators() {
-        // TODO Auto-generated method stub
-
-    }
-
-    protected void cleanUpRebalancing() {
-        // TODO Auto-generated method stub
-
-    }
-
     /**
      * Commit the calculated next ring as the current weaver ring
      */
@@ -499,12 +491,19 @@ public class Coordinator implements Member {
             rendezvousAction.run();
             return null;
         }
-        Runnable timeoutAction = new Runnable() {
+
+        final ArrayList<Replicator> replicators = new ArrayList<Replicator>();
+        Runnable cancellationAction = new Runnable() {
             @Override
             public void run() {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Replicator establishment timed out on %s",
                                            id));
+                }
+                for (Replicator replicator : replicators) {
+                    if (replicator.getState() != ReplicatorFSM.Established) {
+                        replicator.close();
+                    }
                 }
                 fsm.replicatorsEstablishmentTimeout();
             }
@@ -514,12 +513,12 @@ public class Coordinator implements Member {
                                    id));
         }
         Rendezvous rendezvous = new Rendezvous(contacts.size(),
-                                               rendezvousAction);
+                                               rendezvousAction,
+                                               cancellationAction);
         for (Node member : contacts) {
             weaver.openReplicator(member, yellowPages.get(member), rendezvous);
         }
-        rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer,
-                                        timeoutAction);
+        rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer);
         return rendezvous;
     }
 
@@ -539,6 +538,7 @@ public class Coordinator implements Member {
      */
     protected List<Xerox> rebalance(Map<UUID, Node[][]> remapped,
                                     Collection<Node> deadMembers) {
+        @SuppressWarnings("unused")
         Runnable rendezvousAction = new Runnable() {
             @Override
             public void run() {
@@ -552,7 +552,6 @@ public class Coordinator implements Member {
             log.info(String.format("Establishment of replicators initiated on %s",
                                    id));
         }
-        new Rendezvous(inactiveMembers.size(), rendezvousAction);
         List<Xerox> xeroxes = new ArrayList<Xerox>();
         for (Entry<UUID, Node[][]> entry : remapped.entrySet()) {
             xeroxes.addAll(weaver.rebalance(entry.getKey(),
