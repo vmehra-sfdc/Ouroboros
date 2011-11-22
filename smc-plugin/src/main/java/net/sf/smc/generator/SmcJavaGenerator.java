@@ -165,7 +165,7 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
 
         _source.println();
 
-        // The context clas contains all the state classes as
+        // The context class contains all the state classes as
         // inner classes, so generate the context first rather
         // than last.
         _source.print(_accessLevel);
@@ -664,7 +664,9 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
         // Declare the map class. Declare it abstract to prevent
         // its instantiation.
         _source.println();
-        _source.print("    /* package */ static abstract class ");
+        _source.print("    ");
+        _source.print(_accessLevel);
+        _source.print(" static abstract class ");
         _source.println(mapName);
         _source.println("    {");
         _source.println("    //-----------------------------------------------------------");
