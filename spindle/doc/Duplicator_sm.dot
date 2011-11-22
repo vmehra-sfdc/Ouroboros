@@ -1,0 +1,63 @@
+digraph Duplicator_sm {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_DuplicatorFSM {
+
+        label="DuplicatorFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "DuplicatorFSM::Waiting"
+            [label="{Waiting}"];
+
+        "DuplicatorFSM::WriteHeader"
+            [label="{WriteHeader}"];
+
+        "DuplicatorFSM::WriteBatch"
+            [label="{WriteBatch}"];
+
+        "DuplicatorFSM::Closed"
+            [label="{Closed}"];
+
+        "DuplicatorFSM::DefaultState"
+            [label="{&laquo; Default &raquo;}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "DuplicatorFSM::Waiting" -> "DuplicatorFSM::WriteHeader"
+            [label="replicate/\l"];
+
+        "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::Closed"
+            [label="writeReady/\l"];
+
+        "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::WriteBatch"
+            [label="writeReady/\l"];
+
+        "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::WriteBatch"
+            [label="headerWritten/\l"];
+
+        "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::Waiting"
+            [label="pendingEmpty/\l"];
+
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Closed"
+            [label="writeReady/\l"];
+
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::WriteHeader"
+            [label="writeReady/\l"];
+
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Waiting"
+            [label="batchWritten/\l"];
+
+        "%start" -> "DuplicatorFSM::Waiting"
+    }
+
+}

@@ -1,0 +1,192 @@
+<html>
+  <head>
+    <title>Duplicator_sm</title>
+  </head>
+
+  <body>
+    <table align=center border=3 cellspacing=2 cellpadding=2>
+      <caption align="top">
+        DuplicatorFSM Finite State Machine
+      </caption>
+      <tr>
+        <th rowspan=2>
+          State
+        </th>
+        <th colspan=2>
+          Actions
+        </th>
+        <th colspan=6>
+          Transition
+        </th>
+      </tr>
+      <tr>
+        <th>
+          Entry
+        </th>
+        <th>
+         Exit
+        </th>
+        <th>
+          batchWritten
+        </th>
+        <th>
+          headerWritten
+        </th>
+        <th>
+          pendingEmpty
+        </th>
+        <th>
+          replicate
+        </th>
+        <th>
+          writeReady
+        </th>
+        <th>
+          <b>Default</b>
+        </th>
+      </tr>
+      <tr>
+        <td>
+          Waiting
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  WriteHeader
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
+  Waiting
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          WriteHeader
+        </td>
+        <td>
+          <pre>
+processHeader();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  WriteBatch
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
+  Waiting
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.inError() && !ctxt.writeHeader()]
+  WriteHeader
+  {
+    selectForWrite();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  WriteBatch
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          WriteBatch
+        </td>
+        <td>
+          <pre>
+    processBatch();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Waiting
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.inError() && !ctxt.writeHeader()]
+  WriteBatch
+  {
+    selectForWrite();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+[!ctxt.pending.isEmpty()]
+  WriteHeader
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Closed
+        </td>
+        <td>
+          <pre>
+    close();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

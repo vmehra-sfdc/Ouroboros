@@ -71,8 +71,7 @@
 						</goals>
 						<configuration>
 							<targetDirectory>src/main/java</targetDirectory>
-							<docDirectory>target/generated-sources/sm</docDirectory>
-							<packageName>com.salesforce.ouroboros.spindle</packageName>
+							<docDirectory>doc</docDirectory>
 							<table>true</table>
 							<graph>true</graph>
 							<graphLevel>2</graphLevel>

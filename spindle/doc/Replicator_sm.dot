@@ -1,0 +1,54 @@
+digraph Replicator_sm {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_ReplicatorFSM {
+
+        label="ReplicatorFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "ReplicatorFSM::Suspended"
+            [label="{Suspended}"];
+
+        "ReplicatorFSM::Established"
+            [label="{Established}"];
+
+        "ReplicatorFSM::OutboundHandshake"
+            [label="{OutboundHandshake}"];
+
+        "ReplicatorFSM::Closed"
+            [label="{Closed}"];
+
+        "ReplicatorFSM::DefaultState"
+            [label="{&laquo; Default &raquo;}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "ReplicatorFSM::Suspended" -> "ReplicatorFSM::Established"
+            [label="established/\l"];
+
+        "ReplicatorFSM::Suspended" -> "ReplicatorFSM::OutboundHandshake"
+            [label="handshake/\l"];
+
+        "ReplicatorFSM::OutboundHandshake" -> "ReplicatorFSM::Closed"
+            [label="writeReady/\l"];
+
+        "ReplicatorFSM::OutboundHandshake" -> "ReplicatorFSM::Established"
+            [label="writeReady/\l"];
+
+        "ReplicatorFSM::OutboundHandshake" -> "ReplicatorFSM::Established"
+            [label="established/\l"];
+
+        "%start" -> "ReplicatorFSM::Suspended"
+    }
+
+}

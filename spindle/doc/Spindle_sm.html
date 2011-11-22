@@ -1,0 +1,154 @@
+<html>
+  <head>
+    <title>Spindle_sm</title>
+  </head>
+
+  <body>
+    <table align=center border=3 cellspacing=2 cellpadding=2>
+      <caption align="top">
+        SpindleFSM Finite State Machine
+      </caption>
+      <tr>
+        <th rowspan=2>
+          State
+        </th>
+        <th colspan=2>
+          Actions
+        </th>
+        <th colspan=5>
+          Transition
+        </th>
+      </tr>
+      <tr>
+        <th>
+          Entry
+        </th>
+        <th>
+         Exit
+        </th>
+        <th>
+          bind
+        </th>
+        <th>
+          established
+        </th>
+        <th>
+          handshake
+        </th>
+        <th>
+          readReady
+        </th>
+        <th>
+          <b>Default</b>
+        </th>
+      </tr>
+      <tr>
+        <td>
+          Suspended
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Handshake
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Established
+        </td>
+        <td>
+          <pre>
+established();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Handshake
+        </td>
+        <td>
+          <pre>
+processHandshake();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.inError() && !ctxt.readHandshake()]
+  Handshake
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Closed
+        </td>
+        <td>
+          <pre>
+    close();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

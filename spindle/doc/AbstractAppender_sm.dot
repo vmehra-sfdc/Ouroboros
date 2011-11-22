@@ -1,0 +1,72 @@
+digraph AbstractAppender_sm {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_AbstractAppenderFSM {
+
+        label="AbstractAppenderFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "AbstractAppenderFSM::Ready"
+            [label="{Ready}"];
+
+        "AbstractAppenderFSM::Append"
+            [label="{Append}"];
+
+        "AbstractAppenderFSM::DevNull"
+            [label="{DevNull}"];
+
+        "AbstractAppenderFSM::ReadBatchHeader"
+            [label="{ReadBatchHeader}"];
+
+        "AbstractAppenderFSM::Closed"
+            [label="{Closed}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "AbstractAppenderFSM::Ready" -> "AbstractAppenderFSM::ReadBatchHeader"
+            [label="readReady/\l"];
+
+        "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::DevNull"
+            [label="drain/\l"];
+
+        "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::Closed"
+            [label="readReady/\l"];
+
+        "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::Ready"
+            [label="readReady/\l"];
+
+        "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::Ready"
+            [label="appended/\l"];
+
+        "AbstractAppenderFSM::DevNull" -> "AbstractAppenderFSM::ReadBatchHeader"
+            [label="ready/\l"];
+
+        "AbstractAppenderFSM::DevNull" -> "AbstractAppenderFSM::Closed"
+            [label="readReady/\l"];
+
+        "AbstractAppenderFSM::DevNull" -> "AbstractAppenderFSM::Ready"
+            [label="readReady/\l"];
+
+        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Append"
+            [label="append/\l"];
+
+        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Closed"
+            [label="readReady/\l"];
+
+        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Append"
+            [label="readReady/\l"];
+
+        "%start" -> "AbstractAppenderFSM::Ready"
+    }
+
+}

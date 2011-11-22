@@ -1,0 +1,48 @@
+digraph Acknowledger_sm {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_AcknowledgerFSM {
+
+        label="AcknowledgerFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "AcknowledgerFSM::Waiting"
+            [label="{Waiting}"];
+
+        "AcknowledgerFSM::WriteAck"
+            [label="{WriteAck}"];
+
+        "AcknowledgerFSM::Closed"
+            [label="{Closed}"];
+
+        "AcknowledgerFSM::DefaultState"
+            [label="{&laquo; Default &raquo;}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "AcknowledgerFSM::Waiting" -> "AcknowledgerFSM::WriteAck"
+            [label="ack/\l"];
+
+        "AcknowledgerFSM::WriteAck" -> "AcknowledgerFSM::Closed"
+            [label="writeReady/\l"];
+
+        "AcknowledgerFSM::WriteAck" -> "AcknowledgerFSM::WriteAck"
+            [label="writeReady/\l"];
+
+        "AcknowledgerFSM::WriteAck" -> "AcknowledgerFSM::Waiting"
+            [label="waiting/\l"];
+
+        "%start" -> "AcknowledgerFSM::Waiting"
+    }
+
+}

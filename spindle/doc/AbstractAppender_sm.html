@@ -1,0 +1,235 @@
+<html>
+  <head>
+    <title>AbstractAppender_sm</title>
+  </head>
+
+  <body>
+    <table align=center border=3 cellspacing=2 cellpadding=2>
+      <caption align="top">
+        AbstractAppenderFSM Finite State Machine
+      </caption>
+      <tr>
+        <th rowspan=2>
+          State
+        </th>
+        <th colspan=2>
+          Actions
+        </th>
+        <th colspan=6>
+          Transition
+        </th>
+      </tr>
+      <tr>
+        <th>
+          Entry
+        </th>
+        <th>
+         Exit
+        </th>
+        <th>
+          append
+        </th>
+        <th>
+          appended
+        </th>
+        <th>
+          drain
+        </th>
+        <th>
+          readReady
+        </th>
+        <th>
+          ready
+        </th>
+        <th>
+          <b>Default</b>
+        </th>
+      </tr>
+      <tr>
+        <td>
+          Ready
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReadBatchHeader
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Append
+        </td>
+        <td>
+          <pre>
+beginAppend();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Ready
+  {
+    selectForRead();
+  }
+          </pre>
+        </td>
+        <td>
+          <pre>
+  DevNull
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
+[!ctxt.append()]
+  Append
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Ready
+  {
+    selectForRead();
+  }
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          DevNull
+        </td>
+        <td>
+          <pre>
+    drain();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.devNull()]
+  DevNull
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Ready
+  {
+    selectForRead();
+  }
+          </pre>
+        </td>
+        <td>
+          <pre>
+  ReadBatchHeader
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReadBatchHeader
+        </td>
+        <td>
+          <pre>
+    nextBatchHeader();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Append
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.readBatchHeader()]
+  ReadBatchHeader
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Append
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Closed
+        </td>
+        <td>
+          <pre>
+    close();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

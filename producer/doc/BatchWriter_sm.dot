@@ -1,0 +1,90 @@
+digraph BatchWriter_sm {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_BatchWriterFSM {
+
+        label="BatchWriterFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "BatchWriterFSM::Suspended"
+            [label="{Suspended}"];
+
+        "BatchWriterFSM::Waiting"
+            [label="{Waiting}"];
+
+        "BatchWriterFSM::WriteBatchHeader"
+            [label="{WriteBatchHeader}"];
+
+        "BatchWriterFSM::WriteEventHeader"
+            [label="{WriteEventHeader}"];
+
+        "BatchWriterFSM::WritePayload"
+            [label="{WritePayload}"];
+
+        "BatchWriterFSM::Closed"
+            [label="{Closed}"];
+
+        "BatchWriterFSM::DefaultState"
+            [label="{&laquo; Default &raquo;}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "BatchWriterFSM::Suspended" -> "BatchWriterFSM::WriteBatchHeader"
+            [label="connect/\l"];
+
+        "BatchWriterFSM::Suspended" -> "BatchWriterFSM::Waiting"
+            [label="connect/\l"];
+
+        "BatchWriterFSM::Waiting" -> "BatchWriterFSM::WriteBatchHeader"
+            [label="pushBatch/\l"];
+
+        "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::Closed"
+            [label="writeReady/\l"];
+
+        "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::WriteEventHeader"
+            [label="writeReady/\l"];
+
+        "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::WriteEventHeader"
+            [label="batchHeaderWritten/\l"];
+
+        "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::Waiting"
+            [label="queuedEmpty/\l"];
+
+        "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::Closed"
+            [label="writeReady/\l"];
+
+        "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::WritePayload"
+            [label="eventHeaderWritten/\l"];
+
+        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Closed"
+            [label="writeReady/\l"];
+
+        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"
+            [label="writeReady/\l"];
+
+        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"
+            [label="payloadWritten/\l"];
+
+        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Waiting"
+            [label="waiting/\l"];
+
+        "BatchWriterFSM::DefaultState" -> "BatchWriterFSM::Closed"
+            [label="failover/\l"];
+
+        "BatchWriterFSM::DefaultState" -> "BatchWriterFSM::Closed"
+            [label="close/\l"];
+
+        "%start" -> "BatchWriterFSM::Suspended"
+    }
+
+}

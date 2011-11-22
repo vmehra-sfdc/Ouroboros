@@ -1,0 +1,51 @@
+digraph Spindle_sm {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_SpindleFSM {
+
+        label="SpindleFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "SpindleFSM::Suspended"
+            [label="{Suspended}"];
+
+        "SpindleFSM::Established"
+            [label="{Established}"];
+
+        "SpindleFSM::Handshake"
+            [label="{Handshake}"];
+
+        "SpindleFSM::Closed"
+            [label="{Closed}"];
+
+        "SpindleFSM::DefaultState"
+            [label="{&laquo; Default &raquo;}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "SpindleFSM::Suspended" -> "SpindleFSM::Handshake"
+            [label="handshake/\l"];
+
+        "SpindleFSM::Handshake" -> "SpindleFSM::Closed"
+            [label="readReady/\l"];
+
+        "SpindleFSM::Handshake" -> "SpindleFSM::Established"
+            [label="readReady/\l"];
+
+        "SpindleFSM::Handshake" -> "SpindleFSM::Established"
+            [label="established/\l"];
+
+        "%start" -> "SpindleFSM::Suspended"
+    }
+
+}

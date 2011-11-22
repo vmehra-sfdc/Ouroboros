@@ -1,0 +1,72 @@
+digraph Xerox_sm {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_XeroxFSM {
+
+        label="XeroxFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "XeroxFSM::Suspended"
+            [label="{Suspended}"];
+
+        "XeroxFSM::Handshake"
+            [label="{Handshake}"];
+
+        "XeroxFSM::SendHeader"
+            [label="{SendHeader}"];
+
+        "XeroxFSM::Copy"
+            [label="{Copy}"];
+
+        "XeroxFSM::Closed"
+            [label="{Closed}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "XeroxFSM::Suspended" -> "XeroxFSM::Handshake"
+            [label="connect/\l"];
+
+        "XeroxFSM::Handshake" -> "XeroxFSM::SendHeader"
+            [label="handshakeWritten/\l"];
+
+        "XeroxFSM::Handshake" -> "XeroxFSM::Closed"
+            [label="writeReady/\l"];
+
+        "XeroxFSM::Handshake" -> "XeroxFSM::SendHeader"
+            [label="writeReady/\l"];
+
+        "XeroxFSM::SendHeader" -> "XeroxFSM::Closed"
+            [label="writeReady/\l"];
+
+        "XeroxFSM::SendHeader" -> "XeroxFSM::Copy"
+            [label="writeReady/\l"];
+
+        "XeroxFSM::SendHeader" -> "XeroxFSM::Copy"
+            [label="initiateCopy/\l"];
+
+        "XeroxFSM::SendHeader" -> "XeroxFSM::Closed"
+            [label="finished/\l"];
+
+        "XeroxFSM::Copy" -> "XeroxFSM::SendHeader"
+            [label="copied/\l"];
+
+        "XeroxFSM::Copy" -> "XeroxFSM::Closed"
+            [label="writeReady/\l"];
+
+        "XeroxFSM::Copy" -> "XeroxFSM::SendHeader"
+            [label="writeReady/\l"];
+
+        "%start" -> "XeroxFSM::Suspended"
+    }
+
+}

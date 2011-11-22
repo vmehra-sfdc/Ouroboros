@@ -1,0 +1,48 @@
+digraph BatchAcknowledgement_sm {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_BatchAcknowledgementFSM {
+
+        label="BatchAcknowledgementFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "BatchAcknowledgementFSM::Suspended"
+            [label="{Suspended}"];
+
+        "BatchAcknowledgementFSM::ReadAcknowledgement"
+            [label="{ReadAcknowledgement}"];
+
+        "BatchAcknowledgementFSM::Closed"
+            [label="{Closed}"];
+
+        "BatchAcknowledgementFSM::DefaultState"
+            [label="{&laquo; Default &raquo;}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "BatchAcknowledgementFSM::Suspended" -> "BatchAcknowledgementFSM::ReadAcknowledgement"
+            [label="connect/\l"];
+
+        "BatchAcknowledgementFSM::ReadAcknowledgement" -> "BatchAcknowledgementFSM::Closed"
+            [label="readReady/\l"];
+
+        "BatchAcknowledgementFSM::DefaultState" -> "BatchAcknowledgementFSM::Closed"
+            [label="failover/\l"];
+
+        "BatchAcknowledgementFSM::DefaultState" -> "BatchAcknowledgementFSM::Closed"
+            [label="close/\l"];
+
+        "%start" -> "BatchAcknowledgementFSM::Suspended"
+    }
+
+}

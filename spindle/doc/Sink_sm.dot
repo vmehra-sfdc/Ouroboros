@@ -1,0 +1,78 @@
+digraph Sink_sm {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_SinkFSM {
+
+        label="SinkFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "SinkFSM::Suspended"
+            [label="{Suspended}"];
+
+        "SinkFSM::ReadHandshake"
+            [label="{ReadHandshake}"];
+
+        "SinkFSM::ReadHeader"
+            [label="{ReadHeader}"];
+
+        "SinkFSM::Copy"
+            [label="{Copy}"];
+
+        "SinkFSM::Closed"
+            [label="{Closed}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "SinkFSM::Suspended" -> "SinkFSM::ReadHandshake"
+            [label="accept/\l"];
+
+        "SinkFSM::Suspended" -> "SinkFSM::ReadHandshake"
+            [label="readReady/\l"];
+
+        "SinkFSM::ReadHandshake" -> "SinkFSM::ReadHeader"
+            [label="readHeader/\l"];
+
+        "SinkFSM::ReadHandshake" -> "SinkFSM::Closed"
+            [label="readReady/\l"];
+
+        "SinkFSM::ReadHandshake" -> "SinkFSM::ReadHeader"
+            [label="readReady/\l"];
+
+        "SinkFSM::ReadHeader" -> "SinkFSM::Copy"
+            [label="copy/\l"];
+
+        "SinkFSM::ReadHeader" -> "SinkFSM::Closed"
+            [label="readReady/\l"];
+
+        "SinkFSM::ReadHeader" -> "SinkFSM::Copy"
+            [label="readReady/\l"];
+
+        "SinkFSM::Copy" -> "SinkFSM::Suspended"
+            [label="copyFinished/\l"];
+
+        "SinkFSM::Copy" -> "SinkFSM::ReadHeader"
+            [label="copyFinished/\l"];
+
+        "SinkFSM::Copy" -> "SinkFSM::Closed"
+            [label="readReady/\l"];
+
+        "SinkFSM::Copy" -> "SinkFSM::Suspended"
+            [label="readReady/\l"];
+
+        "SinkFSM::Copy" -> "SinkFSM::ReadHeader"
+            [label="readReady/\l"];
+
+        "%start" -> "SinkFSM::Suspended"
+    }
+
+}

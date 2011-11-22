@@ -1,0 +1,237 @@
+<html>
+  <head>
+    <title>Sink_sm</title>
+  </head>
+
+  <body>
+    <table align=center border=3 cellspacing=2 cellpadding=2>
+      <caption align="top">
+        SinkFSM Finite State Machine
+      </caption>
+      <tr>
+        <th rowspan=2>
+          State
+        </th>
+        <th colspan=2>
+          Actions
+        </th>
+        <th colspan=6>
+          Transition
+        </th>
+      </tr>
+      <tr>
+        <th>
+          Entry
+        </th>
+        <th>
+         Exit
+        </th>
+        <th>
+          accept
+        </th>
+        <th>
+          copy
+        </th>
+        <th>
+          copyFinished
+        </th>
+        <th>
+          readHeader
+        </th>
+        <th>
+          readReady
+        </th>
+        <th>
+          <b>Default</b>
+        </th>
+      </tr>
+      <tr>
+        <td>
+          Suspended
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReadHandshake
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReadHandshake
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReadHandshake
+        </td>
+        <td>
+          <pre>
+nextHandshake();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReadHeader
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
+[!ctxt.readHandshake()]
+  ReadHandshake
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  ReadHeader
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReadHeader
+        </td>
+        <td>
+          <pre>
+    nextHeader();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Copy
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.readHeader()]
+  ReadHeader
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Copy
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Copy
+        </td>
+        <td>
+          <pre>
+    startCopy();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[ctxt.isLastSegment()]
+  Suspended
+  {}
+
+  ReadHeader
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.copy()]
+  Copy
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+[ctxt.isLastSegment()]
+  Suspended
+  {}
+
+  ReadHeader
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Closed
+        </td>
+        <td>
+          <pre>
+    close();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

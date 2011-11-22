@@ -1,0 +1,52 @@
+digraph Coordinator_sm {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_CoordinatorFSM {
+
+        label="CoordinatorFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "CoordinatorFSM::Unstable"
+            [label="{Unstable}"];
+
+        "CoordinatorFSM::Stable"
+            [label="{Stable}"];
+
+        "CoordinatorFSM::DefaultState"
+            [label="{&laquo; Default &raquo;}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Stable"
+            [label="stabilized/\l"];
+
+        "CoordinatorFSM::DefaultState" -> "CoordinatorFSM::Unstable"
+            [label="destabilized/\l"];
+
+        "%start" -> "CoordinatorFSM::Unstable"
+    }
+
+    subgraph cluster_ControllerFSM {
+
+        label="ControllerFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        //
+        // Transitions (Edges)
+        //
+    }
+
+}
