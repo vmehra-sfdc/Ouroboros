@@ -50,13 +50,14 @@ public class Sink implements CommunicationsHandler {
 
     private final ByteBuffer     buffer = ByteBuffer.allocate(BUFFER_SIZE);
     private final Bundle         bundle;
+    private long                 bytesWritten;
     private EventChannel         channel;
     private Segment              current;
     private boolean              error;
     private final SinkContext    fsm    = new SinkContext(this);
     private SocketChannelHandler handler;
+    private int                  segmentCount;
     private long                 segmentSize;
-    private long                 bytesWritten;
 
     public Sink(Bundle bundle) {
         this.bundle = bundle;
@@ -145,6 +146,10 @@ public class Sink implements CommunicationsHandler {
         return error;
     }
 
+    protected boolean isLastSegment() {
+        return segmentCount == 0;
+    }
+
     protected void nextHandshake() {
         buffer.rewind();
         if (readHandshake()) {
@@ -155,6 +160,7 @@ public class Sink implements CommunicationsHandler {
     }
 
     protected void nextHeader() {
+        segmentCount--;
         buffer.rewind();
         if (readHeader()) {
             fsm.copy();
@@ -178,7 +184,7 @@ public class Sink implements CommunicationsHandler {
 
         if (!buffer.hasRemaining()) {
             buffer.flip();
-            long magic = buffer.getLong();
+            long magic = buffer.getInt();
             if (MAGIC != magic) {
                 error = true;
                 if (log.isLoggable(Level.WARNING)) {
@@ -187,6 +193,7 @@ public class Sink implements CommunicationsHandler {
                 }
                 return false;
             }
+            segmentCount = buffer.getInt();
             UUID channelId = new UUID(buffer.getLong(), buffer.getLong());
             try {
                 channel = bundle.createEventChannelFor(channelId);
@@ -263,5 +270,4 @@ public class Sink implements CommunicationsHandler {
             handler.selectForRead();
         }
     }
-
 }

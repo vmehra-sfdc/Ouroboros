@@ -46,7 +46,7 @@ import com.salesforce.ouroboros.spindle.XeroxContext.XeroxState;
  */
 public class Xerox implements CommunicationsHandler {
 
-    public static final long     MAGIC             = 0x1638L;
+    public static final int      MAGIC             = 0x1638;
     public static final int      BUFFER_SIZE       = 8 + 8 + 8;
     private static final int     DEFAULT_TXFR_SIZE = 16 * 1024;
     private static final Logger  log               = Logger.getLogger(Xerox.class.getCanonicalName());
@@ -74,7 +74,8 @@ public class Xerox implements CommunicationsHandler {
         channelId = channel;
         this.transferSize = transferSize;
         this.segments = segments;
-        buffer.putLong(MAGIC);
+        buffer.putInt(MAGIC);
+        buffer.putInt(segments.size());
         buffer.putLong(channelId.getMostSignificantBits());
         buffer.putLong(channelId.getLeastSignificantBits());
         buffer.flip();
@@ -220,7 +221,7 @@ public class Xerox implements CommunicationsHandler {
         buffer.putLong(current.getPrefix());
         buffer.putLong(segmentSize);
         buffer.flip();
-        
+
         if (writeHeader()) {
             fsm.initiateCopy();
         } else {

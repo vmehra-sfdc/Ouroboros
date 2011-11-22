@@ -97,7 +97,11 @@ Entry {
 }
 {
 	copyFinished
+		[ctxt.isLastSegment()]
 		Suspended{}
+		
+	copyFinished
+		ReadHeader{}
 		
 	readReady
 		[!ctxt.copy()]
@@ -110,7 +114,11 @@ Entry {
 		Closed{}
 
 	readReady
+		[ctxt.isLastSegment()]
 		Suspended{}
+
+	readReady
+		ReadHeader{}
 }
 
 Closed

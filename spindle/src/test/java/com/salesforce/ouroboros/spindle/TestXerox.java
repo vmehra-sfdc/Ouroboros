@@ -68,16 +68,17 @@ public class TestXerox {
         final long size1 = 2048;
         final long size2 = 1024;
 
-        Answer<Integer> write1 = new Answer<Integer>() {
+        Answer<Integer> writeHandshake = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                assertEquals(Xerox.MAGIC, buffer.getLong());
+                assertEquals(Xerox.MAGIC, buffer.getInt());
+                assertEquals(2, buffer.getInt());
                 assertEquals(id, new UUID(buffer.getLong(), buffer.getLong()));
                 return 24;
             }
         };
-        Answer<Integer> write2 = new Answer<Integer>() {
+        Answer<Integer> writeHeader1 = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
@@ -87,7 +88,7 @@ public class TestXerox {
                 return 24;
             }
         };
-        Answer<Integer> write3 = new Answer<Integer>() {
+        Answer<Integer> writeHeader2 = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
@@ -97,7 +98,7 @@ public class TestXerox {
                 return 24;
             }
         };
-        when(socket.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(write1).thenReturn(0).thenAnswer(write2).thenReturn(0).thenAnswer(write3).thenReturn(0);
+        when(socket.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(writeHandshake).thenReturn(0).thenAnswer(writeHeader1).thenReturn(0).thenAnswer(writeHeader2).thenReturn(0);
         when(segment1.transferTo(0L, 1024L, socket)).thenReturn(1024L);
         when(segment1.transferTo(1024L, 1024L, socket)).thenReturn(1024L);
         when(segment2.transferTo(0L, 1024L, socket)).thenReturn(512L);
