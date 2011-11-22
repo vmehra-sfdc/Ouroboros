@@ -270,7 +270,8 @@ public class TestCoordinator {
                              0);
         coordinator.getInactiveMembers().addAll(Arrays.asList(node1, node2,
                                                               node3));
-        Rendezvous rendezvous = coordinator.openReplicators();
+        coordinator.openReplicators();
+        Rendezvous rendezvous = coordinator.getRendezvous();
         assertNotNull(rendezvous);
         assertEquals(3, rendezvous.getParties());
 

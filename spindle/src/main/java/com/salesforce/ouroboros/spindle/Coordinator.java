@@ -344,6 +344,13 @@ public class Coordinator implements Member {
         nextRing = newRing;
     }
 
+    protected void cleanUp() {
+        if (rendezvous != null) {
+            rendezvous.cancel();
+            rendezvous = null;
+        }
+    }
+
     /**
      * Commit the calculated next ring as the current weaver ring
      */
@@ -461,13 +468,14 @@ public class Coordinator implements Member {
      * 
      * @param controller
      *            - the controller for the group
-     * 
-     * @return - the Rendezvous used to synchronize with replication connections
      */
-    protected Rendezvous openReplicators() {
+    protected void openReplicators() {
+        rendezvous = null;
+
         Runnable rendezvousAction = new Runnable() {
             @Override
             public void run() {
+                rendezvous = null;
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Replicators established on %s", id));
                 }
@@ -489,15 +497,16 @@ public class Coordinator implements Member {
 
         if (contacts.isEmpty()) {
             rendezvousAction.run();
-            return null;
+            return;
         }
 
         final ArrayList<Replicator> replicators = new ArrayList<Replicator>();
         Runnable cancellationAction = new Runnable() {
             @Override
             public void run() {
+                rendezvous = null;
                 if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Replicator establishment timed out on %s",
+                    log.info(String.format("Replicator establishment cancelled on %s",
                                            id));
                 }
                 for (Replicator replicator : replicators) {
@@ -512,14 +521,14 @@ public class Coordinator implements Member {
             log.info(String.format("Establishment of replicators initiated on %s",
                                    id));
         }
-        Rendezvous rendezvous = new Rendezvous(contacts.size(),
-                                               rendezvousAction,
-                                               cancellationAction);
+        rendezvous = new Rendezvous(contacts.size(), rendezvousAction,
+                                    cancellationAction);
         for (Node member : contacts) {
-            weaver.openReplicator(member, yellowPages.get(member), rendezvous);
+            replicators.add(weaver.openReplicator(member,
+                                                  yellowPages.get(member),
+                                                  rendezvous));
         }
         rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer);
-        return rendezvous;
     }
 
     protected void rebalance() {
@@ -620,6 +629,13 @@ public class Coordinator implements Member {
 
     SortedSet<Node> getInactiveMembers() {
         return inactiveMembers;
+    }
+
+    /**
+     * @return the current rendenzvous of the coordinator
+     */
+    Rendezvous getRendezvous() {
+        return rendezvous;
     }
 
     /**

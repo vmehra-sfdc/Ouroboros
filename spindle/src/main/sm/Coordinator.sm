@@ -39,11 +39,18 @@
 %start CoordinatorFSM::Unstable
 %map CoordinatorFSM
 %% 
-Unstable {
+Unstable
+Entry {
+	cleanUp();
+}
+{
 	stabilize
 		EstablishReplicators{}
 
 	destabilize
+		nil {}
+		
+	replicatorsEstablishmentTimeout
 		nil {}
 }
 
