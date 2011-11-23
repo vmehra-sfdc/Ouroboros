@@ -117,11 +117,10 @@ public class TestSink {
         sink.readReady();
 
         verify(socket, new Times(5)).read(isA(ByteBuffer.class));
-        verify(segment, new Times(2)).transferFrom(isA(ReadableByteChannel.class),
+        verify(segment, new Times(1)).transferFrom(isA(ReadableByteChannel.class),
                                                    isA(Long.class),
                                                    isA(Long.class));
-        assertEquals(SinkFSM.ReadHandshake, sink.getState());
-
+        assertEquals(SinkFSM.ReadChannelHeader, sink.getState());
     }
 
     @Test
@@ -151,7 +150,7 @@ public class TestSink {
 
         sink.accept(handler);
         sink.readReady();
-        assertEquals(SinkFSM.ReadHeader, sink.getState());
+        assertEquals(SinkFSM.ReadSegmentHeader, sink.getState());
 
         verify(socket, new Times(3)).read(isA(ByteBuffer.class));
         verify(bundle).createEventChannelFor(channelId);
@@ -201,7 +200,7 @@ public class TestSink {
         sink.accept(handler);
         sink.readReady();
         sink.readReady();
-        assertEquals(SinkFSM.Copy, sink.getState());
+        assertEquals(SinkFSM.CopySegment, sink.getState());
 
         verify(socket, new Times(4)).read(isA(ByteBuffer.class));
         verify(channel).segmentFor(prefix);
@@ -212,7 +211,7 @@ public class TestSink {
     public void testXeroxSink() throws Exception {
         SocketChannelHandler inboundHandler = mock(SocketChannelHandler.class);
         Bundle inboundBundle = mock(Bundle.class);
-        UUID channel = UUID.randomUUID();
+        UUID channelId = UUID.randomUUID();
         long prefix1 = 0x1600;
         long prefix2 = 0x1800;
 
@@ -228,6 +227,7 @@ public class TestSink {
         inboundTmpFile2.deleteOnExit();
         Segment inboundSegment2 = new Segment(inboundTmpFile2);
 
+        EventChannel outboundEventChannel = mock(EventChannel.class);
         SocketChannelHandler outboundHandler = mock(SocketChannelHandler.class);
 
         File tmpOutboundFile1 = new File(Long.toHexString(prefix1)
@@ -241,6 +241,9 @@ public class TestSink {
         tmpOutboundFile2.delete();
         tmpOutboundFile2.deleteOnExit();
         Segment outboundSegment2 = new Segment(tmpOutboundFile2);
+        LinkedList<Segment> segments = new LinkedList<Segment>(
+                                                               Arrays.asList(outboundSegment1,
+                                                                             outboundSegment2));
 
         Node toNode = new Node(0, 0, 0);
 
@@ -265,9 +268,11 @@ public class TestSink {
         when(inboundHandler.getChannel()).thenReturn(inbound);
         when(outboundHandler.getChannel()).thenReturn(outbound);
 
-        when(inboundBundle.createEventChannelFor(channel)).thenReturn(inboundEventChannel);
+        when(inboundBundle.createEventChannelFor(channelId)).thenReturn(inboundEventChannel);
         when(inboundEventChannel.segmentFor(prefix1)).thenReturn(inboundSegment1);
         when(inboundEventChannel.segmentFor(prefix2)).thenReturn(inboundSegment2);
+        when(outboundEventChannel.getId()).thenReturn(channelId);
+        when(outboundEventChannel.getSegmentStack()).thenReturn(segments);
 
         Event event1 = new Event(
                                  666,
@@ -284,12 +289,8 @@ public class TestSink {
         outboundSegment2.force(false);
 
         Rendezvous rendezvous = mock(Rendezvous.class);
-        final Xerox xerox = new Xerox(
-                                      toNode,
-                                      channel,
-                                      new LinkedList<Segment>(
-                                                              Arrays.asList(outboundSegment1,
-                                                                            outboundSegment2)));
+        final Xerox xerox = new Xerox(toNode);
+        xerox.addChannel(outboundEventChannel);
         xerox.setRendezvous(rendezvous);
 
         final Sink sink = new Sink(inboundBundle);
@@ -313,10 +314,10 @@ public class TestSink {
         Thread inboundRead = new Thread(reader, "Inbound read thread");
         inboundRead.start();
 
-        Util.waitFor("Never achieved Closed state", new Util.Condition() {
+        Util.waitFor("Never achieved Finished state", new Util.Condition() {
             @Override
             public boolean value() {
-                if (XeroxFSM.Closed == xerox.getState()) {
+                if (XeroxFSM.Finished == xerox.getState()) {
                     return true;
                 }
                 xerox.writeReady();

@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=7>
+        <th colspan=6>
           Transition
         </th>
       </tr>
@@ -27,16 +27,13 @@
          Exit
         </th>
         <th>
+          channelsEmpty
+        </th>
+        <th>
           connect
         </th>
         <th>
-          copied
-        </th>
-        <th>
           finished
-        </th>
-        <th>
-          handshakeWritten
         </th>
         <th>
           initiateCopy
@@ -57,14 +54,12 @@
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
-  Handshake
+  WriteChannelHeader
   {}
           </pre>
-        </td>
-        <td>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -77,24 +72,18 @@
       </tr>
       <tr>
         <td>
-          Handshake
+          WriteChannelHeader
         </td>
         <td>
           <pre>
-handshake();
+nextChannel();
           </pre>
         </td>
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
-  SendHeader
+  Finished
   {}
           </pre>
         </td>
@@ -102,8 +91,16 @@ handshake();
         </td>
         <td>
           <pre>
-[!ctxt.writeHandshake()]
-  Handshake
+  WriteSegmentHeader
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.writeChannelHeader()]
+  WriteChannelHeader
   {
     selectForWrite();
   }
@@ -112,7 +109,7 @@ handshake();
   Closed
   {}
 
-  SendHeader
+  WriteSegmentHeader
   {}
           </pre>
         </td>
@@ -121,11 +118,11 @@ handshake();
       </tr>
       <tr>
         <td>
-          SendHeader
+          WriteSegmentHeader
         </td>
         <td>
           <pre>
-    nextHeader();
+    nextSegment();
           </pre>
         </td>
         <td>
@@ -136,22 +133,20 @@ handshake();
         </td>
         <td>
           <pre>
-  Closed
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  Copy
+  WriteChannelHeader
   {}
           </pre>
         </td>
         <td>
           <pre>
-[!ctxt.writeHeader()]
-  SendHeader
+  CopySegment
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
+[!ctxt.writeSegmentHeader()]
+  WriteSegmentHeader
   {
     selectForWrite();
   }
@@ -160,7 +155,7 @@ handshake();
   Closed
   {}
 
-  Copy
+  CopySegment
   {}
           </pre>
         </td>
@@ -169,7 +164,7 @@ handshake();
       </tr>
       <tr>
         <td>
-          Copy
+          CopySegment
         </td>
         <td>
           <pre>
@@ -181,21 +176,19 @@ handshake();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
-  SendHeader
+  WriteSegmentHeader
   {}
           </pre>
         </td>
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
 [!ctxt.copy()]
-  Copy
+  CopySegment
   {
     selectForWrite();
   }
@@ -204,9 +197,30 @@ handshake();
   Closed
   {}
 
-  SendHeader
+  WriteSegmentHeader
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Finished
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -219,8 +233,6 @@ handshake();
           <pre>
     close();
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>

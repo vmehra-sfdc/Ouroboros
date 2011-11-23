@@ -39,72 +39,31 @@
 %start SinkFSM::Suspended
 %map SinkFSM
 %% 
-Suspended {
+Suspended
+Entry {
+	selectForRead();
+}
+{
 	accept
-		ReadHandshake{}
+		ReadChannelHeader{}
 
 	readReady
-		ReadHandshake{}
+		ReadChannelHeader{}
 }
 
-ReadHandshake
+ReadChannelHeader
 Entry {
-	nextHandshake();
+	nextChannel();
 }
 {
-	readHeader
-		ReadHeader{}
+	finished
+		ReadSegmentHeader{}
 		
-	readReady
-		[!ctxt.readHandshake()]
-		nil{
-			selectForRead();
-		}
-		
-	readReady
-		[ctxt.inError()]
-		Closed{}
-
-	readReady
-		ReadHeader{}
-}
-
-ReadHeader
-Entry {
-	nextHeader();
-}
-{
-	copy
-		Copy{}
-		
-	readReady
-		[!ctxt.readHeader()]
-		nil{
-			selectForRead();
-		}
-		
-	readReady
-		[ctxt.inError()]
-		Closed{}
-
-	readReady
-		Copy{}
-}
-
-Copy
-Entry {
-	startCopy();
-}
-{
-	copyFinished
-		[ctxt.isLastSegment()]
+	channelComplete
 		Suspended{}
 		
-	copyFinished
-		ReadHeader{}
-		
 	readReady
-		[!ctxt.copy()]
+		[!ctxt.readChannelHeader()]
 		nil{
 			selectForRead();
 		}
@@ -112,13 +71,60 @@ Entry {
 	readReady
 		[ctxt.inError()]
 		Closed{}
+
+	readReady
+		ReadSegmentHeader{}
+}
+
+ReadSegmentHeader
+Entry {
+	nextSegment();
+}
+{
+	finished
+		CopySegment{}
+		
+	readReady
+		[!ctxt.readSegmentHeader()]
+		nil{
+			selectForRead();
+		}
+		
+	readReady
+		[ctxt.inError()]
+		Closed{}
+
+	readReady
+		CopySegment{}
+		
+	noSegments
+		Suspended{}
+}
+
+CopySegment
+Entry {
+	copy();
+}
+{
+	finished
+		ReadSegmentHeader{}
 
 	readReady
 		[ctxt.isLastSegment()]
 		Suspended{}
+		
+	readReady
+		[!ctxt.copySegment()]
+		nil{
+			selectForRead();
+		}
+		
+	readReady
+		[ctxt.inError()]
+		Closed{}
 
 	readReady
-		ReadHeader{}
+		ReadSegmentHeader{}
 }
 
 Closed

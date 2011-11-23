@@ -14,14 +14,17 @@ digraph Xerox_sm {
         "XeroxFSM::Suspended"
             [label="{Suspended}"];
 
-        "XeroxFSM::Handshake"
-            [label="{Handshake}"];
+        "XeroxFSM::WriteChannelHeader"
+            [label="{WriteChannelHeader}"];
 
-        "XeroxFSM::SendHeader"
-            [label="{SendHeader}"];
+        "XeroxFSM::WriteSegmentHeader"
+            [label="{WriteSegmentHeader}"];
 
-        "XeroxFSM::Copy"
-            [label="{Copy}"];
+        "XeroxFSM::CopySegment"
+            [label="{CopySegment}"];
+
+        "XeroxFSM::Finished"
+            [label="{Finished}"];
 
         "XeroxFSM::Closed"
             [label="{Closed}"];
@@ -33,37 +36,40 @@ digraph Xerox_sm {
         // Transitions (Edges)
         //
 
-        "XeroxFSM::Suspended" -> "XeroxFSM::Handshake"
+        "XeroxFSM::Suspended" -> "XeroxFSM::WriteChannelHeader"
             [label="connect/\l"];
 
-        "XeroxFSM::Handshake" -> "XeroxFSM::SendHeader"
-            [label="handshakeWritten/\l"];
-
-        "XeroxFSM::Handshake" -> "XeroxFSM::Closed"
-            [label="writeReady/\l"];
-
-        "XeroxFSM::Handshake" -> "XeroxFSM::SendHeader"
-            [label="writeReady/\l"];
-
-        "XeroxFSM::SendHeader" -> "XeroxFSM::Closed"
-            [label="writeReady/\l"];
-
-        "XeroxFSM::SendHeader" -> "XeroxFSM::Copy"
-            [label="writeReady/\l"];
-
-        "XeroxFSM::SendHeader" -> "XeroxFSM::Copy"
-            [label="initiateCopy/\l"];
-
-        "XeroxFSM::SendHeader" -> "XeroxFSM::Closed"
+        "XeroxFSM::WriteChannelHeader" -> "XeroxFSM::WriteSegmentHeader"
             [label="finished/\l"];
 
-        "XeroxFSM::Copy" -> "XeroxFSM::SendHeader"
-            [label="copied/\l"];
-
-        "XeroxFSM::Copy" -> "XeroxFSM::Closed"
+        "XeroxFSM::WriteChannelHeader" -> "XeroxFSM::Closed"
             [label="writeReady/\l"];
 
-        "XeroxFSM::Copy" -> "XeroxFSM::SendHeader"
+        "XeroxFSM::WriteChannelHeader" -> "XeroxFSM::WriteSegmentHeader"
+            [label="writeReady/\l"];
+
+        "XeroxFSM::WriteChannelHeader" -> "XeroxFSM::Finished"
+            [label="channelsEmpty/\l"];
+
+        "XeroxFSM::WriteSegmentHeader" -> "XeroxFSM::Closed"
+            [label="writeReady/\l"];
+
+        "XeroxFSM::WriteSegmentHeader" -> "XeroxFSM::CopySegment"
+            [label="writeReady/\l"];
+
+        "XeroxFSM::WriteSegmentHeader" -> "XeroxFSM::CopySegment"
+            [label="initiateCopy/\l"];
+
+        "XeroxFSM::WriteSegmentHeader" -> "XeroxFSM::WriteChannelHeader"
+            [label="finished/\l"];
+
+        "XeroxFSM::CopySegment" -> "XeroxFSM::WriteSegmentHeader"
+            [label="finished/\l"];
+
+        "XeroxFSM::CopySegment" -> "XeroxFSM::Closed"
+            [label="writeReady/\l"];
+
+        "XeroxFSM::CopySegment" -> "XeroxFSM::WriteSegmentHeader"
             [label="writeReady/\l"];
 
         "%start" -> "XeroxFSM::Suspended"

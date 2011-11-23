@@ -55,7 +55,6 @@ import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
-import com.salesforce.ouroboros.spindle.messages.ReplicatorMessage;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
@@ -82,6 +81,7 @@ public class Coordinator implements Member {
                                                                                          this);
     private final Node                          id;
     private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
+    private Node[]                              joiningMembers  = new Node[0];
     private ConsistentHashFunction<Node>        nextRing;
     private Rendezvous                          rendezvous;
     private final Switchboard                   switchboard;
@@ -216,9 +216,10 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case PREPARE_FOR_REBALANCE:
-                if (isLeader()) {
-                    fsm.rebalance();
+                if (!isLeader()) {
+                    rebalance((Node[]) arguments);
                 }
+                fsm.rebalance();
                 break;
             case INITIATE_REBALANCE:
                 break;
@@ -340,7 +341,7 @@ public class Coordinator implements Member {
         for (Node node : activeMembers) {
             newRing.add(node, node.capacity);
         }
-        for (Node node : inactiveMembers) {
+        for (Node node : joiningMembers) {
             newRing.add(node, node.capacity);
         }
         nextRing = newRing;
@@ -380,11 +381,10 @@ public class Coordinator implements Member {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating rebalancing on %s", id));
         }
-        Serializable newMembers = new ArrayList<Node>(inactiveMembers).toArray(new Node[inactiveMembers.size()]);
         switchboard.ringCast(new Message(
                                          id,
                                          RebalanceMessage.PREPARE_FOR_REBALANCE,
-                                         newMembers));
+                                         (Serializable) joiningMembers));
     }
 
     /**
@@ -539,6 +539,18 @@ public class Coordinator implements Member {
     }
 
     /**
+     * Calculate the rebalancing of the system using the supplied list of
+     * joining weaver processes.
+     * 
+     * @param joiningMembers
+     *            - the list of weavers that are joining the process group
+     */
+    protected void rebalance(Node[] joiningMembers) {
+        this.joiningMembers = joiningMembers;
+
+    }
+
+    /**
      * Rebalance the channels which this node has responsibility for
      * 
      * @param remapped
@@ -547,8 +559,8 @@ public class Coordinator implements Member {
      *            - the weaver nodes that have failed and are no longer part of
      *            the partition
      */
-    protected List<Xerox> rebalance(Map<UUID, Node[][]> remapped,
-                                    Collection<Node> deadMembers) {
+    protected void rebalance(Map<UUID, Node[][]> remapped,
+                             Collection<Node> deadMembers) {
         @SuppressWarnings("unused")
         Runnable rendezvousAction = new Runnable() {
             @Override
@@ -563,13 +575,12 @@ public class Coordinator implements Member {
             log.info(String.format("Establishment of replicators initiated on %s",
                                    id));
         }
-        List<Xerox> xeroxes = new ArrayList<Xerox>();
+        Map<Node, Xerox> xeroxes = new HashMap<Node, Xerox>();
+
         for (Entry<UUID, Node[][]> entry : remapped.entrySet()) {
-            xeroxes.addAll(weaver.rebalance(entry.getKey(),
-                                            entry.getValue()[0],
-                                            entry.getValue()[1], deadMembers));
+            weaver.rebalance(xeroxes, entry.getKey(), entry.getValue()[0],
+                             entry.getValue()[1], deadMembers);
         }
-        return xeroxes;
     }
 
     /**

@@ -111,7 +111,7 @@ public class Sink implements CommunicationsHandler {
         handler.close();
     }
 
-    protected boolean copy() {
+    protected boolean copySegment() {
         try {
             bytesWritten += current.transferFrom(handler.getChannel(),
                                                  bytesWritten, segmentSize
@@ -153,26 +153,30 @@ public class Sink implements CommunicationsHandler {
         return segmentCount == 0;
     }
 
-    protected void nextHandshake() {
+    protected void nextChannel() {
         buffer.rewind();
-        if (readHandshake()) {
-            fsm.readHeader();
+        if (readChannelHeader()) {
+            fsm.finished();
         } else {
             handler.selectForRead();
         }
     }
 
-    protected void nextHeader() {
+    protected void nextSegment() {
+        if (segmentCount == 0) {
+            fsm.noSegments();
+            return;
+        }
         segmentCount--;
         buffer.rewind();
-        if (readHeader()) {
-            fsm.copy();
+        if (readSegmentHeader()) {
+            fsm.finished();
         } else {
             handler.selectForRead();
         }
     }
 
-    protected boolean readHandshake() {
+    protected boolean readChannelHeader() {
         try {
             handler.getChannel().read(buffer);
         } catch (IOException e) {
@@ -217,7 +221,7 @@ public class Sink implements CommunicationsHandler {
         return false;
     }
 
-    protected boolean readHeader() {
+    protected boolean readSegmentHeader() {
         try {
             handler.getChannel().read(buffer);
         } catch (IOException e) {
@@ -266,9 +270,9 @@ public class Sink implements CommunicationsHandler {
         handler.selectForRead();
     }
 
-    protected void startCopy() {
-        if (copy()) {
-            fsm.copyFinished();
+    protected void copy() {
+        if (copySegment()) {
+            fsm.finished();
         } else {
             handler.selectForRead();
         }

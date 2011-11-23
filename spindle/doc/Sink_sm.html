@@ -30,13 +30,13 @@
           accept
         </th>
         <th>
-          copy
+          channelComplete
         </th>
         <th>
-          copyFinished
+          finished
         </th>
         <th>
-          readHeader
+          noSegments
         </th>
         <th>
           readReady
@@ -50,12 +50,15 @@
           Suspended
         </td>
         <td>
+          <pre>
+selectForRead();
+          </pre>
         </td>
         <td>
         </td>
         <td>
           <pre>
-  ReadHandshake
+  ReadChannelHeader
   {}
           </pre>
         </td>
@@ -67,7 +70,7 @@
         </td>
         <td>
           <pre>
-  ReadHandshake
+  ReadChannelHeader
   {}
           </pre>
         </td>
@@ -76,11 +79,11 @@
       </tr>
       <tr>
         <td>
-          ReadHandshake
+          ReadChannelHeader
         </td>
         <td>
           <pre>
-nextHandshake();
+nextChannel();
           </pre>
         </td>
         <td>
@@ -88,19 +91,23 @@ nextHandshake();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
-  ReadHeader
+  Suspended
   {}
           </pre>
         </td>
         <td>
           <pre>
-[!ctxt.readHandshake()]
-  ReadHandshake
+  ReadSegmentHeader
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.readChannelHeader()]
+  ReadChannelHeader
   {
     selectForRead();
   }
@@ -109,7 +116,7 @@ nextHandshake();
   Closed
   {}
 
-  ReadHeader
+  ReadSegmentHeader
   {}
           </pre>
         </td>
@@ -118,11 +125,11 @@ nextHandshake();
       </tr>
       <tr>
         <td>
-          ReadHeader
+          ReadSegmentHeader
         </td>
         <td>
           <pre>
-    nextHeader();
+    nextSegment();
           </pre>
         </td>
         <td>
@@ -130,19 +137,23 @@ nextHandshake();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
-  Copy
+  CopySegment
   {}
           </pre>
         </td>
         <td>
-        </td>
-        <td>
+          <pre>
+  Suspended
+  {}
+          </pre>
         </td>
         <td>
           <pre>
-[!ctxt.readHeader()]
-  ReadHeader
+[!ctxt.readSegmentHeader()]
+  ReadSegmentHeader
   {
     selectForRead();
   }
@@ -151,7 +162,7 @@ nextHandshake();
   Closed
   {}
 
-  Copy
+  CopySegment
   {}
           </pre>
         </td>
@@ -160,16 +171,24 @@ nextHandshake();
       </tr>
       <tr>
         <td>
-          Copy
+          CopySegment
         </td>
         <td>
           <pre>
-    startCopy();
+    copy();
           </pre>
         </td>
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReadSegmentHeader
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -179,16 +198,8 @@ nextHandshake();
   Suspended
   {}
 
-  ReadHeader
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-[!ctxt.copy()]
-  Copy
+[!ctxt.copySegment()]
+  CopySegment
   {
     selectForRead();
   }
@@ -197,11 +208,7 @@ nextHandshake();
   Closed
   {}
 
-[ctxt.isLastSegment()]
-  Suspended
-  {}
-
-  ReadHeader
+  ReadSegmentHeader
   {}
           </pre>
         </td>

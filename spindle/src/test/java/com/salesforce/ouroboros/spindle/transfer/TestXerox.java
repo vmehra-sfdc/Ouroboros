@@ -42,6 +42,7 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
 import com.salesforce.ouroboros.spindle.transfer.XeroxContext.XeroxFSM;
@@ -63,6 +64,10 @@ public class TestXerox {
         when(handler.getChannel()).thenReturn(socket);
         Node node = new Node(0x1639, 0x1640, 0x1641);
         Rendezvous rendezvous = mock(Rendezvous.class);
+        EventChannel channel = mock(EventChannel.class);
+        LinkedList<Segment> segments = new LinkedList<Segment>();
+        segments.push(segment2);
+        segments.push(segment1);
 
         final UUID id = UUID.randomUUID();
         final long prefix1 = 77L;
@@ -105,31 +110,31 @@ public class TestXerox {
         when(segment1.transferTo(1024L, 1024L, socket)).thenReturn(1024L);
         when(segment2.transferTo(0L, 1024L, socket)).thenReturn(512L);
         when(segment2.transferTo(512L, 1024L, socket)).thenReturn(512L);
-        LinkedList<Segment> segments = new LinkedList<Segment>();
-        segments.push(segment2);
-        segments.push(segment1);
         when(segment1.getPrefix()).thenReturn(prefix1);
         when(segment2.getPrefix()).thenReturn(prefix2);
         when(segment1.size()).thenReturn(size1);
         when(segment2.size()).thenReturn(size2);
+        when(channel.getSegmentStack()).thenReturn(segments);
+        when(channel.getId()).thenReturn(id);
 
         int transferSize = 1024;
-        Xerox xerox = new Xerox(node, id, segments, transferSize);
+        Xerox xerox = new Xerox(node, transferSize);
+        xerox.addChannel(channel);
         xerox.setRendezvous(rendezvous);
         assertEquals(XeroxFSM.Suspended, xerox.getState());
         xerox.connect(handler);
-        assertEquals(XeroxFSM.Handshake, xerox.getState());
+        assertEquals(XeroxFSM.WriteChannelHeader, xerox.getState());
         verify(handler).selectForWrite();
         xerox.writeReady();
-        assertEquals(XeroxFSM.SendHeader, xerox.getState());
+        assertEquals(XeroxFSM.WriteSegmentHeader, xerox.getState());
         xerox.writeReady();
-        assertEquals(XeroxFSM.Copy, xerox.getState());
+        assertEquals(XeroxFSM.CopySegment, xerox.getState());
         xerox.writeReady();
-        assertEquals(XeroxFSM.SendHeader, xerox.getState());
+        assertEquals(XeroxFSM.WriteSegmentHeader, xerox.getState());
         xerox.writeReady();
-        assertEquals(XeroxFSM.Copy, xerox.getState());
+        assertEquals(XeroxFSM.CopySegment, xerox.getState());
         xerox.writeReady();
-        assertEquals(XeroxFSM.Closed, xerox.getState());
+        assertEquals(XeroxFSM.Finished, xerox.getState());
         verify(rendezvous).meet();
     }
 }

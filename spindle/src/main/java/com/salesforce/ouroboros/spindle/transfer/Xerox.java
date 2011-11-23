@@ -28,7 +28,7 @@ package com.salesforce.ouroboros.spindle.transfer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Deque;
-import java.util.UUID;
+import java.util.LinkedList;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,6 +36,7 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.transfer.XeroxContext.XeroxState;
 import com.salesforce.ouroboros.util.Rendezvous;
@@ -48,39 +49,36 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class Xerox implements CommunicationsHandler {
 
-    public static final int      BUFFER_SIZE       = 8 + 8 + 8;
-    public static final int      MAGIC             = 0x1638;
-    private static final int     DEFAULT_TXFR_SIZE = 16 * 1024;
-    private static final Logger  log               = Logger.getLogger(Xerox.class.getCanonicalName());
+    public static final int           BUFFER_SIZE       = 8 + 8 + 8;
+    public static final int           MAGIC             = 0x1638;
+    private static final int          DEFAULT_TXFR_SIZE = 16 * 1024;
+    private static final Logger       log               = Logger.getLogger(Xerox.class.getCanonicalName());
 
-    private final ByteBuffer     buffer            = ByteBuffer.allocate(BUFFER_SIZE);
-    private final UUID           channelId;
-    private Segment              current;
-    private final XeroxContext   fsm               = new XeroxContext(this);
-    private SocketChannelHandler handler;
-    private boolean              inError           = false;
-    private final Node           node;
-    private long                 position;
-    private Rendezvous           rendezvous;
-    private final Deque<Segment> segments;
-    private long                 segmentSize;
-    private final long           transferSize;
+    private final ByteBuffer          buffer            = ByteBuffer.allocate(BUFFER_SIZE);
+    private final Deque<EventChannel> channels          = new LinkedList<EventChannel>();
+    private EventChannel              currentChannel;
+    private Segment                   currentSegment;
+    private final XeroxContext        fsm               = new XeroxContext(this);
+    private SocketChannelHandler      handler;
+    private boolean                   inError           = false;
+    private final Node                node;
+    private long                      position;
+    private Rendezvous                rendezvous;
+    private Deque<Segment>            segments;
+    private long                      segmentSize;
+    private final long                transferSize;
 
-    public Xerox(Node toNode, UUID channel, Deque<Segment> segments) {
-        this(toNode, channel, segments, DEFAULT_TXFR_SIZE);
+    public Xerox(Node toNode) {
+        this(toNode, DEFAULT_TXFR_SIZE);
     }
 
-    public Xerox(Node toNode, UUID channel, Deque<Segment> segments,
-                 int transferSize) {
+    public Xerox(Node toNode, int transferSize) {
         node = toNode;
-        channelId = channel;
         this.transferSize = transferSize;
-        this.segments = segments;
-        buffer.putInt(MAGIC);
-        buffer.putInt(segments.size());
-        buffer.putLong(channelId.getMostSignificantBits());
-        buffer.putLong(channelId.getLeastSignificantBits());
-        buffer.flip();
+    }
+
+    public void addChannel(EventChannel channel) {
+        channels.add(channel);
     }
 
     @Override
@@ -142,23 +140,23 @@ public class Xerox implements CommunicationsHandler {
     protected boolean copy() {
         long written;
         try {
-            written = current.transferTo(position, transferSize,
-                                         handler.getChannel());
+            written = currentSegment.transferTo(position, transferSize,
+                                                handler.getChannel());
         } catch (IOException e) {
             inError = true;
-            log.log(Level.WARNING,
-                    String.format("Error transfering %s on %s", current,
-                                  handler.getChannel()), e);
+            log.log(Level.WARNING, String.format("Error transfering %s on %s",
+                                                 currentSegment,
+                                                 handler.getChannel()), e);
             inError = true;
             return false;
         }
         position += written;
         if (position == segmentSize) {
             try {
-                current.close();
+                currentSegment.close();
             } catch (IOException e) {
                 log.log(Level.FINE,
-                        String.format("Error closing: %s", current), e);
+                        String.format("Error closing: %s", currentSegment), e);
             }
             return true;
         }
@@ -167,15 +165,35 @@ public class Xerox implements CommunicationsHandler {
 
     protected void copySegment() {
         if (copy()) {
-            fsm.copied();
+            fsm.finished();
         } else {
             handler.selectForWrite();
         }
     }
 
-    protected void handshake() {
-        if (writeHandshake()) {
-            fsm.handshakeWritten();
+    protected void nextChannel() {
+        if (channels.isEmpty()) {
+            try {
+                rendezvous.meet();
+            } catch (BrokenBarrierException e) {
+                log.log(Level.SEVERE,
+                        String.format("Rendezvous has already been met in xeroxing channel %s to %s",
+                                      currentChannel.getId(), node), e);
+            }
+            fsm.channelsEmpty();
+            return;
+        }
+        currentChannel = channels.pop();
+        segments = currentChannel.getSegmentStack();
+        
+        buffer.putInt(MAGIC);
+        buffer.putInt(segments.size());
+        buffer.putLong(currentChannel.getId().getMostSignificantBits());
+        buffer.putLong(currentChannel.getId().getLeastSignificantBits());
+        buffer.flip();
+        
+        if (writeChannelHeader()) {
+            fsm.finished();
         } else {
             handler.selectForWrite();
         }
@@ -185,35 +203,29 @@ public class Xerox implements CommunicationsHandler {
         return inError;
     }
 
-    protected void nextHeader() {
-        position = 0;
+    protected void nextSegment() {
         if (segments.isEmpty()) {
-            try {
-                rendezvous.meet();
-            } catch (BrokenBarrierException e) {
-                log.log(Level.SEVERE,
-                        String.format("Rendezvous has already been met in xeroxing channel %s to %s",
-                                      channelId, node), e);
-            }
             fsm.finished();
             return;
         }
-        current = segments.pop();
+        position = 0;
+        currentSegment = segments.pop();
         try {
-            segmentSize = current.size();
+            segmentSize = currentSegment.size();
         } catch (IOException e) {
             log.log(Level.WARNING,
-                    String.format("Error retrieving size of %s", current), e);
+                    String.format("Error retrieving size of %s", currentSegment),
+                    e);
             inError = true;
             return;
         }
         buffer.clear();
         buffer.putLong(MAGIC);
-        buffer.putLong(current.getPrefix());
+        buffer.putLong(currentSegment.getPrefix());
         buffer.putLong(segmentSize);
         buffer.flip();
 
-        if (writeHeader()) {
+        if (writeSegmentHeader()) {
             fsm.initiateCopy();
         } else {
             handler.selectForWrite();
@@ -224,13 +236,14 @@ public class Xerox implements CommunicationsHandler {
         handler.selectForWrite();
     }
 
-    protected boolean writeHandshake() {
+    protected boolean writeChannelHeader() {
         try {
             handler.getChannel().write(buffer);
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Error writing handshake for %s on %s",
-                                  channelId, handler.getChannel()), e);
+                                  currentChannel.getId(), handler.getChannel()),
+                    e);
             inError = true;
             return false;
         }
@@ -240,13 +253,13 @@ public class Xerox implements CommunicationsHandler {
         return false;
     }
 
-    protected boolean writeHeader() {
+    protected boolean writeSegmentHeader() {
         try {
             handler.getChannel().write(buffer);
         } catch (IOException e) {
             log.log(Level.WARNING,
-                    String.format("Error writing header for %s on %s", current,
-                                  handler.getChannel()), e);
+                    String.format("Error writing header for %s on %s",
+                                  currentSegment, handler.getChannel()), e);
             inError = true;
             return false;
         }

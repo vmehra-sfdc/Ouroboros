@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.messages;
+package com.salesforce.ouroboros.spindle;
 
 import java.io.Serializable;
 import java.util.logging.Logger;
@@ -31,7 +31,6 @@ import java.util.logging.Logger;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.spindle.Coordinator;
 
 /**
  * 

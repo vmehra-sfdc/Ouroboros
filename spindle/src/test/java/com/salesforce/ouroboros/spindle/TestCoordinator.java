@@ -280,6 +280,7 @@ public class TestCoordinator {
         verify(weaver).openReplicator(node3, contactInformation3, rendezvous);
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     public void testRebalance() {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
@@ -330,10 +331,12 @@ public class TestCoordinator {
         Map<UUID, Node[][]> remapped = coordinator.remap();
         List<Node> deadMembers = Arrays.asList(removedPrimary, removedMirror);
         coordinator.rebalance(remapped, deadMembers);
-        verify(weaver).rebalance(primary, remapped.get(primary)[0],
-                                 remapped.get(primary)[1], deadMembers);
-        verify(weaver).rebalance(mirror, remapped.get(mirror)[0],
-                                 remapped.get(mirror)[1], deadMembers);
+        verify(weaver).rebalance(isA(Map.class), eq(primary),
+                                 eq(remapped.get(primary)[0]),
+                                 eq(remapped.get(primary)[1]), eq(deadMembers));
+        verify(weaver).rebalance(isA(Map.class), eq(mirror),
+                                 eq(remapped.get(mirror)[0]),
+                                 eq(remapped.get(mirror)[1]), eq(deadMembers));
     }
 
     @Test

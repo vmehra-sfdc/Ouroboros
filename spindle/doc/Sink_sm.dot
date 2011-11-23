@@ -14,14 +14,14 @@ digraph Sink_sm {
         "SinkFSM::Suspended"
             [label="{Suspended}"];
 
-        "SinkFSM::ReadHandshake"
-            [label="{ReadHandshake}"];
+        "SinkFSM::ReadChannelHeader"
+            [label="{ReadChannelHeader}"];
 
-        "SinkFSM::ReadHeader"
-            [label="{ReadHeader}"];
+        "SinkFSM::ReadSegmentHeader"
+            [label="{ReadSegmentHeader}"];
 
-        "SinkFSM::Copy"
-            [label="{Copy}"];
+        "SinkFSM::CopySegment"
+            [label="{CopySegment}"];
 
         "SinkFSM::Closed"
             [label="{Closed}"];
@@ -33,43 +33,46 @@ digraph Sink_sm {
         // Transitions (Edges)
         //
 
-        "SinkFSM::Suspended" -> "SinkFSM::ReadHandshake"
+        "SinkFSM::Suspended" -> "SinkFSM::ReadChannelHeader"
             [label="accept/\l"];
 
-        "SinkFSM::Suspended" -> "SinkFSM::ReadHandshake"
+        "SinkFSM::Suspended" -> "SinkFSM::ReadChannelHeader"
             [label="readReady/\l"];
 
-        "SinkFSM::ReadHandshake" -> "SinkFSM::ReadHeader"
-            [label="readHeader/\l"];
+        "SinkFSM::ReadChannelHeader" -> "SinkFSM::ReadSegmentHeader"
+            [label="finished/\l"];
 
-        "SinkFSM::ReadHandshake" -> "SinkFSM::Closed"
+        "SinkFSM::ReadChannelHeader" -> "SinkFSM::Suspended"
+            [label="channelComplete/\l"];
+
+        "SinkFSM::ReadChannelHeader" -> "SinkFSM::Closed"
             [label="readReady/\l"];
 
-        "SinkFSM::ReadHandshake" -> "SinkFSM::ReadHeader"
+        "SinkFSM::ReadChannelHeader" -> "SinkFSM::ReadSegmentHeader"
             [label="readReady/\l"];
 
-        "SinkFSM::ReadHeader" -> "SinkFSM::Copy"
-            [label="copy/\l"];
+        "SinkFSM::ReadSegmentHeader" -> "SinkFSM::CopySegment"
+            [label="finished/\l"];
 
-        "SinkFSM::ReadHeader" -> "SinkFSM::Closed"
+        "SinkFSM::ReadSegmentHeader" -> "SinkFSM::Closed"
             [label="readReady/\l"];
 
-        "SinkFSM::ReadHeader" -> "SinkFSM::Copy"
+        "SinkFSM::ReadSegmentHeader" -> "SinkFSM::CopySegment"
             [label="readReady/\l"];
 
-        "SinkFSM::Copy" -> "SinkFSM::Suspended"
-            [label="copyFinished/\l"];
+        "SinkFSM::ReadSegmentHeader" -> "SinkFSM::Suspended"
+            [label="noSegments/\l"];
 
-        "SinkFSM::Copy" -> "SinkFSM::ReadHeader"
-            [label="copyFinished/\l"];
+        "SinkFSM::CopySegment" -> "SinkFSM::ReadSegmentHeader"
+            [label="finished/\l"];
 
-        "SinkFSM::Copy" -> "SinkFSM::Closed"
+        "SinkFSM::CopySegment" -> "SinkFSM::Suspended"
             [label="readReady/\l"];
 
-        "SinkFSM::Copy" -> "SinkFSM::Suspended"
+        "SinkFSM::CopySegment" -> "SinkFSM::Closed"
             [label="readReady/\l"];
 
-        "SinkFSM::Copy" -> "SinkFSM::ReadHeader"
+        "SinkFSM::CopySegment" -> "SinkFSM::ReadSegmentHeader"
             [label="readReady/\l"];
 
         "%start" -> "SinkFSM::Suspended"

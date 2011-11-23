@@ -41,19 +41,19 @@
 %% 
 Suspended {
 	connect
-		Handshake{}
+		WriteChannelHeader{}
 }
 
-Handshake
+WriteChannelHeader
 Entry{
-	handshake();
+	nextChannel();
 }
 {
-	handshakeWritten
-		SendHeader{}
+	finished
+		WriteSegmentHeader{}
 		
 	writeReady
-		[!ctxt.writeHandshake()]
+		[!ctxt.writeChannelHeader()]
 		nil {
 			selectForWrite();
 		}
@@ -63,16 +63,20 @@ Entry{
 		Closed{}
 		
 	writeReady
-		SendHeader{}
+		WriteSegmentHeader{}
+		
+	channelsEmpty
+		Finished{
+		}
 }
 
-SendHeader
+WriteSegmentHeader
 Entry {
-	nextHeader();
+	nextSegment();
 }
 {
 	writeReady
-		[!ctxt.writeHeader()]
+		[!ctxt.writeSegmentHeader()]
 		nil {
 			selectForWrite();
 		}
@@ -82,25 +86,25 @@ Entry {
 		Closed{}
 		
 	writeReady
-		Copy{
+		CopySegment{
 		}
 		
 	initiateCopy
-		Copy{
+		CopySegment{
 		}
 		
 	finished
-		Closed{
+		WriteChannelHeader{
 		}
 }
 
-Copy
+CopySegment
 Entry{
 	copySegment();
 }
 {
-	copied
-		SendHeader{}
+	finished
+		WriteSegmentHeader{}
 		
 	writeReady
 		[!ctxt.copy()]
@@ -113,7 +117,10 @@ Entry{
 		Closed{}
 		
 	writeReady
-		SendHeader{}
+		WriteSegmentHeader{}
+}
+
+Finished {
 }
 
 Closed
@@ -121,8 +128,5 @@ Entry {
 	close();
 }
 {
-}
-
-Default {
 }
 %%

@@ -31,9 +31,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -347,21 +346,22 @@ public class Weaver implements Bundle {
 
     /**
      * Rebalance a channel that this node serves as either the primary or
-     * mirror. Answer the list of Xerox machines that will perform the state
-     * transfer, if needed, between this node and other nodes also responsible
-     * for the channel
+     * mirror. Add the list of channels to the Xerox machines that will perform
+     * the state transfer, if needed, between this node and other nodes also
+     * responsible for the channel
+     * 
+     * @param xeroxes
+     *            - the map of Nodes to Xeroxes
      * 
      * @param channel
      *            - the id of the channel to rebalance
      * @param remappedPair
      *            - the pair of nodes that are the new primary/mirror
      *            responsible for the channel
-     * @return the list of Xerox machines which will perform any necessary state
-     *         transfer for the channel
      */
-    public List<Xerox> rebalance(UUID channel, Node[] originalPair,
-                                 Node[] remappedPair,
-                                 Collection<Node> deadMembers) {
+    public void rebalance(Map<Node, Xerox> xeroxes, UUID channel,
+                          Node[] originalPair, Node[] remappedPair,
+                          Collection<Node> deadMembers) {
         EventChannel eventChannel = channels.get(channel);
         assert eventChannel != null : String.format("The event channel to rebalance does not exist: %s",
                                                     channel);
@@ -371,25 +371,43 @@ public class Weaver implements Bundle {
                 // mirror is down
                 if (id.equals(remappedPair[0])) {
                     // Xerox state to the new mirror
-                    return Arrays.asList(new Xerox(
-                                                   remappedPair[1],
-                                                   channel,
-                                                   eventChannel.getSegmentStack()));
+                    Xerox xerox = xeroxes.get(remappedPair[1]);
+                    if (xerox == null) {
+                        xerox = new Xerox(remappedPair[1]);
+                        xeroxes.put(remappedPair[1], xerox);
+                    }
+                    xerox.addChannel(eventChannel);
+                    return;
                 }
                 // Xerox state to new primary and mirror
-                return Arrays.asList(new Xerox(remappedPair[0], channel,
-                                               eventChannel.getSegmentStack()),
-                                     new Xerox(remappedPair[1], channel,
-                                               eventChannel.getSegmentStack()));
+                Xerox xerox = xeroxes.get(remappedPair[0]);
+                if (xerox == null) {
+                    xerox = new Xerox(remappedPair[0]);
+                    xeroxes.put(remappedPair[0], xerox);
+                }
+                xerox.addChannel(eventChannel);
+
+                xerox = xeroxes.get(remappedPair[1]);
+                if (xerox == null) {
+                    xerox = new Xerox(remappedPair[1]);
+                    xeroxes.put(remappedPair[1], xerox);
+                }
+                xerox.addChannel(eventChannel);
+                return;
             }
             // mirror is up
             if (!id.equals(remappedPair[0])) {
                 // Xerox state to the new primary
-                return Arrays.asList(new Xerox(remappedPair[0], channel,
-                                               eventChannel.getSegmentStack()));
+                Xerox xerox = xeroxes.get(remappedPair[0]);
+                if (xerox == null) {
+                    xerox = new Xerox(remappedPair[0]);
+                    xeroxes.put(remappedPair[0], xerox);
+                }
+                xerox.addChannel(eventChannel);
+                return;
             }
 
-            return null; // Nothing to do
+            return; // Nothing to do
         }
 
         // self is the secondary
@@ -397,24 +415,43 @@ public class Weaver implements Bundle {
             // primary is down
             if (id.equals(remappedPair[1])) {
                 // Xerox state to the new primary
-                return Arrays.asList(new Xerox(remappedPair[0], channel,
-                                               eventChannel.getSegmentStack()));
+                Xerox xerox = xeroxes.get(remappedPair[0]);
+                if (xerox == null) {
+                    xerox = new Xerox(remappedPair[0]);
+                    xeroxes.put(remappedPair[0], xerox);
+                }
+                xerox.addChannel(eventChannel);
+                return;
             }
             // Xerox state to the new primary and mirror
-            return Arrays.asList(new Xerox(remappedPair[0], channel,
-                                           eventChannel.getSegmentStack()),
-                                 new Xerox(remappedPair[1], channel,
-                                           eventChannel.getSegmentStack()));
+            Xerox xerox = xeroxes.get(remappedPair[0]);
+            if (xerox == null) {
+                xerox = new Xerox(remappedPair[0]);
+                xeroxes.put(remappedPair[0], xerox);
+            }
+            xerox.addChannel(eventChannel);
+
+            xerox = xeroxes.get(remappedPair[1]);
+            if (xerox == null) {
+                xerox = new Xerox(remappedPair[1]);
+                xeroxes.put(remappedPair[1], xerox);
+            }
+            xerox.addChannel(eventChannel);
+            return;
         }
 
         // primary is up
         if (!id.equals(remappedPair[1])) {
             // Xerox state to the new mirror
-            return Arrays.asList(new Xerox(remappedPair[1], channel,
-                                           eventChannel.getSegmentStack()));
-        }
 
-        return null; // nothing to do
+            Xerox xerox = xeroxes.get(remappedPair[1]);
+            if (xerox == null) {
+                xerox = new Xerox(remappedPair[1]);
+                xeroxes.put(remappedPair[1], xerox);
+            }
+            xerox.addChannel(eventChannel);
+        }
+        // nothing to do
     }
 
     public void setCoordinator(Coordinator coordinator) {

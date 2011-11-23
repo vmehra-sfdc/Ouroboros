@@ -138,6 +138,7 @@ public class EventChannel {
 
     private final File       channel;
     private volatile long    commited;
+    private final UUID       id;
     private volatile long    lastTimestamp;
     private final long       maxSegmentSize;
     private volatile long    nextOffset;
@@ -147,6 +148,7 @@ public class EventChannel {
     public EventChannel(Role role, final UUID channelId, final File root,
                         final long maxSegmentSize, final Replicator replicator) {
         this.role = role;
+        this.id = channelId;
         channel = new File(root, channelId.toString().replace('-', '/'));
         this.maxSegmentSize = maxSegmentSize;
         if (!channel.mkdirs()) {
@@ -214,6 +216,10 @@ public class EventChannel {
             return false;
         }
         return channel.equals(((EventChannel) o).channel);
+    }
+
+    public UUID getId() {
+        return id;
     }
 
     /**
