@@ -1,4 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
@@ -55,9 +56,33 @@
 			<scope>compile</scope>
 		</dependency>
 	</dependencies>
-	
+
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>1.7</version>
+				<executions>
+					<execution>
+						<id>del</id>
+						<phase>generate-sources</phase>
+						<configuration>
+							<target>
+								<delete>
+									<fileset dir="src/main/java/com/salesforce/ouroboros/spindle/" includes="*Context.java"/>
+									<fileset dir="src/main/java/com/salesforce/ouroboros/spindle/replication/" includes="*Context.java"/>
+									<fileset dir="src/main/java/com/salesforce/ouroboros/spindle/source/" includes="*Context.java"/>
+									<fileset dir="src/main/java/com/salesforce/ouroboros/spindle/transfer/" includes="*Context.java"/>
+								</delete>  
+							</target>
+						</configuration>
+						<goals>
+							<goal>run</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>com.salesforce.ouroboros</groupId>
 				<artifactId>smc-plugin</artifactId>
@@ -70,7 +95,7 @@
 							<goal>generate</goal>
 						</goals>
 						<configuration>
-							<targetDirectory>src/main/java</targetDirectory>
+							<targetDirectory>target/generated-sources/sm</targetDirectory>
 							<docDirectory>doc</docDirectory>
 							<table>true</table>
 							<graph>true</graph>
