@@ -57,27 +57,6 @@
 	<build>
 		<plugins>
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-antrun-plugin</artifactId>
-				<version>1.7</version>
-				<executions>
-					<execution>
-						<id>del</id>
-						<phase>generate-sources</phase>
-						<configuration>
-							<target>
-								<delete>
-									<fileset dir="src/main/java/com/salesforce/ouroboros/producer/" includes="*Context.java"/>
-								</delete>  
-							</target>
-						</configuration>
-						<goals>
-							<goal>run</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
 				<groupId>com.salesforce.ouroboros</groupId>
 				<artifactId>smc-plugin</artifactId>
 				<version>6.0.1-SNAPSHOT</version>
