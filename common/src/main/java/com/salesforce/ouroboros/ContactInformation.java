@@ -48,4 +48,10 @@ public class ContactInformation implements Serializable {
         this.replication = replication;
         this.xerox = xerox;
     }
+
+    @Override
+    public String toString() {
+        return "ContactInfo[replication=" + replication + ", spindle="
+               + spindle + ", xerox=" + xerox + "]";
+    }
 }

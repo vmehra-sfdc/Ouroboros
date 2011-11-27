@@ -45,7 +45,7 @@ Entry {
 }
 {
 	stabilize
-		EstablishReplicators{}
+		Failover{}
 
 	destabilize
 		nil {}
@@ -54,26 +54,28 @@ Entry {
 		nil {}
 }
 
-Stable{
-    establishReplicators
-        EstablishReplicators{}
-}
+Stable{}
 
-EstablishReplicators
+Failover
 Entry{
 	failover();
 }
 {
 	coordinateReplicators
-		push(ControllerFSM::CoordinateReplicators) {}
-		
-	replicatorsEstablished
-		ReplicatorsEstablished{}
+		ReplicatorsEstablished/push(ControllerFSM::CoordinateReplicators) {}
 	
-	replicatorsEstablishmentTimeout
-		nil {
-			destabilizePartition();
-		}
+	replicatorsReady
+	   ReplicatorsReady{}
+}
+
+ReplicatorsReady {
+    replicatorsEstablished
+        ReplicatorsEstablished{}
+    
+    replicatorsEstablishmentTimeout
+        nil {
+            destabilizePartition();
+        }
 }
 
 ReplicatorsEstablished{
@@ -119,15 +121,21 @@ Entry{
 	coordinateReplicators();
 }
 {
-	replicatorsEstablished
-		[ctxt.tallyComplete()]
-		pop(replicatorsEstablished) {}
-		
-	replicatorsEstablished
-		nil {}
-		
-	destabilize
-		pop(destabilize) {}
+	replicatorsReady
+	   ReplicatorsReady{}
+}
+
+ReplicatorsReady
+Entry {
+    connectReplicators();
+}
+{
+    replicatorsEstablished
+        [ctxt.tallyComplete()]
+        pop(replicatorsEstablished) {}
+        
+    replicatorsEstablished
+        nil {}
 }
 
 CoordinateRebalance
@@ -179,5 +187,11 @@ Entry{
 		pop(destabilize) {
 			revertRebalancing();
 		}
+}
+
+
+Default { 
+    destabilize
+        pop(destabilize) {}
 }
 %%

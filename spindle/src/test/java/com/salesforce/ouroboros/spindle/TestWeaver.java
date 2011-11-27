@@ -38,6 +38,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.HashMap;
 import java.util.UUID;
 
 import org.junit.Test;
@@ -144,6 +145,8 @@ public class TestWeaver {
                                                                                0));
         Node id = new Node(0, 0, 0);
         Node mirror = new Node(1, 0, 0);
+        HashMap<Node, ContactInformation> yellowPages = new HashMap<Node, ContactInformation>();
+        yellowPages.put(mirror, info);
         File root = File.createTempFile("weaver", ".root");
         root.delete();
         assertTrue(root.mkdirs());
@@ -156,6 +159,7 @@ public class TestWeaver {
         weaver.setCoordinator(coordinator);
         weaver.start();
         weaver.openReplicator(mirror, info, rendezvous);
+        weaver.connectReplicators(yellowPages);
         SocketChannel connected = server.accept();
         assertNotNull(connected);
         assertTrue(connected.isConnected());

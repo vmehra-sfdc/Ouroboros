@@ -179,7 +179,7 @@ public class TestCoordinator {
         newMembers.put(node3, contactInformation3);
         Set<Node> deadMembers = newMembers.keySet();
         when(switchboard.getDeadMembers()).thenReturn(deadMembers);
-        coordinator.getFsm().setState(CoordinatorFSM.EstablishReplicators);
+        coordinator.getFsm().setState(CoordinatorFSM.Failover);
         coordinator.failover();
 
         verify(weaver).failover(deadMembers);
@@ -270,7 +270,8 @@ public class TestCoordinator {
                              0);
         coordinator.getInactiveMembers().addAll(Arrays.asList(node1, node2,
                                                               node3));
-        coordinator.openReplicators();
+        coordinator.getFsm().setState(CoordinatorFSM.Failover);
+        coordinator.readyReplicators();
         Rendezvous rendezvous = coordinator.getRendezvous();
         assertNotNull(rendezvous);
         assertEquals(3, rendezvous.getParties());

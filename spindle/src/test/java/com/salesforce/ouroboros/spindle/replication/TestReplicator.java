@@ -61,7 +61,7 @@ public class TestReplicator {
         Rendezvous rendezvous = mock(Rendezvous.class);
         final Node node = new Node(0x1639, 0x1640, 0x1650);
 
-        Replicator replicator = new Replicator(bundle, node, rendezvous);
+        Replicator replicator = new Replicator(bundle, node, false, rendezvous);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -89,7 +89,7 @@ public class TestReplicator {
         Rendezvous rendezvous = mock(Rendezvous.class);
         when(bundle.getId()).thenReturn(node);
 
-        Replicator replicator = new Replicator(bundle, node, rendezvous);
+        Replicator replicator = new Replicator(bundle, node, true, rendezvous);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override

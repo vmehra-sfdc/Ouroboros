@@ -235,6 +235,15 @@ public class Coordinator implements Member {
     public void dispatch(ReplicatorMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
+            case READY_REPLICATORS:
+                if (isLeader()) {
+                    replicatorsReady();
+                } else {
+                    readyReplicators();
+                    switchboard.ringCast(new Message(sender, type, arguments),
+                                         allMembers);
+                }
+                break;
             case REPLICATORS_ESTABLISHED:
                 if (isLeader()) {
                     replicatorsEstablished(sender);
@@ -243,13 +252,22 @@ public class Coordinator implements Member {
                                          allMembers);
                 }
                 break;
-            case OPEN_REPLICATORS:
+            case CONNECT_REPLICATORS:
                 if (!isLeader()) {
                     switchboard.ringCast(new Message(sender, type, arguments),
                                          allMembers);
-                    openReplicators();
                 }
+                weaver.connectReplicators(yellowPages);
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Invalid replicator message: %s",
+                                                              type));
         }
+    }
+
+    protected void replicatorsReady() {
+        fsm.replicatorsReady();
     }
 
     /**
@@ -398,11 +416,8 @@ public class Coordinator implements Member {
             log.info(String.format("Coordinating establishment of the replicators on %s",
                                    id));
         }
-        tally.set(0);
-        targetTally = allMembers.size();
-        Message message = new Message(id, ReplicatorMessage.OPEN_REPLICATORS);
+        Message message = new Message(id, ReplicatorMessage.READY_REPLICATORS);
         switchboard.ringCast(message, allMembers);
-        openReplicators();
     }
 
     protected void coordinateTakeover() {
@@ -471,7 +486,7 @@ public class Coordinator implements Member {
      * @param controller
      *            - the controller for the group
      */
-    protected void openReplicators() {
+    protected void readyReplicators() {
         rendezvous = null;
 
         Runnable rendezvousAction = new Runnable() {
@@ -531,6 +546,8 @@ public class Coordinator implements Member {
                                                   rendezvous));
         }
         rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer);
+
+        fsm.replicatorsReady();
     }
 
     protected void rebalance() {
@@ -659,5 +676,17 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
+    }
+
+    protected void connectReplicators() {
+        assert isLeader() : "Must be leader to coordinate replicator connect";
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Coordinating replicators connect on %s", id));
+        }
+        tally.set(0);
+        targetTally = allMembers.size();
+        switchboard.ringCast(new Message(id,
+                                         ReplicatorMessage.CONNECT_REPLICATORS),
+                             allMembers);
     }
 }

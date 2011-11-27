@@ -36,9 +36,6 @@
           destabilize
         </th>
         <th>
-          establishReplicators
-        </th>
-        <th>
           rebalance
         </th>
         <th>
@@ -49,6 +46,9 @@
         </th>
         <th>
           replicatorsEstablishmentTimeout
+        </th>
+        <th>
+          replicatorsReady
         </th>
         <th>
           stabilize
@@ -88,16 +88,16 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
           <pre>
   Unstable
   {}
           </pre>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
-  EstablishReplicators
+  Failover
   {}
           </pre>
         </td>
@@ -121,10 +121,6 @@ cleanUp();
         <td>
         </td>
         <td>
-          <pre>
-  EstablishReplicators
-  {}
-          </pre>
         </td>
         <td>
         </td>
@@ -143,7 +139,7 @@ cleanUp();
       </tr>
       <tr>
         <td>
-          EstablishReplicators
+          Failover
         </td>
         <td>
           <pre>
@@ -156,9 +152,42 @@ failover();
         </td>
         <td>
           <pre>
-  push(CoordinatorFSM::EstablishReplicators)
+  push(ReplicatorsEstablished)
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReplicatorsReady
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReplicatorsReady
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -176,11 +205,13 @@ failover();
         </td>
         <td>
           <pre>
-  EstablishReplicators
+  ReplicatorsReady
   {
     destabilizePartition();
   }
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -204,8 +235,6 @@ failover();
         <td>
         </td>
         <td>
-        </td>
-        <td>
           <pre>
 [ctxt.isLeader()]
   push(AwaitingTakeover)
@@ -214,6 +243,8 @@ failover();
   Rebalance
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -248,12 +279,12 @@ failover();
         <td>
         </td>
         <td>
-        </td>
-        <td>
           <pre>
   AwaitingTakeover
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -353,7 +384,7 @@ failover();
         <th colspan=2>
           Actions
         </th>
-        <th colspan=7>
+        <th colspan=8>
           Transition
         </th>
       </tr>
@@ -383,6 +414,9 @@ failover();
           replicatorsEstablished
         </th>
         <th>
+          replicatorsReady
+        </th>
+        <th>
           <b>Default</b>
         </th>
       </tr>
@@ -398,10 +432,38 @@ failover();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
           <pre>
-  pop(destabilize)
+  ReplicatorsReady
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReplicatorsReady
+        </td>
+        <td>
+          <pre>
+    connectReplicators();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -417,9 +479,11 @@ failover();
   pop(replicatorsEstablished)
   {}
 
-  CoordinateReplicators
+  ReplicatorsReady
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -446,6 +510,8 @@ failover();
   Rebalance
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -497,6 +563,8 @@ failover();
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -530,6 +598,8 @@ failover();
   CoordinateTakeover
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
