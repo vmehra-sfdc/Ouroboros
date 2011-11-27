@@ -270,7 +270,7 @@ public class TestCoordinator {
                              0);
         coordinator.getInactiveMembers().addAll(Arrays.asList(node1, node2,
                                                               node3));
-        coordinator.getFsm().setState(CoordinatorFSM.Failover);
+        coordinator.getFsm().setState(CoordinatorFSM.EstablishReplicators);
         coordinator.readyReplicators();
         Rendezvous rendezvous = coordinator.getRendezvous();
         assertNotNull(rendezvous);

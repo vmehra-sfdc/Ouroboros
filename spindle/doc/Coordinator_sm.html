@@ -36,6 +36,9 @@
           destabilize
         </th>
         <th>
+          failedOver
+        </th>
+        <th>
           rebalance
         </th>
         <th>
@@ -52,9 +55,6 @@
         </th>
         <th>
           stabilize
-        </th>
-        <th>
-          takeoverComplete
         </th>
         <th>
           <b>Default</b>
@@ -88,6 +88,8 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Unstable
   {}
@@ -97,11 +99,13 @@ cleanUp();
         </td>
         <td>
           <pre>
+[ctxt.isLeader()]
+  push(CoordinatorFSM::Unstable)
+  {}
+
   Failover
   {}
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -142,9 +146,41 @@ cleanUp();
           Failover
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
           <pre>
-failover();
+  EstablishReplicators
+  {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          EstablishReplicators
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -167,6 +203,8 @@ failover();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   ReplicatorsReady
   {}
@@ -176,12 +214,12 @@ failover();
         </td>
         <td>
         </td>
-        <td>
-        </td>
       </tr>
       <tr>
         <td>
           ReplicatorsReady
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -217,12 +255,12 @@ failover();
         </td>
         <td>
         </td>
-        <td>
-        </td>
       </tr>
       <tr>
         <td>
           ReplicatorsEstablished
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -243,8 +281,6 @@ failover();
   Rebalance
   {}
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -279,12 +315,12 @@ failover();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   AwaitingTakeover
   {}
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -328,10 +364,6 @@ failover();
         <td>
         </td>
         <td>
-          <pre>
-  Stable
-  {}
-          </pre>
         </td>
         <td>
         </td>
@@ -384,7 +416,7 @@ failover();
         <th colspan=2>
           Actions
         </th>
-        <th colspan=8>
+        <th colspan=9>
           Transition
         </th>
       </tr>
@@ -397,6 +429,9 @@ failover();
         </th>
         <th>
           destabilize
+        </th>
+        <th>
+          failedOver
         </th>
         <th>
           memberRebalanced
@@ -422,12 +457,48 @@ failover();
       </tr>
       <tr>
         <td>
+          CoordinateFailover
+        </td>
+        <td>
+          <pre>
+    coordinateFailover();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  pop(failedOver)
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
           CoordinateReplicators
         </td>
         <td>
           <pre>
     coordinateReplicators();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -474,6 +545,8 @@ failover();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [ctxt.tallyComplete()]
   pop(replicatorsEstablished)
@@ -496,6 +569,8 @@ failover();
           <pre>
     coordinateRebalance();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -532,12 +607,8 @@ failover();
         <td>
         </td>
         <td>
-          <pre>
-  pop(destabilize)
-  {
-    revertRebalancing();
-  }
-          </pre>
+        </td>
+        <td>
         </td>
         <td>
           <pre>
@@ -578,19 +649,15 @@ failover();
         <td>
         </td>
         <td>
-          <pre>
-  pop(destabilize)
-  {
-    revertRebalancing();
-  }
-          </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
         <td>
           <pre>
 [ctxt.tallyComplete()]
-  pop(takeoverComplete)
+  pop(commitTakeover)
   {
     commitTakeover();
   }

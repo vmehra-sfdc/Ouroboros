@@ -50,6 +50,7 @@ import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.RebalanceMessage;
+import com.salesforce.ouroboros.partition.FailoverMessage;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
@@ -69,9 +70,9 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * 
  */
 public class Coordinator implements Member {
-    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     static final int                            DEFAULT_TIMEOUT = 1;
     static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
+    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
 
     private boolean                             active          = false;
     private final SortedSet<Node>               activeMembers   = new ConcurrentSkipListSet<Node>();
@@ -186,6 +187,31 @@ public class Coordinator implements Member {
     }
 
     @Override
+    public void dispatch(FailoverMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case PREPARE:
+                failover();
+                if (isLeader()) {
+                    switchboard.ringCast(new Message(sender,
+                                                     FailoverMessage.FAILOVER));
+                } else {
+                    switchboard.ringCast(new Message(sender,
+                                                     FailoverMessage.PREPARE),
+                                         activeMembers);
+                }
+                break;
+            case FAILOVER:
+                // do nothing
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Unknown failover message: %s",
+                                                              type));
+        }
+    }
+
+    @Override
     public void dispatch(GlobalMessageType type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
@@ -264,10 +290,6 @@ public class Coordinator implements Member {
                                                 String.format("Invalid replicator message: %s",
                                                               type));
         }
-    }
-
-    protected void replicatorsReady() {
-        fsm.replicatorsReady();
     }
 
     /**
@@ -390,6 +412,27 @@ public class Coordinator implements Member {
 
     }
 
+    protected void connectReplicators() {
+        assert isLeader() : "Must be leader to coordinate replicator connect";
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Coordinating replicators connect on %s", id));
+        }
+        tally.set(0);
+        targetTally = allMembers.size();
+        switchboard.ringCast(new Message(id,
+                                         ReplicatorMessage.CONNECT_REPLICATORS),
+                             allMembers);
+    }
+
+    protected void coordinateFailover() {
+        assert isLeader() : "Must be leader to coordinate the rebalance";
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Coordinating weaver failover on %s", id));
+        }
+        switchboard.ringCast(new Message(id, FailoverMessage.PREPARE),
+                             activeMembers);
+    }
+
     /**
      * The receiver is the controller for the group. Coordinate the rebalancing
      * of the system by including the new members.
@@ -450,9 +493,7 @@ public class Coordinator implements Member {
         }
         weaver.failover(deadMembers);
         filterSystemMembership();
-        if (isLeader()) {
-            fsm.coordinateReplicators();
-        }
+        fsm.failedOver();
     }
 
     protected void filterSystemMembership() {
@@ -556,18 +597,6 @@ public class Coordinator implements Member {
     }
 
     /**
-     * Calculate the rebalancing of the system using the supplied list of
-     * joining weaver processes.
-     * 
-     * @param joiningMembers
-     *            - the list of weavers that are joining the process group
-     */
-    protected void rebalance(Node[] joiningMembers) {
-        this.joiningMembers = joiningMembers;
-
-    }
-
-    /**
      * Rebalance the channels which this node has responsibility for
      * 
      * @param remapped
@@ -598,6 +627,18 @@ public class Coordinator implements Member {
             weaver.rebalance(xeroxes, entry.getKey(), entry.getValue()[0],
                              entry.getValue()[1], deadMembers);
         }
+    }
+
+    /**
+     * Calculate the rebalancing of the system using the supplied list of
+     * joining weaver processes.
+     * 
+     * @param joiningMembers
+     *            - the list of weavers that are joining the process group
+     */
+    protected void rebalance(Node[] joiningMembers) {
+        this.joiningMembers = joiningMembers;
+
     }
 
     /**
@@ -632,9 +673,8 @@ public class Coordinator implements Member {
         fsm.replicatorsEstablished();
     }
 
-    protected void revertRebalancing() {
-        // TODO Auto-generated method stub
-
+    protected void replicatorsReady() {
+        fsm.replicatorsReady();
     }
 
     /**
@@ -676,17 +716,5 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
-    }
-
-    protected void connectReplicators() {
-        assert isLeader() : "Must be leader to coordinate replicator connect";
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Coordinating replicators connect on %s", id));
-        }
-        tally.set(0);
-        targetTally = allMembers.size();
-        switchboard.ringCast(new Message(id,
-                                         ReplicatorMessage.CONNECT_REPLICATORS),
-                             allMembers);
     }
 }

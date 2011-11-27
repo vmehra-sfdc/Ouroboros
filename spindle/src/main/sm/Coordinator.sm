@@ -45,7 +45,11 @@ Entry {
 }
 {
 	stabilize
-		Failover{}
+	   [ctxt.isLeader()]
+	   push(ControllerFSM::CoordinateFailover){}
+		
+    stabilize
+        Failover{}
 
 	destabilize
 		nil {}
@@ -56,11 +60,12 @@ Entry {
 
 Stable{}
 
-Failover
-Entry{
-	failover();
+Failover{
+    failedOver
+        EstablishReplicators{}
 }
-{
+
+EstablishReplicators{
 	coordinateReplicators
 		ReplicatorsEstablished/push(ControllerFSM::CoordinateReplicators) {}
 	
@@ -99,9 +104,6 @@ Entry {
 AwaitingTakeover {
 	commitTakeover
 		Stable{}
-        
-    takeoverComplete
-        Stable{}
 }
 
 Shutdown {
@@ -116,6 +118,15 @@ Default {
 %%
 %map ControllerFSM
 %%
+CoordinateFailover
+Entry{
+    coordinateFailover();
+}
+{
+    failedOver
+        pop(failedOver){}
+}
+
 CoordinateReplicators
 Entry{
 	coordinateReplicators();
@@ -162,11 +173,6 @@ Entry {
 	memberRebalanced
 		nil {}
 		
-	destabilize
-		pop(destabilize) {
-			revertRebalancing();
-		}
-		
 }
 
 CoordinateTakeover
@@ -176,17 +182,12 @@ Entry{
 {
 	memberTakeoverComplete
 		[ctxt.tallyComplete()]
-		pop(takeoverComplete) {
+		pop(commitTakeover) {
 			commitTakeover();
 		}
 		
 	memberTakeoverComplete
 		nil {}
-		
-	destabilize
-		pop(destabilize) {
-			revertRebalancing();
-		}
 }
 
 

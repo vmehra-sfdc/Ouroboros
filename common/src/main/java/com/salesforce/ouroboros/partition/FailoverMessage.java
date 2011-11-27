@@ -1,4 +1,3 @@
-%{
 /**
  * Copyright (c) 2011, salesforce.com, inc.
  * All rights reserved.
@@ -24,43 +23,23 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.ouroboros.partition;
+
+import java.io.Serializable;
+
+import com.salesforce.ouroboros.Node;
 
 /**
+ * 
  * @author hhildebrand
+ * 
  */
-%}
+public enum FailoverMessage implements MemberDispatch {
+    PREPARE, FAILOVER;
 
-// The FSM of the Coordinator for the Ouroboros producer
-
-%class Coordinator
-%package com.salesforce.ouroboros.producer
-
-%access public
-
-%start CoordinatorFSM::Unstable
-%map CoordinatorFSM
-%%
-Unstable{
-	stabilized
-		AwaitingFailover{}
-		
-	destabilized
-		nil{}
+    @Override
+    public void dispatch(Switchboard switchboard, Node sender,
+                         Serializable[] arguments, long time) {
+        switchboard.dispatchToMember(this, sender, arguments, time);
+    }
 }
-
-AwaitingFailover{
-    failedOver
-        Stable{}
-}
-
-Stable{}
-
-Default {
-	destabilized
-		Unstable{}
-}
-%%
-%map ControllerFSM
-%%
-Default{}
-%%
