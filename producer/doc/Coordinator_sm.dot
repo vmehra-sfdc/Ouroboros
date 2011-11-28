@@ -14,6 +14,9 @@ digraph Coordinator_sm {
         "CoordinatorFSM::Unstable"
             [label="{Unstable}"];
 
+        "CoordinatorFSM::AwaitingFailover"
+            [label="{AwaitingFailover}"];
+
         "CoordinatorFSM::Stable"
             [label="{Stable}"];
 
@@ -27,8 +30,11 @@ digraph Coordinator_sm {
         // Transitions (Edges)
         //
 
-        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Stable"
+        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::AwaitingFailover"
             [label="stabilized/\l"];
+
+        "CoordinatorFSM::AwaitingFailover" -> "CoordinatorFSM::Stable"
+            [label="failedOver/\l"];
 
         "CoordinatorFSM::DefaultState" -> "CoordinatorFSM::Unstable"
             [label="destabilized/\l"];

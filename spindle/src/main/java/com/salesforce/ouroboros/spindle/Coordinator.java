@@ -54,6 +54,7 @@ import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.RebalanceMessage;
+import com.salesforce.ouroboros.partition.FailoverMessage;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
@@ -83,7 +84,6 @@ public class Coordinator implements Member {
 
     private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     private static final String                 WEAVER_XEROX    = "Weaver Xerox";
-
     static final int                            DEFAULT_TIMEOUT = 1;
     static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
 
@@ -208,6 +208,31 @@ public class Coordinator implements Member {
     }
 
     @Override
+    public void dispatch(FailoverMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case PREPARE:
+                failover();
+                if (isLeader()) {
+                    switchboard.ringCast(new Message(sender,
+                                                     FailoverMessage.FAILOVER));
+                } else {
+                    switchboard.ringCast(new Message(sender,
+                                                     FailoverMessage.PREPARE),
+                                         activeMembers);
+                }
+                break;
+            case FAILOVER:
+                // do nothing
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Unknown failover message: %s",
+                                                              type));
+        }
+    }
+
+    @Override
     public void dispatch(GlobalMessageType type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
@@ -257,6 +282,15 @@ public class Coordinator implements Member {
     public void dispatch(ReplicatorMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
+            case READY_REPLICATORS:
+                if (isLeader()) {
+                    replicatorsReady();
+                } else {
+                    readyReplicators();
+                    switchboard.ringCast(new Message(sender, type, arguments),
+                                         allMembers);
+                }
+                break;
             case REPLICATORS_ESTABLISHED:
                 if (isLeader()) {
                     replicatorsEstablished(sender);
@@ -265,12 +299,17 @@ public class Coordinator implements Member {
                                          allMembers);
                 }
                 break;
-            case OPEN_REPLICATORS:
+            case CONNECT_REPLICATORS:
                 if (!isLeader()) {
                     switchboard.ringCast(new Message(sender, type, arguments),
                                          allMembers);
-                    openReplicators();
                 }
+                weaver.connectReplicators(yellowPages);
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Invalid replicator message: %s",
+                                                              type));
         }
     }
 
@@ -394,6 +433,27 @@ public class Coordinator implements Member {
 
     }
 
+    protected void connectReplicators() {
+        assert isLeader() : "Must be leader to coordinate replicator connect";
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Coordinating replicators connect on %s", id));
+        }
+        tally.set(0);
+        targetTally = allMembers.size();
+        switchboard.ringCast(new Message(id,
+                                         ReplicatorMessage.CONNECT_REPLICATORS),
+                             allMembers);
+    }
+
+    protected void coordinateFailover() {
+        assert isLeader() : "Must be leader to coordinate the rebalance";
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Coordinating weaver failover on %s", id));
+        }
+        switchboard.ringCast(new Message(id, FailoverMessage.PREPARE),
+                             activeMembers);
+    }
+
     /**
      * The receiver is the controller for the group. Coordinate the rebalancing
      * of the system by including the new members.
@@ -420,11 +480,8 @@ public class Coordinator implements Member {
             log.info(String.format("Coordinating establishment of the replicators on %s",
                                    id));
         }
-        tally.set(0);
-        targetTally = allMembers.size();
-        Message message = new Message(id, ReplicatorMessage.OPEN_REPLICATORS);
+        Message message = new Message(id, ReplicatorMessage.READY_REPLICATORS);
         switchboard.ringCast(message, allMembers);
-        openReplicators();
     }
 
     protected void coordinateTakeover() {
@@ -457,9 +514,7 @@ public class Coordinator implements Member {
         }
         weaver.failover(deadMembers);
         filterSystemMembership();
-        if (isLeader()) {
-            fsm.coordinateReplicators();
-        }
+        fsm.failedOver();
     }
 
     protected void filterSystemMembership() {
@@ -493,7 +548,7 @@ public class Coordinator implements Member {
      * @param controller
      *            - the controller for the group
      */
-    protected void openReplicators() {
+    protected void readyReplicators() {
         rendezvous = null;
 
         Runnable rendezvousAction = new Runnable() {
@@ -553,23 +608,13 @@ public class Coordinator implements Member {
                                                   rendezvous));
         }
         rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer);
+
+        fsm.replicatorsReady();
     }
 
     protected void rebalance() {
         calculateNextRing();
         rebalance(remap(), switchboard.getDeadMembers());
-    }
-
-    /**
-     * Calculate the rebalancing of the system using the supplied list of
-     * joining weaver processes.
-     * 
-     * @param joiningMembers
-     *            - the list of weavers that are joining the process group
-     */
-    protected void rebalance(Node[] joiningMembers) {
-        this.joiningMembers = joiningMembers;
-
     }
 
     /**
@@ -638,6 +683,18 @@ public class Coordinator implements Member {
     }
 
     /**
+     * Calculate the rebalancing of the system using the supplied list of
+     * joining weaver processes.
+     * 
+     * @param joiningMembers
+     *            - the list of weavers that are joining the process group
+     */
+    protected void rebalance(Node[] joiningMembers) {
+        this.joiningMembers = joiningMembers;
+
+    }
+
+    /**
      * Answer the remapped primary/mirror pairs using the nextRing
      * 
      * @return the remapping of channels hosted on this node that have changed
@@ -669,9 +726,8 @@ public class Coordinator implements Member {
         fsm.replicatorsEstablished();
     }
 
-    protected void revertRebalancing() {
-        // TODO Auto-generated method stub
-
+    protected void replicatorsReady() {
+        fsm.replicatorsReady();
     }
 
     /**

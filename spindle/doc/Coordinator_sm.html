@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=12>
+        <th colspan=13>
           Transition
         </th>
       </tr>
@@ -36,7 +36,7 @@
           destabilize
         </th>
         <th>
-          establishReplicators
+          failedOver
         </th>
         <th>
           rebalance
@@ -54,10 +54,13 @@
           replicatorsEstablishmentCancelled
         </th>
         <th>
-          stabilize
+          replicatorsEstablishmentTimeout
         </th>
         <th>
-          takeoverComplete
+          replicatorsReady
+        </th>
+        <th>
+          stabilize
         </th>
         <th>
           <b>Default</b>
@@ -101,12 +104,18 @@ cleanUp();
           </pre>
         </td>
         <td>
-          <pre>
-  EstablishReplicators
-  {}
-          </pre>
         </td>
         <td>
+        </td>
+        <td>
+          <pre>
+[ctxt.isLeader()]
+  push(CoordinatorFSM::Unstable)
+  {}
+
+  Failover
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -126,10 +135,47 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Failover
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
           <pre>
   EstablishReplicators
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -153,9 +199,6 @@ cleanUp();
           EstablishReplicators
         </td>
         <td>
-          <pre>
-failover();
-          </pre>
         </td>
         <td>
         </td>
@@ -163,9 +206,54 @@ failover();
         </td>
         <td>
           <pre>
-  push(CoordinatorFSM::EstablishReplicators)
+  push(ReplicatorsEstablished)
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  EstablishReplicators
+  {
+    destabilizePartition();
+  }
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReplicatorsReady
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReplicatorsReady
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -184,14 +272,20 @@ failover();
           </pre>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
-  EstablishReplicators
+  ReplicatorsReady
   {
     destabilizePartition();
   }
           </pre>
         </td>
         <td>
+          <pre>
+  ReplicatorsReady
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -223,6 +317,8 @@ failover();
   Rebalance
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -284,6 +380,8 @@ failover();
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -318,10 +416,8 @@ failover();
         <td>
         </td>
         <td>
-          <pre>
-  Stable
-  {}
-          </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -362,6 +458,8 @@ failover();
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
     </table>
     <p>
@@ -376,7 +474,7 @@ failover();
         <th colspan=2>
           Actions
         </th>
-        <th colspan=7>
+        <th colspan=9>
           Transition
         </th>
       </tr>
@@ -389,6 +487,9 @@ failover();
         </th>
         <th>
           destabilize
+        </th>
+        <th>
+          failedOver
         </th>
         <th>
           memberRebalanced
@@ -406,8 +507,45 @@ failover();
           replicatorsEstablished
         </th>
         <th>
+          replicatorsReady
+        </th>
+        <th>
           <b>Default</b>
         </th>
+      </tr>
+      <tr>
+        <td>
+          CoordinateFailover
+        </td>
+        <td>
+          <pre>
+    coordinateFailover();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  pop(failedOver)
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -421,10 +559,42 @@ failover();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
           <pre>
-  pop(destabilize)
+  ReplicatorsReady
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReplicatorsReady
+        </td>
+        <td>
+          <pre>
+    connectReplicators();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -440,9 +610,11 @@ failover();
   pop(replicatorsEstablished)
   {}
 
-  CoordinateReplicators
+  ReplicatorsReady
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -465,10 +637,14 @@ failover();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Rebalance
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -489,12 +665,8 @@ failover();
         <td>
         </td>
         <td>
-          <pre>
-  pop(destabilize)
-  {
-    revertRebalancing();
-  }
-          </pre>
+        </td>
+        <td>
         </td>
         <td>
           <pre>
@@ -515,6 +687,8 @@ failover();
   Rebalance
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -533,19 +707,15 @@ failover();
         <td>
         </td>
         <td>
-          <pre>
-  pop(destabilize)
-  {
-    revertRebalancing();
-  }
-          </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
         <td>
           <pre>
 [ctxt.tallyComplete()]
-  pop(takeoverComplete)
+  pop(commitTakeover)
   {
     commitTakeover();
   }
@@ -553,6 +723,8 @@ failover();
   CoordinateTakeover
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>

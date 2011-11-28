@@ -45,7 +45,11 @@ Entry {
 }
 {
 	stabilize
-		EstablishReplicators{}
+	   [ctxt.isLeader()]
+	   push(ControllerFSM::CoordinateFailover){}
+		
+    stabilize
+        Failover{}
 
 	destabilize
 		nil {}
@@ -54,26 +58,35 @@ Entry {
 		nil {}
 }
 
-Stable{
-    establishReplicators
+Stable{}
+
+Failover{
+    failedOver
         EstablishReplicators{}
 }
 
-EstablishReplicators
-Entry{
-	failover();
-}
-{
+EstablishReplicators{
 	coordinateReplicators
-		push(ControllerFSM::CoordinateReplicators) {}
-		
-	replicatorsEstablished
-		ReplicatorsEstablished{}
+		ReplicatorsEstablished/push(ControllerFSM::CoordinateReplicators) {}
 	
 	replicatorsEstablishmentCancelled
 		nil {
 			destabilizePartition();
 		}
+	replicatorsReady
+	   ReplicatorsReady{}
+}
+
+ReplicatorsReady {
+    replicatorsEstablished
+        ReplicatorsEstablished{}
+    
+    replicatorsEstablishmentTimeout
+        nil {
+            destabilizePartition();
+        }
+	replicatorsReady
+	   ReplicatorsReady{}
 }
 
 ReplicatorsEstablished{
@@ -92,19 +105,16 @@ Entry {
 {
 	rebalanced
 		AwaitingTakeover{}
-	
+		
 	rebalanceCancelled
-		nil {
-			destabilizePartition();
-		}
+        nil {
+            destabilizePartition();
+        }
 }
 
 AwaitingTakeover {
 	commitTakeover
 		Stable{}
-        
-    takeoverComplete
-        Stable{}
 }
 
 Shutdown {
@@ -119,20 +129,35 @@ Default {
 %%
 %map ControllerFSM
 %%
+CoordinateFailover
+Entry{
+    coordinateFailover();
+}
+{
+    failedOver
+        pop(failedOver){}
+}
+
 CoordinateReplicators
 Entry{
 	coordinateReplicators();
 }
 {
-	replicatorsEstablished
-		[ctxt.tallyComplete()]
-		pop(replicatorsEstablished) {}
-		
-	replicatorsEstablished
-		nil {}
-		
-	destabilize
-		pop(destabilize) {}
+	replicatorsReady
+	   ReplicatorsReady{}
+}
+
+ReplicatorsReady
+Entry {
+    connectReplicators();
+}
+{
+    replicatorsEstablished
+        [ctxt.tallyComplete()]
+        pop(replicatorsEstablished) {}
+        
+    replicatorsEstablished
+        nil {}
 }
 
 CoordinateRebalance
@@ -159,11 +184,6 @@ Entry {
 	memberRebalanced
 		nil {}
 		
-	destabilize
-		pop(destabilize) {
-			revertRebalancing();
-		}
-		
 }
 
 CoordinateTakeover
@@ -173,16 +193,16 @@ Entry{
 {
 	memberTakeoverComplete
 		[ctxt.tallyComplete()]
-		pop(takeoverComplete) {
+		pop(commitTakeover) {
 			commitTakeover();
 		}
 		
 	memberTakeoverComplete
 		nil {}
-		
-	destabilize
-		pop(destabilize) {
-			revertRebalancing();
-		}
+}
+
+Default { 
+    destabilize
+        pop(destabilize) {}
 }
 %%

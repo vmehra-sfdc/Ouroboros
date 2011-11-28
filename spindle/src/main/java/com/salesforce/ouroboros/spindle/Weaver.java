@@ -288,6 +288,29 @@ public class Weaver implements Bundle {
     }
 
     /**
+     * Connect the originating replicators using the yellow pages to determine
+     * endpoints
+     * 
+     * @param yellowPages
+     *            - the contact information for the nodes
+     */
+    public void connectReplicators(Map<Node, ContactInformation> yellowPages) {
+        for (Replicator replicator : replicators.values()) {
+            try {
+                if (replicator.willOriginate()) {
+                    replicator.connect(yellowPages, replicationHandler);
+                }
+            } catch (IOException e) {
+                if (log.isLoggable(Level.WARNING)) {
+                    log.log(Level.WARNING,
+                            String.format("Error connecting originating replicator from %s to %s",
+                                          id, replicator.getPartner()), e);
+                }
+            }
+        }
+    }
+
+    /**
      * Open a replicator to the node
      * 
      * @param node
@@ -299,26 +322,13 @@ public class Weaver implements Bundle {
      */
     public Replicator openReplicator(Node node, ContactInformation info,
                                      Rendezvous rendezvous) {
-        Replicator replicator = new Replicator(this, node, rendezvous);
+        boolean originator = thisEndInitiatesConnectionsTo(node);
+        Replicator replicator = new Replicator(this, node, originator,
+                                               rendezvous);
         Replicator previous = replicators.putIfAbsent(node, replicator);
         assert previous == null : String.format("Replicator already opend on weaver %s to weaver %s",
                                                 id, node);
-        if (thisEndInitiatesConnectionsTo(node)) {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Initiating replication connection from weaver %s to new weaver %s",
-                                       id, node));
-            }
-            try {
-                replicationHandler.connectTo(info.replication, replicator);
-            } catch (IOException e) {
-
-                // We be screwed.  Log this #fail and force a repartition event
-                String msg = String.format("Unable to connect to weaver: %s at replicator port: %s",
-                                           node, info);
-                log.log(Level.SEVERE, msg, e);
-                throw new IllegalStateException(msg, e);
-            }
-        } else {
+        if (!originator) {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Waiting for replication inbound connection to weaver %s from new weaver %s",
                                        id, node));
