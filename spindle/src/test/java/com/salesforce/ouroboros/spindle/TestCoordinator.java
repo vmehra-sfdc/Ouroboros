@@ -72,14 +72,18 @@ public class TestCoordinator {
                                                                                         0));
 
     @Test
-    public void testClose() {
+    public void testClose() throws Exception {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
         Switchboard switchboard = mock(Switchboard.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        Coordinator coordinator = new Coordinator(
+                                                  timer,
+                                                  switchboard,
+                                                  weaver,
+                                                  new CoordinatorConfiguration());
         Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -142,14 +146,18 @@ public class TestCoordinator {
     }
 
     @Test
-    public void testFailover() {
+    public void testFailover() throws Exception {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
         Switchboard switchboard = mock(Switchboard.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        Coordinator coordinator = new Coordinator(
+                                                  timer,
+                                                  switchboard,
+                                                  weaver,
+                                                  new CoordinatorConfiguration());
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -190,14 +198,18 @@ public class TestCoordinator {
     }
 
     @Test
-    public void testOpen() {
+    public void testOpen() throws Exception {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
         Switchboard switchboard = mock(Switchboard.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        Coordinator coordinator = new Coordinator(
+                                                  timer,
+                                                  switchboard,
+                                                  weaver,
+                                                  new CoordinatorConfiguration());
         Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -235,13 +247,17 @@ public class TestCoordinator {
     }
 
     @Test
-    public void testOpenReplicators() {
+    public void testOpenReplicators() throws Exception {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
         Switchboard switchboard = mock(Switchboard.class);
         when(weaver.getId()).thenReturn(new Node(0, 0, 0));
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        Coordinator coordinator = new Coordinator(
+                                                  timer,
+                                                  switchboard,
+                                                  weaver,
+                                                  new CoordinatorConfiguration());
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -282,14 +298,18 @@ public class TestCoordinator {
 
     @SuppressWarnings("unchecked")
     @Test
-    public void testRebalance() {
+    public void testRebalance() throws Exception {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
         Switchboard switchboard = mock(Switchboard.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        Coordinator coordinator = new Coordinator(
+                                                  timer,
+                                                  switchboard,
+                                                  weaver,
+                                                  new CoordinatorConfiguration());
         Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
@@ -331,23 +351,27 @@ public class TestCoordinator {
         Map<UUID, Node[][]> remapped = coordinator.remap();
         List<Node> deadMembers = Arrays.asList(removedPrimary, removedMirror);
         coordinator.rebalance(remapped, deadMembers);
-        verify(weaver).rebalance(isA(Map.class), eq(primary),
-                                 eq(remapped.get(primary)[0]),
+        verify(weaver).rebalance(isA(Map.class), isA(Rendezvous.class),
+                                 eq(primary), eq(remapped.get(primary)[0]),
                                  eq(remapped.get(primary)[1]), eq(deadMembers));
-        verify(weaver).rebalance(isA(Map.class), eq(mirror),
-                                 eq(remapped.get(mirror)[0]),
+        verify(weaver).rebalance(isA(Map.class), isA(Rendezvous.class),
+                                 eq(mirror), eq(remapped.get(mirror)[0]),
                                  eq(remapped.get(mirror)[1]), eq(deadMembers));
     }
 
     @Test
-    public void testRemap() {
+    public void testRemap() throws Exception {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
         Weaver weaver = mock(Weaver.class);
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
         Switchboard switchboard = mock(Switchboard.class);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        Coordinator coordinator = new Coordinator(
+                                                  timer,
+                                                  switchboard,
+                                                  weaver,
+                                                  new CoordinatorConfiguration());
         Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);

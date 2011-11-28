@@ -97,11 +97,6 @@ public class WeaverConfigation {
     private Executor                  spindles                 = Executors.newSingleThreadExecutor(threadFactory("spindle"));
     private final SocketOptions       spindleSocketOptions     = new SocketOptions();
     private String                    stateName                = DEFAULT_STATE_NAME;
-    private InetSocketAddress         xeroxAddress             = new InetSocketAddress(
-                                                                                       "127.0.0.1",
-                                                                                       0);
-    private Executor                  xeroxes                  = Executors.newSingleThreadExecutor(threadFactory("xerox"));
-    private final SocketOptions       xeroxSocketOptions       = new SocketOptions();
 
     public void addRoot(File directory) {
         addRoot(directory, 1);
@@ -202,24 +197,6 @@ public class WeaverConfigation {
         return stateName;
     }
 
-    public InetSocketAddress getXeroxAddress() {
-        return xeroxAddress;
-    }
-
-    /**
-     * @return the xeroxes
-     */
-    public Executor getXeroxes() {
-        return xeroxes;
-    }
-
-    /**
-     * @return the xeroxSocketOptions
-     */
-    public SocketOptions getXeroxSocketOptions() {
-        return xeroxSocketOptions;
-    }
-
     /**
      * @param id
      *            the id to set
@@ -298,22 +275,6 @@ public class WeaverConfigation {
      */
     public void setStateName(String stateName) {
         this.stateName = stateName;
-    }
-
-    /**
-     * @param xeroxAddress
-     *            the xeroxAddress to set
-     */
-    public void setXeroxAddress(InetSocketAddress xeroxAddress) {
-        this.xeroxAddress = xeroxAddress;
-    }
-
-    /**
-     * @param xeroxes
-     *            the xeroxes to set
-     */
-    public void setXeroxes(Executor xeroxes) {
-        this.xeroxes = xeroxes;
     }
 
     public void validate() {

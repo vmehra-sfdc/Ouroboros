@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=11>
+        <th colspan=12>
           Transition
         </th>
       </tr>
@@ -42,13 +42,16 @@
           rebalance
         </th>
         <th>
+          rebalanceCancelled
+        </th>
+        <th>
           rebalanced
         </th>
         <th>
           replicatorsEstablished
         </th>
         <th>
-          replicatorsEstablishmentTimeout
+          replicatorsEstablishmentCancelled
         </th>
         <th>
           stabilize
@@ -80,6 +83,8 @@ cleanUp();
   Unstable
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -140,6 +145,8 @@ cleanUp();
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -159,6 +166,8 @@ failover();
   push(CoordinatorFSM::EstablishReplicators)
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -227,6 +236,8 @@ failover();
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -248,6 +259,14 @@ failover();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+          <pre>
+  Rebalance
+  {
+    destabilizePartition();
+  }
+          </pre>
         </td>
         <td>
           <pre>
@@ -297,6 +316,8 @@ failover();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Stable
   {}
@@ -322,6 +343,8 @@ failover();
   Shutdown
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>

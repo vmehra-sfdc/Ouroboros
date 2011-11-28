@@ -50,7 +50,7 @@ Entry {
 	destabilize
 		nil {}
 		
-	replicatorsEstablishmentTimeout
+	replicatorsEstablishmentCancelled
 		nil {}
 }
 
@@ -70,7 +70,7 @@ Entry{
 	replicatorsEstablished
 		ReplicatorsEstablished{}
 	
-	replicatorsEstablishmentTimeout
+	replicatorsEstablishmentCancelled
 		nil {
 			destabilizePartition();
 		}
@@ -92,6 +92,11 @@ Entry {
 {
 	rebalanced
 		AwaitingTakeover{}
+	
+	rebalanceCancelled
+		nil {
+			destabilizePartition();
+		}
 }
 
 AwaitingTakeover {

@@ -233,7 +233,8 @@ public class TestProducerChannelBuffer {
             return new com.salesforce.ouroboros.spindle.Coordinator(
                                                                     timer(),
                                                                     switchboard(),
-                                                                    weaver());
+                                                                    weaver(),
+                                                                    new com.salesforce.ouroboros.spindle.CoordinatorConfiguration());
         }
 
         /* (non-Javadoc)
@@ -351,12 +352,13 @@ public class TestProducerChannelBuffer {
             }
         }, 30000, 200);
 
-        Util.waitFor("weaver did not establish replicators", new Util.Condition() {
-            @Override
-            public boolean value() {
-                return weaverSwitchboard.isStable();
-            }
-        }, 30000, 200);
+        Util.waitFor("weaver did not establish replicators",
+                     new Util.Condition() {
+                         @Override
+                         public boolean value() {
+                             return weaverSwitchboard.isStable();
+                         }
+                     }, 30000, 200);
 
         com.salesforce.ouroboros.producer.Coordinator producer = producerContext.getBean(com.salesforce.ouroboros.producer.Coordinator.class);
         com.salesforce.ouroboros.spindle.Coordinator weaver = weaverContext.getBean(com.salesforce.ouroboros.spindle.Coordinator.class);

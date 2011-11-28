@@ -49,7 +49,6 @@ import com.salesforce.ouroboros.spindle.WeaverConfigation.RootDirectory;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
-import com.salesforce.ouroboros.spindle.transfer.Sink;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
@@ -94,13 +93,6 @@ public class Weaver implements Bundle {
         }
     }
 
-    private class SinkFactory implements CommunicationsHandlerFactory {
-        @Override
-        public Sink createCommunicationsHandler(SocketChannel channel) {
-            return new Sink(Weaver.this);
-        }
-    }
-
     private class SpindleFactory implements CommunicationsHandlerFactory {
         @Override
         public Spindle createCommunicationsHandler(SocketChannel channel) {
@@ -111,7 +103,6 @@ public class Weaver implements Bundle {
     private static final Logger                     log               = Logger.getLogger(Weaver.class.getCanonicalName());
     private static final String                     WEAVER_REPLICATOR = "Weaver Replicator";
     private static final String                     WEAVER_SPINDLE    = "Weaver Spindle";
-    private static final String                     WEAVER_XEROX      = "Weaver Xerox";
     static final int                                HANDSHAKE_SIZE    = Node.BYTE_LENGTH + 4;
     static final int                                MAGIC             = 0x1638;
 
@@ -125,7 +116,6 @@ public class Weaver implements Bundle {
     private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
     private final ConsistentHashFunction<File>      roots             = new ConsistentHashFunction<File>();
     private final ServerSocketChannelHandler        spindleHandler;
-    private final ServerSocketChannelHandler        xeroxHandler;
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
@@ -146,13 +136,6 @@ public class Weaver implements Bundle {
             }
         }
         maxSegmentSize = configuration.getMaxSegmentSize();
-
-        xeroxHandler = new ServerSocketChannelHandler(
-                                                      WEAVER_XEROX,
-                                                      configuration.getXeroxSocketOptions(),
-                                                      configuration.getXeroxAddress(),
-                                                      configuration.getXeroxes(),
-                                                      new SinkFactory());
         replicationHandler = new ServerSocketChannelHandler(
                                                             WEAVER_REPLICATOR,
                                                             configuration.getReplicationSocketOptions(),
@@ -352,6 +335,7 @@ public class Weaver implements Bundle {
      * 
      * @param xeroxes
      *            - the map of Nodes to Xeroxes
+     * @param rendezvous
      * 
      * @param channel
      *            - the id of the channel to rebalance
@@ -359,9 +343,9 @@ public class Weaver implements Bundle {
      *            - the pair of nodes that are the new primary/mirror
      *            responsible for the channel
      */
-    public void rebalance(Map<Node, Xerox> xeroxes, UUID channel,
-                          Node[] originalPair, Node[] remappedPair,
-                          Collection<Node> deadMembers) {
+    public void rebalance(Map<Node, Xerox> xeroxes, Rendezvous rendezvous,
+                          UUID channel, Node[] originalPair,
+                          Node[] remappedPair, Collection<Node> deadMembers) {
         EventChannel eventChannel = channels.get(channel);
         assert eventChannel != null : String.format("The event channel to rebalance does not exist: %s",
                                                     channel);
@@ -373,7 +357,7 @@ public class Weaver implements Bundle {
                     // Xerox state to the new mirror
                     Xerox xerox = xeroxes.get(remappedPair[1]);
                     if (xerox == null) {
-                        xerox = new Xerox(remappedPair[1]);
+                        xerox = new Xerox(remappedPair[1], rendezvous);
                         xeroxes.put(remappedPair[1], xerox);
                     }
                     xerox.addChannel(eventChannel);
@@ -382,14 +366,14 @@ public class Weaver implements Bundle {
                 // Xerox state to new primary and mirror
                 Xerox xerox = xeroxes.get(remappedPair[0]);
                 if (xerox == null) {
-                    xerox = new Xerox(remappedPair[0]);
+                    xerox = new Xerox(remappedPair[0], rendezvous);
                     xeroxes.put(remappedPair[0], xerox);
                 }
                 xerox.addChannel(eventChannel);
 
                 xerox = xeroxes.get(remappedPair[1]);
                 if (xerox == null) {
-                    xerox = new Xerox(remappedPair[1]);
+                    xerox = new Xerox(remappedPair[1], rendezvous);
                     xeroxes.put(remappedPair[1], xerox);
                 }
                 xerox.addChannel(eventChannel);
@@ -400,7 +384,7 @@ public class Weaver implements Bundle {
                 // Xerox state to the new primary
                 Xerox xerox = xeroxes.get(remappedPair[0]);
                 if (xerox == null) {
-                    xerox = new Xerox(remappedPair[0]);
+                    xerox = new Xerox(remappedPair[0], rendezvous);
                     xeroxes.put(remappedPair[0], xerox);
                 }
                 xerox.addChannel(eventChannel);
@@ -417,7 +401,7 @@ public class Weaver implements Bundle {
                 // Xerox state to the new primary
                 Xerox xerox = xeroxes.get(remappedPair[0]);
                 if (xerox == null) {
-                    xerox = new Xerox(remappedPair[0]);
+                    xerox = new Xerox(remappedPair[0], rendezvous);
                     xeroxes.put(remappedPair[0], xerox);
                 }
                 xerox.addChannel(eventChannel);
@@ -426,14 +410,14 @@ public class Weaver implements Bundle {
             // Xerox state to the new primary and mirror
             Xerox xerox = xeroxes.get(remappedPair[0]);
             if (xerox == null) {
-                xerox = new Xerox(remappedPair[0]);
+                xerox = new Xerox(remappedPair[0], rendezvous);
                 xeroxes.put(remappedPair[0], xerox);
             }
             xerox.addChannel(eventChannel);
 
             xerox = xeroxes.get(remappedPair[1]);
             if (xerox == null) {
-                xerox = new Xerox(remappedPair[1]);
+                xerox = new Xerox(remappedPair[1], rendezvous);
                 xeroxes.put(remappedPair[1], xerox);
             }
             xerox.addChannel(eventChannel);
@@ -446,7 +430,7 @@ public class Weaver implements Bundle {
 
             Xerox xerox = xeroxes.get(remappedPair[1]);
             if (xerox == null) {
-                xerox = new Xerox(remappedPair[1]);
+                xerox = new Xerox(remappedPair[1], rendezvous);
                 xeroxes.put(remappedPair[1], xerox);
             }
             xerox.addChannel(eventChannel);
@@ -464,7 +448,6 @@ public class Weaver implements Bundle {
     public void start() {
         spindleHandler.start();
         replicationHandler.start();
-        xeroxHandler.start();
     }
 
     /**
@@ -473,7 +456,6 @@ public class Weaver implements Bundle {
     public void terminate() {
         spindleHandler.terminate();
         replicationHandler.terminate();
-        xeroxHandler.terminate();
     }
 
     @Override

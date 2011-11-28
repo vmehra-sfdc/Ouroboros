@@ -27,7 +27,9 @@ package com.salesforce.ouroboros.spindle;
 
 import static com.salesforce.ouroboros.util.Utils.point;
 
+import java.io.IOException;
 import java.io.Serializable;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -46,6 +48,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.hellblazer.pinkie.CommunicationsHandlerFactory;
+import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
@@ -57,6 +61,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
+import com.salesforce.ouroboros.spindle.transfer.Sink;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
 import com.salesforce.ouroboros.util.Association;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
@@ -69,7 +74,16 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * 
  */
 public class Coordinator implements Member {
+    private class SinkFactory implements CommunicationsHandlerFactory {
+        @Override
+        public Sink createCommunicationsHandler(SocketChannel channel) {
+            return new Sink(weaver);
+        }
+    }
+
     private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
+    private static final String                 WEAVER_XEROX    = "Weaver Xerox";
+
     static final int                            DEFAULT_TIMEOUT = 1;
     static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
 
@@ -90,10 +104,12 @@ public class Coordinator implements Member {
     private final ScheduledExecutorService      timer;
     private final Weaver                        weaver;
     private ConsistentHashFunction<Node>        weaverRing      = new ConsistentHashFunction<Node>();
+    private final ServerSocketChannelHandler    xeroxHandler;
     private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
-                       Weaver weaver) {
+                       Weaver weaver, CoordinatorConfiguration configuration)
+                                                                             throws IOException {
         this.timer = timer;
         this.switchboard = switchboard;
         this.weaver = weaver;
@@ -101,6 +117,12 @@ public class Coordinator implements Member {
         weaver.setCoordinator(this);
         id = weaver.getId();
         yellowPages.put(id, weaver.getContactInformation());
+        xeroxHandler = new ServerSocketChannelHandler(
+                                                      WEAVER_XEROX,
+                                                      configuration.getXeroxSocketOptions(),
+                                                      configuration.getXeroxAddress(),
+                                                      configuration.getXeroxes(),
+                                                      new SinkFactory());
     }
 
     @Override
@@ -516,7 +538,7 @@ public class Coordinator implements Member {
                         replicator.close();
                     }
                 }
-                fsm.replicatorsEstablishmentTimeout();
+                fsm.replicatorsEstablishmentCancelled();
             }
         };
         if (log.isLoggable(Level.INFO)) {
@@ -561,25 +583,57 @@ public class Coordinator implements Member {
      */
     protected void rebalance(Map<UUID, Node[][]> remapped,
                              Collection<Node> deadMembers) {
-        @SuppressWarnings("unused")
+        final Map<Node, Xerox> xeroxes = new HashMap<Node, Xerox>();
+
         Runnable rendezvousAction = new Runnable() {
             @Override
             public void run() {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Weavers rebalanced on %s", id));
                 }
+                for (Xerox xerox : xeroxes.values()) {
+                    xerox.close();
+                }
                 fsm.rebalanced();
             }
         };
+
+        Runnable cancellationAction = new Runnable() {
+            @Override
+            public void run() {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Weaver rebalancing cancelled on %s",
+                                           id));
+                }
+                for (Xerox xerox : xeroxes.values()) {
+                    xerox.close();
+                }
+                fsm.rebalanceCancelled();
+            }
+        };
+
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Establishment of replicators initiated on %s",
                                    id));
         }
-        Map<Node, Xerox> xeroxes = new HashMap<Node, Xerox>();
+
+        rendezvous = new Rendezvous(xeroxes.size(), rendezvousAction,
+                                    cancellationAction);
 
         for (Entry<UUID, Node[][]> entry : remapped.entrySet()) {
-            weaver.rebalance(xeroxes, entry.getKey(), entry.getValue()[0],
-                             entry.getValue()[1], deadMembers);
+            weaver.rebalance(xeroxes, rendezvous, entry.getKey(),
+                             entry.getValue()[0], entry.getValue()[1],
+                             deadMembers);
+        }
+
+        for (Map.Entry<Node, Xerox> entry : xeroxes.entrySet()) {
+            try {
+                xeroxHandler.connectTo(yellowPages.get(entry.getKey()).xerox,
+                                       entry.getValue());
+            } catch (IOException e) {
+                cancellationAction.run();
+                return;
+            }
         }
     }
 
@@ -659,5 +713,13 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
+    }
+
+    public void start() {
+        xeroxHandler.start();
+    }
+
+    public void terminate() {
+        xeroxHandler.terminate();
     }
 }

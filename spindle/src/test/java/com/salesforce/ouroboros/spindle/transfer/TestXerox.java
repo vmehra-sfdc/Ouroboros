@@ -118,9 +118,8 @@ public class TestXerox {
         when(channel.getId()).thenReturn(id);
 
         int transferSize = 1024;
-        Xerox xerox = new Xerox(node, transferSize);
+        Xerox xerox = new Xerox(node, transferSize, rendezvous);
         xerox.addChannel(channel);
-        xerox.setRendezvous(rendezvous);
         assertEquals(XeroxFSM.Suspended, xerox.getState());
         xerox.connect(handler);
         assertEquals(XeroxFSM.WriteChannelHeader, xerox.getState());
