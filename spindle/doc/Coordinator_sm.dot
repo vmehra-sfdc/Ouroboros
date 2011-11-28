@@ -47,7 +47,7 @@ digraph Coordinator_sm {
         "CoordinatorFSM::AwaitingTakeover::ControllerFSM"
             [label="{ControllerFSM|O-O\r}"]
 
-        "CoordinatorFSM::Unstable::ControllerFSM"
+        "CoordinatorFSM::Failover::ControllerFSM"
             [label="{ControllerFSM|O-O\r}"]
 
         "%start"
@@ -57,7 +57,7 @@ digraph Coordinator_sm {
         // Transitions (Edges)
         //
 
-        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Unstable::ControllerFSM"
+        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Failover::ControllerFSM"
             [label="stabilize/\lpush(ControllerFSM::CoordinateFailover)\l"];
 
         "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Failover"
@@ -99,7 +99,7 @@ digraph Coordinator_sm {
         "CoordinatorFSM::AwaitingTakeover::ControllerFSM" -> "CoordinatorFSM::AwaitingTakeover"
             [label="pop/"]
 
-        "CoordinatorFSM::Unstable::ControllerFSM" -> "CoordinatorFSM::Unstable"
+        "CoordinatorFSM::Failover::ControllerFSM" -> "CoordinatorFSM::Failover"
             [label="pop/"]
 
         "%start" -> "CoordinatorFSM::Unstable"

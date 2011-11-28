@@ -46,7 +46,7 @@ Entry {
 {
 	stabilize
 	   [ctxt.isLeader()]
-	   push(ControllerFSM::CoordinateFailover){}
+	   Failover/push(ControllerFSM::CoordinateFailover){}
 		
     stabilize
         Failover{}

@@ -110,7 +110,7 @@ cleanUp();
         <td>
           <pre>
 [ctxt.isLeader()]
-  push(CoordinatorFSM::Unstable)
+  Failover/push(CoordinatorFSM::Unstable)
   {}
 
   Failover
@@ -206,7 +206,7 @@ cleanUp();
         </td>
         <td>
           <pre>
-  push(ReplicatorsEstablished)
+  ReplicatorsEstablished/push(CoordinatorFSM::EstablishReplicators)
   {}
           </pre>
         </td>
@@ -311,7 +311,7 @@ cleanUp();
         <td>
           <pre>
 [ctxt.isLeader()]
-  push(AwaitingTakeover)
+  AwaitingTakeover/push(CoordinatorFSM::ReplicatorsEstablished)
   {}
 
   Rebalance
