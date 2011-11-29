@@ -53,6 +53,7 @@ import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.RebalanceMessage;
 import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardState;
+import com.salesforce.ouroboros.util.Gate;
 
 /**
  * The common high level distribute coordination logic for Ouroboros group
@@ -101,6 +102,13 @@ public class Switchboard {
         public void objectNotification(final Object obj, final int sender,
                                        final long time) {
             if (obj instanceof Message) {
+                if (!stable.get()) {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Partition is not stable, ignoring inbound %s on: %s",
+                                               obj, self));
+                    }
+                    return;
+                }
                 try {
                     messageProcessor.execute(new Runnable() {
                         @Override
@@ -138,9 +146,11 @@ public class Switchboard {
     private final Node                  self;
     private final AtomicBoolean         stable          = new AtomicBoolean(
                                                                             false);
+    private final Gate                  inboundGate     = new Gate();
     private NodeIdSet                   view;
 
     public Switchboard(Node node, Partition p) {
+        inboundGate.close();
         self = node;
         partition = p;
         messageProcessor = Executors.newSingleThreadExecutor(new ThreadFactory() {
@@ -319,11 +329,9 @@ public class Switchboard {
 
     private void processMessage(final Message message, int sender,
                                 final long time) {
-        if (!stable.get()) {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Partition is not stable, ignoring inbound %s on: %s",
-                                       message, self));
-            }
+        try {
+            inboundGate.await();
+        } catch (InterruptedException e) {
             return;
         }
         if (log.isLoggable(Level.FINEST)) {
@@ -410,6 +418,7 @@ public class Switchboard {
         }
         previousMembers.clear();
         stable.set(true);
+        inboundGate.open();
     }
 
     protected void stabilized() {
@@ -434,6 +443,7 @@ public class Switchboard {
      *            - the leader
      */
     void destabilize(View view, int leader) {
+        inboundGate.close();
         stable.set(false);
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Destabilizing partition on: %s, view: %s, leader: %s",
