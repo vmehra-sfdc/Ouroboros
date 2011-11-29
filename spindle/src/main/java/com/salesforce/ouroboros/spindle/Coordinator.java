@@ -342,10 +342,49 @@ public class Coordinator implements Member {
     }
 
     /**
+     * Initiate the bootstrapping of the weaver ring.
+     */
+    public void initiateBootstrap(Node[] joiningMembers) {
+        if (!isLeader() || active) {
+            throw new IllegalStateException(
+                                            "This node must be inactive and the leader to initiate rebalancing");
+        }
+        if (activeMembers.size() != 0) {
+            throw new IllegalStateException(
+                                            "There must be no active members in the partition");
+        }
+        if (joiningMembers == null) {
+            throw new IllegalArgumentException(
+                                               "joining members must not be null");
+        }
+        for (Node node : joiningMembers) {
+            if (!inactiveMembers.contains(node)) {
+                throw new IllegalArgumentException(
+                                                   "Joining members must be inactive");
+            }
+        }
+        fsm.bootstrapSystem(joiningMembers);
+    }
+
+    /**
      * Initiate the rebalancing of the weaver ring.
      */
-    public void initiateRebalance() {
-        fsm.rebalance();
+    public void initiateRebalance(Node[] joiningMembers) {
+        if (!isLeader() || !active) {
+            throw new IllegalStateException(
+                                            "This node must be active and the leader to initiate rebalancing");
+        }
+        if (joiningMembers == null) {
+            throw new IllegalArgumentException(
+                                               "joining members must not be null");
+        }
+        for (Node node : joiningMembers) {
+            if (!inactiveMembers.contains(node)) {
+                throw new IllegalArgumentException(
+                                                   "Joining members must be inactive");
+            }
+        }
+        fsm.rebalance(joiningMembers);
     }
 
     /**
@@ -817,6 +856,11 @@ public class Coordinator implements Member {
      */
     Rendezvous getRendezvous() {
         return rendezvous;
+    }
+
+    void setJoiningMembers(Node[] joiningMembers) {
+        assert joiningMembers != null : "joining members must not be null";
+        this.joiningMembers = joiningMembers;
     }
 
     /**

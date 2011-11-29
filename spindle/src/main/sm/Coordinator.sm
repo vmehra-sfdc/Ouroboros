@@ -34,6 +34,7 @@
 
 %class Coordinator
 %package com.salesforce.ouroboros.spindle
+%import com.salesforce.ouroboros.Node
 %access public
 
 %start CoordinatorFSM::Unstable
@@ -103,9 +104,11 @@ ReplicatorsReady {
 }
 
 ReplicatorsEstablished{
-    rebalance
+    rebalance(joiningMembers: Node[])
         [ctxt.isLeader()]
-        AwaitingTakeover/push(ControllerFSM::CoordinateRebalance) {}
+        AwaitingTakeover/push(ControllerFSM::CoordinateRebalance) {
+        	setJoiningMembers(joiningMembers);
+        }
     
     rebalance
         Rebalance{}
@@ -143,8 +146,10 @@ Default {
 %map ControllerFSM
 %%
 Bootstrap {
-	bootstrapSystem
-		CoordinateBootstrap{}
+	bootstrapSystem(joiningMembers: Node[])
+		CoordinateBootstrap{
+			setJoiningMembers(joiningMembers);
+		}
 }
 
 CoordinateBootstrap

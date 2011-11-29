@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=14>
+        <th colspan=15>
           Transition
         </th>
       </tr>
@@ -43,6 +43,11 @@
         </th>
         <th>
           rebalance
+        </th>
+        <th>
+          rebalance
+          <br>
+          (Node[])
         </th>
         <th>
           rebalanceCancelled
@@ -91,6 +96,8 @@ cleanUp();
   Unstable
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -169,6 +176,8 @@ cleanUp();
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -183,6 +192,8 @@ cleanUp();
   Stable
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -251,6 +262,8 @@ cleanUp();
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -269,6 +282,8 @@ cleanUp();
   ReplicatorsEstablished/push(CoordinatorFSM::EstablishReplicators)
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -306,6 +321,8 @@ cleanUp();
       <tr>
         <td>
           ReplicatorsReady
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -374,12 +391,17 @@ cleanUp();
         </td>
         <td>
           <pre>
-[ctxt.isLeader()]
-  AwaitingTakeover/push(CoordinatorFSM::ReplicatorsEstablished)
-  {}
-
   Rebalance
   {}
+          </pre>
+        </td>
+        <td>
+          <pre>
+[ctxt.isLeader()]
+  AwaitingTakeover/push(CoordinatorFSM::ReplicatorsEstablished)
+  {
+    setJoiningMembers(joiningMembers);
+  }
           </pre>
         </td>
         <td>
@@ -407,6 +429,8 @@ cleanUp();
           <pre>
     rebalance();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -489,6 +513,8 @@ cleanUp();
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -509,6 +535,8 @@ cleanUp();
   Shutdown
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -557,6 +585,8 @@ cleanUp();
         </th>
         <th>
           bootstrapSystem
+          <br>
+          (Node[])
         </th>
         <th>
           bootstrapped
@@ -600,7 +630,9 @@ cleanUp();
         <td>
           <pre>
   CoordinateBootstrap
-  {}
+  {
+    setJoiningMembers(joiningMembers);
+  }
           </pre>
         </td>
         <td>
