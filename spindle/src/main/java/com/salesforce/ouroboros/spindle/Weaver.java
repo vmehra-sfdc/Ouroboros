@@ -169,6 +169,29 @@ public class Weaver implements Bundle {
         }
     }
 
+    /**
+     * Connect the originating replicators using the yellow pages to determine
+     * endpoints
+     * 
+     * @param yellowPages
+     *            - the contact information for the nodes
+     */
+    public void connectReplicators(Map<Node, ContactInformation> yellowPages) {
+        for (Replicator replicator : replicators.values()) {
+            try {
+                if (replicator.willOriginate()) {
+                    replicator.connect(yellowPages, replicationHandler);
+                }
+            } catch (IOException e) {
+                if (log.isLoggable(Level.WARNING)) {
+                    log.log(Level.WARNING,
+                            String.format("Error connecting originating replicator from %s to %s",
+                                          id, replicator.getPartner()), e);
+                }
+            }
+        }
+    }
+
     @Override
     public EventChannel createEventChannelFor(UUID channel) {
         // This node is the primary for the event channel
@@ -285,29 +308,6 @@ public class Weaver implements Bundle {
                                            maxSegmentSize,
                                            replicators.get(mirror));
         channels.putIfAbsent(channel, ec);
-    }
-
-    /**
-     * Connect the originating replicators using the yellow pages to determine
-     * endpoints
-     * 
-     * @param yellowPages
-     *            - the contact information for the nodes
-     */
-    public void connectReplicators(Map<Node, ContactInformation> yellowPages) {
-        for (Replicator replicator : replicators.values()) {
-            try {
-                if (replicator.willOriginate()) {
-                    replicator.connect(yellowPages, replicationHandler);
-                }
-            } catch (IOException e) {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.log(Level.WARNING,
-                            String.format("Error connecting originating replicator from %s to %s",
-                                          id, replicator.getPartner()), e);
-                }
-            }
-        }
     }
 
     /**

@@ -262,15 +262,30 @@ public class Coordinator implements Member {
     public void dispatch(RebalanceMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
-            case PREPARE_FOR_REBALANCE:
+            case BOOTSTRAP:
+                bootstrap((Node[]) arguments);
                 if (!isLeader()) {
-                    rebalance((Node[]) arguments);
+                    switchboard.ringCast(new Message(sender, type, arguments));
+                }
+                fsm.bootstrapped();
+                break;
+            case PREPARE_FOR_REBALANCE:
+                rebalance((Node[]) arguments);
+                if (!isLeader()) {
+                    switchboard.ringCast(new Message(sender, type, arguments));
                 }
                 fsm.rebalance();
                 break;
             case INITIATE_REBALANCE:
+                if (!isLeader()) {
+                    switchboard.ringCast(new Message(sender, type));
+                }
                 break;
             case REBALANCE_COMPLETE:
+                rebalanced();
+                if (!isLeader()) {
+                    switchboard.ringCast(new Message(sender, type));
+                }
                 break;
             default:
                 throw new IllegalStateException(
@@ -393,6 +408,23 @@ public class Coordinator implements Member {
         fsm.stabilize();
     }
 
+    public void start() {
+        xeroxHandler.start();
+    }
+
+    public void terminate() {
+        xeroxHandler.terminate();
+    }
+
+    protected void bootstrap(Node[] bootsrappingMembers) {
+        active = true;
+        for (Node node : bootsrappingMembers) {
+            activeMembers.add(node);
+            inactiveMembers.remove(node);
+            weaverRing.add(node, node.capacity);
+        }
+    }
+
     /**
      * Calculate the next ring based on the current member set and the new
      * member set
@@ -413,6 +445,9 @@ public class Coordinator implements Member {
             rendezvous.cancel();
             rendezvous = null;
         }
+        nextRing = null;
+        tally.set(0);
+        joiningMembers = new Node[0];
     }
 
     /**
@@ -443,6 +478,14 @@ public class Coordinator implements Member {
         switchboard.ringCast(new Message(id,
                                          ReplicatorMessage.CONNECT_REPLICATORS),
                              allMembers);
+    }
+
+    protected void coordinateBootstrap() {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Coordinating bootstrap on %s", id));
+        }
+        switchboard.ringCast(new Message(id, RebalanceMessage.BOOTSTRAP,
+                                         (Serializable) joiningMembers));
     }
 
     protected void coordinateFailover() {
@@ -486,8 +529,10 @@ public class Coordinator implements Member {
 
     protected void coordinateTakeover() {
         assert isLeader() : "Must be leader to coordinate the takeover";
-        // TODO Auto-generated method stub
-        tally.set(0);
+        rendezvous = null;
+        switchboard.ringCast(new Message(id,
+                                         RebalanceMessage.REBALANCE_COMPLETE),
+                             allMembers);
     }
 
     /**
@@ -613,7 +658,6 @@ public class Coordinator implements Member {
     }
 
     protected void rebalance() {
-        calculateNextRing();
         rebalance(remap(), switchboard.getDeadMembers());
     }
 
@@ -691,7 +735,21 @@ public class Coordinator implements Member {
      */
     protected void rebalance(Node[] joiningMembers) {
         this.joiningMembers = joiningMembers;
+        calculateNextRing();
+    }
 
+    /**
+     * The weaver cluster has been rebalanced. Switch over to the new membership
+     * and commit the takeover
+     */
+    protected void rebalanced() {
+        for (Node node : joiningMembers) {
+            activeMembers.add(node);
+            inactiveMembers.remove(node);
+        }
+        weaverRing = nextRing;
+        active = true;
+        fsm.commitTakeover();
     }
 
     /**
@@ -769,13 +827,5 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
-    }
-
-    public void start() {
-        xeroxHandler.start();
-    }
-
-    public void terminate() {
-        xeroxHandler.terminate();
     }
 }

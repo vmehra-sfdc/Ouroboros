@@ -317,6 +317,73 @@ public class Switchboard {
         partition.deregister(notification);
     }
 
+    private void processMessage(final Message message, int sender,
+                                final long time) {
+        if (!stable.get()) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Partition is not stable, ignoring inbound %s on: %s",
+                                       message, self));
+            }
+            return;
+        }
+        if (log.isLoggable(Level.FINEST)) {
+            log.finest(String.format("Processing inbound %s on: %s", message,
+                                     self));
+        }
+        message.type.dispatch(Switchboard.this, message.sender,
+                              message.arguments, time);
+    }
+
+    /**
+     * Send a message to a specific node
+     * 
+     * @param msg
+     *            - the message to send
+     * @param node
+     *            - the process id of the receiver of the message
+     */
+    private void send(final Message msg, final int node) {
+        if (!stable.get()) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Partition is unstable, not sending message %s to %s",
+                                       msg, node));
+            }
+            return;
+        }
+        if (node == self.processId) {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Sending %s to self", msg));
+            }
+            try {
+                messageProcessor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        processMessage(msg, self.processId,
+                                       System.currentTimeMillis());
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                if (log.isLoggable(Level.FINEST)) {
+                    log.finest(String.format("rejecting message %s due to shutdown on %s",
+                                             msg, self));
+                }
+            }
+            return;
+        }
+        MessageConnection connection = partition.connect(node);
+        if (connection == null) {
+            if (log.isLoggable(Level.WARNING)) {
+                log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
+                                          msg, node, self));
+            }
+        } else {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Sending %s to %s", msg, node));
+            }
+            connection.sendObject(msg);
+        }
+    }
+
     protected void advertise() {
         member.advertise();
     }
@@ -456,73 +523,6 @@ public class Switchboard {
             fsm.stabilized(view, leaderNode);
         } else {
             fsm.destabilize(view, leaderNode);
-        }
-    }
-
-    private void processMessage(final Message message, int sender,
-                                final long time) {
-        if (!stable.get()) {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Partition is not stable, ignoring inbound %s on: %s",
-                                       message, self));
-            }
-            return;
-        }
-        if (log.isLoggable(Level.FINEST)) {
-            log.finest(String.format("Processing inbound %s on: %s", message,
-                                     self));
-        }
-        message.type.dispatch(Switchboard.this, message.sender,
-                              message.arguments, time);
-    }
-
-    /**
-     * Send a message to a specific node
-     * 
-     * @param msg
-     *            - the message to send
-     * @param node
-     *            - the process id of the receiver of the message
-     */
-    private void send(final Message msg, final int node) {
-        if (!stable.get()) {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Partition is unstable, not sending message %s to %s",
-                                       msg, node));
-            }
-            return;
-        }
-        if (node == self.processId) {
-            if (log.isLoggable(Level.FINE)) {
-                log.fine(String.format("Sending %s to self", msg));
-            }
-            try {
-                messageProcessor.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        processMessage(msg, self.processId,
-                                       System.currentTimeMillis());
-                    }
-                });
-            } catch (RejectedExecutionException e) {
-                if (log.isLoggable(Level.FINEST)) {
-                    log.finest(String.format("rejecting message %s due to shutdown on %s",
-                                             msg, self));
-                }
-            }
-            return;
-        }
-        MessageConnection connection = partition.connect(node);
-        if (connection == null) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
-                                          msg, node, self));
-            }
-        } else {
-            if (log.isLoggable(Level.FINE)) {
-                log.fine(String.format("Sending %s to %s", msg, node));
-            }
-            connection.sendObject(msg);
         }
     }
 }

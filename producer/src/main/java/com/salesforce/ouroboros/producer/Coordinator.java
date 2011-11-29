@@ -484,80 +484,6 @@ public class Coordinator implements Member {
         spinnerHandler.terminate();
     }
 
-    protected void closePublishingGate() throws InterruptedException {
-        publishGate.close();
-        // Wait until all publishing threads are finished
-        while (publishingThreads.get() != 0) {
-            Thread.sleep(1);
-        }
-    }
-
-    /**
-     * Create the spinners to the new set of weavers in the partition.
-     */
-    protected void createSpinners() {
-        for (Node n : inactiveWeavers) {
-            ContactInformation info = yellowPages.get(n);
-            assert info != null : String.format("Did not find any connection information for node %s",
-                                                n);
-            Spinner spinner = new Spinner(this);
-            try {
-                spinnerHandler.connectTo(info.spindle, spinner);
-            } catch (IOException e) {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.log(Level.WARNING,
-                            String.format("Cannot connect to spindle on node %s at address %s",
-                                          n, info.spindle), e);
-                }
-            }
-            spinners.put(n, spinner);
-        }
-    }
-
-    /**
-     * Failover the process, assuming primary role for any failed primaries this
-     * process is serving as the mirror
-     */
-    protected void failover() {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Initiating failover on %s", self));
-        }
-        Map<UUID, Long> newPrimaries;
-        try {
-            newPrimaries = failover(switchboard.getDeadMembers());
-        } catch (InterruptedException e) {
-            return;
-        }
-        if (newPrimaries.size() != 0) {
-            source.assumePrimary(newPrimaries);
-        }
-        filterSystemMembership();
-        createSpinners();
-        fsm.failedOver();
-    }
-
-    protected boolean isActive() {
-        return active;
-    }
-
-    /**
-     * Answer true if the receiver is the leader of the group
-     * 
-     * @return
-     */
-    protected boolean isLeader() {
-        if (active) {
-            return activeMembers.size() == 0 ? true
-                                            : activeMembers.last().equals(self);
-        }
-        return inactiveMembers.size() == 0 ? true
-                                          : inactiveMembers.last().equals(self);
-    }
-
-    protected void openPublishingGate() {
-        publishGate.open();
-    }
-
     /**
      * Perform the failover for this node. Failover to the channel mirrors and
      * assume primary producer responsibility for channels this node was
@@ -707,5 +633,79 @@ public class Coordinator implements Member {
             }
             channelState.putIfAbsent(channel, new ChannelState(spinner, -1));
         }
+    }
+
+    protected void closePublishingGate() throws InterruptedException {
+        publishGate.close();
+        // Wait until all publishing threads are finished
+        while (publishingThreads.get() != 0) {
+            Thread.sleep(1);
+        }
+    }
+
+    /**
+     * Create the spinners to the new set of weavers in the partition.
+     */
+    protected void createSpinners() {
+        for (Node n : inactiveWeavers) {
+            ContactInformation info = yellowPages.get(n);
+            assert info != null : String.format("Did not find any connection information for node %s",
+                                                n);
+            Spinner spinner = new Spinner(this);
+            try {
+                spinnerHandler.connectTo(info.spindle, spinner);
+            } catch (IOException e) {
+                if (log.isLoggable(Level.WARNING)) {
+                    log.log(Level.WARNING,
+                            String.format("Cannot connect to spindle on node %s at address %s",
+                                          n, info.spindle), e);
+                }
+            }
+            spinners.put(n, spinner);
+        }
+    }
+
+    /**
+     * Failover the process, assuming primary role for any failed primaries this
+     * process is serving as the mirror
+     */
+    protected void failover() {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Initiating failover on %s", self));
+        }
+        Map<UUID, Long> newPrimaries;
+        try {
+            newPrimaries = failover(switchboard.getDeadMembers());
+        } catch (InterruptedException e) {
+            return;
+        }
+        if (newPrimaries.size() != 0) {
+            source.assumePrimary(newPrimaries);
+        }
+        filterSystemMembership();
+        createSpinners();
+        fsm.failedOver();
+    }
+
+    protected boolean isActive() {
+        return active;
+    }
+
+    /**
+     * Answer true if the receiver is the leader of the group
+     * 
+     * @return
+     */
+    protected boolean isLeader() {
+        if (active) {
+            return activeMembers.size() == 0 ? true
+                                            : activeMembers.last().equals(self);
+        }
+        return inactiveMembers.size() == 0 ? true
+                                          : inactiveMembers.last().equals(self);
+    }
+
+    protected void openPublishingGate() {
+        publishGate.open();
     }
 }

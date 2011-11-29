@@ -49,9 +49,8 @@ import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
-import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
-import com.salesforce.ouroboros.spindle.source.Spindle;
+import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.source.SpindleContext.SpindleFSM;
 
 /**

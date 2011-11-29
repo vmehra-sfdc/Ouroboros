@@ -148,7 +148,7 @@ public class EventChannel {
     public EventChannel(Role role, final UUID channelId, final File root,
                         final long maxSegmentSize, final Replicator replicator) {
         this.role = role;
-        this.id = channelId;
+        id = channelId;
         channel = new File(root, channelId.toString().replace('-', '/'));
         this.maxSegmentSize = maxSegmentSize;
         if (!channel.mkdirs()) {

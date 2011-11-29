@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=13>
+        <th colspan=14>
           Transition
         </th>
       </tr>
@@ -25,6 +25,9 @@
         </th>
         <th>
          Exit
+        </th>
+        <th>
+          bootstrapped
         </th>
         <th>
           commitTakeover
@@ -82,20 +85,6 @@ cleanUp();
         <td>
         </td>
         <td>
-          <pre>
-  Unstable
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
         </td>
         <td>
           <pre>
@@ -108,12 +97,36 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
           <pre>
-[ctxt.isLeader()]
-  Failover/push(CoordinatorFSM::Unstable)
+  Unstable
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[ctxt.isActive() && ctxt.isLeader()]
+  EstablishReplicators/push(CoordinatorFSM::Unstable)
   {}
 
+[ctxt.isActive()]
   Failover
+  {}
+
+[ctxt.isLeader()]
+  Bootstrapping/push(CoordinatorFSM::Unstable)
+  {}
+
+  Bootstrapping
   {}
           </pre>
         </td>
@@ -127,6 +140,49 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Bootstrapping
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Stable
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -170,6 +226,8 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   EstablishReplicators
   {}
@@ -197,6 +255,8 @@ cleanUp();
       <tr>
         <td>
           EstablishReplicators
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -266,6 +326,8 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   ReplicatorsEstablished
   {}
@@ -295,6 +357,8 @@ cleanUp();
       <tr>
         <td>
           ReplicatorsEstablished
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -357,6 +421,8 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Rebalance
   {
@@ -386,6 +452,8 @@ cleanUp();
       <tr>
         <td>
           AwaitingTakeover
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -435,6 +503,8 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Shutdown
   {}
@@ -474,7 +544,7 @@ cleanUp();
         <th colspan=2>
           Actions
         </th>
-        <th colspan=9>
+        <th colspan=11>
           Transition
         </th>
       </tr>
@@ -484,6 +554,12 @@ cleanUp();
         </th>
         <th>
          Exit
+        </th>
+        <th>
+          bootstrapSystem
+        </th>
+        <th>
+          bootstrapped
         </th>
         <th>
           destabilize
@@ -515,12 +591,89 @@ cleanUp();
       </tr>
       <tr>
         <td>
+          Bootstrap
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  CoordinateBootstrap
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          CoordinateBootstrap
+        </td>
+        <td>
+          <pre>
+    coordinateBootstrap();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  pop(bootstrapped)
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
           CoordinateFailover
         </td>
         <td>
           <pre>
     coordinateFailover();
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -573,6 +726,10 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
           <pre>
   ReplicatorsReady
   {}
@@ -589,6 +746,10 @@ cleanUp();
           <pre>
     connectReplicators();
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -639,6 +800,10 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
           <pre>
   Rebalance
   {}
@@ -661,6 +826,10 @@ cleanUp();
           <pre>
     rebalance();
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -703,6 +872,10 @@ cleanUp();
           <pre>
     coordinateTakeover();
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>

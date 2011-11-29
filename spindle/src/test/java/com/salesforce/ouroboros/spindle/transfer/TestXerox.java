@@ -44,7 +44,6 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
-import com.salesforce.ouroboros.spindle.transfer.Xerox;
 import com.salesforce.ouroboros.spindle.transfer.XeroxContext.XeroxFSM;
 import com.salesforce.ouroboros.util.Rendezvous;
 

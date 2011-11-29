@@ -48,10 +48,8 @@ import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
-import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
-import com.salesforce.ouroboros.spindle.replication.ReplicatingAppender;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
  * 

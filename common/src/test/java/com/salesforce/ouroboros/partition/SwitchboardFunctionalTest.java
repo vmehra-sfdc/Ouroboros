@@ -468,6 +468,14 @@ public class SwitchboardFunctionalTest {
         }
     }
 
+    private List<AnnotationConfigApplicationContext> createMembers() {
+        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
+        for (Class<?> config : configs) {
+            contexts.add(new AnnotationConfigApplicationContext(config));
+        }
+        return contexts;
+    }
+
     protected Class<?>[] getConfigs() {
         return new Class[] { node0.class, node1.class, node2.class,
                 node3.class, node4.class, node5.class, node6.class,
@@ -479,13 +487,5 @@ public class SwitchboardFunctionalTest {
 
     protected Class<?> getControllerConfig() {
         return MyControllerConfig.class;
-    }
-
-    private List<AnnotationConfigApplicationContext> createMembers() {
-        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
-        for (Class<?> config : configs) {
-            contexts.add(new AnnotationConfigApplicationContext(config));
-        }
-        return contexts;
     }
 }

@@ -45,11 +45,19 @@ Entry {
 }
 {
 	stabilize
-	   [ctxt.isLeader()]
-	   Failover/push(ControllerFSM::CoordinateFailover){}
+	   [ctxt.isActive() && ctxt.isLeader()]
+	   EstablishReplicators/push(ControllerFSM::CoordinateFailover){}
 		
     stabilize
+    	[ctxt.isActive()]
         Failover{}
+        
+    stabilize
+    	[ctxt.isLeader()]
+    	Bootstrapping/push(ControllerFSM::Bootstrap){}
+        
+    stabilize
+    	Bootstrapping{}
 
 	destabilize
 		nil {}
@@ -59,6 +67,11 @@ Entry {
 }
 
 Stable{}
+
+Bootstrapping{
+	bootstrapped
+		Stable{}
+}
 
 Failover{
     failedOver
@@ -129,6 +142,20 @@ Default {
 %%
 %map ControllerFSM
 %%
+Bootstrap {
+	bootstrapSystem
+		CoordinateBootstrap{}
+}
+
+CoordinateBootstrap
+Entry{
+	coordinateBootstrap();
+}
+{
+	bootstrapped
+		pop(bootstrapped){}
+}
+
 CoordinateFailover
 Entry{
     coordinateFailover();

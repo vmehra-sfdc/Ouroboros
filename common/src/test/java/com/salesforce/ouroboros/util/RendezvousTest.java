@@ -48,6 +48,48 @@ import org.junit.Test;
 public class RendezvousTest {
     @SuppressWarnings("unchecked")
     @Test
+    public void testCancellation() {
+        final AtomicBoolean ran = new AtomicBoolean();
+        Rendezvous rendezvous = new Rendezvous(2, new Runnable() {
+            @Override
+            public void run() {
+                fail("completion action should not have run");
+            }
+        }, new Runnable() {
+            @Override
+            public void run() {
+                ran.set(true);
+            }
+        });
+        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
+        @SuppressWarnings("rawtypes")
+        ScheduledFuture future = mock(ScheduledFuture.class);
+
+        int delay = 1000;
+        TimeUnit unit = TimeUnit.MILLISECONDS;
+
+        when(
+             timer.schedule(isA(Runnable.class), isA(Long.class),
+                            isA(TimeUnit.class))).thenReturn(future);
+
+        rendezvous.scheduleCancellation(delay, unit, timer);
+
+        assertFalse(rendezvous.isCancelled());
+        assertFalse(rendezvous.isMet());
+
+        rendezvous.cancel();
+
+        verify(future).cancel(true);
+        assertTrue(ran.get());
+        assertTrue(rendezvous.isCancelled());
+
+        ran.set(false);
+        rendezvous.cancel();
+        assertFalse(ran.get());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
     public void testCountdown() throws Exception {
         final AtomicBoolean ran = new AtomicBoolean();
 
@@ -97,47 +139,5 @@ public class RendezvousTest {
         } catch (IllegalStateException e) {
             // expected
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test
-    public void testCancellation() {
-        final AtomicBoolean ran = new AtomicBoolean();
-        Rendezvous rendezvous = new Rendezvous(2, new Runnable() {
-            @Override
-            public void run() {
-                fail("completion action should not have run");
-            }
-        }, new Runnable() {
-            @Override
-            public void run() {
-                ran.set(true);
-            }
-        });
-        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
-        @SuppressWarnings("rawtypes")
-        ScheduledFuture future = mock(ScheduledFuture.class);
-
-        int delay = 1000;
-        TimeUnit unit = TimeUnit.MILLISECONDS;
-
-        when(
-             timer.schedule(isA(Runnable.class), isA(Long.class),
-                            isA(TimeUnit.class))).thenReturn(future);
-
-        rendezvous.scheduleCancellation(delay, unit, timer);
-
-        assertFalse(rendezvous.isCancelled());
-        assertFalse(rendezvous.isMet());
-
-        rendezvous.cancel();
-
-        verify(future).cancel(true);
-        assertTrue(ran.get());
-        assertTrue(rendezvous.isCancelled());
-
-        ran.set(false);
-        rendezvous.cancel();
-        assertFalse(ran.get());
     }
 }

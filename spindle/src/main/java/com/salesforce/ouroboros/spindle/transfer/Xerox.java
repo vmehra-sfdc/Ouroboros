@@ -68,23 +68,23 @@ public class Xerox implements CommunicationsHandler {
     private long                      segmentSize;
     private final long                transferSize;
 
-    public Xerox(Node toNode, Rendezvous rendezvous) {
-        this(toNode, DEFAULT_TXFR_SIZE, rendezvous);
-    }
-
     public Xerox(Node toNode, int transferSize, Rendezvous rendezvous) {
         node = toNode;
         this.transferSize = transferSize;
         this.rendezvous = rendezvous;
     }
 
-    public void addChannel(EventChannel channel) {
-        channels.add(channel);
+    public Xerox(Node toNode, Rendezvous rendezvous) {
+        this(toNode, DEFAULT_TXFR_SIZE, rendezvous);
     }
 
     @Override
     public void accept(SocketChannelHandler handler) {
         throw new UnsupportedOperationException();
+    }
+
+    public void addChannel(EventChannel channel) {
+        channels.add(channel);
     }
 
     public void close() {
@@ -164,6 +164,10 @@ public class Xerox implements CommunicationsHandler {
         }
     }
 
+    protected boolean inError() {
+        return inError;
+    }
+
     protected void nextChannel() {
         if (channels.isEmpty()) {
             try {
@@ -190,10 +194,6 @@ public class Xerox implements CommunicationsHandler {
         } else {
             handler.selectForWrite();
         }
-    }
-
-    protected boolean inError() {
-        return inError;
     }
 
     protected void nextSegment() {

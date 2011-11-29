@@ -111,6 +111,14 @@ public class Sink implements CommunicationsHandler {
         handler.close();
     }
 
+    protected void copy() {
+        if (copySegment()) {
+            fsm.finished();
+        } else {
+            handler.selectForRead();
+        }
+    }
+
     protected boolean copySegment() {
         try {
             bytesWritten += current.transferFrom(handler.getChannel(),
@@ -268,13 +276,5 @@ public class Sink implements CommunicationsHandler {
 
     protected void selectForRead() {
         handler.selectForRead();
-    }
-
-    protected void copy() {
-        if (copySegment()) {
-            fsm.finished();
-        } else {
-            handler.selectForRead();
-        }
     }
 }
