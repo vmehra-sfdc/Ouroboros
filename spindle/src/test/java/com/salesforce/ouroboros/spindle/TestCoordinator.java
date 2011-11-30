@@ -29,6 +29,7 @@ import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,12 +46,16 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import org.junit.Test;
 import org.mockito.internal.verification.Times;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.RebalanceMessage;
 import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.spindle.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
@@ -413,5 +418,41 @@ public class TestCoordinator {
         assertEquals(2, remapped.size());
         assertNotNull(remapped.get(primary));
         assertNotNull(remapped.get(mirror));
+    }
+
+    @Test
+    public void testInitiateBootstrap() throws Exception {
+        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
+        Weaver weaver = mock(Weaver.class);
+        final Node localNode = new Node(0, 0, 0);
+        when(weaver.getId()).thenReturn(localNode);
+        when(weaver.getContactInformation()).thenReturn(dummyInfo);
+        Switchboard switchboard = mock(Switchboard.class);
+        Coordinator coordinator = new Coordinator(
+                                                  timer,
+                                                  switchboard,
+                                                  weaver,
+                                                  new CoordinatorConfiguration());
+        Answer<Void> answer = new Answer<Void>() {
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                Message message = (Message) invocation.getArguments()[0];
+                assertEquals(RebalanceMessage.BOOTSTRAP, message.type);
+                Node[] joiningMembers = (Node[]) message.arguments[0];
+                assertNotNull(joiningMembers);
+                assertEquals(1, joiningMembers.length);
+                assertEquals(localNode, joiningMembers[0]);
+                return null;
+            }
+        };
+        doAnswer(answer).when(switchboard).ringCast(isA(Message.class));
+        coordinator.stabilized();
+        coordinator.getInactiveMembers().add(localNode);
+        coordinator.initiateBootstrap(new Node[] { localNode });
+        assertEquals(ControllerFSM.CoordinateBootstrap, coordinator.getState());
+        coordinator.dispatch(RebalanceMessage.BOOTSTRAP, localNode,
+                             new Node[] { localNode }, 0);
+        assertEquals(CoordinatorFSM.Stable, coordinator.getState());
+        verify(switchboard, new Times(1)).ringCast(isA(Message.class));
     }
 }

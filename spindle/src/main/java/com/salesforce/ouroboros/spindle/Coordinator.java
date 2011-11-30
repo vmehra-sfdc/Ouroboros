@@ -60,6 +60,7 @@ import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
+import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorState;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.transfer.Sink;
@@ -339,6 +340,10 @@ public class Coordinator implements Member {
     public Node[] getReplicationPair(UUID channel) {
         List<Node> pair = weaverRing.hash(point(channel), 2);
         return new Node[] { pair.get(0), pair.get(1) };
+    }
+
+    public CoordinatorState getState() {
+        return fsm.getState();
     }
 
     /**
