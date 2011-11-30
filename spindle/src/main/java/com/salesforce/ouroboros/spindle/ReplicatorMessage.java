@@ -38,7 +38,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * 
  */
 public enum ReplicatorMessage implements MemberDispatch {
-    READY_REPLICATORS, CONNECT_REPLICATORS, REPLICATORS_ESTABLISHED;
+    CONNECT_REPLICATORS, READY_REPLICATORS, REPLICATORS_ESTABLISHED;
 
     private final static Logger log = Logger.getLogger(ReplicatorMessage.class.getCanonicalName());
 

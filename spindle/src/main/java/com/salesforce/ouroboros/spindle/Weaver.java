@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
@@ -109,13 +111,13 @@ public class Weaver implements Bundle {
     private final ConcurrentMap<Node, Acknowledger> acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
     private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
     private final ContactInformation                contactInfo;
-    private Coordinator                             coordinator;
     private final Node                              id;
     private final long                              maxSegmentSize;
     private final ServerSocketChannelHandler        replicationHandler;
     private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
     private final ConsistentHashFunction<File>      roots             = new ConsistentHashFunction<File>();
     private final ServerSocketChannelHandler        spindleHandler;
+    private ConsistentHashFunction<Node>            weaverRing        = new ConsistentHashFunction<Node>();
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
@@ -152,6 +154,12 @@ public class Weaver implements Bundle {
                                              spindleHandler.getLocalAddress(),
                                              replicationHandler.getLocalAddress(),
                                              null);
+    }
+
+    public void bootstrap(Node[] bootsrappingMembers) {
+        for (Node node : bootsrappingMembers) {
+            weaverRing.add(node, node.capacity);
+        }
     }
 
     public void close(UUID channel) {
@@ -220,7 +228,7 @@ public class Weaver implements Bundle {
         for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
             UUID channelId = entry.getKey();
             EventChannel channel = entry.getValue();
-            Node[] pair = coordinator.getReplicationPair(channelId);
+            Node[] pair = getReplicationPair(channelId);
             if (deadMembers.contains(pair[0]) || deadMembers.contains(pair[1])) {
                 if (channel.isPrimary()) {
                     // The mirror for this channel has died
@@ -260,6 +268,19 @@ public class Weaver implements Bundle {
         return id;
     }
 
+    /**
+     * Answer the replication pair of nodes that provide the primary and mirror
+     * for the channel
+     * 
+     * @param channel
+     *            - the id of the channel
+     * @return the tuple of primary and mirror nodes for this channel
+     */
+    public Node[] getReplicationPair(UUID channel) {
+        List<Node> pair = weaverRing.hash(point(channel), 2);
+        return new Node[] { pair.get(0), pair.get(1) };
+    }
+
     /* (non-Javadoc)
      * @see com.salesforce.ouroboros.spindle.Bundle#map(com.salesforce.ouroboros.Node, com.salesforce.ouroboros.spindle.Acknowledger)
      */
@@ -276,7 +297,7 @@ public class Weaver implements Bundle {
      * @param primary
      *            - the primary node for this subscription
      */
-    public void openMirror(UUID channel, Node primary) {
+    public boolean openMirror(UUID channel, Node primary) {
         // This node is the mirror for the event channel
         if (log.isLoggable(Level.INFO)) {
             log.fine(String.format(" Weaver[%s] is the mirror for the new subscription %s",
@@ -286,7 +307,7 @@ public class Weaver implements Bundle {
                                            roots.hash(point(channel)),
                                            maxSegmentSize,
                                            replicators.get(primary));
-        channels.putIfAbsent(channel, ec);
+        return null == channels.putIfAbsent(channel, ec);
     }
 
     /**
@@ -297,7 +318,7 @@ public class Weaver implements Bundle {
      * @param mirror
      *            - the mirror node for this subscription
      */
-    public void openPrimary(UUID channel, Node mirror) {
+    public boolean openPrimary(UUID channel, Node mirror) {
         // This node is the primary for the event channel
         if (log.isLoggable(Level.INFO)) {
             log.fine(String.format(" Weaver[%s] is the primary for the new subscription %s",
@@ -307,7 +328,7 @@ public class Weaver implements Bundle {
                                            roots.hash(point(channel)),
                                            maxSegmentSize,
                                            replicators.get(mirror));
-        channels.putIfAbsent(channel, ec);
+        return null == channels.putIfAbsent(channel, ec);
     }
 
     /**
@@ -448,8 +469,8 @@ public class Weaver implements Bundle {
         // nothing to do
     }
 
-    public void setCoordinator(Coordinator coordinator) {
-        this.coordinator = coordinator;
+    public void setRing(ConsistentHashFunction<Node> nextRing) {
+        weaverRing = nextRing;
     }
 
     /**
@@ -504,5 +525,34 @@ public class Weaver implements Bundle {
      */
     private boolean thisEndInitiatesConnectionsTo(Node target) {
         return id.compareTo(target) < 0;
+    }
+
+    /**
+     * Answer the remapped primary/mirror pairs using the nextRing
+     * 
+     * @param nextRing
+     *            - the new weaver hash ring
+     * @return the remapping of channels hosted on this node that have changed
+     *         their primary or mirror in the new hash ring
+     */
+    protected Map<UUID, Node[][]> remap(ConsistentHashFunction<Node> nextRing) {
+        Map<UUID, Node[][]> remapped = new HashMap<UUID, Node[][]>();
+        for (UUID channel : channels.keySet()) {
+            long channelPoint = point(channel);
+            List<Node> newPair = nextRing.hash(channelPoint, 2);
+            List<Node> oldPair = weaverRing.hash(channelPoint, 2);
+            if (oldPair.contains(id)) {
+                if (!oldPair.get(0).equals(newPair.get(0))
+                    || !oldPair.get(1).equals(newPair.get(1))) {
+                    remapped.put(channel,
+                                 new Node[][] {
+                                         new Node[] { oldPair.get(0),
+                                                 oldPair.get(1) },
+                                         new Node[] { newPair.get(0),
+                                                 newPair.get(1) } });
+                }
+            }
+        }
+        return remapped;
     }
 }

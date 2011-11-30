@@ -55,30 +55,32 @@ public class WeaverConfigation {
         }
     }
 
-    public static final long     DEFAULT_MAX_SEGMENTSIZE        = 1000 * 1024;
-    public static final long     DEFAULT_PARTITION_TIMEOUT      = 60;
-    public static final TimeUnit DEFAULT_PARTITION_TIMEOUT_UNIT = TimeUnit.SECONDS;
-    public static final int      DEFAULT_REPLICATION_QUEUE_SIZE = 100;
+    public static final long          DEFAULT_MAX_SEGMENTSIZE        = 1000 * 1024;
+    public static final long          DEFAULT_PARTITION_TIMEOUT      = 60;
+    public static final TimeUnit      DEFAULT_PARTITION_TIMEOUT_UNIT = TimeUnit.SECONDS;
+    public static final int           DEFAULT_REPLICATION_QUEUE_SIZE = 100;
 
-    public static final String   DEFAULT_STATE_NAME             = "weavers";
+    public static final String        DEFAULT_STATE_NAME             = "weavers";
 
     private Node                      id;
-    private long                      maxSegmentSize           = DEFAULT_MAX_SEGMENTSIZE;
-    private long                      partitionTimeout         = DEFAULT_PARTITION_TIMEOUT;
-    private TimeUnit                  partitionTimeoutUnit     = DEFAULT_PARTITION_TIMEOUT_UNIT;
-    private InetSocketAddress         replicationAddress       = new InetSocketAddress(
-                                                                                       "127.0.0.1",
-                                                                                       0);
-    private int                       replicationQueueSize     = DEFAULT_REPLICATION_QUEUE_SIZE;
-    private final SocketOptions       replicationSocketOptions = new SocketOptions();
-    private Executor                  replicators              = Executors.newSingleThreadExecutor(new LabeledThreadFactory("replicator"));
-    private final List<RootDirectory> roots                    = new ArrayList<RootDirectory>();
-    private InetSocketAddress         spindleAddress           = new InetSocketAddress(
-                                                                                       "127.0.0.1",
-                                                                                       0);
-    private Executor                  spindles                 = Executors.newSingleThreadExecutor(new LabeledThreadFactory("spindle"));
-    private final SocketOptions       spindleSocketOptions     = new SocketOptions();
-    private String                    stateName                = DEFAULT_STATE_NAME;
+    private long                      maxSegmentSize                 = DEFAULT_MAX_SEGMENTSIZE;
+    private long                      partitionTimeout               = DEFAULT_PARTITION_TIMEOUT;
+    private TimeUnit                  partitionTimeoutUnit           = DEFAULT_PARTITION_TIMEOUT_UNIT;
+    private InetSocketAddress         replicationAddress             = new InetSocketAddress(
+                                                                                             "127.0.0.1",
+                                                                                             0);
+    private int                       replicationQueueSize           = DEFAULT_REPLICATION_QUEUE_SIZE;
+    private final SocketOptions       replicationSocketOptions       = new SocketOptions();
+    private Executor                  replicators                    = Executors.newSingleThreadExecutor(new LabeledThreadFactory(
+                                                                                                                                  "replicator"));
+    private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
+    private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
+                                                                                             "127.0.0.1",
+                                                                                             0);
+    private Executor                  spindles                       = Executors.newSingleThreadExecutor(new LabeledThreadFactory(
+                                                                                                                                  "spindle"));
+    private final SocketOptions       spindleSocketOptions           = new SocketOptions();
+    private String                    stateName                      = DEFAULT_STATE_NAME;
 
     public void addRoot(File directory) {
         addRoot(directory, 1);

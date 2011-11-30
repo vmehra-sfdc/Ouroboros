@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import static com.salesforce.ouroboros.util.Utils.point;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
@@ -61,7 +62,6 @@ import com.salesforce.ouroboros.spindle.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
-import com.salesforce.ouroboros.util.Utils;
 
 /**
  * 
@@ -129,7 +129,7 @@ public class TestCoordinator {
         UUID primary = null;
         while (primary == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Utils.point(test), 2);
+            List<Node> pair = ring.hash(point(test), 2);
             if (pair.get(0).equals(localNode)) {
                 primary = test;
             }
@@ -137,18 +137,21 @@ public class TestCoordinator {
         UUID mirror = null;
         while (mirror == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Utils.point(test), 2);
+            List<Node> pair = ring.hash(point(test), 2);
             if (pair.get(1).equals(localNode)) {
                 mirror = test;
             }
         }
+        when(weaver.getReplicationPair(primary)).thenReturn(getPair(primary,
+                                                                    ring));
+        when(weaver.getReplicationPair(mirror)).thenReturn(getPair(mirror, ring));
         coordinator.open(primary, requester);
         coordinator.open(mirror, requester);
         coordinator.close(primary, requester);
         coordinator.close(mirror, requester);
         verify(weaver).close(primary);
         verify(weaver).close(mirror);
-        verify(switchboard, new Times(4)).send(isA(Message.class),
+        verify(switchboard, new Times(2)).send(isA(Message.class),
                                                eq(requester));
     }
 
@@ -272,7 +275,7 @@ public class TestCoordinator {
         UUID primary = null;
         while (primary == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Utils.point(test), 2);
+            List<Node> pair = ring.hash(point(test), 2);
             if (pair.get(0).equals(localNode)) {
                 primary = test;
             }
@@ -280,11 +283,14 @@ public class TestCoordinator {
         UUID mirror = null;
         while (mirror == null) {
             UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Utils.point(test), 2);
+            List<Node> pair = ring.hash(point(test), 2);
             if (pair.get(1).equals(localNode)) {
                 mirror = test;
             }
         }
+        when(weaver.getReplicationPair(primary)).thenReturn(getPair(primary,
+                                                                    ring));
+        when(weaver.getReplicationPair(mirror)).thenReturn(getPair(mirror, ring));
         coordinator.open(primary, requester);
         coordinator.openMirror(mirror, requester);
         verify(weaver).openPrimary(eq(primary), isA(Node.class));
@@ -342,121 +348,8 @@ public class TestCoordinator {
         verify(weaver).openReplicator(node3, contactInformation3, rendezvous);
     }
 
-    @SuppressWarnings("unchecked")
-    @Test
-    public void testRebalance() throws Exception {
-        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
-        Weaver weaver = mock(Weaver.class);
-        Switchboard switchboard = mock(Switchboard.class);
-        Node localNode = new Node(0, 0, 0);
-        when(weaver.getId()).thenReturn(localNode);
-        when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(
-                                                  timer,
-                                                  switchboard,
-                                                  weaver,
-                                                  new CoordinatorConfiguration());
-        Node requester = new Node(-1, -1, -1);
-        Node node1 = new Node(1, 1, 1);
-        Node node2 = new Node(2, 1, 1);
-        Node node3 = new Node(3, 1, 1);
-
-        when(weaver.getId()).thenReturn(localNode);
-        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
-        ring.add(localNode, 1);
-        ring.add(node1, 1);
-        ring.add(node2, 1);
-        ring.add(node3, 1);
-        coordinator.setNextRing(ring);
-        coordinator.commitNextRing();
-        UUID primary = null;
-        while (primary == null) {
-            UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Utils.point(test), 2);
-            if (pair.get(0).equals(localNode)) {
-                primary = test;
-            }
-        }
-        UUID mirror = null;
-        while (mirror == null) {
-            UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Utils.point(test), 2);
-            if (pair.get(1).equals(localNode)) {
-                mirror = test;
-            }
-        }
-        coordinator.open(primary, requester);
-        coordinator.open(mirror, requester);
-        Node removedMirror = coordinator.getReplicationPair(primary)[1];
-        Node removedPrimary = coordinator.getReplicationPair(mirror)[0];
-
-        ConsistentHashFunction<Node> newRing = ring.clone();
-        newRing.remove(removedMirror);
-        newRing.remove(removedPrimary);
-        coordinator.setNextRing(newRing);
-        Map<UUID, Node[][]> remapped = coordinator.remap();
-        List<Node> deadMembers = Arrays.asList(removedPrimary, removedMirror);
-        coordinator.rebalance(remapped, deadMembers);
-        verify(weaver).rebalance(isA(Map.class), isA(Rendezvous.class),
-                                 eq(primary), eq(remapped.get(primary)[0]),
-                                 eq(remapped.get(primary)[1]), eq(deadMembers));
-        verify(weaver).rebalance(isA(Map.class), isA(Rendezvous.class),
-                                 eq(mirror), eq(remapped.get(mirror)[0]),
-                                 eq(remapped.get(mirror)[1]), eq(deadMembers));
-    }
-
-    @Test
-    public void testRemap() throws Exception {
-        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
-        Weaver weaver = mock(Weaver.class);
-        Node localNode = new Node(0, 0, 0);
-        when(weaver.getId()).thenReturn(localNode);
-        when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Switchboard switchboard = mock(Switchboard.class);
-        Coordinator coordinator = new Coordinator(
-                                                  timer,
-                                                  switchboard,
-                                                  weaver,
-                                                  new CoordinatorConfiguration());
-        Node requester = new Node(-1, -1, -1);
-        Node node1 = new Node(1, 1, 1);
-        Node node2 = new Node(2, 1, 1);
-        Node node3 = new Node(3, 1, 1);
-
-        when(weaver.getId()).thenReturn(localNode);
-        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
-        ring.add(localNode, 1);
-        ring.add(node1, 1);
-        ring.add(node2, 1);
-        ring.add(node3, 1);
-        coordinator.setNextRing(ring);
-        coordinator.commitNextRing();
-        UUID primary = null;
-        while (primary == null) {
-            UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Utils.point(test), 2);
-            if (pair.get(0).equals(localNode)) {
-                primary = test;
-            }
-        }
-        UUID mirror = null;
-        while (mirror == null) {
-            UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(Utils.point(test), 2);
-            if (pair.get(1).equals(localNode)) {
-                mirror = test;
-            }
-        }
-        coordinator.open(primary, requester);
-        coordinator.open(mirror, requester);
-        ConsistentHashFunction<Node> newRing = ring.clone();
-        newRing.remove(coordinator.getReplicationPair(primary)[1]);
-        newRing.remove(coordinator.getReplicationPair(mirror)[0]);
-        coordinator.setNextRing(newRing);
-        Map<UUID, Node[][]> remapped = coordinator.remap();
-        assertNotNull(remapped);
-        assertEquals(2, remapped.size());
-        assertNotNull(remapped.get(primary));
-        assertNotNull(remapped.get(mirror));
+    private Node[] getPair(UUID channel, ConsistentHashFunction<Node> ring) {
+        List<Node> pair = ring.hash(point(channel), 2);
+        return new Node[] { pair.get(0), pair.get(1) };
     }
 }

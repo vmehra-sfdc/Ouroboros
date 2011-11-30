@@ -25,19 +25,14 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import static com.salesforce.ouroboros.util.Utils.point;
-
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -93,7 +88,6 @@ public class Coordinator implements Member {
     private boolean                             active          = false;
     private final SortedSet<Node>               activeMembers   = new ConcurrentSkipListSet<Node>();
     private final SortedSet<Node>               allMembers      = new ConcurrentSkipListSet<Node>();
-    private final Set<UUID>                     channels        = new HashSet<UUID>();
     private final CoordinatorContext            fsm             = new CoordinatorContext(
                                                                                          this);
     private final Node                          id;
@@ -106,7 +100,6 @@ public class Coordinator implements Member {
     private int                                 targetTally;
     private final ScheduledExecutorService      timer;
     private final Weaver                        weaver;
-    private ConsistentHashFunction<Node>        weaverRing      = new ConsistentHashFunction<Node>();
     private final ServerSocketChannelHandler    xeroxHandler;
     private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
 
@@ -117,7 +110,6 @@ public class Coordinator implements Member {
         this.switchboard = switchboard;
         this.weaver = weaver;
         switchboard.setMember(this);
-        weaver.setCoordinator(this);
         id = weaver.getId();
         yellowPages.put(id, weaver.getContactInformation());
         xeroxHandler = new ServerSocketChannelHandler(
@@ -145,8 +137,7 @@ public class Coordinator implements Member {
      *            - the id of the channel to close
      */
     public void close(UUID channel, Node requester) {
-        channels.remove(channel);
-        Node[] pair = getReplicationPair(channel);
+        Node[] pair = weaver.getReplicationPair(channel);
         if (activeMembers.contains(pair[0])) {
             switchboard.send(new Message(id, ChannelMessage.CLOSE_MIRROR,
                                          new Association<Node, UUID>(requester,
@@ -167,7 +158,6 @@ public class Coordinator implements Member {
      *            - the id of the channel to close
      */
     public void closeMirror(UUID channel, Node requester) {
-        channels.remove(channel);
         weaver.close(channel);
         switchboard.send(new Message(id, ChannelMessage.CLOSED, channel),
                          requester);
@@ -332,19 +322,6 @@ public class Coordinator implements Member {
     }
 
     /**
-     * Answer the replication pair of nodes that provide the primary and mirror
-     * for the channel
-     * 
-     * @param channel
-     *            - the id of the channel
-     * @return the tuple of primary and mirror nodes for this channel
-     */
-    public Node[] getReplicationPair(UUID channel) {
-        List<Node> pair = weaverRing.hash(point(channel), 2);
-        return new Node[] { pair.get(0), pair.get(1) };
-    }
-
-    /**
      * @return the state of the reciver. return null if the state is undefined,
      *         such as when the coordinator is transititioning between states
      */
@@ -426,8 +403,8 @@ public class Coordinator implements Member {
      *            - the id of the channel to open
      */
     public void open(UUID channel, Node requester) {
-        Node[] pair = getReplicationPair(channel);
-        if (!channels.add(channel)) {
+        Node[] pair = weaver.getReplicationPair(channel);
+        if (!weaver.openPrimary(channel, pair[1])) {
             if (log.isLoggable(Level.FINER)) {
                 log.finer(String.format("Channel is already opened %s", channel));
             }
@@ -445,7 +422,6 @@ public class Coordinator implements Member {
             switchboard.send(new Message(id, ChannelMessage.OPENED, channel),
                              requester);
         }
-        weaver.openPrimary(channel, pair[1]);
     }
 
     /**
@@ -456,18 +432,17 @@ public class Coordinator implements Member {
      *            - the id of the channel to open
      */
     public void openMirror(UUID channel, Node requester) {
-        if (!channels.add(channel)) {
+        Node[] pair = weaver.getReplicationPair(channel);
+        if (!weaver.openMirror(channel, pair[0])) {
             if (log.isLoggable(Level.FINER)) {
                 log.finer(String.format("Channel is already opened on mirror %s",
                                         channel));
             }
         } else {
-            Node[] pair = getReplicationPair(channel);
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Opening mirror for channel %s on %s",
                                        channel, id));
             }
-            weaver.openMirror(channel, pair[0]);
         }
         switchboard.send(new Message(id, ChannelMessage.OPENED, channel),
                          requester);
@@ -491,8 +466,8 @@ public class Coordinator implements Member {
         for (Node node : bootsrappingMembers) {
             activeMembers.add(node);
             inactiveMembers.remove(node);
-            weaverRing.add(node, node.capacity);
         }
+        weaver.bootstrap(bootsrappingMembers);
     }
 
     /**
@@ -525,7 +500,7 @@ public class Coordinator implements Member {
      */
     protected void commitNextRing() {
         assert nextRing != null : "Next ring has not been calculated";
-        weaverRing = nextRing;
+        weaver.setRing(nextRing);
         nextRing = null;
     }
 
@@ -728,7 +703,7 @@ public class Coordinator implements Member {
     }
 
     protected void rebalance() {
-        rebalance(remap(), switchboard.getDeadMembers());
+        rebalance(weaver.remap(nextRing), switchboard.getDeadMembers());
     }
 
     /**
@@ -817,36 +792,9 @@ public class Coordinator implements Member {
             activeMembers.add(node);
             inactiveMembers.remove(node);
         }
-        weaverRing = nextRing;
+        commitNextRing();
         active = true;
         fsm.commitTakeover();
-    }
-
-    /**
-     * Answer the remapped primary/mirror pairs using the nextRing
-     * 
-     * @return the remapping of channels hosted on this node that have changed
-     *         their primary or mirror in the new hash ring
-     */
-    protected Map<UUID, Node[][]> remap() {
-        Map<UUID, Node[][]> remapped = new HashMap<UUID, Node[][]>();
-        for (UUID channel : channels) {
-            long channelPoint = point(channel);
-            List<Node> newPair = nextRing.hash(channelPoint, 2);
-            List<Node> oldPair = weaverRing.hash(channelPoint, 2);
-            if (oldPair.contains(id)) {
-                if (!oldPair.get(0).equals(newPair.get(0))
-                    || !oldPair.get(1).equals(newPair.get(1))) {
-                    remapped.put(channel,
-                                 new Node[][] {
-                                         new Node[] { oldPair.get(0),
-                                                 oldPair.get(1) },
-                                         new Node[] { newPair.get(0),
-                                                 newPair.get(1) } });
-                }
-            }
-        }
-        return remapped;
     }
 
     protected void replicatorsEstablished(Node member) {

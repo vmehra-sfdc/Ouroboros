@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.util;
 
+import java.io.File;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
@@ -52,6 +53,24 @@ final public class Utils {
         }
         UUID_GENERATOR = new NameBasedGenerator(null, digester,
                                                 UUIDType.NAME_BASED_SHA1);
+    }
+
+    public static void delete(File dirOrFile) {
+        if (dirOrFile.isDirectory()) {
+            deleteDirectory(dirOrFile);
+        } else {
+            dirOrFile.delete();
+        }
+    }
+
+    public static void deleteDirectory(File dir) {
+        for (File f : dir.listFiles()) {
+            if (f.isDirectory()) {
+                deleteDirectory(f);
+            } else {
+                f.delete();
+            }
+        }
     }
 
     public static long point(UUID id) {
