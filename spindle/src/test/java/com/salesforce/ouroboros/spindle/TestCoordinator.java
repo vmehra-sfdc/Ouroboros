@@ -199,12 +199,8 @@ public class TestCoordinator {
         when(switchboard.getDeadMembers()).thenReturn(deadMembers);
         coordinator.getFsm().setState(CoordinatorFSM.Failover);
         coordinator.failover();
-
+        assertEquals(CoordinatorFSM.EstablishReplicators, coordinator.getState());
         verify(weaver).failover(deadMembers);
-        verify(weaver).closeReplicator(localNode);
-        verify(weaver).closeReplicator(node1);
-        verify(weaver).closeReplicator(node2);
-        verify(weaver).closeReplicator(node2);
     }
 
     @Test

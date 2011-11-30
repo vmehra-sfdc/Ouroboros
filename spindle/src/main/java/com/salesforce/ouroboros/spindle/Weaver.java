@@ -225,6 +225,13 @@ public class Weaver implements Bundle {
      *            - the weaver nodes that have died
      */
     public void failover(Collection<Node> deadMembers) {
+        for (Node node : deadMembers) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Removing weaver[%s] from the partition",
+                                       node));
+            }
+            closeReplicator(node);
+        }
         for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
             UUID channelId = entry.getKey();
             EventChannel channel = entry.getValue();

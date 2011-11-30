@@ -595,12 +595,7 @@ public class Coordinator implements Member {
     protected void failover() {
         Collection<Node> deadMembers = switchboard.getDeadMembers();
         for (Node node : deadMembers) {
-            if (log.isLoggable(Level.INFO)) {
-                log.fine(String.format("Removing weaver[%s] from the partition",
-                                       node));
-            }
             yellowPages.remove(node);
-            weaver.closeReplicator(node);
         }
         weaver.failover(deadMembers);
         filterSystemMembership();
