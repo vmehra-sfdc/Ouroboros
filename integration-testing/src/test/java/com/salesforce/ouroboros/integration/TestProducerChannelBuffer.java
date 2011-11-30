@@ -47,6 +47,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.smartfrog.services.anubis.BasicConfiguration;
+import org.smartfrog.services.anubis.locator.AnubisLocator;
+import org.smartfrog.services.anubis.locator.Locator;
 import org.smartfrog.services.anubis.partition.test.controller.Controller;
 import org.smartfrog.services.anubis.partition.test.controller.ControllerConfiguration;
 import org.smartfrog.services.anubis.partition.test.controller.NodeData;
@@ -163,6 +165,12 @@ public class TestProducerChannelBuffer {
     }
 
     static class nodeCfg extends BasicConfiguration {
+        @Override
+        @Bean
+        public AnubisLocator locator() {
+            return null;
+        }
+
         @Override
         public int getMagic() {
             try {
