@@ -68,14 +68,17 @@ public class Coordinator implements Member {
     private final SortedSet<Node>               inactiveWeavers = new ConcurrentSkipListSet<Node>();
     private Node[]                              joiningWeavers  = new Node[0];
     private ConsistentHashFunction<Node>        nextWeaverRing  = new ConsistentHashFunction<Node>();
+    private final Producer                      producer;
     private final Node                          self;
     private final Switchboard                   switchboard;
     private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
 
-    public Coordinator(Node self, Switchboard switchboard) throws IOException {
-        this.self = self;
-        this.switchboard = switchboard;
+    public Coordinator(Switchboard switchboard, Producer producer)
+                                                                  throws IOException {
+        this.producer = producer;
+        self = producer.getId();
         switchboard.setMember(this);
+        this.switchboard = switchboard;
     }
 
     @Override

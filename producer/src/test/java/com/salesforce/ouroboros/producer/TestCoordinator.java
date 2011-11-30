@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.producer;
 import static junit.framework.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -57,9 +58,11 @@ public class TestCoordinator {
     @Test
     public void testAdvertise() throws Exception {
         Node self = mock(Node.class);
+        Producer producer = mock(Producer.class);
+        when(producer.getId()).thenReturn(self);
         Switchboard switchboard = mock(Switchboard.class);
 
-        Coordinator coordinator = new Coordinator(self, switchboard);
+        Coordinator coordinator = new Coordinator(switchboard, producer);
         coordinator.advertise();
         verify(switchboard).ringCast(messageCaptor.capture());
         assertEquals(GlobalMessageType.ADVERTISE_PRODUCER,
