@@ -31,12 +31,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.util.LabeledThreadFactory;
 
 /**
  * The java bean representation of the configuration of a Weaver.
@@ -63,23 +62,6 @@ public class WeaverConfigation {
 
     public static final String   DEFAULT_STATE_NAME             = "weavers";
 
-    public static ThreadFactory threadFactory(final String prefix) {
-        return new ThreadFactory() {
-            private final AtomicInteger count = new AtomicInteger(0);
-
-            @Override
-            public Thread newThread(Runnable runnable) {
-                Thread thread = new Thread(
-                                           runnable,
-                                           String.format("%s[%s]",
-                                                         prefix,
-                                                         count.getAndIncrement()));
-                thread.setDaemon(true);
-                return thread;
-            }
-        };
-    }
-
     private Node                      id;
     private long                      maxSegmentSize           = DEFAULT_MAX_SEGMENTSIZE;
     private long                      partitionTimeout         = DEFAULT_PARTITION_TIMEOUT;
@@ -89,12 +71,12 @@ public class WeaverConfigation {
                                                                                        0);
     private int                       replicationQueueSize     = DEFAULT_REPLICATION_QUEUE_SIZE;
     private final SocketOptions       replicationSocketOptions = new SocketOptions();
-    private Executor                  replicators              = Executors.newSingleThreadExecutor(threadFactory("replicator"));
+    private Executor                  replicators              = Executors.newSingleThreadExecutor(new LabeledThreadFactory("replicator"));
     private final List<RootDirectory> roots                    = new ArrayList<RootDirectory>();
     private InetSocketAddress         spindleAddress           = new InetSocketAddress(
                                                                                        "127.0.0.1",
                                                                                        0);
-    private Executor                  spindles                 = Executors.newSingleThreadExecutor(threadFactory("spindle"));
+    private Executor                  spindles                 = Executors.newSingleThreadExecutor(new LabeledThreadFactory("spindle"));
     private final SocketOptions       spindleSocketOptions     = new SocketOptions();
     private String                    stateName                = DEFAULT_STATE_NAME;
 

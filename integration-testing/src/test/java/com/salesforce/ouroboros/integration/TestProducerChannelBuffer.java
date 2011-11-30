@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.integration;
 
+import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 
@@ -33,9 +34,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Timer;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -58,9 +57,8 @@ import org.springframework.context.annotation.Configuration;
 
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.producer.CoordinatorConfiguration;
+import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardFSM;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverConfigation;
 
@@ -110,25 +108,6 @@ public class TestProducerChannelBuffer {
             return node;
         }
 
-    }
-
-    public static class Source implements EventSource {
-        @Override
-        public void assumePrimary(Map<UUID, Long> newPrimaries) {
-            // TODO Auto-generated method stub 
-        }
-
-        @Override
-        public void opened(UUID channel) {
-            // TODO Auto-generated method stub
-
-        }
-
-        @Override
-        public void closed(UUID channel) {
-            // TODO Auto-generated method stub
-
-        }
     }
 
     @Configuration
@@ -192,14 +171,12 @@ public class TestProducerChannelBuffer {
     @Configuration
     static class ProducerCfg extends nodeCfg {
 
-        @Bean(initMethod = "start", destroyMethod = "terminate")
+        @Bean
         public com.salesforce.ouroboros.producer.Coordinator coordinator()
                                                                           throws IOException {
             return new com.salesforce.ouroboros.producer.Coordinator(
                                                                      memberNode(),
-                                                                     switchboard(),
-                                                                     eventSource(),
-                                                                     producerConfiguration());
+                                                                     switchboard());
         }
 
         /* (non-Javadoc)
@@ -213,14 +190,6 @@ public class TestProducerChannelBuffer {
         @Bean
         public ScheduledExecutorService timer() {
             return Executors.newSingleThreadScheduledExecutor();
-        }
-
-        private Source eventSource() {
-            return new Source();
-        }
-
-        private CoordinatorConfiguration producerConfiguration() {
-            return new CoordinatorConfiguration();
         }
     }
 
@@ -345,23 +314,35 @@ public class TestProducerChannelBuffer {
     public void testPush() throws Exception {
         final Switchboard producerSwitchboard = producerContext.getBean(Switchboard.class);
         final Switchboard weaverSwitchboard = weaverContext.getBean(Switchboard.class);
-        Util.waitFor("producer did not stabilize", new Util.Condition() {
-            @Override
-            public boolean value() {
-                return producerSwitchboard.isStable();
-            }
-        }, 30000, 200);
-
-        Util.waitFor("weaver did not establish replicators",
+        Util.waitFor("producer switchboard did not stabilize",
                      new Util.Condition() {
                          @Override
                          public boolean value() {
-                             return weaverSwitchboard.isStable();
+                             return producerSwitchboard.getState() == SwitchboardFSM.Stable;
                          }
                      }, 30000, 200);
 
-        com.salesforce.ouroboros.producer.Coordinator producer = producerContext.getBean(com.salesforce.ouroboros.producer.Coordinator.class);
-        com.salesforce.ouroboros.spindle.Coordinator weaver = weaverContext.getBean(com.salesforce.ouroboros.spindle.Coordinator.class);
+        Util.waitFor("weaver switchboard did not stabilize",
+                     new Util.Condition() {
+                         @Override
+                         public boolean value() {
+                             return weaverSwitchboard.getState() == SwitchboardFSM.Stable;
+                         }
+                     }, 30000, 200);
 
+        final com.salesforce.ouroboros.producer.Coordinator producer = producerContext.getBean(com.salesforce.ouroboros.producer.Coordinator.class);
+        final com.salesforce.ouroboros.spindle.Coordinator weaver = weaverContext.getBean(com.salesforce.ouroboros.spindle.Coordinator.class);
+
+        weaver.initiateBootstrap();
+
+        Util.waitFor("weaver coordinator did not stabilize",
+                     new Util.Condition() {
+                         @Override
+                         public boolean value() {
+                             return weaver.getState() == com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM.Stable;
+                         }
+                     }, 30000, 200);
+        assertEquals(com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM.Stable,
+                     weaver.getState());
     }
 }

@@ -57,7 +57,7 @@ import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.producer.Batch;
-import com.salesforce.ouroboros.producer.Coordinator;
+import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.Spinner;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
@@ -135,9 +135,9 @@ public class TestSpinnerSpindle {
         spinnerHandler.start();
 
         Node coordNode = new Node(2);
-        Coordinator coordinator = mock(Coordinator.class);
-        when(coordinator.getId()).thenReturn(coordNode);
-        final Spinner spinner = new Spinner(coordinator);
+        Producer producer = mock(Producer.class);
+        when(producer.getId()).thenReturn(coordNode);
+        final Spinner spinner = new Spinner(producer);
 
         spindleHandler.connectTo(spindleAddress, spinner);
 

@@ -74,10 +74,10 @@ public class TestSpinner {
         SocketChannel channel = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(channel);
-        Coordinator coordinator = mock(Coordinator.class);
+        Producer producer = mock(Producer.class);
         final Node node = new Node(0x1638);
-        when(coordinator.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(coordinator);
+        when(producer.getId()).thenReturn(node);
+        Spinner spinner = new Spinner(producer);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -103,10 +103,10 @@ public class TestSpinner {
         SocketChannel outbound = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(outbound);
-        Coordinator coordinator = mock(Coordinator.class);
+        Producer producer = mock(Producer.class);
         Node node = new Node(0x1638);
-        when(coordinator.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(coordinator);
+        when(producer.getId()).thenReturn(node);
+        Spinner spinner = new Spinner(producer);
         spinner.connect(handler);
 
         long timestamp = 100000L;
@@ -145,10 +145,10 @@ public class TestSpinner {
         SocketChannel channel = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(channel);
-        Coordinator coordinator = mock(Coordinator.class);
+        Producer producer = mock(Producer.class);
         Node node = new Node(0x1638);
-        when(coordinator.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(coordinator);
+        when(producer.getId()).thenReturn(node);
+        Spinner spinner = new Spinner(producer);
         spinner.connect(handler);
 
         Node mirror = new Node(0x1638);
@@ -158,7 +158,7 @@ public class TestSpinner {
         spinner.push(batch);
         Thread.sleep(10);
         spinner.acknowledge(batch);
-        verify(coordinator).acknowledge(captor.capture());
+        verify(producer).acknowledge(captor.capture());
         assertTrue(10 <= captor.getValue().interval());
     }
 }

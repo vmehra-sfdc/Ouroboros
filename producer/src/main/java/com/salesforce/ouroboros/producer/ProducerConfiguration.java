@@ -27,41 +27,23 @@ package com.salesforce.ouroboros.producer;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.util.LabeledThreadFactory;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class CoordinatorConfiguration {
-
-    public static ThreadFactory threadFactory(final String prefix) {
-        return new ThreadFactory() {
-            private AtomicInteger count = new AtomicInteger(0);
-
-            @Override
-            public Thread newThread(Runnable runnable) {
-                Thread thread = new Thread(
-                                           runnable,
-                                           String.format("%s[%s]",
-                                                         prefix,
-                                                         count.getAndIncrement()));
-                thread.setDaemon(true);
-                return thread;
-            }
-        };
-    }
-
+public class ProducerConfiguration {
     private double              maximumEventRate             = 2000.0;
     private double              minimumEventRate             = 500.0;
     private int                 minimumTokenRegenerationTime = 10;
     private int                 sampleFrequency              = 10;
     private int                 sampleWindowSize             = 1000;
-    private Executor            spinners                     = Executors.newSingleThreadExecutor(threadFactory("Spinner"));
+    private Executor            spinners                     = Executors.newSingleThreadExecutor(new LabeledThreadFactory(
+                                                                                                                          "Spinner"));
     private final SocketOptions spinnerSocketOptions         = new SocketOptions();
     private double              targetEventRate              = 1000.0;
     private int                 tokenLimit                   = 1000;

@@ -250,15 +250,15 @@ public class Switchboard {
         return newMembers;
     }
 
+    /**
+     * @return the state of the reciver. return null if the state is undefined,
+     *         such as when the switchboard is transititioning between states
+     */
     public SwitchboardState getState() {
-        return fsm.getState();
-    }
-
-    public boolean isStable() {
         try {
-            return fsm.getState() == SwitchboardContext.SwitchboardFSM.Stable;
+            return fsm.getState();
         } catch (StateUndefinedException e) {
-            return false;
+            return null;
         }
     }
 

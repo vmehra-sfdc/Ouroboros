@@ -54,7 +54,7 @@ public class Spinner implements CommunicationsHandler {
 
     private final BatchAcknowledgement               ack                 = new BatchAcknowledgement(
                                                                                                     this);
-    private final Coordinator                        coordinator;
+    private final Producer                           producer;
     private final SpinnerContext                     fsm                 = new SpinnerContext(
                                                                                               this);
     private SocketChannelHandler                     handler;
@@ -63,10 +63,10 @@ public class Spinner implements CommunicationsHandler {
     private final NavigableMap<BatchIdentity, Batch> pending             = new ConcurrentSkipListMap<BatchIdentity, Batch>();
     private final BatchWriter                        writer              = new BatchWriter();
 
-    public Spinner(Coordinator coordinator) {
-        this.coordinator = coordinator;
+    public Spinner(Producer producer) {
+        this.producer = producer;
         handshake.putInt(MAGIC);
-        coordinator.getId().serialize(handshake);
+        producer.getId().serialize(handshake);
         handshake.flip();
     }
 
@@ -84,16 +84,16 @@ public class Spinner implements CommunicationsHandler {
     public void acknowledge(BatchIdentity ack) {
         Batch batch = pending.remove(ack);
         if (batch != null) {
-            coordinator.acknowledge(batch);
+            producer.acknowledge(batch);
             if (log.isLoggable(Level.FINER)) {
                 log.finer(String.format("Acknowledgement for %s on primary %s",
-                                        ack, coordinator.getId()));
+                                        ack, producer.getId()));
             }
         } else {
-            coordinator.acknowledge(ack);
+            producer.acknowledge(ack);
             if (log.isLoggable(Level.FINER)) {
                 log.finer(String.format("Acknowledgement for %s on mirror %s",
-                                        ack, coordinator.getId()));
+                                        ack, producer.getId()));
             }
         }
     }

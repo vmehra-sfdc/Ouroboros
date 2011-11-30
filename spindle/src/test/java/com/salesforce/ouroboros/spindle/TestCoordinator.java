@@ -26,7 +26,9 @@
 package com.salesforce.ouroboros.spindle;
 
 import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertTrue;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.doAnswer;
@@ -200,6 +202,44 @@ public class TestCoordinator {
         verify(weaver).closeReplicator(node1);
         verify(weaver).closeReplicator(node2);
         verify(weaver).closeReplicator(node2);
+    }
+
+    @Test
+    public void testInitiateBootstrap() throws Exception {
+        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
+        Weaver weaver = mock(Weaver.class);
+        final Node localNode = new Node(0, 0, 0);
+        when(weaver.getId()).thenReturn(localNode);
+        when(weaver.getContactInformation()).thenReturn(dummyInfo);
+        Switchboard switchboard = mock(Switchboard.class);
+        Coordinator coordinator = new Coordinator(
+                                                  timer,
+                                                  switchboard,
+                                                  weaver,
+                                                  new CoordinatorConfiguration());
+        Answer<Void> answer = new Answer<Void>() {
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                Message message = (Message) invocation.getArguments()[0];
+                assertEquals(RebalanceMessage.BOOTSTRAP, message.type);
+                Node[] joiningMembers = (Node[]) message.arguments[0];
+                assertNotNull(joiningMembers);
+                assertEquals(1, joiningMembers.length);
+                assertEquals(localNode, joiningMembers[0]);
+                return null;
+            }
+        };
+        doAnswer(answer).when(switchboard).ringCast(isA(Message.class));
+        coordinator.stabilized();
+        assertFalse(coordinator.isActive());
+        coordinator.getInactiveMembers().add(localNode);
+        coordinator.initiateBootstrap(new Node[] { localNode });
+        assertEquals(ControllerFSM.CoordinateBootstrap, coordinator.getState());
+        coordinator.dispatch(RebalanceMessage.BOOTSTRAP, localNode,
+                             new Serializable[] { new Node[] { localNode } }, 0);
+        assertEquals(CoordinatorFSM.Stable, coordinator.getState());
+        verify(switchboard, new Times(1)).ringCast(isA(Message.class));
+        assertTrue(coordinator.isActive());
     }
 
     @Test
@@ -418,41 +458,5 @@ public class TestCoordinator {
         assertEquals(2, remapped.size());
         assertNotNull(remapped.get(primary));
         assertNotNull(remapped.get(mirror));
-    }
-
-    @Test
-    public void testInitiateBootstrap() throws Exception {
-        ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
-        Weaver weaver = mock(Weaver.class);
-        final Node localNode = new Node(0, 0, 0);
-        when(weaver.getId()).thenReturn(localNode);
-        when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Switchboard switchboard = mock(Switchboard.class);
-        Coordinator coordinator = new Coordinator(
-                                                  timer,
-                                                  switchboard,
-                                                  weaver,
-                                                  new CoordinatorConfiguration());
-        Answer<Void> answer = new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                Message message = (Message) invocation.getArguments()[0];
-                assertEquals(RebalanceMessage.BOOTSTRAP, message.type);
-                Node[] joiningMembers = (Node[]) message.arguments[0];
-                assertNotNull(joiningMembers);
-                assertEquals(1, joiningMembers.length);
-                assertEquals(localNode, joiningMembers[0]);
-                return null;
-            }
-        };
-        doAnswer(answer).when(switchboard).ringCast(isA(Message.class));
-        coordinator.stabilized();
-        coordinator.getInactiveMembers().add(localNode);
-        coordinator.initiateBootstrap(new Node[] { localNode });
-        assertEquals(ControllerFSM.CoordinateBootstrap, coordinator.getState());
-        coordinator.dispatch(RebalanceMessage.BOOTSTRAP, localNode,
-                             new Node[] { localNode }, 0);
-        assertEquals(CoordinatorFSM.Stable, coordinator.getState());
-        verify(switchboard, new Times(1)).ringCast(isA(Message.class));
     }
 }

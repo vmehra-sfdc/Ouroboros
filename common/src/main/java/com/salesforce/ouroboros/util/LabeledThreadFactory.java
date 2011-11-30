@@ -23,46 +23,31 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer;
+package com.salesforce.ouroboros.util;
 
-import static junit.framework.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.MockitoAnnotations;
-
-import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.GlobalMessageType;
-import com.salesforce.ouroboros.partition.Message;
-import com.salesforce.ouroboros.partition.Switchboard;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class TestCoordinator {
-    @Captor
-    ArgumentCaptor<Message> messageCaptor;
+public class LabeledThreadFactory implements ThreadFactory {
+    private final AtomicInteger count = new AtomicInteger(0);
+    private final String        prefix;
 
-    @Before
-    public void init() {
-        MockitoAnnotations.initMocks(this);
+    public LabeledThreadFactory(String prefix) {
+        this.prefix = prefix;
     }
 
-    @Test
-    public void testAdvertise() throws Exception {
-        Node self = mock(Node.class);
-        Switchboard switchboard = mock(Switchboard.class);
-
-        Coordinator coordinator = new Coordinator(self, switchboard);
-        coordinator.advertise();
-        verify(switchboard).ringCast(messageCaptor.capture());
-        assertEquals(GlobalMessageType.ADVERTISE_PRODUCER,
-                     messageCaptor.getValue().type);
+    @Override
+    public Thread newThread(Runnable runnable) {
+        Thread thread = new Thread(runnable,
+                                   String.format("%s[%s]", prefix,
+                                                 count.getAndIncrement()));
+        thread.setDaemon(true);
+        return thread;
     }
+
 }

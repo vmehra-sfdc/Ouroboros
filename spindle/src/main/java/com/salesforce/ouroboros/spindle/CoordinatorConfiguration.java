@@ -1,19 +1,19 @@
 package com.salesforce.ouroboros.spindle;
 
-import static com.salesforce.ouroboros.spindle.WeaverConfigation.threadFactory;
-
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.util.LabeledThreadFactory;
 
 public class CoordinatorConfiguration {
 
     private InetSocketAddress   xeroxAddress       = new InetSocketAddress(
                                                                            "127.0.0.1",
                                                                            0);
-    private Executor            xeroxes            = Executors.newSingleThreadExecutor(threadFactory("xerox"));
+    private Executor            xeroxes            = Executors.newSingleThreadExecutor(new LabeledThreadFactory(
+                                                                                                                "xerox"));
     private final SocketOptions xeroxSocketOptions = new SocketOptions();
 
     /**

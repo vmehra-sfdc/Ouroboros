@@ -48,6 +48,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import statemap.StateUndefinedException;
+
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.salesforce.ouroboros.ChannelMessage;
@@ -264,14 +266,14 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case BOOTSTRAP:
-                bootstrap((Node[]) arguments);
+                bootstrap((Node[]) arguments[0]);
                 if (!isLeader()) {
                     switchboard.ringCast(new Message(sender, type, arguments));
                 }
                 fsm.bootstrapped();
                 break;
             case PREPARE_FOR_REBALANCE:
-                rebalance((Node[]) arguments);
+                rebalance((Node[]) arguments[0]);
                 if (!isLeader()) {
                     switchboard.ringCast(new Message(sender, type, arguments));
                 }
@@ -342,8 +344,24 @@ public class Coordinator implements Member {
         return new Node[] { pair.get(0), pair.get(1) };
     }
 
+    /**
+     * @return the state of the reciver. return null if the state is undefined,
+     *         such as when the coordinator is transititioning between states
+     */
     public CoordinatorState getState() {
-        return fsm.getState();
+        try {
+            return fsm.getState();
+        } catch (StateUndefinedException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Initiate the bootstrapping of the weaver ring using the set of inactive
+     * members
+     */
+    public void initiateBootstrap() {
+        initiateBootstrap(inactiveMembers.toArray(new Node[inactiveMembers.size()]));
     }
 
     /**
@@ -369,6 +387,14 @@ public class Coordinator implements Member {
             }
         }
         fsm.bootstrapSystem(joiningMembers);
+    }
+
+    /**
+     * Initiate the rebalancing of the weaver ring using the set of inactive
+     * members
+     */
+    public void initiateRebalance() {
+        initiateRebalance(inactiveMembers.toArray(new Node[inactiveMembers.size()]));
     }
 
     /**
