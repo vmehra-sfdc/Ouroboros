@@ -34,7 +34,9 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Timer;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -57,8 +59,11 @@ import org.springframework.context.annotation.Configuration;
 
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardFSM;
+import com.salesforce.ouroboros.producer.Producer;
+import com.salesforce.ouroboros.producer.ProducerConfiguration;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverConfigation;
 
@@ -68,6 +73,22 @@ import com.salesforce.ouroboros.spindle.WeaverConfigation;
  * 
  */
 public class TestProducerChannelBuffer {
+
+    public static class Source implements EventSource {
+
+        @Override
+        public void assumePrimary(Map<UUID, Long> newPrimaries) {
+        }
+
+        @Override
+        public void closed(UUID channel) {
+        }
+
+        @Override
+        public void opened(UUID channel) {
+        }
+
+    }
 
     public static class ControlNode extends NodeData {
         static final Logger log = Logger.getLogger(ControlNode.class.getCanonicalName());
@@ -175,8 +196,23 @@ public class TestProducerChannelBuffer {
         public com.salesforce.ouroboros.producer.Coordinator coordinator()
                                                                           throws IOException {
             return new com.salesforce.ouroboros.producer.Coordinator(
-                                                                     memberNode(),
-                                                                     switchboard());
+                                                                     switchboard(),
+                                                                     producer());
+        }
+
+        @Bean
+        public Producer producer() throws IOException {
+            return new Producer(memberNode(), source(), configuration());
+        }
+
+        @Bean
+        public Source source() {
+            return new Source();
+        }
+
+        @Bean
+        public ProducerConfiguration configuration() {
+            return new ProducerConfiguration();
         }
 
         /* (non-Javadoc)
