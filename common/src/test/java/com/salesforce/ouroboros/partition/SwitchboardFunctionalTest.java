@@ -152,13 +152,6 @@ public class SwitchboardFunctionalTest {
         }
 
         @Override
-        public void dispatch(MemberDispatch type,
-                             com.salesforce.ouroboros.Node sender,
-                             Serializable[] arguments, long time) {
-
-        }
-
-        @Override
         public void dispatch(RebalanceMessage type, Node sender,
                              Serializable[] arguments, long time) {
 

@@ -38,7 +38,6 @@ import statemap.StateUndefinedException;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
@@ -157,10 +156,11 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case PREPARE:
-                // do nothing
+                switchboard.ringCast(new Message(sender, type));
                 break;
             case FAILOVER:
                 failover();
+                switchboard.ringCast(new Message(sender, type));
                 break;
             default: {
                 if (log.isLoggable(Level.WARNING)) {
@@ -169,11 +169,6 @@ public class Coordinator implements Member {
                 }
             }
         }
-    }
-
-    @Override
-    public void dispatch(MemberDispatch type, Node sender,
-                         Serializable[] arguments, long time) {
     }
 
     @Override
@@ -255,5 +250,9 @@ public class Coordinator implements Member {
         }
         return inactiveMembers.size() == 0 ? true
                                           : inactiveMembers.last().equals(self);
+    }
+
+    protected void cleanUp() {
+        joiningWeavers = new Node[0];
     }
 }

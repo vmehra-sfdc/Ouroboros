@@ -92,9 +92,6 @@ public class Switchboard {
         void dispatch(FailoverMessage type, Node sender,
                       Serializable[] arguments, long time);
 
-        void dispatch(MemberDispatch type, Node sender,
-                      Serializable[] arguments, long time);
-
         void dispatch(RebalanceMessage type, Node sender,
                       Serializable[] arguments, long time);
 
@@ -258,11 +255,6 @@ public class Switchboard {
     }
 
     public void dispatchToMember(FailoverMessage type, Node sender,
-                                 Serializable[] arguments, long time) {
-        member.dispatch(type, sender, arguments, time);
-    }
-
-    public void dispatchToMember(MemberDispatch type, Node sender,
                                  Serializable[] arguments, long time) {
         member.dispatch(type, sender, arguments, time);
     }
