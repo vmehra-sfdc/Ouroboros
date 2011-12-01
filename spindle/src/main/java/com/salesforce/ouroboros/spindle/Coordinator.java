@@ -206,7 +206,7 @@ public class Coordinator implements Member {
         switch (type) {
             case PREPARE:
                 failover();
-                if (isLeader()) {
+                if (sender.equals(id)) {
                     switchboard.ringCast(new Message(sender,
                                                      FailoverMessage.FAILOVER));
                 } else {
@@ -249,19 +249,19 @@ public class Coordinator implements Member {
         switch (type) {
             case PREPARE_FOR_REBALANCE:
                 rebalance((Node[]) arguments[0]);
-                if (!isLeader()) {
+                if (!sender.equals(id)) {
                     switchboard.ringCast(new Message(sender, type, arguments));
                 }
                 fsm.rebalance();
                 break;
             case INITIATE_REBALANCE:
-                if (!isLeader()) {
+                if (!sender.equals(id)) {
                     switchboard.ringCast(new Message(sender, type));
                 }
                 break;
             case REBALANCE_COMPLETE:
                 rebalanced();
-                if (!isLeader()) {
+                if (!sender.equals(id)) {
                     switchboard.ringCast(new Message(sender, type));
                 }
                 break;
@@ -276,7 +276,7 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case READY_REPLICATORS:
-                if (isLeader()) {
+                if (sender.equals(id)) {
                     replicatorsReady();
                 } else {
                     readyReplicators();
@@ -285,7 +285,7 @@ public class Coordinator implements Member {
                 }
                 break;
             case REPLICATORS_ESTABLISHED:
-                if (isLeader()) {
+                if (sender.equals(id)) {
                     replicatorsEstablished(sender);
                 } else {
                     switchboard.ringCast(new Message(sender, type, arguments),
@@ -293,7 +293,7 @@ public class Coordinator implements Member {
                 }
                 break;
             case CONNECT_REPLICATORS:
-                if (!isLeader()) {
+                if (!sender.equals(id)) {
                     switchboard.ringCast(new Message(sender, type, arguments),
                                          allMembers);
                 }
@@ -484,7 +484,6 @@ public class Coordinator implements Member {
      * Commit the calculated next ring as the current weaver ring
      */
     protected void commitNextRing() {
-        assert nextRing != null : "Next ring has not been calculated";
         weaver.setRing(nextRing);
         nextRing = null;
     }
@@ -493,13 +492,11 @@ public class Coordinator implements Member {
      * Commit the takeover of the new primaries and secondaries.
      */
     protected void commitTakeover() {
-        assert isLeader() : "Must be leader to commit takeover";
         // TODO Auto-generated method stub
 
     }
 
     protected void connectReplicators() {
-        assert isLeader() : "Must be leader to coordinate replicator connect";
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating replicators connect on %s", id));
         }
@@ -520,7 +517,6 @@ public class Coordinator implements Member {
     }
 
     protected void coordinateFailover() {
-        assert isLeader() : "Must be leader to coordinate the rebalance";
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating weaver failover on %s", id));
         }
@@ -533,7 +529,6 @@ public class Coordinator implements Member {
      * of the system by including the new members.
      */
     protected void coordinateRebalance() {
-        assert isLeader() : "Must be leader to coordinate the rebalance";
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating rebalancing on %s", id));
         }
@@ -549,7 +544,6 @@ public class Coordinator implements Member {
      * group
      */
     protected void coordinateReplicators() {
-        assert isLeader() : "Must be leader to coordinate the establishment of replicators";
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating establishment of the replicators on %s",
                                    id));
@@ -559,7 +553,6 @@ public class Coordinator implements Member {
     }
 
     protected void coordinateTakeover() {
-        assert isLeader() : "Must be leader to coordinate the takeover";
         rendezvous = null;
         switchboard.ringCast(new Message(id,
                                          RebalanceMessage.REBALANCE_COMPLETE),
@@ -837,7 +830,9 @@ public class Coordinator implements Member {
     public void dispatch(BootstrapMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
-
+            case BOOTSTAP_PRODUCERS:
+                switchboard.ringCast(new Message(sender, type, arguments));
+                break;
             case BOOTSTRAP_SPINDLES:
                 bootstrap((Node[]) arguments[0]);
                 if (!isLeader()) {

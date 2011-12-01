@@ -20,8 +20,14 @@ digraph Coordinator_sm {
         "CoordinatorFSM::Stable"
             [label="{Stable}"];
 
+        "CoordinatorFSM::Bootstrapping"
+            [label="{Bootstrapping}"];
+
         "CoordinatorFSM::DefaultState"
             [label="{&laquo; Default &raquo;}"];
+
+        "CoordinatorFSM::Bootstrapping::ControllerFSM"
+            [label="{ControllerFSM|O-O\r}"]
 
         "%start"
             [label="" shape=circle style=filled fillcolor=black width=0.25];
@@ -31,13 +37,25 @@ digraph Coordinator_sm {
         //
 
         "CoordinatorFSM::Unstable" -> "CoordinatorFSM::AwaitingFailover"
-            [label="stabilized/\l"];
+            [label="stabilize/\l"];
+
+        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Bootstrapping::ControllerFSM"
+            [label="stabilize/\lpush(ControllerFSM::Bootstrap)\l"];
+
+        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Bootstrapping"
+            [label="stabilize/\l"];
 
         "CoordinatorFSM::AwaitingFailover" -> "CoordinatorFSM::Stable"
             [label="failedOver/\l"];
 
+        "CoordinatorFSM::Bootstrapping" -> "CoordinatorFSM::Stable"
+            [label="bootstrapped/\l"];
+
         "CoordinatorFSM::DefaultState" -> "CoordinatorFSM::Unstable"
-            [label="destabilized/\l"];
+            [label="destabilize/\l"];
+
+        "CoordinatorFSM::Bootstrapping::ControllerFSM" -> "CoordinatorFSM::Bootstrapping"
+            [label="pop/"]
 
         "%start" -> "CoordinatorFSM::Unstable"
     }
@@ -50,9 +68,48 @@ digraph Coordinator_sm {
         // States (Nodes)
         //
 
+        "ControllerFSM::Bootstrap"
+            [label="{Bootstrap}"];
+
+        "ControllerFSM::CoordinateBootstrap"
+            [label="{CoordinateBootstrap}"];
+
+        "ControllerFSM::DefaultState"
+            [label="{&laquo; Default &raquo;}"];
+
+        "ControllerFSM::pop(destabilize)"
+            [label="" width=1]
+
+        "ControllerFSM::pop(bootstrapped)"
+            [label="" width=1]
+
+        "ControllerFSM::%end"
+            [label="" shape=doublecircle style=filled fillcolor=black width=0.15];
+
+        "push(ControllerFSM::Bootstrap)"
+            [label="" shape=plaintext];
+
         //
         // Transitions (Edges)
         //
+
+        "ControllerFSM::Bootstrap" -> "ControllerFSM::CoordinateBootstrap"
+            [label="bootstrapSystem/\l"];
+
+        "ControllerFSM::CoordinateBootstrap" -> "ControllerFSM::pop(bootstrapped)"
+            [label="bootstrapped/\l"];
+
+        "ControllerFSM::DefaultState" -> "ControllerFSM::pop(destabilize)"
+            [label="destabilize/\l"];
+
+        "ControllerFSM::pop(destabilize)" -> "ControllerFSM::%end"
+            [label="pop(destabilize);\l"];
+
+        "ControllerFSM::pop(bootstrapped)" -> "ControllerFSM::%end"
+            [label="pop(bootstrapped);\l"];
+
+        "push(ControllerFSM::Bootstrap)" -> "ControllerFSM::Bootstrap"
+            [arrowtail=odot];
     }
 
 }

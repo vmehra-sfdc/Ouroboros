@@ -66,11 +66,13 @@ public class Coordinator implements Member {
                                                                                          this);
     private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
     private final SortedSet<Node>               inactiveWeavers = new ConcurrentSkipListSet<Node>();
+    private Node[]                              joiningMembers  = new Node[0];
     private Node[]                              joiningWeavers  = new Node[0];
-    private ConsistentHashFunction<Node>        nextWeaverRing  = new ConsistentHashFunction<Node>();
+    private ConsistentHashFunction<Node>        nextWeaverRing;
     private final Producer                      producer;
     private final Node                          self;
     private final Switchboard                   switchboard;
+
     private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(Switchboard switchboard, Producer producer)
@@ -90,17 +92,38 @@ public class Coordinator implements Member {
 
     @Override
     public void destabilize() {
-        fsm.destabilized();
+        fsm.destabilize();
     }
 
     @Override
     public void dispatch(BootstrapMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
-            case BOOTSTRAP_SPINDLES:
-                joiningWeavers = (Node[]) arguments[0];
+            case BOOTSTAP_PRODUCERS: {
+                ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+                for (Node node : (Node[]) arguments[0]) {
+                    ring.add(node, node.capacity);
+                    inactiveMembers.remove(node);
+                    activeMembers.add(node);
+                }
+                producer.setProducerRing(ring);
+                if (!sender.equals(self)) {
+                    switchboard.ringCast(new Message(sender, type, arguments));
+                }
+                fsm.bootstrapped();
+                break;
+            }
+            case BOOTSTRAP_SPINDLES: {
+                ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+                for (Node node : (Node[]) arguments[0]) {
+                    ring.add(node, node.capacity);
+                    inactiveWeavers.remove(node);
+                    activeWeavers.add(node);
+                }
+                producer.remapWeavers(ring);
                 switchboard.ringCast(new Message(sender, type, arguments));
                 break;
+            }
             default:
                 throw new IllegalStateException(
                                                 String.format("Invalid bootstrap message: %s",
@@ -206,9 +229,45 @@ public class Coordinator implements Member {
         }
     }
 
+    /**
+     * Initiate the bootstrapping of the producer ring using the set of inactive
+     * members
+     */
+    public void initiateBootstrap() {
+        initiateBootstrap(inactiveMembers.toArray(new Node[inactiveMembers.size()]));
+    }
+
+    /**
+     * Initiate the bootstrapping of the producer ring
+     * 
+     * @param joiningMembers
+     *            - the bootstrap membership set
+     */
+    public void initiateBootstrap(Node[] joiningMembers) {
+        if (!isLeader() || active) {
+            throw new IllegalStateException(
+                                            "This node must be inactive and the leader to initiate rebalancing");
+        }
+        if (activeMembers.size() != 0) {
+            throw new IllegalStateException(
+                                            "There must be no active members in the partition");
+        }
+        if (joiningMembers == null) {
+            throw new IllegalArgumentException(
+                                               "joining members must not be null");
+        }
+        for (Node node : joiningMembers) {
+            if (!inactiveMembers.contains(node)) {
+                throw new IllegalArgumentException(
+                                                   "Joining members must be inactive");
+            }
+        }
+        fsm.bootstrapSystem(joiningMembers);
+    }
+
     @Override
     public void stabilized() {
-        fsm.stabilized();
+        fsm.stabilize();
     }
 
     /**
@@ -220,6 +279,19 @@ public class Coordinator implements Member {
         activeWeavers.removeAll(switchboard.getDeadMembers());
         inactiveMembers.removeAll(switchboard.getDeadMembers());
         inactiveWeavers.removeAll(switchboard.getDeadMembers());
+    }
+
+    protected void cleanUp() {
+        joiningMembers = joiningWeavers = new Node[0];
+    }
+
+    protected void coordinateBootstrap() {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Coordinating bootstrap on %s", self));
+        }
+        switchboard.ringCast(new Message(self,
+                                         BootstrapMessage.BOOTSTAP_PRODUCERS,
+                                         (Serializable) joiningMembers));
     }
 
     /**
@@ -252,7 +324,7 @@ public class Coordinator implements Member {
                                           : inactiveMembers.last().equals(self);
     }
 
-    protected void cleanUp() {
-        joiningWeavers = new Node[0];
+    protected void setJoiningMembers(Node[] joiningMembers) {
+        this.joiningMembers = joiningMembers;
     }
 }

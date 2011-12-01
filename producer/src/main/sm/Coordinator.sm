@@ -34,17 +34,29 @@
 
 %class Coordinator
 %package com.salesforce.ouroboros.producer
-
+%import com.salesforce.ouroboros.Node
 %access public
 
 %start CoordinatorFSM::Unstable
 %map CoordinatorFSM
 %%
-Unstable{
-	stabilized
+Unstable
+Entry {
+	cleanUp();
+}
+{
+	stabilize
+		[ctxt.isActive()]
 		AwaitingFailover{}
+        
+    stabilize
+    	[ctxt.isLeader()]
+    	Bootstrapping/push(ControllerFSM::Bootstrap){}
+        
+    stabilize
+    	Bootstrapping{}
 		
-	destabilized
+	destabilize
 		nil{}
 }
 
@@ -55,14 +67,36 @@ AwaitingFailover{
 
 Stable{}
 
+Bootstrapping{
+	bootstrapped
+		Stable{}
+}
+
 Default {
-	destabilized
+	destabilize
 		Unstable{}
 }
 %%
 %map ControllerFSM
 %%
+Bootstrap {
+	bootstrapSystem(joiningMembers: Node[])
+		CoordinateBootstrap{
+			setJoiningMembers(joiningMembers);
+		}
+}
+
+CoordinateBootstrap
+Entry{
+	coordinateBootstrap();
+}
+{
+	bootstrapped
+		pop(bootstrapped){}
+}
 
 Default{
+	destabilize 
+		pop(destabilize){}
 }
 %%

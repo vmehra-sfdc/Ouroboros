@@ -478,4 +478,8 @@ public class Producer {
     protected void openPublishingGate() {
         publishGate.open();
     }
+
+    protected void setProducerRing(ConsistentHashFunction<Node> newRing) {
+        producerRing = newRing;
+    }
 }

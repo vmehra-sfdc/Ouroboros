@@ -386,7 +386,15 @@ public class TestProducerChannelBuffer {
                              return weaver.getState() == com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM.Stable;
                          }
                      }, 30000, 200);
-        assertEquals(com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM.Stable,
-                     weaver.getState());
+
+        producer.initiateBootstrap();
+
+        Util.waitFor("producer coordinator did not stabilize",
+                     new Util.Condition() {
+                         @Override
+                         public boolean value() {
+                             return producer.getState() == com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM.Stable;
+                         }
+                     }, 30000, 200);
     }
 }
