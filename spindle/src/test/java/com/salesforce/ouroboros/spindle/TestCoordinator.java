@@ -54,10 +54,11 @@ import org.mockito.stubbing.Answer;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.RebalanceMessage;
-import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
+import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
+import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
@@ -199,7 +200,8 @@ public class TestCoordinator {
         when(switchboard.getDeadMembers()).thenReturn(deadMembers);
         coordinator.getFsm().setState(CoordinatorFSM.Failover);
         coordinator.failover();
-        assertEquals(CoordinatorFSM.EstablishReplicators, coordinator.getState());
+        assertEquals(CoordinatorFSM.EstablishReplicators,
+                     coordinator.getState());
         verify(weaver).failover(deadMembers);
     }
 
@@ -220,7 +222,7 @@ public class TestCoordinator {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
                 Message message = (Message) invocation.getArguments()[0];
-                assertEquals(RebalanceMessage.BOOTSTRAP, message.type);
+                assertEquals(BootstrapMessage.BOOTSTRAP_SPINDLES, message.type);
                 Node[] joiningMembers = (Node[]) message.arguments[0];
                 assertNotNull(joiningMembers);
                 assertEquals(1, joiningMembers.length);
@@ -234,7 +236,7 @@ public class TestCoordinator {
         coordinator.getInactiveMembers().add(localNode);
         coordinator.initiateBootstrap(new Node[] { localNode });
         assertEquals(ControllerFSM.CoordinateBootstrap, coordinator.getState());
-        coordinator.dispatch(RebalanceMessage.BOOTSTRAP, localNode,
+        coordinator.dispatch(BootstrapMessage.BOOTSTRAP_SPINDLES, localNode,
                              new Serializable[] { new Node[] { localNode } }, 0);
         assertEquals(CoordinatorFSM.Stable, coordinator.getState());
         verify(switchboard, new Times(1)).ringCast(isA(Message.class));
@@ -322,13 +324,13 @@ public class TestCoordinator {
                                                                         address,
                                                                         address,
                                                                         address);
-        coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node1,
+        coordinator.dispatch(DiscoveryMessage.ADVERTISE_CHANNEL_BUFFER, node1,
                              new Serializable[] { contactInformation1, true },
                              0);
-        coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node2,
+        coordinator.dispatch(DiscoveryMessage.ADVERTISE_CHANNEL_BUFFER, node2,
                              new Serializable[] { contactInformation2, true },
                              0);
-        coordinator.dispatch(GlobalMessageType.ADVERTISE_CHANNEL_BUFFER, node3,
+        coordinator.dispatch(DiscoveryMessage.ADVERTISE_CHANNEL_BUFFER, node3,
                              new Serializable[] { contactInformation3, true },
                              0);
         coordinator.getInactiveMembers().addAll(Arrays.asList(node1, node2,

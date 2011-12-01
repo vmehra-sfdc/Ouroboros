@@ -47,16 +47,17 @@ import statemap.StateUndefinedException;
 
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
-import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.RebalanceMessage;
-import com.salesforce.ouroboros.partition.FailoverMessage;
-import com.salesforce.ouroboros.partition.GlobalMessageType;
 import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
+import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
+import com.salesforce.ouroboros.partition.messages.ChannelMessage;
+import com.salesforce.ouroboros.partition.messages.FailoverMessage;
+import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
+import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorState;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
@@ -125,7 +126,7 @@ public class Coordinator implements Member {
         ContactInformation info = yellowPages.get(id);
         switchboard.ringCast(new Message(
                                          weaver.getId(),
-                                         GlobalMessageType.ADVERTISE_CHANNEL_BUFFER,
+                                         DiscoveryMessage.ADVERTISE_CHANNEL_BUFFER,
                                          info, active));
     }
 
@@ -226,7 +227,7 @@ public class Coordinator implements Member {
     }
 
     @Override
-    public void dispatch(GlobalMessageType type, Node sender,
+    public void dispatch(DiscoveryMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
             case ADVERTISE_CHANNEL_BUFFER:
@@ -255,13 +256,6 @@ public class Coordinator implements Member {
     public void dispatch(RebalanceMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
-            case BOOTSTRAP:
-                bootstrap((Node[]) arguments[0]);
-                if (!isLeader()) {
-                    switchboard.ringCast(new Message(sender, type, arguments));
-                }
-                fsm.bootstrapped();
-                break;
             case PREPARE_FOR_REBALANCE:
                 rebalance((Node[]) arguments[0]);
                 if (!isLeader()) {
@@ -529,7 +523,8 @@ public class Coordinator implements Member {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating bootstrap on %s", id));
         }
-        switchboard.ringCast(new Message(id, RebalanceMessage.BOOTSTRAP,
+        switchboard.ringCast(new Message(id,
+                                         BootstrapMessage.BOOTSTRAP_SPINDLES,
                                          (Serializable) joiningMembers));
     }
 
@@ -845,5 +840,24 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
+    }
+
+    @Override
+    public void dispatch(BootstrapMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+
+            case BOOTSTRAP_SPINDLES:
+                bootstrap((Node[]) arguments[0]);
+                if (!isLeader()) {
+                    switchboard.ringCast(new Message(sender, type, arguments));
+                }
+                fsm.bootstrapped();
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Illegal bootstrap method: %s",
+                                                              type));
+        }
     }
 }

@@ -23,49 +23,25 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer;
+package com.salesforce.ouroboros.partition.messages;
 
-import static junit.framework.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.MockitoAnnotations;
+import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.Message;
+import com.salesforce.ouroboros.partition.MemberDispatch;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class TestCoordinator {
-    @Captor
-    ArgumentCaptor<Message> messageCaptor;
+public enum BootstrapMessage implements MemberDispatch {
+    BOOTSTRAP_SPINDLES, BOOTSTAP_PRODUCERS;
 
-    @Before
-    public void init() {
-        MockitoAnnotations.initMocks(this);
-    }
-
-    @Test
-    public void testAdvertise() throws Exception {
-        Node self = mock(Node.class);
-        Producer producer = mock(Producer.class);
-        when(producer.getId()).thenReturn(self);
-        Switchboard switchboard = mock(Switchboard.class);
-
-        Coordinator coordinator = new Coordinator(switchboard, producer);
-        coordinator.advertise();
-        verify(switchboard).ringCast(messageCaptor.capture());
-        assertEquals(DiscoveryMessage.ADVERTISE_PRODUCER,
-                     messageCaptor.getValue().type);
+    @Override
+    public void dispatch(Switchboard switchboard, Node sender,
+                         Serializable[] arguments, long time) {
+        switchboard.dispatchToMember(this, sender, arguments, time);
     }
 }

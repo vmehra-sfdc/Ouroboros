@@ -48,11 +48,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
-import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.RebalanceMessage;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.partition.Util.Condition;
+import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
+import com.salesforce.ouroboros.partition.messages.ChannelMessage;
+import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
+import com.salesforce.ouroboros.partition.messages.FailoverMessage;
+import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
 
 /**
  * 
@@ -117,12 +120,17 @@ public class SwitchboardFunctionalTest {
             System.err.println("advertising");
             switchboard.ringCast(new Message(
                                              node,
-                                             GlobalMessageType.ADVERTISE_CONSUMER));
+                                             DiscoveryMessage.ADVERTISE_CONSUMER));
         }
 
         @Override
         public void destabilize() {
             stabilized = false;
+        }
+
+        @Override
+        public void dispatch(BootstrapMessage type, Node sender,
+                             Serializable[] arguments, long time) {
         }
 
         @Override
@@ -132,15 +140,15 @@ public class SwitchboardFunctionalTest {
         }
 
         @Override
-        public void dispatch(FailoverMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void dispatch(GlobalMessageType type,
+        public void dispatch(DiscoveryMessage type,
                              com.salesforce.ouroboros.Node sender,
                              Serializable[] arguments, long time) {
 
+        }
+
+        @Override
+        public void dispatch(FailoverMessage type, Node sender,
+                             Serializable[] arguments, long time) {
         }
 
         @Override

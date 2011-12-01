@@ -41,6 +41,7 @@ import org.smartfrog.services.anubis.partition.views.View;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardFSM;
+import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 
 /**
  * 
@@ -108,7 +109,7 @@ public class SwitchboardTest {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
                 Message message = (Message) invocation.getArguments()[0];
-                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE, message.type);
+                assertEquals(DiscoveryMessage.DISCOVERY_COMPLETE, message.type);
                 return null;
             }
         };
@@ -116,7 +117,7 @@ public class SwitchboardTest {
         doAnswer(answer).when(connection2).sendObject(isA(Message.class));
 
         switchboard.broadcast(new Message(node,
-                                          GlobalMessageType.DISCOVERY_COMPLETE));
+                                          DiscoveryMessage.DISCOVERY_COMPLETE));
         verify(connection1).sendObject(isA(Message.class));
 
     }
@@ -183,7 +184,7 @@ public class SwitchboardTest {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
                 Message message = (Message) invocation.getArguments()[0];
-                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE, message.type);
+                assertEquals(DiscoveryMessage.DISCOVERY_COMPLETE, message.type);
                 return null;
             }
         }).when(connection).sendObject(isA(Message.class));
@@ -225,13 +226,13 @@ public class SwitchboardTest {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
                 Message message = (Message) invocation.getArguments()[0];
-                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE, message.type);
+                assertEquals(DiscoveryMessage.DISCOVERY_COMPLETE, message.type);
                 return null;
             }
         }).when(connection).sendObject(isA(Message.class));
 
         switchboard.ringCast(new Message(node,
-                                         GlobalMessageType.DISCOVERY_COMPLETE));
+                                         DiscoveryMessage.DISCOVERY_COMPLETE));
         verify(connection).sendObject(isA(Message.class));
 
     }
@@ -253,7 +254,7 @@ public class SwitchboardTest {
         switchboard.setMember(member);
         switchboard.partitionEvent(v, 0);
         Message msg = new Message(testNode,
-                                  GlobalMessageType.DISCOVERY_COMPLETE);
+                                  DiscoveryMessage.DISCOVERY_COMPLETE);
         switchboard.send(msg, testNode);
         verify(connection).sendObject(msg);
     }
@@ -270,7 +271,7 @@ public class SwitchboardTest {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
                 Message message = (Message) invocation.getArguments()[0];
-                assertEquals(GlobalMessageType.DISCOVERY_COMPLETE, message.type);
+                assertEquals(DiscoveryMessage.DISCOVERY_COMPLETE, message.type);
                 return null;
             }
         };
@@ -285,7 +286,7 @@ public class SwitchboardTest {
         switchboard.partitionEvent(view, 0);
         switchboard.discover(node);
         switchboard.discover(testNode);
-        switchboard.dispatch(GlobalMessageType.DISCOVERY_COMPLETE, node, null,
+        switchboard.dispatch(DiscoveryMessage.DISCOVERY_COMPLETE, node, null,
                              -1);
         assertEquals(SwitchboardFSM.Stable, switchboard.getState());
         verify(member).stabilized();

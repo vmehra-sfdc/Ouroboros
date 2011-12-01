@@ -49,10 +49,13 @@ import org.smartfrog.services.anubis.partition.views.View;
 
 import statemap.StateUndefinedException;
 
-import com.salesforce.ouroboros.ChannelMessage;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.RebalanceMessage;
 import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardState;
+import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
+import com.salesforce.ouroboros.partition.messages.ChannelMessage;
+import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
+import com.salesforce.ouroboros.partition.messages.FailoverMessage;
+import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
 import com.salesforce.ouroboros.util.Gate;
 
 /**
@@ -77,13 +80,16 @@ public class Switchboard {
          */
         void destabilize();
 
+        void dispatch(BootstrapMessage type, Node sender,
+                      Serializable[] arguments, long time);
+
         void dispatch(ChannelMessage type, Node sender,
                       Serializable[] arguments, long time);
 
-        void dispatch(FailoverMessage type, Node sender,
+        void dispatch(DiscoveryMessage type, Node sender,
                       Serializable[] arguments, long time);
 
-        void dispatch(GlobalMessageType type, Node sender,
+        void dispatch(FailoverMessage type, Node sender,
                       Serializable[] arguments, long time);
 
         void dispatch(MemberDispatch type, Node sender,
@@ -203,6 +209,47 @@ public class Switchboard {
      */
     public void destabilize() {
         partition.destabilize();
+    }
+
+    /**
+     * The double dispatch of the GlobalMessage
+     * 
+     * @param type
+     * @param sender
+     * @param arguments
+     * @param time
+     */
+    public void dispatch(DiscoveryMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        if (self.equals(sender)) {
+            if (log.isLoggable(Level.FINER)) {
+                log.fine(String.format("Complete ring traversal of %s from %s",
+                                       type, self));
+            }
+        } else {
+            ringCast(new Message(sender, type, arguments));
+        }
+        switch (type) {
+            case DISCOVERY_COMPLETE:
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Discovery complete on %s", self));
+                }
+                fsm.discoveryComplete();
+                break;
+            default:
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Discovery of node %s = %s", self,
+                                           type));
+                }
+                discover(sender);
+                member.dispatch(type, sender, arguments, time);
+                break;
+        }
+    }
+
+    public void dispatchToMember(BootstrapMessage type, Node sender,
+                                 Serializable[] arguments, long time) {
+        member.dispatch(type, sender, arguments, time);
     }
 
     public void dispatchToMember(ChannelMessage type, Node sender,
@@ -474,48 +521,12 @@ public class Switchboard {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("All members discovered on %s", self));
             }
-            ringCast(new Message(self, GlobalMessageType.DISCOVERY_COMPLETE));
+            ringCast(new Message(self, DiscoveryMessage.DISCOVERY_COMPLETE));
         } else {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("member %s discovered on %s", sender,
                                        self));
             }
-        }
-    }
-
-    /**
-     * The double dispatch of the GlobalMessage
-     * 
-     * @param type
-     * @param sender
-     * @param arguments
-     * @param time
-     */
-    void dispatch(GlobalMessageType type, Node sender,
-                  Serializable[] arguments, long time) {
-        if (self.equals(sender)) {
-            if (log.isLoggable(Level.FINER)) {
-                log.fine(String.format("Complete ring traversal of %s from %s",
-                                       type, self));
-            }
-        } else {
-            ringCast(new Message(sender, type, arguments));
-        }
-        switch (type) {
-            case DISCOVERY_COMPLETE:
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Discovery complete on %s", self));
-                }
-                fsm.discoveryComplete();
-                break;
-            default:
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Discovery of node %s = %s", self,
-                                           type));
-                }
-                discover(sender);
-                member.dispatch(type, sender, arguments, time);
-                break;
         }
     }
 

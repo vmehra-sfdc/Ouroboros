@@ -23,18 +23,20 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.partition;
+package com.salesforce.ouroboros.partition.messages;
 
 import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.partition.SwitchboardDispatch;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public enum GlobalMessageType implements SwitchboardDispatch {
+public enum DiscoveryMessage implements SwitchboardDispatch {
     ADVERTISE_CHANNEL_BUFFER, ADVERTISE_CONSUMER, ADVERTISE_PRODUCER,
     DISCOVERY_COMPLETE;
 

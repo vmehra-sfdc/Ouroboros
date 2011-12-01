@@ -23,11 +23,13 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.partition;
+package com.salesforce.ouroboros.partition.messages;
 
 import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.MemberDispatch;
+import com.salesforce.ouroboros.partition.Switchboard;
 
 /**
  * 
