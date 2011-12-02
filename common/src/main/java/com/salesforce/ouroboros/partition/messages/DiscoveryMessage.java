@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.partition.messages;
 import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.SwitchboardDispatch;
 
@@ -44,5 +45,6 @@ public enum DiscoveryMessage implements SwitchboardDispatch {
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
         switchboard.dispatch(this, sender, arguments, time);
+        switchboard.forwardToNextInRing(new Message(sender, this, arguments));
     }
 }

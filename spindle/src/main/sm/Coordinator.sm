@@ -167,7 +167,9 @@ Entry{
 }
 {
     failedOver
-        pop(failedOver){}
+        pop(failedOver){
+        	commitFailover();
+        }
 }
 
 CoordinateReplicators

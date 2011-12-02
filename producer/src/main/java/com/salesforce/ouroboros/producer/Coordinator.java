@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Map;
 import java.util.SortedSet;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.logging.Level;
@@ -107,9 +108,6 @@ public class Coordinator implements Member {
                     activeMembers.add(node);
                 }
                 producer.setProducerRing(ring);
-                if (!sender.equals(self)) {
-                    switchboard.ringCast(new Message(sender, type, arguments));
-                }
                 fsm.bootstrapped();
                 break;
             }
@@ -121,7 +119,6 @@ public class Coordinator implements Member {
                     activeWeavers.add(node);
                 }
                 producer.remapWeavers(ring);
-                switchboard.ringCast(new Message(sender, type, arguments));
                 break;
             }
             default:
@@ -179,11 +176,9 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case PREPARE:
-                switchboard.ringCast(new Message(sender, type));
                 break;
             case FAILOVER:
                 failover();
-                switchboard.ringCast(new Message(sender, type));
                 break;
             default: {
                 if (log.isLoggable(Level.WARNING)) {
@@ -281,13 +276,20 @@ public class Coordinator implements Member {
         inactiveWeavers.removeAll(switchboard.getDeadMembers());
     }
 
+    /**
+     * Clean up any state when destabilizing the partition.
+     */
     protected void cleanUp() {
         joiningMembers = joiningWeavers = new Node[0];
     }
 
+    /**
+     * Coordinate the bootstrapping of the producer process group.
+     */
     protected void coordinateBootstrap() {
         if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Coordinating bootstrap on %s", self));
+            log.info(String.format("Coordinating producer bootstrap on %s",
+                                   self));
         }
         switchboard.ringCast(new Message(self,
                                          BootstrapMessage.BOOTSTAP_PRODUCERS,
@@ -326,5 +328,10 @@ public class Coordinator implements Member {
 
     protected void setJoiningMembers(Node[] joiningMembers) {
         this.joiningMembers = joiningMembers;
+    }
+
+    protected void openChannel(UUID channel) {
+        // TODO Auto-generated method stub
+
     }
 }

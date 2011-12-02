@@ -169,6 +169,26 @@ public class Coordinator implements Member {
     }
 
     @Override
+    public void dispatch(BootstrapMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case BOOTSTAP_PRODUCERS:
+                break;
+            case BOOTSTRAP_SPINDLES:
+                bootstrap((Node[]) arguments[0]);
+                if (!isLeader()) {
+                    switchboard.ringCast(new Message(sender, type, arguments));
+                }
+                fsm.bootstrapped();
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Illegal bootstrap method: %s",
+                                                              type));
+        }
+    }
+
+    @Override
     public void dispatch(ChannelMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
@@ -201,31 +221,6 @@ public class Coordinator implements Member {
     }
 
     @Override
-    public void dispatch(FailoverMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        switch (type) {
-            case PREPARE:
-                failover();
-                if (sender.equals(id)) {
-                    switchboard.ringCast(new Message(sender,
-                                                     FailoverMessage.FAILOVER));
-                } else {
-                    switchboard.ringCast(new Message(sender,
-                                                     FailoverMessage.PREPARE),
-                                         activeMembers);
-                }
-                break;
-            case FAILOVER:
-                // do nothing
-                break;
-            default:
-                throw new IllegalStateException(
-                                                String.format("Unknown failover message: %s",
-                                                              type));
-        }
-    }
-
-    @Override
     public void dispatch(DiscoveryMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
@@ -244,26 +239,34 @@ public class Coordinator implements Member {
     }
 
     @Override
+    public void dispatch(FailoverMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case PREPARE:
+                failover();
+                break;
+            case FAILOVER:
+                // do nothing
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Unknown failover message: %s",
+                                                              type));
+        }
+    }
+
+    @Override
     public void dispatch(RebalanceMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
             case PREPARE_FOR_REBALANCE:
                 rebalance((Node[]) arguments[0]);
-                if (!sender.equals(id)) {
-                    switchboard.ringCast(new Message(sender, type, arguments));
-                }
                 fsm.rebalance();
                 break;
             case INITIATE_REBALANCE:
-                if (!sender.equals(id)) {
-                    switchboard.ringCast(new Message(sender, type));
-                }
                 break;
             case REBALANCE_COMPLETE:
                 rebalanced();
-                if (!sender.equals(id)) {
-                    switchboard.ringCast(new Message(sender, type));
-                }
                 break;
             default:
                 throw new IllegalStateException(
@@ -277,26 +280,15 @@ public class Coordinator implements Member {
         switch (type) {
             case READY_REPLICATORS:
                 if (sender.equals(id)) {
-                    replicatorsReady();
-                } else {
-                    readyReplicators();
-                    switchboard.ringCast(new Message(sender, type, arguments),
-                                         allMembers);
+                    fsm.replicatorsReady();
                 }
                 break;
             case REPLICATORS_ESTABLISHED:
                 if (sender.equals(id)) {
                     replicatorsEstablished(sender);
-                } else {
-                    switchboard.ringCast(new Message(sender, type, arguments),
-                                         allMembers);
                 }
                 break;
             case CONNECT_REPLICATORS:
-                if (!sender.equals(id)) {
-                    switchboard.ringCast(new Message(sender, type, arguments),
-                                         allMembers);
-                }
                 weaver.connectReplicators(yellowPages);
                 break;
             default:
@@ -480,6 +472,10 @@ public class Coordinator implements Member {
         joiningMembers = new Node[0];
     }
 
+    protected void commitFailover() {
+        switchboard.ringCast(new Message(id, FailoverMessage.FAILOVER));
+    }
+
     /**
      * Commit the calculated next ring as the current weaver ring
      */
@@ -552,6 +548,9 @@ public class Coordinator implements Member {
         switchboard.ringCast(message, allMembers);
     }
 
+    /**
+     * Coordinate the takeover of the completion of the rebalancing
+     */
     protected void coordinateTakeover() {
         rendezvous = null;
         switchboard.ringCast(new Message(id,
@@ -581,6 +580,10 @@ public class Coordinator implements Member {
         fsm.failedOver();
     }
 
+    /**
+     * Filter the system membership to reflect any dead members that did not
+     * survive to this partition incarnation
+     */
     protected void filterSystemMembership() {
         Collection<Node> deadMembers = switchboard.getDeadMembers();
         allMembers.removeAll(deadMembers);
@@ -676,6 +679,9 @@ public class Coordinator implements Member {
         fsm.replicatorsReady();
     }
 
+    /**
+     * Rebalance the weaver process group.
+     */
     protected void rebalance() {
         rebalance(weaver.remap(nextRing), switchboard.getDeadMembers());
     }
@@ -771,13 +777,15 @@ public class Coordinator implements Member {
         fsm.commitTakeover();
     }
 
+    /**
+     * Note that the replicators have been established on the weaver process
+     * group member
+     * 
+     * @param member
+     */
     protected void replicatorsEstablished(Node member) {
         tally.incrementAndGet();
         fsm.replicatorsEstablished();
-    }
-
-    protected void replicatorsReady() {
-        fsm.replicatorsReady();
     }
 
     /**
@@ -790,16 +798,30 @@ public class Coordinator implements Member {
     /**
      * Test access
      * 
-     * @return the list of active members
+     * @return the set of active members
      */
-    Collection<Node> getActiveMembers() {
+    SortedSet<Node> getActiveMembers() {
         return activeMembers;
     }
 
+    SortedSet<Node> getAllMembers() {
+        return allMembers;
+    }
+
+    /**
+     * Test access
+     * 
+     * @return the FSM for the receiver
+     */
     CoordinatorContext getFsm() {
         return fsm;
     }
 
+    /**
+     * Test access
+     * 
+     * @return the set of inactive members
+     */
     SortedSet<Node> getInactiveMembers() {
         return inactiveMembers;
     }
@@ -811,6 +833,11 @@ public class Coordinator implements Member {
         return rendezvous;
     }
 
+    /**
+     * Set the joining members of the receiver
+     * 
+     * @param joiningMembers
+     */
     void setJoiningMembers(Node[] joiningMembers) {
         assert joiningMembers != null : "joining members must not be null";
         this.joiningMembers = joiningMembers;
@@ -824,26 +851,5 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
-    }
-
-    @Override
-    public void dispatch(BootstrapMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        switch (type) {
-            case BOOTSTAP_PRODUCERS:
-                switchboard.ringCast(new Message(sender, type, arguments));
-                break;
-            case BOOTSTRAP_SPINDLES:
-                bootstrap((Node[]) arguments[0]);
-                if (!isLeader()) {
-                    switchboard.ringCast(new Message(sender, type, arguments));
-                }
-                fsm.bootstrapped();
-                break;
-            default:
-                throw new IllegalStateException(
-                                                String.format("Illegal bootstrap method: %s",
-                                                              type));
-        }
     }
 }

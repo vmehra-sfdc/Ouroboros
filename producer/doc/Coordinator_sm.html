@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=5>
+        <th colspan=7>
           Transition
         </th>
       </tr>
@@ -34,6 +34,14 @@
         </th>
         <th>
           failedOver
+        </th>
+        <th>
+          open
+          <br>
+          (UUID)
+        </th>
+        <th>
+          rebalance
         </th>
         <th>
           stabilize
@@ -60,6 +68,10 @@ cleanUp();
   Unstable
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -102,6 +114,10 @@ cleanUp();
         </td>
         <td>
         </td>
+        <td>
+        </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -116,6 +132,20 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+          <pre>
+  Stable
+  {
+    openChannel(channel);
+  }
+          </pre>
+        </td>
+        <td>
+          <pre>
+  Rebalance
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -135,6 +165,33 @@ cleanUp();
   Stable
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Rebalance
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>

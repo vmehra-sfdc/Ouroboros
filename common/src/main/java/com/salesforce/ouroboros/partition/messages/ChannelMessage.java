@@ -44,5 +44,4 @@ public enum ChannelMessage implements MemberDispatch {
                          Serializable[] arguments, long time) {
         switchboard.dispatchToMember(this, sender, arguments, time);
     }
-
 }

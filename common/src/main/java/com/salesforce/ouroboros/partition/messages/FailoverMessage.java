@@ -29,6 +29,7 @@ import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.MemberDispatch;
+import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 
 /**
@@ -43,5 +44,6 @@ public enum FailoverMessage implements MemberDispatch {
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
         switchboard.dispatchToMember(this, sender, arguments, time);
+        switchboard.forwardToNextInRing(new Message(sender, this, arguments));
     }
 }

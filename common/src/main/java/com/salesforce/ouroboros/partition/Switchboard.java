@@ -218,14 +218,6 @@ public class Switchboard {
      */
     public void dispatch(DiscoveryMessage type, Node sender,
                          Serializable[] arguments, long time) {
-        if (self.equals(sender)) {
-            if (log.isLoggable(Level.FINER)) {
-                log.fine(String.format("Complete ring traversal of %s from %s",
-                                       type, self));
-            }
-        } else {
-            ringCast(new Message(sender, type, arguments));
-        }
         switch (type) {
             case DISCOVERY_COMPLETE:
                 if (log.isLoggable(Level.INFO)) {
@@ -299,6 +291,44 @@ public class Switchboard {
         } catch (StateUndefinedException e) {
             return null;
         }
+    }
+
+    /**
+     * Forward the message to the next receiver in the ring. If this node is the
+     * original sender of the message, then the ring cast is complete.
+     * 
+     * @param message
+     *            - message to forward around the ring
+     * @param ring
+     *            - the set of nodes forming the ring
+     */
+    public void forwardToNextInRing(Message message, SortedSet<Node> ring) {
+        if (self.equals(message.sender)) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Ring cast of %s complete on %s",
+                                       message, self));
+            }
+            return;
+        }
+        ringCast(message, ring);
+    }
+
+    /**
+     * Forward the message to the next receiver in the ring. If this node is the
+     * original sender of the message, then the ring cast is complete.
+     * 
+     * @param message
+     *            - message to forward around the ring
+     */
+    public void forwardToNextInRing(Message message) {
+        if (self.equals(message.sender)) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Ring cast of %s complete on %s",
+                                       message, self));
+            }
+            return;
+        }
+        ringCast(message);
     }
 
     /**

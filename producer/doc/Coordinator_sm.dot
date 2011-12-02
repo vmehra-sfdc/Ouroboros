@@ -23,6 +23,9 @@ digraph Coordinator_sm {
         "CoordinatorFSM::Bootstrapping"
             [label="{Bootstrapping}"];
 
+        "CoordinatorFSM::Rebalance"
+            [label="{Rebalance}"];
+
         "CoordinatorFSM::DefaultState"
             [label="{&laquo; Default &raquo;}"];
 
@@ -47,6 +50,9 @@ digraph Coordinator_sm {
 
         "CoordinatorFSM::AwaitingFailover" -> "CoordinatorFSM::Stable"
             [label="failedOver/\l"];
+
+        "CoordinatorFSM::Stable" -> "CoordinatorFSM::Rebalance"
+            [label="rebalance/\l"];
 
         "CoordinatorFSM::Bootstrapping" -> "CoordinatorFSM::Stable"
             [label="bootstrapped/\l"];
