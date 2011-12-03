@@ -55,7 +55,7 @@ Entry {
         
     stabilize
     	[ctxt.isLeader()]
-    	Bootstrapping/push(ControllerFSM::Bootstrap){}
+    	ReplicatorsReady/push(ControllerFSM::Bootstrap){}
         
     stabilize
     	Bootstrapping{}
@@ -71,7 +71,7 @@ Stable{}
 
 Bootstrapping{
 	bootstrapped
-		Stable{}
+		EstablishReplicators{}
 }
 
 Failover{
@@ -158,7 +158,7 @@ Entry{
 }
 {
 	bootstrapped
-		pop(bootstrapped){}
+		CoordinateReplicators{}
 }
 
 CoordinateFailover
@@ -177,8 +177,13 @@ Entry{
 	coordinateReplicators();
 }
 {
+		
+	replicatorsEstablished
+		[ctxt.tallyComplete()]
+        nil {}
+		
 	replicatorsReady
-	   ReplicatorsReady{}
+		ReplicatorsReady{}
 }
 
 ReplicatorsReady
@@ -204,8 +209,8 @@ Entry{
 }
 
 Rebalance
-Entry {
-	rebalance();
+Entry{
+	coordinateTakeover();
 }
 {
 	rebalanced
@@ -221,9 +226,6 @@ Entry {
 }
 
 CoordinateTakeover
-Entry{
-	coordinateTakeover();
-}
 {
 	memberTakeoverComplete
 		[ctxt.tallyComplete()]

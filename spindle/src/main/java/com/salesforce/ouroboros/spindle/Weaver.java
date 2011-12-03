@@ -494,6 +494,9 @@ public class Weaver implements Bundle {
     public void terminate() {
         spindleHandler.terminate();
         replicationHandler.terminate();
+        for (EventChannel channel : channels.values()) {
+            channel.close();
+        }
     }
 
     @Override

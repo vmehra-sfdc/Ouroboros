@@ -346,8 +346,10 @@ public class Switchboard {
                 log.fine(String.format("Ring does not have right neighbor of %s",
                                        self));
             }
+            send(message, self);
+        } else {
+            send(message, neighbor);
         }
-        send(message, neighbor);
     }
 
     /**
@@ -367,9 +369,10 @@ public class Switchboard {
                 log.fine(String.format("Ring does not have right neighbor of %s",
                                        self));
             }
-            return;
+            send(message, self);
+        } else {
+            send(message, self.getRightNeighbor(ring));
         }
-        send(message, self.getRightNeighbor(ring));
     }
 
     /**

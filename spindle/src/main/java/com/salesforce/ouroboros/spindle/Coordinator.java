@@ -255,18 +255,38 @@ public class Coordinator implements Member {
         }
     }
 
+    public void dispatch(RebalancedMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case MEMBER_REBALANCED: {
+                if (isLeader()) {
+                    tally.incrementAndGet();
+                    fsm.memberRebalanced();
+                } else {
+                    switchboard.forwardToNextInRing(new Message(sender, type,
+                                                                arguments),
+                                                    allMembers);
+                }
+                break;
+            }
+            default:
+                throw new IllegalStateException(
+                                                String.format("Invalid rebalanced message: %s",
+                                                              type));
+        }
+    }
+
     @Override
     public void dispatch(RebalanceMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
             case PREPARE_FOR_REBALANCE:
                 rebalance((Node[]) arguments[0]);
-                fsm.rebalance();
                 break;
             case INITIATE_REBALANCE:
+                rebalanced();
                 break;
             case REBALANCE_COMPLETE:
-                rebalanced();
                 break;
             default:
                 throw new IllegalStateException(
@@ -279,13 +299,18 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case READY_REPLICATORS:
-                if (sender.equals(id)) {
+                readyReplicators();
+                if (isLeader()) {
                     fsm.replicatorsReady();
                 }
                 break;
             case REPLICATORS_ESTABLISHED:
-                if (sender.equals(id)) {
+                if (isLeader()) {
                     replicatorsEstablished(sender);
+                } else {
+                    switchboard.forwardToNextInRing(new Message(sender, type,
+                                                                arguments),
+                                                    allMembers);
                 }
                 break;
             case CONNECT_REPLICATORS:
@@ -488,16 +513,13 @@ public class Coordinator implements Member {
      * Commit the takeover of the new primaries and secondaries.
      */
     protected void commitTakeover() {
-        // TODO Auto-generated method stub
-
+        // TODO
     }
 
     protected void connectReplicators() {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating replicators connect on %s", id));
         }
-        tally.set(0);
-        targetTally = allMembers.size();
         switchboard.ringCast(new Message(id,
                                          ReplicatorMessage.CONNECT_REPLICATORS),
                              allMembers);
@@ -544,6 +566,8 @@ public class Coordinator implements Member {
             log.info(String.format("Coordinating establishment of the replicators on %s",
                                    id));
         }
+        tally.set(0);
+        targetTally = allMembers.size();
         Message message = new Message(id, ReplicatorMessage.READY_REPLICATORS);
         switchboard.ringCast(message, allMembers);
     }
@@ -554,7 +578,7 @@ public class Coordinator implements Member {
     protected void coordinateTakeover() {
         rendezvous = null;
         switchboard.ringCast(new Message(id,
-                                         RebalanceMessage.REBALANCE_COMPLETE),
+                                         RebalanceMessage.INITIATE_REBALANCE),
                              allMembers);
     }
 
@@ -611,9 +635,6 @@ public class Coordinator implements Member {
 
     /**
      * Open the replicators to the the new members
-     * 
-     * @param controller
-     *            - the controller for the group
      */
     protected void readyReplicators() {
         rendezvous = null;
@@ -761,6 +782,7 @@ public class Coordinator implements Member {
     protected void rebalance(Node[] joiningMembers) {
         this.joiningMembers = joiningMembers;
         calculateNextRing();
+        fsm.rebalance();
     }
 
     /**
@@ -774,6 +796,9 @@ public class Coordinator implements Member {
         }
         commitNextRing();
         active = true;
+        switchboard.ringCast(new Message(id,
+                                         RebalancedMessage.MEMBER_REBALANCED),
+                             allMembers);
         fsm.commitTakeover();
     }
 

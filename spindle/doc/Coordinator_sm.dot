@@ -44,10 +44,10 @@ digraph Coordinator_sm {
         "CoordinatorFSM::DefaultState"
             [label="{&laquo; Default &raquo;}"];
 
-        "CoordinatorFSM::Bootstrapping::ControllerFSM"
+        "CoordinatorFSM::ReplicatorsEstablished::ControllerFSM"
             [label="{ControllerFSM|O-O\r}"]
 
-        "CoordinatorFSM::ReplicatorsEstablished::ControllerFSM"
+        "CoordinatorFSM::ReplicatorsReady::ControllerFSM"
             [label="{ControllerFSM|O-O\r}"]
 
         "CoordinatorFSM::AwaitingTakeover::ControllerFSM"
@@ -69,13 +69,13 @@ digraph Coordinator_sm {
         "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Failover"
             [label="stabilize/\l"];
 
-        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Bootstrapping::ControllerFSM"
+        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::ReplicatorsReady::ControllerFSM"
             [label="stabilize/\lpush(ControllerFSM::Bootstrap)\l"];
 
         "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Bootstrapping"
             [label="stabilize/\l"];
 
-        "CoordinatorFSM::Bootstrapping" -> "CoordinatorFSM::Stable"
+        "CoordinatorFSM::Bootstrapping" -> "CoordinatorFSM::EstablishReplicators"
             [label="bootstrapped/\l"];
 
         "CoordinatorFSM::Failover" -> "CoordinatorFSM::EstablishReplicators"
@@ -108,10 +108,10 @@ digraph Coordinator_sm {
         "CoordinatorFSM::DefaultState" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
-        "CoordinatorFSM::Bootstrapping::ControllerFSM" -> "CoordinatorFSM::Bootstrapping"
+        "CoordinatorFSM::ReplicatorsEstablished::ControllerFSM" -> "CoordinatorFSM::ReplicatorsEstablished"
             [label="pop/"]
 
-        "CoordinatorFSM::ReplicatorsEstablished::ControllerFSM" -> "CoordinatorFSM::ReplicatorsEstablished"
+        "CoordinatorFSM::ReplicatorsReady::ControllerFSM" -> "CoordinatorFSM::ReplicatorsReady"
             [label="pop/"]
 
         "CoordinatorFSM::AwaitingTakeover::ControllerFSM" -> "CoordinatorFSM::AwaitingTakeover"
@@ -161,9 +161,6 @@ digraph Coordinator_sm {
         "ControllerFSM::pop(destabilize)"
             [label="" width=1]
 
-        "ControllerFSM::pop(bootstrapped)"
-            [label="" width=1]
-
         "ControllerFSM::pop(commitTakeover)"
             [label="" width=1]
 
@@ -195,7 +192,7 @@ digraph Coordinator_sm {
         "ControllerFSM::Bootstrap" -> "ControllerFSM::CoordinateBootstrap"
             [label="bootstrapSystem/\l"];
 
-        "ControllerFSM::CoordinateBootstrap" -> "ControllerFSM::pop(bootstrapped)"
+        "ControllerFSM::CoordinateBootstrap" -> "ControllerFSM::CoordinateReplicators"
             [label="bootstrapped/\l"];
 
         "ControllerFSM::CoordinateFailover" -> "ControllerFSM::pop(failedOver)"
@@ -221,9 +218,6 @@ digraph Coordinator_sm {
 
         "ControllerFSM::pop(destabilize)" -> "ControllerFSM::%end"
             [label="pop(destabilize);\l"];
-
-        "ControllerFSM::pop(bootstrapped)" -> "ControllerFSM::%end"
-            [label="pop(bootstrapped);\l"];
 
         "ControllerFSM::pop(commitTakeover)" -> "ControllerFSM::%end"
             [label="pop(commitTakeover);\l"];

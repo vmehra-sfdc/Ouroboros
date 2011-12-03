@@ -130,7 +130,7 @@ cleanUp();
   {}
 
 [ctxt.isLeader()]
-  Bootstrapping/push(CoordinatorFSM::Unstable)
+  ReplicatorsReady/push(CoordinatorFSM::Unstable)
   {}
 
   Bootstrapping
@@ -189,7 +189,7 @@ cleanUp();
         </td>
         <td>
           <pre>
-  Stable
+  EstablishReplicators
   {}
           </pre>
         </td>
@@ -671,7 +671,7 @@ cleanUp();
         </td>
         <td>
           <pre>
-  pop(bootstrapped)
+  CoordinateReplicators
   {}
           </pre>
         </td>
@@ -762,6 +762,11 @@ cleanUp();
         <td>
         </td>
         <td>
+          <pre>
+[ctxt.tallyComplete()]
+  CoordinateReplicators
+  {}
+          </pre>
         </td>
         <td>
           <pre>
@@ -858,7 +863,7 @@ cleanUp();
         </td>
         <td>
           <pre>
-    rebalance();
+    coordinateTakeover();
           </pre>
         </td>
         <td>
@@ -903,9 +908,6 @@ cleanUp();
           CoordinateTakeover
         </td>
         <td>
-          <pre>
-    coordinateTakeover();
-          </pre>
         </td>
         <td>
         </td>

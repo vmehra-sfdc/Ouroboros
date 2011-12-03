@@ -237,7 +237,7 @@ public class TestCoordinator {
         assertEquals(ControllerFSM.CoordinateBootstrap, coordinator.getState());
         coordinator.dispatch(BootstrapMessage.BOOTSTRAP_SPINDLES, localNode,
                              new Serializable[] { new Node[] { localNode } }, 0);
-        assertEquals(CoordinatorFSM.Stable, coordinator.getState());
+        assertEquals(ControllerFSM.CoordinateReplicators, coordinator.getState());
         verify(switchboard, new Times(1)).ringCast(isA(Message.class));
         assertTrue(coordinator.isActive());
     }

@@ -38,30 +38,16 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * @author hhildebrand
  * 
  */
-public enum ReplicatorMessage implements MemberDispatch {
-    CONNECT_REPLICATORS, READY_REPLICATORS, REPLICATORS_ESTABLISHED {
-        /**
-         * Forwarding must be done at dispatch site
-         */
-        @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable[] arguments, long time) {
-            if (!(switchboard.getMember() instanceof Coordinator)) {
-                log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
-                                          this, switchboard.getMember()));
-            }
-            Coordinator coordinator = (Coordinator) switchboard.getMember();
-            coordinator.dispatch(this, sender, arguments, time);
-        }
-    };
+public enum RebalancedMessage implements MemberDispatch {
+    MEMBER_REBALANCED;
 
-    private final static Logger log = Logger.getLogger(ReplicatorMessage.class.getCanonicalName());
+    private final static Logger log = Logger.getLogger(RebalancedMessage.class.getCanonicalName());
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
         if (!(switchboard.getMember() instanceof Coordinator)) {
-            log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
+            log.warning(String.format("RebalancedMessage %s must be targeted at weaver coordinator, not %s",
                                       this, switchboard.getMember()));
         }
         Coordinator coordinator = (Coordinator) switchboard.getMember();
