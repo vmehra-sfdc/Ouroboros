@@ -1,4 +1,4 @@
-digraph Switchboard_sm {
+digraph Switchboard {
 
     node
         [shape=Mrecord width=1.5];
@@ -23,9 +23,6 @@ digraph Switchboard_sm {
         "SwitchboardFSM::Stopped"
             [label="{Stopped}"];
 
-        "SwitchboardFSM::DefaultState"
-            [label="{&laquo; Default &raquo;}"];
-
         "%start"
             [label="" shape=circle style=filled fillcolor=black width=0.25];
 
@@ -36,10 +33,19 @@ digraph Switchboard_sm {
         "SwitchboardFSM::Unstable" -> "SwitchboardFSM::Advertising"
             [label="stabilized/\l"];
 
+        "SwitchboardFSM::Unstable" -> "SwitchboardFSM::Unstable"
+            [label="destabilize/\l"];
+
+        "SwitchboardFSM::Stable" -> "SwitchboardFSM::Unstable"
+            [label="destabilize/\l"];
+
         "SwitchboardFSM::Advertising" -> "SwitchboardFSM::Stable"
             [label="discoveryComplete/\l"];
 
-        "SwitchboardFSM::DefaultState" -> "SwitchboardFSM::Unstable"
+        "SwitchboardFSM::Advertising" -> "SwitchboardFSM::Unstable"
+            [label="destabilize/\l"];
+
+        "SwitchboardFSM::Stopped" -> "SwitchboardFSM::Unstable"
             [label="destabilize/\l"];
 
         "%start" -> "SwitchboardFSM::Unstable"

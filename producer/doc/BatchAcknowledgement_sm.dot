@@ -1,4 +1,4 @@
-digraph BatchAcknowledgement_sm {
+digraph BatchAcknowledgement {
 
     node
         [shape=Mrecord width=1.5];
@@ -20,9 +20,6 @@ digraph BatchAcknowledgement_sm {
         "BatchAcknowledgementFSM::Closed"
             [label="{Closed}"];
 
-        "BatchAcknowledgementFSM::DefaultState"
-            [label="{&laquo; Default &raquo;}"];
-
         "%start"
             [label="" shape=circle style=filled fillcolor=black width=0.25];
 
@@ -33,13 +30,25 @@ digraph BatchAcknowledgement_sm {
         "BatchAcknowledgementFSM::Suspended" -> "BatchAcknowledgementFSM::ReadAcknowledgement"
             [label="connect/\l"];
 
+        "BatchAcknowledgementFSM::Suspended" -> "BatchAcknowledgementFSM::Closed"
+            [label="failover/\l"];
+
+        "BatchAcknowledgementFSM::Suspended" -> "BatchAcknowledgementFSM::Closed"
+            [label="close/\l"];
+
         "BatchAcknowledgementFSM::ReadAcknowledgement" -> "BatchAcknowledgementFSM::Closed"
             [label="readReady/\l"];
 
-        "BatchAcknowledgementFSM::DefaultState" -> "BatchAcknowledgementFSM::Closed"
+        "BatchAcknowledgementFSM::ReadAcknowledgement" -> "BatchAcknowledgementFSM::Closed"
             [label="failover/\l"];
 
-        "BatchAcknowledgementFSM::DefaultState" -> "BatchAcknowledgementFSM::Closed"
+        "BatchAcknowledgementFSM::ReadAcknowledgement" -> "BatchAcknowledgementFSM::Closed"
+            [label="close/\l"];
+
+        "BatchAcknowledgementFSM::Closed" -> "BatchAcknowledgementFSM::Closed"
+            [label="failover/\l"];
+
+        "BatchAcknowledgementFSM::Closed" -> "BatchAcknowledgementFSM::Closed"
             [label="close/\l"];
 
         "%start" -> "BatchAcknowledgementFSM::Suspended"

@@ -1,4 +1,4 @@
-digraph Xerox_sm {
+digraph Xerox {
 
     node
         [shape=Mrecord width=1.5];

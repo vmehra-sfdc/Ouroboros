@@ -1,4 +1,4 @@
-digraph Replicator_sm {
+digraph Replicator {
 
     node
         [shape=Mrecord width=1.5];
@@ -22,9 +22,6 @@ digraph Replicator_sm {
 
         "ReplicatorFSM::Closed"
             [label="{Closed}"];
-
-        "ReplicatorFSM::DefaultState"
-            [label="{&laquo; Default &raquo;}"];
 
         "%start"
             [label="" shape=circle style=filled fillcolor=black width=0.25];

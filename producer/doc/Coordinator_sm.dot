@@ -1,4 +1,4 @@
-digraph Coordinator_sm {
+digraph Coordinator {
 
     node
         [shape=Mrecord width=1.5];
@@ -26,9 +26,6 @@ digraph Coordinator_sm {
         "CoordinatorFSM::Rebalance"
             [label="{Rebalance}"];
 
-        "CoordinatorFSM::DefaultState"
-            [label="{&laquo; Default &raquo;}"];
-
         "CoordinatorFSM::Bootstrapping::ControllerFSM"
             [label="{ControllerFSM|O-O\r}"]
 
@@ -51,13 +48,22 @@ digraph Coordinator_sm {
         "CoordinatorFSM::AwaitingFailover" -> "CoordinatorFSM::Stable"
             [label="failedOver/\l"];
 
+        "CoordinatorFSM::AwaitingFailover" -> "CoordinatorFSM::Unstable"
+            [label="destabilize/\l"];
+
         "CoordinatorFSM::Stable" -> "CoordinatorFSM::Rebalance"
             [label="rebalance/\l"];
+
+        "CoordinatorFSM::Stable" -> "CoordinatorFSM::Unstable"
+            [label="destabilize/\l"];
 
         "CoordinatorFSM::Bootstrapping" -> "CoordinatorFSM::Stable"
             [label="bootstrapped/\l"];
 
-        "CoordinatorFSM::DefaultState" -> "CoordinatorFSM::Unstable"
+        "CoordinatorFSM::Bootstrapping" -> "CoordinatorFSM::Unstable"
+            [label="destabilize/\l"];
+
+        "CoordinatorFSM::Rebalance" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
         "CoordinatorFSM::Bootstrapping::ControllerFSM" -> "CoordinatorFSM::Bootstrapping"
@@ -80,9 +86,6 @@ digraph Coordinator_sm {
         "ControllerFSM::CoordinateBootstrap"
             [label="{CoordinateBootstrap}"];
 
-        "ControllerFSM::DefaultState"
-            [label="{&laquo; Default &raquo;}"];
-
         "ControllerFSM::pop(destabilize)"
             [label="" width=1]
 
@@ -102,10 +105,13 @@ digraph Coordinator_sm {
         "ControllerFSM::Bootstrap" -> "ControllerFSM::CoordinateBootstrap"
             [label="bootstrapSystem/\l"];
 
+        "ControllerFSM::Bootstrap" -> "ControllerFSM::pop(destabilize)"
+            [label="destabilize/\l"];
+
         "ControllerFSM::CoordinateBootstrap" -> "ControllerFSM::pop(bootstrapped)"
             [label="bootstrapped/\l"];
 
-        "ControllerFSM::DefaultState" -> "ControllerFSM::pop(destabilize)"
+        "ControllerFSM::CoordinateBootstrap" -> "ControllerFSM::pop(destabilize)"
             [label="destabilize/\l"];
 
         "ControllerFSM::pop(destabilize)" -> "ControllerFSM::%end"

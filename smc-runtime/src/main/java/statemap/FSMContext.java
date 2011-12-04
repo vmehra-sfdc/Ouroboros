@@ -25,7 +25,7 @@
 //  state machine.
 //
 // RCS ID
-// $Id: FSMContext.java,v 1.14 2009/11/24 20:42:39 cwrapp Exp $
+// $Id: FSMContext.java,v 1.15 2011/11/20 14:58:33 cwrapp Exp $
 //
 // CHANGE LOG
 // (See the bottom of this file.)
@@ -33,8 +33,11 @@
 
 package statemap;
 
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.PrintStream;
 import java.io.Serializable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -109,7 +112,7 @@ public abstract class FSMContext
     //-----------------------------------------------------------
     // Get methods.
     //
-    
+
     /**
      * Returns the logger
      * @return the Logger
@@ -144,7 +147,7 @@ public abstract class FSMContext
 
     /**
      * If this FSM is in transition, then returns the transition
-     * name. If not in trnasition, then returns an empty string.
+     * name. If not in transition, then returns an empty string.
      * @return the current transition name.
      */
     public String getTransition()
@@ -172,6 +175,15 @@ public abstract class FSMContext
                                      state.getName()));
         }
 
+        // clearState() is not called when a transition has
+        // no actions, so set _previousState to _state in
+        // that situation. We know clearState() was not
+        // called when _state is not null.
+        if (_state != null)
+        {
+            _previousState = _state;
+        }
+
         _state = state;
 
         return;
@@ -191,20 +203,24 @@ public abstract class FSMContext
 
     public void pushState(State state) {
         throw new UnsupportedOperationException("Push support has not been generated for this FSM Context");
-    }
-    
+        }
+
     public void popState() {
         throw new UnsupportedOperationException("Push support has not been generated for this FSM Context");
-    }
+        }
     public void emptyStateStack() {
         throw new UnsupportedOperationException("Push support has not been generated for this FSM Context");
-    }
+        }
 
     //
     // end of Set methods.
     //-----------------------------------------------------------
 
-    
+    // The following methods allow listeners to watch this
+    // finite state machine for state changes.
+    // Note: if a transition does not cause a state change,
+    // then no state change event is fired.
+
     @Override
     public String toString() {
         return String.format("%s[current=%s, previous=%s, transition=%s]", getClass().getCanonicalName(), _state, _previousState, _transition);
@@ -215,32 +231,41 @@ public abstract class FSMContext
 //
 
     /**
+     * The FSM name.
+     */
+    transient protected String _name;
+
+    /**
      * The current state. Will be {@code null} while in
      * transition.
      */
-    transient volatile protected State _state;
+    transient protected State _state;
 
     /**
      * The current transition name. Used for debugging
      * purposes. Will be en empty string when not in
      * transition.
      */
-    transient volatile protected String _transition;
+    transient protected String _transition;
 
     /**
      * Stores which state a transition left. May be {@code null}.
      */
-    transient volatile protected State _previousState;
+    transient protected State _previousState;
 
     //-----------------------------------------------------------
     // Constants.
     //
     private static final long serialVersionUID = 0x060000L;
+    private static final String STATE_PROPERTY = "State";
 } // end of class FSMContext
 
 //
 // CHANGE LOG
 // $Log: FSMContext.java,v $
+// Revision 1.15  2011/11/20 14:58:33  cwrapp
+// Check in for SMC v. 6.1.0
+//
 // Revision 1.14  2009/11/24 20:42:39  cwrapp
 // v. 6.0.1 update
 //

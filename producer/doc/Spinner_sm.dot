@@ -1,4 +1,4 @@
-digraph Spinner_sm {
+digraph Spinner {
 
     node
         [shape=Mrecord width=1.5];
@@ -22,9 +22,6 @@ digraph Spinner_sm {
 
         "SpinnerFSM::Closed"
             [label="{Closed}"];
-
-        "SpinnerFSM::DefaultState"
-            [label="{&laquo; Default &raquo;}"];
 
         "%start"
             [label="" shape=circle style=filled fillcolor=black width=0.25];

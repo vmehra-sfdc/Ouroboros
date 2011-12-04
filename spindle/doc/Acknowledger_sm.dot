@@ -1,4 +1,4 @@
-digraph Acknowledger_sm {
+digraph Acknowledger {
 
     node
         [shape=Mrecord width=1.5];
@@ -19,9 +19,6 @@ digraph Acknowledger_sm {
 
         "AcknowledgerFSM::Closed"
             [label="{Closed}"];
-
-        "AcknowledgerFSM::DefaultState"
-            [label="{&laquo; Default &raquo;}"];
 
         "%start"
             [label="" shape=circle style=filled fillcolor=black width=0.25];

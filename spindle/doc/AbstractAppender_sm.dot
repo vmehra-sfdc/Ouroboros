@@ -1,4 +1,4 @@
-digraph AbstractAppender_sm {
+digraph AbstractAppender {
 
     node
         [shape=Mrecord width=1.5];

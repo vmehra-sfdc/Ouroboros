@@ -9,5 +9,5 @@
   </parent>
   <groupId>smc</groupId>
   <artifactId>smc-runtime</artifactId>
-  <version>6.0.1</version>
+  <version>6.1.0</version>
 </project>

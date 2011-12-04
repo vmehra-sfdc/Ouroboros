@@ -1,5 +1,5 @@
 
-	transient protected java.util.Stack<State> _stateStack;
+	transient protected java.util.Stack<statemap.State> _stateStack;
 
     /**
      * Pushes the current state on top of the state stack and
@@ -8,7 +8,7 @@
      * @exception NullPointerException
      * if {@code state} is {@code null}.
      */
-    public void pushState(State state)
+    public void pushState(statemap.State state)
     {
         if (_state == null)
         {
@@ -23,7 +23,7 @@
 
         if (_stateStack == null)
         {
-            _stateStack = new java.util.Stack<State>();
+            _stateStack = new java.util.Stack<statemap.State>();
         }
 
         _stateStack.push(_state);

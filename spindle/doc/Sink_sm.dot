@@ -1,4 +1,4 @@
-digraph Sink_sm {
+digraph Sink {
 
     node
         [shape=Mrecord width=1.5];
