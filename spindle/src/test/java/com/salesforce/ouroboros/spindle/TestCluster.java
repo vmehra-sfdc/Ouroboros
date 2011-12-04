@@ -26,13 +26,16 @@
 package com.salesforce.ouroboros.spindle;
 
 import static com.salesforce.ouroboros.spindle.Util.waitFor;
+import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Timer;
 import java.util.concurrent.CountDownLatch;
@@ -44,10 +47,8 @@ import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.smartfrog.services.anubis.BasicConfiguration;
 import org.smartfrog.services.anubis.locator.AnubisLocator;
 import org.smartfrog.services.anubis.partition.test.controller.Controller;
-import org.smartfrog.services.anubis.partition.test.controller.ControllerConfiguration;
 import org.smartfrog.services.anubis.partition.test.controller.NodeData;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.View;
@@ -57,6 +58,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
+import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
+import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.ControllerFSM;
@@ -112,16 +115,12 @@ public class TestCluster {
     }
 
     @Configuration
-    static class MyControllerConfig extends ControllerConfiguration {
+    static class MyControllerConfig extends ControllerGossipConfiguration {
+
         @Override
         @Bean
         public DeployedPostProcessor deployedPostProcessor() {
             return new DeployedPostProcessor();
-        }
-
-        @Override
-        public int heartbeatGroupTTL() {
-            return 0;
         }
 
         @Override
@@ -134,15 +133,27 @@ public class TestCluster {
         }
 
         @Override
-        protected MyController constructController()
-                                                    throws UnknownHostException {
+        protected Controller constructController() throws UnknownHostException {
             return new MyController(timer(), 1000, 300000, partitionIdentity(),
                                     heartbeatTimeout(), heartbeatInterval());
         }
 
+        @Override
+        protected Collection<InetSocketAddress> seedHosts()
+                                                           throws UnknownHostException {
+            return asList(seedContact1(), seedContact2());
+        }
+
+        InetSocketAddress seedContact1() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort1);
+        }
+
+        InetSocketAddress seedContact2() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort2);
+        }
     }
 
-    static class nodeCfg extends BasicConfiguration {
+    static class nodeCfg extends GossipConfiguration {
         @Bean
         public Coordinator coordinator() throws IOException {
             return new Coordinator(timer(), switchboard(), weaver(),
@@ -156,11 +167,6 @@ public class TestCluster {
             } catch (IOException e) {
                 throw new IllegalStateException(e);
             }
-        }
-
-        @Override
-        public int heartbeatGroupTTL() {
-            return 0;
         }
 
         @Override
@@ -190,6 +196,20 @@ public class TestCluster {
             return new Weaver(weaverConfiguration());
         }
 
+        @Override
+        protected Collection<InetSocketAddress> seedHosts()
+                                                           throws UnknownHostException {
+            return asList(seedContact1(), seedContact2());
+        }
+
+        InetSocketAddress seedContact1() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort1);
+        }
+
+        InetSocketAddress seedContact2() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort2);
+        }
+
         private WeaverConfigation weaverConfiguration() throws IOException {
             File directory = File.createTempFile("CoordinatorIntegration-",
                                                  "root");
@@ -209,6 +229,12 @@ public class TestCluster {
         public int node() {
             return 0;
         }
+
+        @Override
+        protected InetSocketAddress gossipEndpoint()
+                                                    throws UnknownHostException {
+            return seedContact1();
+        }
     }
 
     @Configuration
@@ -216,6 +242,12 @@ public class TestCluster {
         @Override
         public int node() {
             return 1;
+        }
+
+        @Override
+        protected InetSocketAddress gossipEndpoint()
+                                                    throws UnknownHostException {
+            return seedContact2();
         }
     }
 
@@ -283,18 +315,29 @@ public class TestCluster {
         }
     }
 
+    static int                               testPort1;
+    static int                               testPort2;
     private static final Logger              log     = Logger.getLogger(TestCluster.class.getCanonicalName());
 
+    static {
+        String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
+                                         "24010");
+        testPort1 = Integer.parseInt(port);
+        port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
+                                  "24020");
+        testPort2 = Integer.parseInt(port);
+    }
+
     final Class<?>[]                         configs = new Class[] { w0.class,
-                    w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
-                    w7.class, w8.class, w9.class    };
+            w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
+            w7.class, w8.class, w9.class            };
 
     MyController                             controller;
     AnnotationConfigApplicationContext       controllerContext;
+    List<Coordinator>                        coordinators;
     CountDownLatch                           initialLatch;
     List<AnnotationConfigApplicationContext> memberContexts;
     List<ControlNode>                        partition;
-    List<Coordinator>                        coordinators;
 
     @Before
     public void starUp() throws Exception {
@@ -317,8 +360,7 @@ public class TestCluster {
             for (AnnotationConfigApplicationContext context : memberContexts) {
                 ControlNode node = (ControlNode) controller.getNode(context.getBean(Identity.class));
                 assertNotNull("Can't find node: "
-                                              + context.getBean(Identity.class),
-                              node);
+                                      + context.getBean(Identity.class), node);
                 partition.add(node);
                 Coordinator coordinator = context.getBean(Coordinator.class);
                 assertNotNull("Can't find coordinator in context: " + context,
@@ -357,14 +399,6 @@ public class TestCluster {
         initialLatch = null;
     }
 
-    private List<AnnotationConfigApplicationContext> createMembers() {
-        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
-        for (Class<?> config : configs) {
-            contexts.add(new AnnotationConfigApplicationContext(config));
-        }
-        return contexts;
-    }
-
     @Test
     public void testPartition() throws Exception {
         for (Coordinator coordinator : coordinators) {
@@ -378,5 +412,13 @@ public class TestCluster {
                 }
             }, 2000, 100);
         }
+    }
+
+    private List<AnnotationConfigApplicationContext> createMembers() {
+        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
+        for (Class<?> config : configs) {
+            contexts.add(new AnnotationConfigApplicationContext(config));
+        }
+        return contexts;
     }
 }

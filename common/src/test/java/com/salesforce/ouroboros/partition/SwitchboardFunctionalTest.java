@@ -19,14 +19,17 @@
 
 package com.salesforce.ouroboros.partition;
 
+import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Timer;
 import java.util.concurrent.CountDownLatch;
@@ -36,9 +39,8 @@ import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.smartfrog.services.anubis.BasicConfiguration;
+import org.smartfrog.services.anubis.locator.AnubisLocator;
 import org.smartfrog.services.anubis.partition.test.controller.Controller;
-import org.smartfrog.services.anubis.partition.test.controller.ControllerConfiguration;
 import org.smartfrog.services.anubis.partition.test.controller.NodeData;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.View;
@@ -48,6 +50,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
+import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
+import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.partition.Util.Condition;
@@ -165,16 +169,12 @@ public class SwitchboardFunctionalTest {
     }
 
     @Configuration
-    static class MyControllerConfig extends ControllerConfiguration {
+    static class MyControllerConfig extends ControllerGossipConfiguration {
+
         @Override
         @Bean
         public DeployedPostProcessor deployedPostProcessor() {
             return new DeployedPostProcessor();
-        }
-
-        @Override
-        public int heartbeatGroupTTL() {
-            return 0;
         }
 
         @Override
@@ -192,6 +192,20 @@ public class SwitchboardFunctionalTest {
                                     heartbeatTimeout(), heartbeatInterval());
         }
 
+        @Override
+        protected Collection<InetSocketAddress> seedHosts()
+                                                           throws UnknownHostException {
+            return asList(seedContact1(), seedContact2());
+        }
+
+        InetSocketAddress seedContact1() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort1);
+        }
+
+        InetSocketAddress seedContact2() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort2);
+        }
+
     }
 
     @Configuration
@@ -200,6 +214,12 @@ public class SwitchboardFunctionalTest {
         public int node() {
             return 0;
         }
+
+        @Override
+        protected InetSocketAddress gossipEndpoint()
+                                                    throws UnknownHostException {
+            return seedContact1();
+        }
     }
 
     @Configuration
@@ -207,6 +227,12 @@ public class SwitchboardFunctionalTest {
         @Override
         public int node() {
             return 1;
+        }
+
+        @Override
+        protected InetSocketAddress gossipEndpoint()
+                                                    throws UnknownHostException {
+            return seedContact2();
         }
     }
 
@@ -354,7 +380,7 @@ public class SwitchboardFunctionalTest {
         }
     }
 
-    static class nodeCfg extends BasicConfiguration {
+    static class nodeCfg extends GossipConfiguration {
         @Override
         public int getMagic() {
             try {
@@ -365,8 +391,9 @@ public class SwitchboardFunctionalTest {
         }
 
         @Override
-        public int heartbeatGroupTTL() {
-            return 0;
+        @Bean
+        public AnubisLocator locator() {
+            return null;
         }
 
         @Bean
@@ -384,9 +411,34 @@ public class SwitchboardFunctionalTest {
             Switchboard switchboard = new Switchboard(memberNode(), partition());
             return switchboard;
         }
+
+        @Override
+        protected Collection<InetSocketAddress> seedHosts()
+                                                           throws UnknownHostException {
+            return asList(seedContact1(), seedContact2());
+        }
+
+        InetSocketAddress seedContact1() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort1);
+        }
+
+        InetSocketAddress seedContact2() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort2);
+        }
     }
 
+    static int                               testPort1;
+    static int                               testPort2;
     private static final Logger              log     = Logger.getLogger(SwitchboardFunctionalTest.class.getCanonicalName());
+
+    static {
+        String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
+                                         "24010");
+        testPort1 = Integer.parseInt(port);
+        port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
+                                  "24020");
+        testPort2 = Integer.parseInt(port);
+    }
 
     final Class<?>[]                         configs = getConfigs();
     MyController                             controller;
@@ -469,14 +521,6 @@ public class SwitchboardFunctionalTest {
         }
     }
 
-    private List<AnnotationConfigApplicationContext> createMembers() {
-        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
-        for (Class<?> config : configs) {
-            contexts.add(new AnnotationConfigApplicationContext(config));
-        }
-        return contexts;
-    }
-
     protected Class<?>[] getConfigs() {
         return new Class[] { node0.class, node1.class, node2.class,
                 node3.class, node4.class, node5.class, node6.class,
@@ -488,5 +532,13 @@ public class SwitchboardFunctionalTest {
 
     protected Class<?> getControllerConfig() {
         return MyControllerConfig.class;
+    }
+
+    private List<AnnotationConfigApplicationContext> createMembers() {
+        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
+        for (Class<?> config : configs) {
+            contexts.add(new AnnotationConfigApplicationContext(config));
+        }
+        return contexts;
     }
 }

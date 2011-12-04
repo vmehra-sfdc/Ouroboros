@@ -25,13 +25,16 @@
  */
 package com.salesforce.ouroboros.integration;
 
+import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
@@ -45,10 +48,8 @@ import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.smartfrog.services.anubis.BasicConfiguration;
 import org.smartfrog.services.anubis.locator.AnubisLocator;
 import org.smartfrog.services.anubis.partition.test.controller.Controller;
-import org.smartfrog.services.anubis.partition.test.controller.ControllerConfiguration;
 import org.smartfrog.services.anubis.partition.test.controller.NodeData;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.View;
@@ -58,6 +59,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
+import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
+import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -73,22 +76,6 @@ import com.salesforce.ouroboros.spindle.WeaverConfigation;
  * 
  */
 public class TestProducerChannelBuffer {
-
-    public static class Source implements EventSource {
-
-        @Override
-        public void assumePrimary(Map<UUID, Long> newPrimaries) {
-        }
-
-        @Override
-        public void closed(UUID channel) {
-        }
-
-        @Override
-        public void opened(UUID channel) {
-        }
-
-    }
 
     public static class ControlNode extends NodeData {
         static final Logger log = Logger.getLogger(ControlNode.class.getCanonicalName());
@@ -131,17 +118,29 @@ public class TestProducerChannelBuffer {
 
     }
 
+    public static class Source implements EventSource {
+
+        @Override
+        public void assumePrimary(Map<UUID, Long> newPrimaries) {
+        }
+
+        @Override
+        public void closed(UUID channel) {
+        }
+
+        @Override
+        public void opened(UUID channel) {
+        }
+
+    }
+
     @Configuration
-    static class MyControllerConfig extends ControllerConfiguration {
+    static class MyControllerConfig extends ControllerGossipConfiguration {
+
         @Override
         @Bean
         public DeployedPostProcessor deployedPostProcessor() {
             return new DeployedPostProcessor();
-        }
-
-        @Override
-        public int heartbeatGroupTTL() {
-            return 0;
         }
 
         @Override
@@ -154,21 +153,28 @@ public class TestProducerChannelBuffer {
         }
 
         @Override
-        protected MyController constructController()
-                                                    throws UnknownHostException {
+        protected Controller constructController() throws UnknownHostException {
             return new MyController(timer(), 1000, 300000, partitionIdentity(),
                                     heartbeatTimeout(), heartbeatInterval());
         }
 
-    }
-
-    static class nodeCfg extends BasicConfiguration {
         @Override
-        @Bean
-        public AnubisLocator locator() {
-            return null;
+        protected Collection<InetSocketAddress> seedHosts()
+                                                           throws UnknownHostException {
+            return asList(seedContact1(), seedContact2());
         }
 
+        InetSocketAddress seedContact1() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort1);
+        }
+
+        InetSocketAddress seedContact2() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort2);
+        }
+
+    }
+
+    static class nodeCfg extends GossipConfiguration {
         @Override
         public int getMagic() {
             try {
@@ -179,8 +185,9 @@ public class TestProducerChannelBuffer {
         }
 
         @Override
-        public int heartbeatGroupTTL() {
-            return 0;
+        @Bean
+        public AnubisLocator locator() {
+            return null;
         }
 
         @Bean
@@ -193,10 +200,29 @@ public class TestProducerChannelBuffer {
             Switchboard switchboard = new Switchboard(memberNode(), partition());
             return switchboard;
         }
+
+        @Override
+        protected Collection<InetSocketAddress> seedHosts()
+                                                           throws UnknownHostException {
+            return asList(seedContact1(), seedContact2());
+        }
+
+        InetSocketAddress seedContact1() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort1);
+        }
+
+        InetSocketAddress seedContact2() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort2);
+        }
     }
 
     @Configuration
     static class ProducerCfg extends nodeCfg {
+
+        @Bean
+        public ProducerConfiguration configuration() {
+            return new ProducerConfiguration();
+        }
 
         @Bean
         public com.salesforce.ouroboros.producer.Coordinator coordinator()
@@ -204,6 +230,14 @@ public class TestProducerChannelBuffer {
             return new com.salesforce.ouroboros.producer.Coordinator(
                                                                      switchboard(),
                                                                      producer());
+        }
+
+        /* (non-Javadoc)
+         * @see org.smartfrog.services.anubis.BasicConfiguration#node()
+         */
+        @Override
+        public int node() {
+            return 2;
         }
 
         @Bean
@@ -217,21 +251,14 @@ public class TestProducerChannelBuffer {
         }
 
         @Bean
-        public ProducerConfiguration configuration() {
-            return new ProducerConfiguration();
-        }
-
-        /* (non-Javadoc)
-         * @see org.smartfrog.services.anubis.BasicConfiguration#node()
-         */
-        @Override
-        public int node() {
-            return 2;
-        }
-
-        @Bean
         public ScheduledExecutorService timer() {
             return Executors.newSingleThreadScheduledExecutor();
+        }
+
+        @Override
+        protected InetSocketAddress gossipEndpoint()
+                                                    throws UnknownHostException {
+            return seedContact1();
         }
     }
 
@@ -266,6 +293,12 @@ public class TestProducerChannelBuffer {
             return new Weaver(weaverConfiguration());
         }
 
+        @Override
+        protected InetSocketAddress gossipEndpoint()
+                                                    throws UnknownHostException {
+            return seedContact2();
+        }
+
         private WeaverConfigation weaverConfiguration() throws IOException {
             File directory = File.createTempFile("prod-CB", "root");
             directory.delete();
@@ -278,7 +311,17 @@ public class TestProducerChannelBuffer {
         }
     }
 
+    static int                         testPort1;
+    static int                         testPort2;
     private static final Logger        log = Logger.getLogger(TestProducerChannelBuffer.class.getCanonicalName());
+    static {
+        String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
+                                         "24010");
+        testPort1 = Integer.parseInt(port);
+        port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
+                                  "24020");
+        testPort2 = Integer.parseInt(port);
+    }
 
     MyController                       controller;
     AnnotationConfigApplicationContext controllerContext;
@@ -388,7 +431,7 @@ public class TestProducerChannelBuffer {
                      */
 
         producer.initiateBootstrap();
-        
+
         /*
         Util.waitFor("producer coordinator did not stabilize",
                      new Util.Condition() {
