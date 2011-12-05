@@ -62,8 +62,8 @@ import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.spindle.CoordinatorContext.ControllerFSM;
-import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
+import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
+import com.salesforce.ouroboros.spindle.CoordinatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.Util.Condition;
 
 /**
@@ -329,8 +329,8 @@ public class TestCluster {
     }
 
     final Class<?>[]                         configs = new Class[] { w0.class,
-            w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
-            w7.class, w8.class, w9.class            };
+                    w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
+                    w7.class, w8.class, w9.class    };
 
     MyController                             controller;
     AnnotationConfigApplicationContext       controllerContext;
@@ -360,7 +360,8 @@ public class TestCluster {
             for (AnnotationConfigApplicationContext context : memberContexts) {
                 ControlNode node = (ControlNode) controller.getNode(context.getBean(Identity.class));
                 assertNotNull("Can't find node: "
-                                      + context.getBean(Identity.class), node);
+                                              + context.getBean(Identity.class),
+                              node);
                 partition.add(node);
                 Coordinator coordinator = context.getBean(Coordinator.class);
                 assertNotNull("Can't find coordinator in context: " + context,
@@ -407,8 +408,8 @@ public class TestCluster {
                     + coordinator, new Condition() {
                 @Override
                 public boolean value() {
-                    return CoordinatorFSM.Bootstrapping == c.getState()
-                           || ControllerFSM.Bootstrap == c.getState();
+                    return ReplicatorFSM.EstablishReplicators == c.getState()
+                           || BootstrapFSM.Bootstrap == c.getState();
                 }
             }, 2000, 100);
         }

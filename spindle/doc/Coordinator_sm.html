@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=15>
+        <th colspan=11>
           Transition
         </th>
       </tr>
@@ -27,13 +27,7 @@
          Exit
         </th>
         <th>
-          bootstrapped
-        </th>
-        <th>
           commitTakeover
-        </th>
-        <th>
-          coordinateReplicators
         </th>
         <th>
           destabilize
@@ -62,12 +56,6 @@
           replicatorsEstablishmentCancelled
         </th>
         <th>
-          replicatorsEstablishmentTimeout
-        </th>
-        <th>
-          replicatorsReady
-        </th>
-        <th>
           stabilize
         </th>
         <th>
@@ -88,10 +76,6 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
   Unstable
   {}
@@ -114,15 +98,11 @@ cleanUp();
   Unstable
   {}
           </pre>
-        </td>
-        <td>
-        </td>
-        <td>
         </td>
         <td>
           <pre>
 [ctxt.isActive() && ctxt.isLeader()]
-  EstablishReplicators/push(CoordinatorFSM::Unstable)
+  Stable/push(CoordinatorFSM::Unstable)
   {}
 
 [ctxt.isActive()]
@@ -130,10 +110,10 @@ cleanUp();
   {}
 
 [ctxt.isLeader()]
-  ReplicatorsReady/push(CoordinatorFSM::Unstable)
+  Stable/push(CoordinatorFSM::Unstable)
   {}
 
-  Bootstrapping
+  Stable/push(CoordinatorFSM::Unstable)
   {}
           </pre>
         </td>
@@ -155,42 +135,18 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          Bootstrapping
-        </td>
-        <td>
-        </td>
-        <td>
+          <pre>
+  Rebalance
+  {}
+          </pre>
         </td>
         <td>
           <pre>
-  EstablishReplicators
-  {}
+[ctxt.isLeader()]
+  AwaitingTakeover/push(CoordinatorFSM::Stable)
+  {
+    setJoiningMembers(joiningMembers);
+  }
           </pre>
         </td>
         <td>
@@ -198,22 +154,10 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
+          <pre>
+  Stable
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -235,173 +179,9 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
-  EstablishReplicators
+  Stable/push(CoordinatorFSM::Failover)
   {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          EstablishReplicators
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  ReplicatorsEstablished/push(CoordinatorFSM::EstablishReplicators)
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  EstablishReplicators
-  {
-    destabilizePartition();
-  }
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  ReplicatorsReady
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          ReplicatorsReady
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  ReplicatorsEstablished
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  ReplicatorsReady
-  {
-    destabilizePartition();
-  }
-          </pre>
-        </td>
-        <td>
-          <pre>
-  ReplicatorsReady
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          ReplicatorsEstablished
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  Rebalance
-  {}
-          </pre>
-        </td>
-        <td>
-          <pre>
-[ctxt.isLeader()]
-  AwaitingTakeover/push(CoordinatorFSM::ReplicatorsEstablished)
-  {
-    setJoiningMembers(joiningMembers);
-  }
           </pre>
         </td>
         <td>
@@ -443,10 +223,6 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
   Rebalance
   {
@@ -468,10 +244,6 @@ cleanUp();
         </td>
         <td>
         </td>
-        <td>
-        </td>
-        <td>
-        </td>
       </tr>
       <tr>
         <td>
@@ -482,18 +254,10 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
           <pre>
   Stable
   {}
           </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -527,18 +291,10 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
   Shutdown
   {}
           </pre>
-        </td>
-        <td>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -572,7 +328,7 @@ cleanUp();
         <th colspan=2>
           Actions
         </th>
-        <th colspan=11>
+        <th colspan=9>
           Transition
         </th>
       </tr>
@@ -582,14 +338,6 @@ cleanUp();
         </th>
         <th>
          Exit
-        </th>
-        <th>
-          bootstrapSystem
-          <br>
-          (Node[])
-        </th>
-        <th>
-          bootstrapped
         </th>
         <th>
           destabilize
@@ -621,91 +369,12 @@ cleanUp();
       </tr>
       <tr>
         <td>
-          Bootstrap
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  CoordinateBootstrap
-  {
-    setJoiningMembers(joiningMembers);
-  }
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          CoordinateBootstrap
-        </td>
-        <td>
-          <pre>
-    coordinateBootstrap();
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  CoordinateReplicators
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
           CoordinateFailover
         </td>
         <td>
           <pre>
     coordinateFailover();
           </pre>
-        </td>
-        <td>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -758,12 +427,7 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
-[ctxt.tallyComplete()]
   CoordinateReplicators
   {}
           </pre>
@@ -785,10 +449,6 @@ cleanUp();
           <pre>
     connectReplicators();
           </pre>
-        </td>
-        <td>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -839,10 +499,6 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
   Rebalance
   {}
@@ -865,10 +521,6 @@ cleanUp();
           <pre>
     coordinateTakeover();
           </pre>
-        </td>
-        <td>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -918,10 +570,6 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
 [ctxt.tallyComplete()]
   pop(commitTakeover)
@@ -940,6 +588,223 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+    </table>
+    <p>
+    <table align=center border=3 cellspacing=2 cellpadding=2>
+      <caption align="top">
+        ReplicatorFSM Finite State Machine
+      </caption>
+      <tr>
+        <th rowspan=2>
+          State
+        </th>
+        <th colspan=2>
+          Actions
+        </th>
+        <th colspan=7>
+          Transition
+        </th>
+      </tr>
+      <tr>
+        <th>
+          Entry
+        </th>
+        <th>
+         Exit
+        </th>
+        <th>
+          coordinateReplicators
+        </th>
+        <th>
+          destabilize
+        </th>
+        <th>
+          replicatorsEstablished
+        </th>
+        <th>
+          replicatorsEstablishmentCancelled
+        </th>
+        <th>
+          replicatorsEstablishmentTimeout
+        </th>
+        <th>
+          replicatorsReady
+        </th>
+        <th>
+          <b>Default</b>
+        </th>
+      </tr>
+      <tr>
+        <td>
+          EstablishReplicators
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  push(ReplicatorFSM::EstablishReplicators)
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  EstablishReplicators
+  {
+    destabilizePartition();
+  }
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReplicatorsReady
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReplicatorsReady
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  pop(replicatorsEstablished)
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReplicatorsReady
+  {
+    destabilizePartition();
+  }
+          </pre>
+        </td>
+        <td>
+          <pre>
+  ReplicatorsReady
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+    </table>
+    <p>
+    <table align=center border=3 cellspacing=2 cellpadding=2>
+      <caption align="top">
+        BootstrapFSM Finite State Machine
+      </caption>
+      <tr>
+        <th rowspan=2>
+          State
+        </th>
+        <th colspan=2>
+          Actions
+        </th>
+        <th colspan=5>
+          Transition
+        </th>
+      </tr>
+      <tr>
+        <th>
+          Entry
+        </th>
+        <th>
+         Exit
+        </th>
+        <th>
+          bootstrapSystem
+          <br>
+          (Node[])
+        </th>
+        <th>
+          bootstrapped
+        </th>
+        <th>
+          destabilize
+        </th>
+        <th>
+          replicatorsEstablished
+        </th>
+        <th>
+          <b>Default</b>
+        </th>
+      </tr>
+      <tr>
+        <td>
+          Bootstrap
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  CoordinateBootstrap
+  {
+    setJoiningMembers(joiningMembers);
+  }
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          CoordinateBootstrap
+        </td>
+        <td>
+          <pre>
+    coordinateBootstrap();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  push(BootstrapFSM::CoordinateBootstrap)
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  pop(replicatorsEstablished)
+  {}
+          </pre>
         </td>
         <td>
         </td>

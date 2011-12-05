@@ -646,14 +646,10 @@ public class Coordinator implements Member {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Replicators established on %s", id));
                 }
-                if (isLeader()) {
-                    tally.incrementAndGet();
-                } else {
-                    switchboard.ringCast(new Message(
-                                                     id,
-                                                     ReplicatorMessage.REPLICATORS_ESTABLISHED),
-                                         allMembers);
-                }
+                switchboard.ringCast(new Message(
+                                                 id,
+                                                 ReplicatorMessage.REPLICATORS_ESTABLISHED),
+                                     allMembers);
                 fsm.replicatorsEstablished();
             }
         };
@@ -809,6 +805,10 @@ public class Coordinator implements Member {
      * @param member
      */
     protected void replicatorsEstablished(Node member) {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Replicators reported established on %s (coordinator %s)",
+                                   member, id));
+        }
         tally.incrementAndGet();
         fsm.replicatorsEstablished();
     }

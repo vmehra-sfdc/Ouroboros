@@ -351,12 +351,12 @@ public class TestProducerChannelBuffer {
             partition = new ArrayList<ControlNode>();
             ControlNode member = (ControlNode) controller.getNode(producerContext.getBean(Identity.class));
             assertNotNull("Can't find node: "
-                                  + producerContext.getBean(Identity.class),
+                                          + producerContext.getBean(Identity.class),
                           member);
             partition.add(member);
             member = (ControlNode) controller.getNode(weaverContext.getBean(Identity.class));
             assertNotNull("Can't find node: "
-                                  + weaverContext.getBean(Identity.class),
+                                          + weaverContext.getBean(Identity.class),
                           member);
             partition.add(member);
         } finally {
@@ -420,19 +420,16 @@ public class TestProducerChannelBuffer {
 
         weaver.initiateBootstrap();
 
-        /*
         Util.waitFor("weaver coordinator did not stabilize",
                      new Util.Condition() {
                          @Override
                          public boolean value() {
-                             return weaver.getState() == com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM.ReplicatorsReady;
+                             return weaver.getState() == com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM.Stable;
                          }
                      }, 30000, 200);
-                     */
 
         producer.initiateBootstrap();
 
-        /*
         Util.waitFor("producer coordinator did not stabilize",
                      new Util.Condition() {
                          @Override
@@ -440,6 +437,5 @@ public class TestProducerChannelBuffer {
                              return producer.getState() == com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM.Stable;
                          }
                      }, 30000, 200);
-                     */
     }
 }

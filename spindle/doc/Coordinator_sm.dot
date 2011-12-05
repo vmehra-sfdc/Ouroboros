@@ -17,20 +17,8 @@ digraph Coordinator {
         "CoordinatorFSM::Stable"
             [label="{Stable}"];
 
-        "CoordinatorFSM::Bootstrapping"
-            [label="{Bootstrapping}"];
-
         "CoordinatorFSM::Failover"
             [label="{Failover}"];
-
-        "CoordinatorFSM::EstablishReplicators"
-            [label="{EstablishReplicators}"];
-
-        "CoordinatorFSM::ReplicatorsReady"
-            [label="{ReplicatorsReady}"];
-
-        "CoordinatorFSM::ReplicatorsEstablished"
-            [label="{ReplicatorsEstablished}"];
 
         "CoordinatorFSM::Rebalance"
             [label="{Rebalance}"];
@@ -41,17 +29,17 @@ digraph Coordinator {
         "CoordinatorFSM::Shutdown"
             [label="{Shutdown}"];
 
-        "CoordinatorFSM::ReplicatorsEstablished::ControllerFSM"
-            [label="{ControllerFSM|O-O\r}"]
-
-        "CoordinatorFSM::ReplicatorsReady::ControllerFSM"
-            [label="{ControllerFSM|O-O\r}"]
-
         "CoordinatorFSM::AwaitingTakeover::ControllerFSM"
             [label="{ControllerFSM|O-O\r}"]
 
-        "CoordinatorFSM::EstablishReplicators::ControllerFSM"
+        "CoordinatorFSM::Stable::ReplicatorFSM"
+            [label="{ReplicatorFSM|O-O\r}"]
+
+        "CoordinatorFSM::Stable::ControllerFSM"
             [label="{ControllerFSM|O-O\r}"]
+
+        "CoordinatorFSM::Stable::BootstrapFSM"
+            [label="{BootstrapFSM|O-O\r}"]
 
         "%start"
             [label="" shape=circle style=filled fillcolor=black width=0.25];
@@ -60,58 +48,31 @@ digraph Coordinator {
         // Transitions (Edges)
         //
 
-        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::EstablishReplicators::ControllerFSM"
+        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Stable::ControllerFSM"
             [label="stabilize/\lpush(ControllerFSM::CoordinateFailover)\l"];
 
         "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Failover"
             [label="stabilize/\l"];
 
-        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::ReplicatorsReady::ControllerFSM"
-            [label="stabilize/\lpush(ControllerFSM::Bootstrap)\l"];
+        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Stable::BootstrapFSM"
+            [label="stabilize/\lpush(BootstrapFSM::Bootstrap)\l"];
 
-        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Bootstrapping"
-            [label="stabilize/\l"];
+        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Stable::ReplicatorFSM"
+            [label="stabilize/\lpush(ReplicatorFSM::EstablishReplicators)\l"];
+
+        "CoordinatorFSM::Stable" -> "CoordinatorFSM::AwaitingTakeover::ControllerFSM"
+            [label="rebalance/\lpush(ControllerFSM::CoordinateRebalance)\l"];
+
+        "CoordinatorFSM::Stable" -> "CoordinatorFSM::Rebalance"
+            [label="rebalance/\l"];
 
         "CoordinatorFSM::Stable" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
-        "CoordinatorFSM::Bootstrapping" -> "CoordinatorFSM::EstablishReplicators"
-            [label="bootstrapped/\l"];
-
-        "CoordinatorFSM::Bootstrapping" -> "CoordinatorFSM::Unstable"
-            [label="destabilize/\l"];
-
-        "CoordinatorFSM::Failover" -> "CoordinatorFSM::EstablishReplicators"
-            [label="failedOver/\l"];
+        "CoordinatorFSM::Failover" -> "CoordinatorFSM::Stable::ReplicatorFSM"
+            [label="failedOver/\lpush(ReplicatorFSM::EstablishReplicators)\l"];
 
         "CoordinatorFSM::Failover" -> "CoordinatorFSM::Unstable"
-            [label="destabilize/\l"];
-
-        "CoordinatorFSM::EstablishReplicators" -> "CoordinatorFSM::ReplicatorsEstablished::ControllerFSM"
-            [label="coordinateReplicators/\lpush(ControllerFSM::CoordinateReplicators)\l"];
-
-        "CoordinatorFSM::EstablishReplicators" -> "CoordinatorFSM::ReplicatorsReady"
-            [label="replicatorsReady/\l"];
-
-        "CoordinatorFSM::EstablishReplicators" -> "CoordinatorFSM::Unstable"
-            [label="destabilize/\l"];
-
-        "CoordinatorFSM::ReplicatorsReady" -> "CoordinatorFSM::ReplicatorsEstablished"
-            [label="replicatorsEstablished/\l"];
-
-        "CoordinatorFSM::ReplicatorsReady" -> "CoordinatorFSM::ReplicatorsReady"
-            [label="replicatorsReady/\l"];
-
-        "CoordinatorFSM::ReplicatorsReady" -> "CoordinatorFSM::Unstable"
-            [label="destabilize/\l"];
-
-        "CoordinatorFSM::ReplicatorsEstablished" -> "CoordinatorFSM::AwaitingTakeover::ControllerFSM"
-            [label="rebalance/\lpush(ControllerFSM::CoordinateRebalance)\l"];
-
-        "CoordinatorFSM::ReplicatorsEstablished" -> "CoordinatorFSM::Rebalance"
-            [label="rebalance/\l"];
-
-        "CoordinatorFSM::ReplicatorsEstablished" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
         "CoordinatorFSM::Rebalance" -> "CoordinatorFSM::AwaitingTakeover"
@@ -126,16 +87,16 @@ digraph Coordinator {
         "CoordinatorFSM::AwaitingTakeover" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
-        "CoordinatorFSM::ReplicatorsEstablished::ControllerFSM" -> "CoordinatorFSM::ReplicatorsEstablished"
-            [label="pop/"]
-
-        "CoordinatorFSM::ReplicatorsReady::ControllerFSM" -> "CoordinatorFSM::ReplicatorsReady"
-            [label="pop/"]
-
         "CoordinatorFSM::AwaitingTakeover::ControllerFSM" -> "CoordinatorFSM::AwaitingTakeover"
             [label="pop/"]
 
-        "CoordinatorFSM::EstablishReplicators::ControllerFSM" -> "CoordinatorFSM::EstablishReplicators"
+        "CoordinatorFSM::Stable::ReplicatorFSM" -> "CoordinatorFSM::Stable"
+            [label="pop/"]
+
+        "CoordinatorFSM::Stable::ControllerFSM" -> "CoordinatorFSM::Stable"
+            [label="pop/"]
+
+        "CoordinatorFSM::Stable::BootstrapFSM" -> "CoordinatorFSM::Stable"
             [label="pop/"]
 
         "%start" -> "CoordinatorFSM::Unstable"
@@ -148,12 +109,6 @@ digraph Coordinator {
         //
         // States (Nodes)
         //
-
-        "ControllerFSM::Bootstrap"
-            [label="{Bootstrap}"];
-
-        "ControllerFSM::CoordinateBootstrap"
-            [label="{CoordinateBootstrap}"];
 
         "ControllerFSM::CoordinateFailover"
             [label="{CoordinateFailover}"];
@@ -188,13 +143,10 @@ digraph Coordinator {
         "ControllerFSM::%end"
             [label="" shape=doublecircle style=filled fillcolor=black width=0.15];
 
-        "push(ControllerFSM::CoordinateRebalance)"
-            [label="" shape=plaintext];
-
         "push(ControllerFSM::CoordinateReplicators)"
             [label="" shape=plaintext];
 
-        "push(ControllerFSM::Bootstrap)"
+        "push(ControllerFSM::CoordinateRebalance)"
             [label="" shape=plaintext];
 
         "push(ControllerFSM::CoordinateFailover)"
@@ -203,18 +155,6 @@ digraph Coordinator {
         //
         // Transitions (Edges)
         //
-
-        "ControllerFSM::Bootstrap" -> "ControllerFSM::CoordinateBootstrap"
-            [label="bootstrapSystem/\l"];
-
-        "ControllerFSM::Bootstrap" -> "ControllerFSM::pop(destabilize)"
-            [label="destabilize/\l"];
-
-        "ControllerFSM::CoordinateBootstrap" -> "ControllerFSM::CoordinateReplicators"
-            [label="bootstrapped/\l"];
-
-        "ControllerFSM::CoordinateBootstrap" -> "ControllerFSM::pop(destabilize)"
-            [label="destabilize/\l"];
 
         "ControllerFSM::CoordinateFailover" -> "ControllerFSM::pop(failedOver)"
             [label="failedOver/\l"];
@@ -264,16 +204,138 @@ digraph Coordinator {
         "ControllerFSM::pop(failedOver)" -> "ControllerFSM::%end"
             [label="pop(failedOver);\l"];
 
-        "push(ControllerFSM::CoordinateRebalance)" -> "ControllerFSM::CoordinateRebalance"
-            [arrowtail=odot];
-
         "push(ControllerFSM::CoordinateReplicators)" -> "ControllerFSM::CoordinateReplicators"
             [arrowtail=odot];
 
-        "push(ControllerFSM::Bootstrap)" -> "ControllerFSM::Bootstrap"
+        "push(ControllerFSM::CoordinateRebalance)" -> "ControllerFSM::CoordinateRebalance"
             [arrowtail=odot];
 
         "push(ControllerFSM::CoordinateFailover)" -> "ControllerFSM::CoordinateFailover"
+            [arrowtail=odot];
+    }
+
+    subgraph cluster_ReplicatorFSM {
+
+        label="ReplicatorFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "ReplicatorFSM::EstablishReplicators"
+            [label="{EstablishReplicators}"];
+
+        "ReplicatorFSM::ReplicatorsReady"
+            [label="{ReplicatorsReady}"];
+
+        "ReplicatorFSM::pop(destabilize)"
+            [label="" width=1]
+
+        "ReplicatorFSM::pop(replicatorsEstablished)"
+            [label="" width=1]
+
+        "ReplicatorFSM::%end"
+            [label="" shape=doublecircle style=filled fillcolor=black width=0.15];
+
+        "ReplicatorFSM::EstablishReplicators::ControllerFSM"
+            [label="{ControllerFSM|O-O\r}"]
+
+        "push(ReplicatorFSM::EstablishReplicators)"
+            [label="" shape=plaintext];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "ReplicatorFSM::EstablishReplicators" -> "ReplicatorFSM::EstablishReplicators::ControllerFSM"
+            [label="coordinateReplicators/\lpush(ControllerFSM::CoordinateReplicators)\l"];
+
+        "ReplicatorFSM::EstablishReplicators" -> "ReplicatorFSM::ReplicatorsReady"
+            [label="replicatorsReady/\l"];
+
+        "ReplicatorFSM::EstablishReplicators" -> "ReplicatorFSM::pop(destabilize)"
+            [label="destabilize/\l"];
+
+        "ReplicatorFSM::ReplicatorsReady" -> "ReplicatorFSM::pop(replicatorsEstablished)"
+            [label="replicatorsEstablished/\l"];
+
+        "ReplicatorFSM::ReplicatorsReady" -> "ReplicatorFSM::ReplicatorsReady"
+            [label="replicatorsReady/\l"];
+
+        "ReplicatorFSM::ReplicatorsReady" -> "ReplicatorFSM::pop(destabilize)"
+            [label="destabilize/\l"];
+
+        "ReplicatorFSM::pop(destabilize)" -> "ReplicatorFSM::%end"
+            [label="pop(destabilize);\l"];
+
+        "ReplicatorFSM::pop(replicatorsEstablished)" -> "ReplicatorFSM::%end"
+            [label="pop(replicatorsEstablished);\l"];
+
+        "ReplicatorFSM::EstablishReplicators::ControllerFSM" -> "ReplicatorFSM::EstablishReplicators"
+            [label="pop/"]
+
+        "push(ReplicatorFSM::EstablishReplicators)" -> "ReplicatorFSM::EstablishReplicators"
+            [arrowtail=odot];
+    }
+
+    subgraph cluster_BootstrapFSM {
+
+        label="BootstrapFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "BootstrapFSM::Bootstrap"
+            [label="{Bootstrap}"];
+
+        "BootstrapFSM::CoordinateBootstrap"
+            [label="{CoordinateBootstrap}"];
+
+        "BootstrapFSM::pop(destabilize)"
+            [label="" width=1]
+
+        "BootstrapFSM::pop(replicatorsEstablished)"
+            [label="" width=1]
+
+        "BootstrapFSM::%end"
+            [label="" shape=doublecircle style=filled fillcolor=black width=0.15];
+
+        "BootstrapFSM::CoordinateBootstrap::ControllerFSM"
+            [label="{ControllerFSM|O-O\r}"]
+
+        "push(BootstrapFSM::Bootstrap)"
+            [label="" shape=plaintext];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "BootstrapFSM::Bootstrap" -> "BootstrapFSM::CoordinateBootstrap"
+            [label="bootstrapSystem/\l"];
+
+        "BootstrapFSM::Bootstrap" -> "BootstrapFSM::pop(destabilize)"
+            [label="destabilize/\l"];
+
+        "BootstrapFSM::CoordinateBootstrap" -> "BootstrapFSM::CoordinateBootstrap::ControllerFSM"
+            [label="bootstrapped/\lpush(ControllerFSM::CoordinateReplicators)\l"];
+
+        "BootstrapFSM::CoordinateBootstrap" -> "BootstrapFSM::pop(replicatorsEstablished)"
+            [label="replicatorsEstablished/\l"];
+
+        "BootstrapFSM::CoordinateBootstrap" -> "BootstrapFSM::pop(destabilize)"
+            [label="destabilize/\l"];
+
+        "BootstrapFSM::pop(destabilize)" -> "BootstrapFSM::%end"
+            [label="pop(destabilize);\l"];
+
+        "BootstrapFSM::pop(replicatorsEstablished)" -> "BootstrapFSM::%end"
+            [label="pop(replicatorsEstablished);\l"];
+
+        "BootstrapFSM::CoordinateBootstrap::ControllerFSM" -> "BootstrapFSM::CoordinateBootstrap"
+            [label="pop/"]
+
+        "push(BootstrapFSM::Bootstrap)" -> "BootstrapFSM::Bootstrap"
             [arrowtail=odot];
     }
 

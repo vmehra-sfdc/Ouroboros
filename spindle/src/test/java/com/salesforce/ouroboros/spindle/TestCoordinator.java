@@ -58,8 +58,10 @@ import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
+import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
+import com.salesforce.ouroboros.spindle.CoordinatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
 
@@ -199,8 +201,7 @@ public class TestCoordinator {
         when(switchboard.getDeadMembers()).thenReturn(deadMembers);
         coordinator.getFsm().setState(CoordinatorFSM.Failover);
         coordinator.failover();
-        assertEquals(CoordinatorFSM.EstablishReplicators,
-                     coordinator.getState());
+        assertEquals(ReplicatorFSM.EstablishReplicators, coordinator.getState());
         verify(weaver).failover(deadMembers);
     }
 
@@ -234,10 +235,11 @@ public class TestCoordinator {
         assertFalse(coordinator.isActive());
         coordinator.getInactiveMembers().add(localNode);
         coordinator.initiateBootstrap(new Node[] { localNode });
-        assertEquals(ControllerFSM.CoordinateBootstrap, coordinator.getState());
+        assertEquals(BootstrapFSM.CoordinateBootstrap, coordinator.getState());
         coordinator.dispatch(BootstrapMessage.BOOTSTRAP_SPINDLES, localNode,
                              new Serializable[] { new Node[] { localNode } }, 0);
-        assertEquals(ControllerFSM.CoordinateReplicators, coordinator.getState());
+        assertEquals(ControllerFSM.CoordinateReplicators,
+                     coordinator.getState());
         verify(switchboard, new Times(1)).ringCast(isA(Message.class));
         assertTrue(coordinator.isActive());
     }
@@ -334,7 +336,7 @@ public class TestCoordinator {
                              0);
         coordinator.getInactiveMembers().addAll(Arrays.asList(node1, node2,
                                                               node3));
-        coordinator.getFsm().setState(CoordinatorFSM.EstablishReplicators);
+        coordinator.getFsm().setState(ReplicatorFSM.EstablishReplicators);
         coordinator.readyReplicators();
         Rendezvous rendezvous = coordinator.getRendezvous();
         assertNotNull(rendezvous);

@@ -47,7 +47,7 @@ Entry {
 {
 	stabilize
 	   [ctxt.isActive() && ctxt.isLeader()]
-	   EstablishReplicators/push(ControllerFSM::CoordinateFailover){}
+	   Stable/push(ControllerFSM::CoordinateFailover){}
 		
     stabilize
     	[ctxt.isActive()]
@@ -55,10 +55,10 @@ Entry {
         
     stabilize
     	[ctxt.isLeader()]
-    	ReplicatorsReady/push(ControllerFSM::Bootstrap){}
+    	Stable/push(BootstrapFSM::Bootstrap){}
         
     stabilize
-    	Bootstrapping{}
+    	Stable/push(ReplicatorFSM::EstablishReplicators){}
 
 	destabilize
 		nil {}
@@ -67,43 +67,10 @@ Entry {
 		nil {}
 }
 
-Stable{}
-
-Bootstrapping{
-	bootstrapped
-		EstablishReplicators{}
-}
-
-Failover{
-    failedOver
-        EstablishReplicators{}
-}
-
-EstablishReplicators{
-	coordinateReplicators
-		ReplicatorsEstablished/push(ControllerFSM::CoordinateReplicators) {}
-	
-	replicatorsEstablishmentCancelled
-		nil {
-			destabilizePartition();
-		}
-	replicatorsReady
-	   ReplicatorsReady{}
-}
-
-ReplicatorsReady {
-    replicatorsEstablished
-        ReplicatorsEstablished{}
-    
-    replicatorsEstablishmentTimeout
-        nil {
-            destabilizePartition();
-        }
-	replicatorsReady
-	   ReplicatorsReady{}
-}
-
-ReplicatorsEstablished{
+Stable{
+	replicatorsEstablished
+		nil {}
+		
     rebalance(joiningMembers: Node[])
         [ctxt.isLeader()]
         AwaitingTakeover/push(ControllerFSM::CoordinateRebalance) {
@@ -112,6 +79,11 @@ ReplicatorsEstablished{
     
     rebalance
         Rebalance{}
+}
+
+Failover{
+    failedOver
+        Stable/push(ReplicatorFSM::EstablishReplicators){}
 }
 
 Rebalance
@@ -145,22 +117,6 @@ Default {
 %%
 %map ControllerFSM
 %%
-Bootstrap {
-	bootstrapSystem(joiningMembers: Node[])
-		CoordinateBootstrap{
-			setJoiningMembers(joiningMembers);
-		}
-}
-
-CoordinateBootstrap
-Entry{
-	coordinateBootstrap();
-}
-{
-	bootstrapped
-		CoordinateReplicators{}
-}
-
 CoordinateFailover
 Entry{
     coordinateFailover();
@@ -177,10 +133,8 @@ Entry{
 	coordinateReplicators();
 }
 {
-		
-	replicatorsEstablished
-		[ctxt.tallyComplete()]
-        nil {}
+    replicatorsEstablished
+    	nil{}
 		
 	replicatorsReady
 		ReplicatorsReady{}
@@ -235,6 +189,63 @@ CoordinateTakeover
 		
 	memberTakeoverComplete
 		nil {}
+}
+
+Default { 
+    destabilize
+        pop(destabilize) {}
+}
+%%
+%map ReplicatorFSM
+%%
+EstablishReplicators{
+	coordinateReplicators
+		push(ControllerFSM::CoordinateReplicators) {}
+	
+	replicatorsEstablishmentCancelled
+		nil {
+			destabilizePartition();
+		}
+	replicatorsReady
+	   ReplicatorsReady{}
+}
+
+ReplicatorsReady {
+    replicatorsEstablished
+        pop(replicatorsEstablished){}
+    
+    replicatorsEstablishmentTimeout
+        nil {
+            destabilizePartition();
+        }
+	replicatorsReady
+	   ReplicatorsReady{}
+}
+
+Default { 
+    destabilize
+        pop(destabilize) {}
+}
+%%
+%map BootstrapFSM
+%%
+Bootstrap {
+	bootstrapSystem(joiningMembers: Node[])
+		CoordinateBootstrap{
+			setJoiningMembers(joiningMembers);
+		}
+}
+
+CoordinateBootstrap
+Entry{
+	coordinateBootstrap();
+}
+{
+	bootstrapped
+		push(ControllerFSM::CoordinateReplicators){}
+	
+	replicatorsEstablished
+		pop(replicatorsEstablished){}
 }
 
 Default { 
