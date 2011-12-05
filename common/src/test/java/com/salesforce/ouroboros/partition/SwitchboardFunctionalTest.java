@@ -511,13 +511,13 @@ public class SwitchboardFunctionalTest {
         assertEquals(memberContexts.size(), vnodes.size());
         for (M m : vnodes) {
             final M member = m;
-            Util.waitFor("Member is not stable", new Condition() {
-
-                @Override
-                public boolean value() {
-                    return member.stabilized;
-                }
-            }, 10000, 100);
+            Util.waitFor(String.format("Member %s is not stable", m.node),
+                         new Condition() {
+                             @Override
+                             public boolean value() {
+                                 return member.stabilized;
+                             }
+                         }, 20000, 100);
         }
     }
 
