@@ -30,7 +30,7 @@
  */
 %}
 
-// The FSM for the distributed control of the weaver
+// The FSM for the distributed coordination of the spindle
 
 %class Coordinator
 %package com.salesforce.ouroboros.spindle
@@ -227,7 +227,7 @@ Default {
         pop(destabilize) {}
 }
 %%
-%map BootstrapFSM
+%map BootstrapFSM 
 %%
 Bootstrap {
 	bootstrapSystem(joiningMembers: Node[])

@@ -29,6 +29,7 @@ import static com.salesforce.ouroboros.spindle.Util.waitFor;
 import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 import java.io.File;
 import java.io.IOException;
@@ -51,6 +52,7 @@ import org.smartfrog.services.anubis.locator.AnubisLocator;
 import org.smartfrog.services.anubis.partition.test.controller.Controller;
 import org.smartfrog.services.anubis.partition.test.controller.NodeData;
 import org.smartfrog.services.anubis.partition.util.Identity;
+import org.smartfrog.services.anubis.partition.views.BitView;
 import org.smartfrog.services.anubis.partition.views.View;
 import org.smartfrog.services.anubis.partition.wire.msg.Heartbeat;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -196,6 +198,18 @@ public class TestCluster {
             return new Weaver(weaverConfiguration());
         }
 
+        private WeaverConfigation weaverConfiguration() throws IOException {
+            File directory = File.createTempFile("CoordinatorIntegration-",
+                                                 "root");
+            directory.delete();
+            directory.mkdirs();
+            directory.deleteOnExit();
+            WeaverConfigation weaverConfigation = new WeaverConfigation();
+            weaverConfigation.setId(memberNode());
+            weaverConfigation.addRoot(directory);
+            return weaverConfigation;
+        }
+
         @Override
         protected Collection<InetSocketAddress> seedHosts()
                                                            throws UnknownHostException {
@@ -208,18 +222,6 @@ public class TestCluster {
 
         InetSocketAddress seedContact2() throws UnknownHostException {
             return new InetSocketAddress("127.0.0.1", testPort2);
-        }
-
-        private WeaverConfigation weaverConfiguration() throws IOException {
-            File directory = File.createTempFile("CoordinatorIntegration-",
-                                                 "root");
-            directory.delete();
-            directory.mkdirs();
-            directory.deleteOnExit();
-            WeaverConfigation weaverConfigation = new WeaverConfigation();
-            weaverConfigation.setId(memberNode());
-            weaverConfigation.addRoot(directory);
-            return weaverConfigation;
         }
     }
 
@@ -373,6 +375,8 @@ public class TestCluster {
                 tearDown();
             }
         }
+
+        assertPartitionStabilized(coordinators);
     }
 
     @After
@@ -400,9 +404,101 @@ public class TestCluster {
         initialLatch = null;
     }
 
+    /**
+     * Test the partitioning behavior of the Coordinator. Test that we can
+     * asymmetrically partition the coordinators and that the stable partition
+     * stablizes. Then test that we can reform the partition and the reformed
+     * partition stabilzed. Test that the only active members are those that
+     * were part of the minority partition that could stabilize.
+     * 
+     * @throws Exception
+     */
     @Test
-    public void testPartition() throws Exception {
+    public void testPartitioning() throws Exception {
+        int minorPartitionSize = configs.length / 2;
+        BitView A = new BitView();
+        BitView B = new BitView();
+        BitView All = new BitView();
+
+        List<Coordinator> partitionA = new ArrayList<Coordinator>();
+        List<Coordinator> partitionB = new ArrayList<Coordinator>();
+
+        int i = 0;
         for (Coordinator coordinator : coordinators) {
+            if (i++ % 2 == 0) {
+                partitionA.add(coordinator);
+            } else {
+                partitionB.add(coordinator);
+            }
+        }
+
+        CountDownLatch latchA = new CountDownLatch(minorPartitionSize);
+        List<ControlNode> groupA = new ArrayList<ControlNode>();
+
+        CountDownLatch latchB = new CountDownLatch(minorPartitionSize);
+        List<ControlNode> groupB = new ArrayList<ControlNode>();
+
+        i = 0;
+        for (ControlNode member : partition) {
+            All.add(member.getIdentity());
+            if (i++ % 2 == 0) {
+                groupA.add(member);
+                member.latch = latchA;
+                member.cardinality = minorPartitionSize;
+                A.add(member.getIdentity());
+            } else {
+                groupB.add(member);
+                member.latch = latchB;
+                member.cardinality = minorPartitionSize;
+                B.add(member.getIdentity());
+            }
+        }
+
+        log.info("asymmetric partitioning: " + A);
+        controller.asymPartition(A);
+        log.info("Awaiting stability of minor partition A");
+        latchA.await(60, TimeUnit.SECONDS);
+        for (ControlNode member : groupA) {
+            assertEquals(A, member.getPartition());
+        }
+        log.info("Asserting partition A have stabilized");
+        assertPartitionStabilized(partitionA);
+
+        // The other partition should still be unstable.
+        assertEquals(configs.length / 2, latchB.getCount());
+
+        // reform
+        log.info("Reforming partition");
+
+        CountDownLatch latch = new CountDownLatch(configs.length);
+        for (ControlNode node : partition) {
+            node.latch = latch;
+            node.cardinality = configs.length;
+        }
+
+        controller.clearPartitions();
+        log.info("Awaiting stability of reformed major partition");
+        latch.await(60, TimeUnit.SECONDS);
+
+        for (ControlNode member : partition) {
+            assertEquals(All, member.getPartition());
+        }
+
+        log.info("Asserting full partition has stabilized");
+        assertPartitionStabilized(coordinators);
+    }
+
+    private List<AnnotationConfigApplicationContext> createMembers() {
+        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
+        for (Class<?> config : configs) {
+            contexts.add(new AnnotationConfigApplicationContext(config));
+        }
+        return contexts;
+    }
+
+    protected void assertPartitionStabilized(List<Coordinator> partition)
+                                                                         throws InterruptedException {
+        for (Coordinator coordinator : partition) {
             final Coordinator c = coordinator;
             waitFor("Coordinator never entered the bootstrapping state: "
                     + coordinator, new Condition() {
@@ -413,13 +509,5 @@ public class TestCluster {
                 }
             }, 2000, 100);
         }
-    }
-
-    private List<AnnotationConfigApplicationContext> createMembers() {
-        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
-        for (Class<?> config : configs) {
-            contexts.add(new AnnotationConfigApplicationContext(config));
-        }
-        return contexts;
     }
 }
