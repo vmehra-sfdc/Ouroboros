@@ -1,4 +1,3 @@
-%{
 /**
  * Copyright (c) 2011, salesforce.com, inc.
  * All rights reserved.
@@ -24,77 +23,27 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.ouroboros.partition.messages;
+
+import java.io.Serializable;
+
+import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.Message;
+import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.partition.SwitchboardDispatch;
 
 /**
+ * 
  * @author hhildebrand
+ * 
  */
-%}
+public enum ViewElectionMessage implements SwitchboardDispatch {
+    VOTE;
 
-// The FSM for managing the partion level behavior
-
-%class Switchboard
-%package com.salesforce.ouroboros.partition
-%access public
-%import org.smartfrog.services.anubis.partition.views.View
-
-%start SwitchboardFSM::Unstable
-%map SwitchboardFSM
-%%
-Unstable
-Entry{
-	cleanUp();
-} 
-{
-	stabilized(view: View, leader: int)
-		ElectView {
-			stabilize(view, leader);
-		}
-		
-	unstable
-		nil{}
+    @Override
+    public void dispatch(Switchboard switchboard, Node sender,
+                         Serializable[] arguments, long time) {
+        switchboard.dispatch(this, sender, arguments, time);
+        switchboard.forwardToNextInRing(new Message(sender, this, arguments));
+    }
 }
-
-Stable
-Entry{
-    stabilized();
-}
-{
-}
-
-ElectView
-Entry{
-	vote();
-}
-{
-	voteReceived
-		[ctxt.votingComplete()]
-		Advertising{
-			electView();
-		}
-
-	voteReceived
-		nil{}
-}
-
-Advertising
-Entry {
-	advertise();
-}
-{
-	discoveryComplete
-		Stable{}
-}
-
-Stopped {
-}
-
-Default {
-	stabilized(view: View, leader: int)
-		nil{}
-		
-	destabilize(view: View, leader: int)
-		Unstable{
-			destabilize(view, leader);
-		}
-}
-%%

@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Timer;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -164,6 +165,12 @@ public class SwitchboardFunctionalTest {
         @Override
         public void stabilized() {
             stabilized = true;
+        }
+
+        @Override
+        public void becomeInactive() {
+            // TODO Auto-generated method stub
+
         }
 
     }
@@ -408,7 +415,9 @@ public class SwitchboardFunctionalTest {
 
         @Bean(initMethod = "start", destroyMethod = "terminate")
         public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(memberNode(), partition());
+            Switchboard switchboard = new Switchboard(memberNode(),
+                                                      partition(),
+                                                      UUID.randomUUID());
             return switchboard;
         }
 
@@ -467,7 +476,8 @@ public class SwitchboardFunctionalTest {
             for (AnnotationConfigApplicationContext context : memberContexts) {
                 ControlNode member = (ControlNode) controller.getNode(context.getBean(Identity.class));
                 assertNotNull("Can't find node: "
-                                      + context.getBean(Identity.class), member);
+                                              + context.getBean(Identity.class),
+                              member);
                 partition.add(member);
             }
         } finally {
@@ -523,11 +533,11 @@ public class SwitchboardFunctionalTest {
 
     protected Class<?>[] getConfigs() {
         return new Class[] { node0.class, node1.class, node2.class,
-                node3.class, node4.class, node5.class, node6.class,
-                node7.class, node8.class, node9.class, node10.class,
-                node11.class, node12.class, node13.class, node14.class,
-                node15.class, node16.class, node17.class, node18.class,
-                node19.class };
+                        node3.class, node4.class, node5.class, node6.class,
+                        node7.class, node8.class, node9.class, node10.class,
+                        node11.class, node12.class, node13.class, node14.class,
+                        node15.class, node16.class, node17.class, node18.class,
+                        node19.class };
     }
 
     protected Class<?> getControllerConfig() {

@@ -17,6 +17,9 @@ digraph Switchboard {
         "SwitchboardFSM::Stable"
             [label="{Stable}"];
 
+        "SwitchboardFSM::ElectView"
+            [label="{ElectView}"];
+
         "SwitchboardFSM::Advertising"
             [label="{Advertising}"];
 
@@ -30,13 +33,19 @@ digraph Switchboard {
         // Transitions (Edges)
         //
 
-        "SwitchboardFSM::Unstable" -> "SwitchboardFSM::Advertising"
+        "SwitchboardFSM::Unstable" -> "SwitchboardFSM::ElectView"
             [label="stabilized/\l"];
 
         "SwitchboardFSM::Unstable" -> "SwitchboardFSM::Unstable"
             [label="destabilize/\l"];
 
         "SwitchboardFSM::Stable" -> "SwitchboardFSM::Unstable"
+            [label="destabilize/\l"];
+
+        "SwitchboardFSM::ElectView" -> "SwitchboardFSM::Advertising"
+            [label="voteReceived/\l"];
+
+        "SwitchboardFSM::ElectView" -> "SwitchboardFSM::Unstable"
             [label="destabilize/\l"];
 
         "SwitchboardFSM::Advertising" -> "SwitchboardFSM::Stable"

@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=5>
+        <th colspan=6>
           Transition
         </th>
       </tr>
@@ -47,6 +47,9 @@
           unstable
         </th>
         <th>
+          voteReceived
+        </th>
+        <th>
           <b>Default</b>
         </th>
       </tr>
@@ -55,6 +58,9 @@
           Unstable
         </td>
         <td>
+          <pre>
+cleanUp();
+          </pre>
         </td>
         <td>
         </td>
@@ -64,10 +70,9 @@
         </td>
         <td>
           <pre>
-  Advertising
+  ElectView
   {
     stabilize(view, leader);
-    advertise();
   }
           </pre>
         </td>
@@ -76,6 +81,8 @@
   Unstable
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -101,12 +108,51 @@
         </td>
         <td>
         </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ElectView
+        </td>
+        <td>
+          <pre>
+    vote();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[ctxt.votingComplete()]
+  Advertising
+  {
+    electView();
+  }
+
+  ElectView
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
           Advertising
         </td>
         <td>
+          <pre>
+    advertise();
+          </pre>
         </td>
         <td>
         </td>
@@ -124,10 +170,14 @@
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
           Stopped
+        </td>
+        <td>
         </td>
         <td>
         </td>

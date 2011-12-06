@@ -28,16 +28,22 @@ package com.salesforce.ouroboros.partition;
 import java.io.Serializable;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map.Entry;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -56,6 +62,7 @@ import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
+import com.salesforce.ouroboros.partition.messages.ViewElectionMessage;
 import com.salesforce.ouroboros.util.Gate;
 
 /**
@@ -95,8 +102,37 @@ public class Switchboard {
         void dispatch(RebalanceMessage type, Node sender,
                       Serializable[] arguments, long time);
 
+        /**
+         * The partition has stabilized.
+         */
         void stabilized();
 
+        /**
+         * The member is part of a new view and must start in the inactive
+         * state.
+         */
+        void becomeInactive();
+
+    }
+
+    public static class Result implements Comparable<Result> {
+        public final int  tally;
+        public final UUID vote;
+
+        public Result(int tally, UUID vote) {
+            super();
+            this.tally = tally;
+            this.vote = vote;
+        }
+
+        @Override
+        public int compareTo(Result other) {
+            int tallyCompare = tally - other.tally;
+            if (tallyCompare == 0) {
+                return vote.compareTo(other.vote);
+            }
+            return tallyCompare;
+        }
     }
 
     class Notification implements PartitionNotification {
@@ -134,28 +170,31 @@ public class Switchboard {
         }
     }
 
-    static final Logger                 log             = Logger.getLogger(Switchboard.class.getCanonicalName());
-    private final ArrayList<Node>       deadMembers     = new ArrayList<Node>();
-    private final SwitchboardContext    fsm             = new SwitchboardContext(
-                                                                                 this);
-    private boolean                     leader          = false;
-    private Member                      member;
-    private SortedSet<Node>             members         = new ConcurrentSkipListSet<Node>();
-    private final Executor              messageProcessor;
-    private final PartitionNotification notification    = new Notification();
-    private final Partition             partition;
-    private ArrayList<Node>             previousMembers = new ArrayList<Node>();
-    private NodeIdSet                   previousView;
-    private final Node                  self;
-    private final AtomicBoolean         stable          = new AtomicBoolean(
-                                                                            false);
-    private final Gate                  inboundGate     = new Gate();
-    private NodeIdSet                   view;
+    static final Logger                              log             = Logger.getLogger(Switchboard.class.getCanonicalName());
+    private final ArrayList<Node>                    deadMembers     = new ArrayList<Node>();
+    private final SwitchboardContext                 fsm             = new SwitchboardContext(
+                                                                                              this);
+    private final Gate                               inboundGate     = new Gate();
+    private boolean                                  leader          = false;
+    private Member                                   member;
+    private SortedSet<Node>                          members         = new ConcurrentSkipListSet<Node>();
+    private final Executor                           messageProcessor;
+    private final PartitionNotification              notification    = new Notification();
+    private final Partition                          partition;
+    private ArrayList<Node>                          previousMembers = new ArrayList<Node>();
+    private NodeIdSet                                previousView;
+    private final Node                               self;
+    private final AtomicBoolean                      stable          = new AtomicBoolean(
+                                                                                         false);
+    private NodeIdSet                                view;
+    private UUID                                     viewId;
+    private final ConcurrentMap<UUID, AtomicInteger> votes           = new ConcurrentHashMap<UUID, AtomicInteger>();
 
-    public Switchboard(Node node, Partition p) {
+    public Switchboard(Node node, Partition p, UUID viewId) {
         inboundGate.close();
         self = node;
         partition = p;
+        this.viewId = viewId;
         messageProcessor = Executors.newSingleThreadExecutor(new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -236,6 +275,26 @@ public class Switchboard {
         }
     }
 
+    public void dispatch(ViewElectionMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case VOTE:
+                assert arguments.length == 1 : "No view id in vote";
+                AtomicInteger initialTally = new AtomicInteger(1);
+                AtomicInteger tally = votes.putIfAbsent((UUID) arguments[0],
+                                                        initialTally);
+                if (tally != null) {
+                    tally.incrementAndGet();
+                }
+                fsm.voteReceived();
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Invalid view election message type: %s",
+                                                              type));
+        }
+    }
+
     public void dispatchToMember(BootstrapMessage type, Node sender,
                                  Serializable[] arguments, long time) {
         member.dispatch(type, sender, arguments, time);
@@ -254,6 +313,44 @@ public class Switchboard {
     public void dispatchToMember(RebalanceMessage type, Node sender,
                                  Serializable[] arguments, long time) {
         member.dispatch(type, sender, arguments, time);
+    }
+
+    /**
+     * Forward the message to the next receiver in the ring. If this node is the
+     * original sender of the message, then the ring cast is complete.
+     * 
+     * @param message
+     *            - message to forward around the ring
+     */
+    public void forwardToNextInRing(Message message) {
+        if (self.equals(message.sender)) {
+            if (log.isLoggable(Level.FINEST)) {
+                log.finest(String.format("Ring cast of %s complete on %s",
+                                         message, self));
+            }
+            return;
+        }
+        ringCast(message);
+    }
+
+    /**
+     * Forward the message to the next receiver in the ring. If this node is the
+     * original sender of the message, then the ring cast is complete.
+     * 
+     * @param message
+     *            - message to forward around the ring
+     * @param ring
+     *            - the set of nodes forming the ring
+     */
+    public void forwardToNextInRing(Message message, SortedSet<Node> ring) {
+        if (self.equals(message.sender)) {
+            if (log.isLoggable(Level.FINEST)) {
+                log.finest(String.format("Ring cast of %s complete on %s",
+                                         message, self));
+            }
+            return;
+        }
+        ringCast(message, ring);
     }
 
     public Collection<Node> getDeadMembers() {
@@ -291,44 +388,6 @@ public class Switchboard {
         } catch (StateUndefinedException e) {
             return null;
         }
-    }
-
-    /**
-     * Forward the message to the next receiver in the ring. If this node is the
-     * original sender of the message, then the ring cast is complete.
-     * 
-     * @param message
-     *            - message to forward around the ring
-     * @param ring
-     *            - the set of nodes forming the ring
-     */
-    public void forwardToNextInRing(Message message, SortedSet<Node> ring) {
-        if (self.equals(message.sender)) {
-            if (log.isLoggable(Level.FINEST)) {
-                log.finest(String.format("Ring cast of %s complete on %s",
-                                         message, self));
-            }
-            return;
-        }
-        ringCast(message, ring);
-    }
-
-    /**
-     * Forward the message to the next receiver in the ring. If this node is the
-     * original sender of the message, then the ring cast is complete.
-     * 
-     * @param message
-     *            - message to forward around the ring
-     */
-    public void forwardToNextInRing(Message message) {
-        if (self.equals(message.sender)) {
-            if (log.isLoggable(Level.FINEST)) {
-                log.finest(String.format("Ring cast of %s complete on %s",
-                                         message, self));
-            }
-            return;
-        }
-        ringCast(message);
     }
 
     /**
@@ -469,6 +528,33 @@ public class Switchboard {
     }
 
     /**
+     * Distributed election of the correct view. After the election, if this
+     * node's previous view is the elected view, this node remains an active
+     * member. Otherwise, if this node's previous view is not the elected view,
+     * this node becomes inactivated.
+     */
+    protected void electView() {
+        int i = 0;
+        Result[] results = new Result[votes.size()];
+        for (Entry<UUID, AtomicInteger> entry : votes.entrySet()) {
+            results[i++] = new Result(entry.getValue().get(), entry.getKey());
+        }
+        votes.clear();
+
+        Arrays.sort(results);
+        Result result = results[results.length - 1];
+
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("View elected: %s on %s", result.vote, self));
+        }
+        UUID previousViewId = viewId;
+        viewId = result.vote;
+        if (!viewId.equals(previousViewId)) {
+            member.becomeInactive();
+        }
+    }
+
+    /**
      * Stabilize the partition
      * 
      * @param v
@@ -499,6 +585,26 @@ public class Switchboard {
                                    self));
         }
         member.stabilized();
+    }
+
+    /**
+     * Establish the cannonical view for this partition. The partition members
+     * hold an election to establish which previous view is the "correct" view.
+     */
+    protected void vote() {
+        ringCast(new Message(self, ViewElectionMessage.VOTE,
+                             new Serializable[] { viewId }));
+    }
+
+    /**
+     * @return true if all the members have voted on the majority view.
+     */
+    protected boolean votingComplete() {
+        int totalVotes = 0;
+        for (AtomicInteger tally : votes.values()) {
+            totalVotes += tally.get();
+        }
+        return totalVotes == view.cardinality();
     }
 
     // test access
@@ -570,5 +676,16 @@ public class Switchboard {
         } else {
             fsm.destabilize(view, leaderNode);
         }
+    }
+
+    SwitchboardContext getFsm() {
+        return fsm;
+    }
+
+    /**
+     * clean up any state upon destabilizing.
+     */
+    protected void cleanUp() {
+        votes.clear();
     }
 }
