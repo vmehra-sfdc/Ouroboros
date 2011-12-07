@@ -681,7 +681,6 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
      * @param map emit Java code for this map.
      */
     @Override
-    @SuppressWarnings("static-access")
     public void visit(SmcMap map) 
     {
         List<SmcTransition> definedDefaultTransitions;
@@ -1160,7 +1159,6 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
             transition.getParameters();
         List<SmcGuard> guards = transition.getGuards();
         boolean nullCondition = false;
-        Iterator<SmcParameter> pit;
         Iterator<SmcGuard> git;
         SmcGuard guard;
 
@@ -1656,25 +1654,21 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
              loopbackFlag == false) ||
              transType == TransType.TRANS_PUSH)
         {
-            if (_debugLevel >= DEBUG_LEVEL_1)
-            {
-                String sep;
 
-                _source.println();
-                _source.print(indent3);
-                _source.println("if (context.getLog().isLoggable(Level.FINEST))");
-                _source.print(indent3);
-                _source.println("{");
-                _source.print(indent3);
-                _source.print("    context.getLog().finest(\"BEFORE ENTRY    : ");
-                _source.print(mapName);
-                _source.print('.');
-                _source.print(stateName);
-                _source.println(".Entry(context)\");");
-                _source.print(indent3);
-                _source.println("}");
-                _source.println();
-            }
+            _source.println();
+            _source.print(indent3);
+            _source.println("if (context.getLog().isLoggable(Level.FINEST))");
+            _source.print(indent3);
+            _source.println("{");
+            _source.print(indent3);
+            _source.print("    context.getLog().finest(\"BEFORE ENTRY    : ");
+            _source.print(mapName);
+            _source.print('.');
+            _source.print(stateName);
+            _source.println(".Entry(context)\");");
+            _source.print(indent3);
+            _source.println("}");
+            _source.println();
 
             _source.print(indent3);
             _source.println(
@@ -1810,7 +1804,6 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
         final List<SmcMap> maps,
         final List<SmcTransition> transitions)
     {
-        String mapName;
 
         _source.print("        _transitions = new TreeSet");
         if (_genericFlag == true)

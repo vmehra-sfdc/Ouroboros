@@ -155,7 +155,6 @@ public final class Smc
             SmcParser parser;
             SmcFSM fsm;
             Iterator<String> sit;
-            boolean checkFlag;
             long startTime = 0;
             long finishTime;
             long totalStartTime = 0;
@@ -343,7 +342,6 @@ public final class Smc
 
     // Parse the command line arguments and fill in the static
     // data accordingly.
-    @SuppressWarnings("unused")
     private static boolean parseArgs(final String[] args)
     {
         int i;
@@ -1566,6 +1564,7 @@ public final class Smc
     private static String _suffix;
 
     // Append this suffix to the end of the output header file.
+    @SuppressWarnings("unused")
     private static String _hsuffix;
 
     // Place the output files in this directory. May be null.
