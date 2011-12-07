@@ -33,11 +33,8 @@
 
 package statemap;
 
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyChangeSupport;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.PrintStream;
 import java.io.Serializable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -169,9 +166,9 @@ public abstract class FSMContext
      */
     public void setState(State state)
     {
-        if (getLog().isLoggable(Level.FINEST))
+        if (getLog().isLoggable(Level.FINER))
         {
-            getLog().finest(String.format("ENTER STATE     : %s",
+            getLog().finer(String.format("ENTER STATE     : %s",
                                      state.getName()));
         }
 
@@ -257,7 +254,6 @@ public abstract class FSMContext
     // Constants.
     //
     private static final long serialVersionUID = 0x060000L;
-    private static final String STATE_PROPERTY = "State";
 } // end of class FSMContext
 
 //

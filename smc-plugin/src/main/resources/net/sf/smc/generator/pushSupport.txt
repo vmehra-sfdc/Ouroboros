@@ -15,9 +15,9 @@
             throw (new NullPointerException());
         }
 
-        if (getLog().isLoggable(Level.FINEST))
+        if (getLog().isLoggable(Level.FINER))
         {
-            getLog().finest(String.format("PUSH TO STATE   : %s",
+            getLog().finer(String.format("PUSH TO STATE   : %s",
                                      state.getName()));
         }
 
@@ -43,9 +43,9 @@
         if (_stateStack == null ||
             _stateStack.isEmpty() == true)
         {
-            if (getLog().isLoggable(Level.FINEST))
+            if (getLog().isLoggable(Level.FINER))
             {
-                getLog().finest(
+                getLog().finer(
                     "POPPING ON EMPTY STATE STACK.");
             }
 
@@ -62,9 +62,9 @@
                 _stateStack = null;
             }
 
-            if (getLog().isLoggable(Level.FINEST))
+            if (getLog().isLoggable(Level.FINER))
             {
-                getLog().finest(String.format("POP TO STATE    : %s",
+                getLog().finer(String.format("POP TO STATE    : %s",
                                       _state.getName()));
             }
         }

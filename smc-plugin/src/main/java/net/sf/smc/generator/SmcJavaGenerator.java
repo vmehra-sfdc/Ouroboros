@@ -150,12 +150,6 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
             _source.println(";");
         }
 
-        // If the -g option was specified, then import the
-        // Level class.
-        if (_debugLevel >= DEBUG_LEVEL_0) {
-            _source.println("import java.util.logging.Level;");
-        }
-
         if (_reflectFlag == true)
         {
             _source.println("import java.util.HashMap;");
@@ -559,17 +553,13 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
         _source.print(fsmClassName);
         _source.println(" context)");
         _source.println("        {");
-
-        if (_debugLevel >= DEBUG_LEVEL_0) {
-            _source.println("            if (context.getLog().isLoggable(Level.FINEST))");
-            _source.println("            {");
-            _source.print(_indent);
-            _source.println("                context.getLog().finest(");
-            _source.println("                    \"TRANSITION   : Default\");");
-            _source.println("            }");
-            _source.println();
-        }
-
+        _source.println("            if (context.getLog().isLoggable(Level.FINEST))");
+        _source.println("            {");
+        _source.print(_indent);
+        _source.println("                context.getLog().finest(");
+        _source.println("                    \"TRANSITION   : Default\");");
+        _source.println("            }");
+        _source.println(); 
         _source.println("            throw (");
         _source.println(
             "                new statemap.TransitionUndefinedException(");
@@ -1208,21 +1198,18 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
         _source.println();
 
         // Output state exit.
-        if (_debugLevel >= DEBUG_LEVEL_0)
-        {
-            _source.print(_indent);
-            _source.println("    if (context.getLog().isLoggable(Level.FINEST))");
-            _source.print(_indent);
-            _source.println("    {");
-            _source.print(_indent);
-            _source.print("        context.getLog().finest(\"LEAVING STATE   : ");
-            _source.print(mapName);
-            _source.print('.');
-            _source.print(stateName);
-            _source.println("\");");
-            _source.print(_indent);
-            _source.println("    }");
-        }
+        _source.print(_indent);
+        _source.println("    if (context.getLog().isLoggable(Level.FINEST))");
+        _source.print(_indent);
+        _source.println("    {");
+        _source.print(_indent);
+        _source.print("        context.getLog().finest(\"LEAVING STATE   : ");
+        _source.print(mapName);
+        _source.print('.');
+        _source.print(stateName);
+        _source.println("\");");
+        _source.print(_indent);
+        _source.println("    }");
 
         // Loop through the guards and print each one.
         for (git = guards.iterator(),
@@ -1435,42 +1422,38 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
         // v. 1.0, beta 3: Not any more. The exit actions are
         // executed only if 1) this is a standard, non-loopback
         // transition or a pop transition.
-        if (transType == TransType.TRANS_POP || loopbackFlag == false) {
-            if (_debugLevel >= DEBUG_LEVEL_1) {
-                _source.print(_indent);
-                _source.println("    if (context.getLog().isLoggable(Level.FINEST))");
-                _source.print(_indent);
-                _source.println("{");
-                _source.print(_indent);
-                _source.print("        context.getLog().finest(\"BEFORE EXIT     : ");
-                _source.print(mapName);
-                _source.print('.');
-                _source.print(stateName);
-                _source.println(".Exit(context)\");");
-                _source.print(indent2);
-                _source.println("}");
-                _source.println();
-            }
+        if (transType == TransType.TRANS_POP || loopbackFlag == false) { 
+            _source.print(_indent);
+            _source.println("    if (context.getLog().isLoggable(Level.FINEST))");
+            _source.print(_indent);
+            _source.println("{");
+            _source.print(_indent);
+            _source.print("        context.getLog().finest(\"BEFORE EXIT     : ");
+            _source.print(mapName);
+            _source.print('.');
+            _source.print(stateName);
+            _source.println(".Exit(context)\");");
+            _source.print(indent2);
+            _source.println("}");
+            _source.println();
 
             _source.print(indent2);
             _source.println(
                 "(context.getState()).Exit(context);");
-
-            if (_debugLevel >= DEBUG_LEVEL_1) {
-                _source.print(_indent);
-                _source.println("    if (context.getLog().isLoggable(Level.FINEST))");
-                _source.print(_indent);
-                _source.println("{");
-                _source.print(_indent);
-                _source.print("        context.getLog().finest(\"AFTER EXIT      : ");
-                _source.print(mapName);
-                _source.print('.');
-                _source.print(stateName);
-                _source.println(".Exit(context)\");");
-                _source.print(indent2);
-                _source.println("    }");
-                _source.println();
-            }
+ 
+            _source.print(_indent);
+            _source.println("    if (context.getLog().isLoggable(Level.FINEST))");
+            _source.print(_indent);
+            _source.println("{");
+            _source.print(_indent);
+            _source.print("        context.getLog().finest(\"AFTER EXIT      : ");
+            _source.print(mapName);
+            _source.print('.');
+            _source.print(stateName);
+            _source.println(".Exit(context)\");");
+            _source.print(indent2);
+            _source.println("    }");
+            _source.println();
 
         }
 
@@ -1697,24 +1680,19 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
             _source.println(
                 "(context.getState()).Entry(context);");
 
-            if (_debugLevel >= DEBUG_LEVEL_1)
-            {
-                String sep;
-
-                _source.println();
-                _source.print(indent3);
-                _source.println("if (context.getLog().isLoggable(Level.FINEST))");
-                _source.print(indent3);
-                _source.println("{");
-                _source.print(indent3);
-                _source.print("    context.getLog().finest(\"AFTER ENTRY     : ");
-                _source.print(mapName);
-                _source.print('.');
-                _source.print(stateName);
-                _source.println(".Entry(context)\");");
-                _source.print(indent3);
-                _source.println("}");
-            }
+            _source.println();
+            _source.print(indent3);
+            _source.println("if (context.getLog().isLoggable(Level.FINEST))");
+            _source.print(indent3);
+            _source.println("{");
+            _source.print(indent3);
+            _source.print("    context.getLog().finest(\"AFTER ENTRY     : ");
+            _source.print(mapName);
+            _source.print('.');
+            _source.print(stateName);
+            _source.println(".Entry(context)\");");
+            _source.print(indent3);
+            _source.println("}");
         }
 
         // If there was a try/finally, then put the closing
