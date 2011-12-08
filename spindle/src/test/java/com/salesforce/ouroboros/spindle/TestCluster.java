@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle;
 
 import static com.salesforce.ouroboros.spindle.Util.waitFor;
 import static java.util.Arrays.asList;
+import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
@@ -39,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Timer;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -65,7 +67,7 @@ import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
-import com.salesforce.ouroboros.spindle.CoordinatorContext.ReplicatorFSM;
+import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.spindle.Util.Condition;
 
 /**
@@ -184,7 +186,9 @@ public class TestCluster {
 
         @Bean(initMethod = "start", destroyMethod = "terminate")
         public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(memberNode(), partition());
+            Switchboard switchboard = new Switchboard(memberNode(),
+                                                      partition(),
+                                                      UUID.randomUUID());
             return switchboard;
         }
 
@@ -376,7 +380,7 @@ public class TestCluster {
             }
         }
 
-        assertPartitionStabilized(coordinators);
+        assertPartitionBootstrapping(coordinators);
     }
 
     @After
@@ -415,6 +419,10 @@ public class TestCluster {
      */
     @Test
     public void testPartitioning() throws Exception {
+        coordinators.get(coordinators.size() - 1).initiateBootstrap();
+
+        assertPartitionStable(coordinators);
+
         int minorPartitionSize = configs.length / 2;
         BitView A = new BitView();
         BitView B = new BitView();
@@ -462,7 +470,14 @@ public class TestCluster {
             assertEquals(A, member.getPartition());
         }
         log.info("Asserting partition A have stabilized");
-        assertPartitionStabilized(partitionA);
+        assertPartitionStable(partitionA);
+
+        for (Coordinator coordinator : partitionA) {
+            assertTrue("Coordinator is not active", coordinator.isActive());
+        }
+        for (Coordinator coordinator : partitionB) {
+            assertFalse("Coordinator is active", coordinator.isActive());
+        }
 
         // The other partition should still be unstable.
         assertEquals(configs.length / 2, latchB.getCount());
@@ -485,7 +500,7 @@ public class TestCluster {
         }
 
         log.info("Asserting full partition has stabilized");
-        assertPartitionStabilized(coordinators);
+        assertPartitionBootstrapping(coordinators);
     }
 
     private List<AnnotationConfigApplicationContext> createMembers() {
@@ -496,18 +511,32 @@ public class TestCluster {
         return contexts;
     }
 
-    protected void assertPartitionStabilized(List<Coordinator> partition)
-                                                                         throws InterruptedException {
+    protected void assertPartitionBootstrapping(List<Coordinator> partition)
+                                                                            throws InterruptedException {
         for (Coordinator coordinator : partition) {
             final Coordinator c = coordinator;
             waitFor("Coordinator never entered the bootstrapping state: "
                     + coordinator, new Condition() {
                 @Override
                 public boolean value() {
-                    return ReplicatorFSM.EstablishReplicators == c.getState()
+                    return CoordinatorFSM.Bootstrapping == c.getState()
                            || BootstrapFSM.Bootstrap == c.getState();
                 }
-            }, 2000, 100);
+            }, 30000, 100);
+        }
+    }
+
+    protected void assertPartitionStable(List<Coordinator> partition)
+                                                                     throws InterruptedException {
+        for (Coordinator coordinator : partition) {
+            final Coordinator c = coordinator;
+            waitFor("Coordinator never entered the stable state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return CoordinatorFSM.Stable == c.getState();
+                }
+            }, 60000, 100);
         }
     }
 }

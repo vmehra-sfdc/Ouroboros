@@ -494,13 +494,7 @@ public class Switchboard {
                 log.fine(String.format("Sending %s to self", msg));
             }
             try {
-                messageProcessor.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        processMessage(msg, self.processId,
-                                       System.currentTimeMillis());
-                    }
-                });
+                processMessage(msg, self.processId, System.currentTimeMillis());
             } catch (RejectedExecutionException e) {
                 if (log.isLoggable(Level.FINEST)) {
                     log.finest(String.format("rejecting message %s due to shutdown on %s",
@@ -576,6 +570,10 @@ public class Switchboard {
         }
         previousMembers.clear();
         stable.set(true);
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("members = %s, new members = %s, dead members = %s on %s",
+                                    members, getNewMembers(), deadMembers, self));
+        }
         inboundGate.open();
     }
 

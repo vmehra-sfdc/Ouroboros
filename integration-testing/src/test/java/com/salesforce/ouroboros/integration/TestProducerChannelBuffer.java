@@ -197,7 +197,9 @@ public class TestProducerChannelBuffer {
 
         @Bean(initMethod = "start", destroyMethod = "terminate")
         public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(memberNode(), partition());
+            Switchboard switchboard = new Switchboard(memberNode(),
+                                                      partition(),
+                                                      UUID.randomUUID());
             return switchboard;
         }
 

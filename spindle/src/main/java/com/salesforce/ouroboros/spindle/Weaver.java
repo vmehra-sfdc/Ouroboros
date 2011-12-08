@@ -30,6 +30,7 @@ import static com.salesforce.ouroboros.util.Utils.point;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.util.Collection;
 import java.util.HashMap;
@@ -71,12 +72,20 @@ public class Weaver implements Bundle {
             try {
                 channel.configureBlocking(true);
             } catch (IOException e) {
-                String msg = String.format("Unable to configure blocking for socket channel: %s",
-                                           channel);
-                log.log(Level.WARNING, msg, e);
-                throw new IllegalStateException(msg, e);
+                throw new IllegalStateException(
+                                                String.format("Unable to configure blocking for socket channel: %s",
+                                                              channel), e);
             }
-            Node node = readHandshake(channel);
+            Node node;
+            try {
+                node = readHandshake(channel);
+            } catch (ClosedChannelException e) {
+                return null;
+            } catch (IOException e) {
+                throw new IllegalStateException(
+                                                String.format("Unable to read handshake from: %s",
+                                                              channel), e);
+            }
             if (node == null) {
                 try {
                     channel.close();
@@ -91,6 +100,13 @@ public class Weaver implements Bundle {
             }
             Replicator replicator = replicators.get(node);
             replicator.bind();
+            try {
+                channel.configureBlocking(false);
+            } catch (IOException e) {
+                throw new IllegalStateException(
+                                                String.format("Unable to configure nonblocking for socket channel: %s",
+                                                              channel), e);
+            }
             return replicator;
         }
     }
@@ -286,6 +302,15 @@ public class Weaver implements Bundle {
     public Node[] getReplicationPair(UUID channel) {
         List<Node> pair = weaverRing.hash(point(channel), 2);
         return new Node[] { pair.get(0), pair.get(1) };
+    }
+
+    public void inactivate() {
+        spindleHandler.closeOpenHandlers();
+        replicationHandler.closeOpenHandlers();
+        for (EventChannel channel : channels.values()) {
+            channel.close();
+        }
+        channels.clear();
     }
 
     /* (non-Javadoc)
@@ -506,16 +531,13 @@ public class Weaver implements Bundle {
                              replicationHandler.getLocalAddress());
     }
 
-    private Node readHandshake(SocketChannel channel) {
-        ByteBuffer handshake = ByteBuffer.allocate(HANDSHAKE_SIZE);
-        try {
-            channel.read(handshake);
-        } catch (IOException e) {
-            log.log(Level.WARNING,
-                    String.format("Unable to read handshake from: %s", channel),
-                    e);
-            return null;
+    private Node readHandshake(SocketChannel channel) throws IOException {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("reading replicator handshake on %s from %s",
+                                   id, channel));
         }
+        ByteBuffer handshake = ByteBuffer.allocate(HANDSHAKE_SIZE);
+        channel.read(handshake);
         handshake.flip();
         int magic = handshake.getInt();
         if (MAGIC != magic) {
@@ -556,10 +578,10 @@ public class Weaver implements Bundle {
                     || !oldPair.get(1).equals(newPair.get(1))) {
                     remapped.put(channel,
                                  new Node[][] {
-                                         new Node[] { oldPair.get(0),
-                                                 oldPair.get(1) },
-                                         new Node[] { newPair.get(0),
-                                                 newPair.get(1) } });
+                                                 new Node[] { oldPair.get(0),
+                                                                 oldPair.get(1) },
+                                                 new Node[] { newPair.get(0),
+                                                                 newPair.get(1) } });
                 }
             }
         }

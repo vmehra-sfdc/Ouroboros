@@ -71,14 +71,16 @@ public class WeaverConfigation {
                                                                                              0);
     private int                       replicationQueueSize           = DEFAULT_REPLICATION_QUEUE_SIZE;
     private final SocketOptions       replicationSocketOptions       = new SocketOptions();
-    private Executor                  replicators                    = Executors.newSingleThreadExecutor(new LabeledThreadFactory(
-                                                                                                                                  "replicator"));
+    private Executor                  replicators                    = Executors.newFixedThreadPool(3,
+                                                                                                    new LabeledThreadFactory(
+                                                                                                                             "replicator"));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
     private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
-    private Executor                  spindles                       = Executors.newSingleThreadExecutor(new LabeledThreadFactory(
-                                                                                                                                  "spindle"));
+    private Executor                  spindles                       = Executors.newFixedThreadPool(3,
+                                                                                                    new LabeledThreadFactory(
+                                                                                                                             "spindle"));
     private final SocketOptions       spindleSocketOptions           = new SocketOptions();
     private String                    stateName                      = DEFAULT_STATE_NAME;
 

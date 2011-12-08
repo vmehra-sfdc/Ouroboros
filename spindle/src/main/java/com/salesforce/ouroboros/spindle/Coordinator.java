@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -82,7 +83,7 @@ public class Coordinator implements Member {
 
     private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
     private static final String                 WEAVER_XEROX    = "Weaver Xerox";
-    static final int                            DEFAULT_TIMEOUT = 1;
+    static final int                            DEFAULT_TIMEOUT = 5;
     static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
 
     private boolean                             active          = false;
@@ -97,7 +98,6 @@ public class Coordinator implements Member {
     private Rendezvous                          rendezvous;
     private final Switchboard                   switchboard;
     private final AtomicInteger                 tally           = new AtomicInteger();
-    private int                                 targetTally;
     private final ScheduledExecutorService      timer;
     private final Weaver                        weaver;
     private final ServerSocketChannelHandler    xeroxHandler;
@@ -111,6 +111,7 @@ public class Coordinator implements Member {
         this.weaver = weaver;
         switchboard.setMember(this);
         id = weaver.getId();
+        fsm.setName(Integer.toString(id.processId));
         yellowPages.put(id, weaver.getContactInformation());
         xeroxHandler = new ServerSocketChannelHandler(
                                                       WEAVER_XEROX,
@@ -175,6 +176,9 @@ public class Coordinator implements Member {
             case BOOTSTAP_PRODUCERS:
                 break;
             case BOOTSTRAP_SPINDLES:
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Bootstrapping spindles on %s", id));
+                }
                 bootstrap((Node[]) arguments[0]);
                 if (!isLeader()) {
                     switchboard.ringCast(new Message(sender, type, arguments));
@@ -260,7 +264,7 @@ public class Coordinator implements Member {
         switch (type) {
             case MEMBER_REBALANCED: {
                 if (isLeader()) {
-                    tally.incrementAndGet();
+                    tally.decrementAndGet();
                     fsm.memberRebalanced();
                 } else {
                     switchboard.forwardToNextInRing(new Message(sender, type,
@@ -299,9 +303,9 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case READY_REPLICATORS:
-                readyReplicators();
-                if (isLeader()) {
-                    fsm.replicatorsReady();
+                Runnable rendezvousAction = readyReplicators();
+                if (rendezvousAction != null) {
+                    rendezvousAction.run();
                 }
                 break;
             case REPLICATORS_ESTABLISHED:
@@ -314,6 +318,9 @@ public class Coordinator implements Member {
                 }
                 break;
             case CONNECT_REPLICATORS:
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Connecting replicators on %s", id));
+                }
                 weaver.connectReplicators(yellowPages);
                 break;
             default:
@@ -452,6 +459,7 @@ public class Coordinator implements Member {
 
     @Override
     public void stabilized() {
+        filterSystemMembership();
         fsm.stabilize();
     }
 
@@ -464,6 +472,7 @@ public class Coordinator implements Member {
     }
 
     protected void bootstrap(Node[] bootsrappingMembers) {
+        joiningMembers = bootsrappingMembers;
         active = true;
         for (Node node : bootsrappingMembers) {
             activeMembers.add(node);
@@ -529,6 +538,7 @@ public class Coordinator implements Member {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating bootstrap on %s", id));
         }
+        tally.set(joiningMembers.length);
         switchboard.ringCast(new Message(id,
                                          BootstrapMessage.BOOTSTRAP_SPINDLES,
                                          (Serializable) joiningMembers));
@@ -566,8 +576,6 @@ public class Coordinator implements Member {
             log.info(String.format("Coordinating establishment of the replicators on %s",
                                    id));
         }
-        tally.set(0);
-        targetTally = allMembers.size();
         Message message = new Message(id, ReplicatorMessage.READY_REPLICATORS);
         switchboard.ringCast(message, allMembers);
     }
@@ -600,7 +608,6 @@ public class Coordinator implements Member {
             yellowPages.remove(node);
         }
         weaver.failover(deadMembers);
-        filterSystemMembership();
         fsm.failedOver();
     }
 
@@ -613,6 +620,11 @@ public class Coordinator implements Member {
         allMembers.removeAll(deadMembers);
         activeMembers.removeAll(deadMembers);
         inactiveMembers.removeAll(deadMembers);
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Filtered membership on %s, all  = %s, active = %s, inactive = %s",
+                                    id, allMembers, activeMembers,
+                                    inactiveMembers));
+        }
     }
 
     protected boolean isActive() {
@@ -634,9 +646,13 @@ public class Coordinator implements Member {
     }
 
     /**
-     * Open the replicators to the the new members
+     * Open the replicators to the the new members.
+     * 
+     * @return the rendezvous action to run if the group contains a single
+     *         member - i.e. this member. Or null if the rendezvous action will
+     *         be triggered normally
      */
-    protected void readyReplicators() {
+    protected Runnable readyReplicators() {
         rendezvous = null;
 
         Runnable rendezvousAction = new Runnable() {
@@ -646,21 +662,26 @@ public class Coordinator implements Member {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Replicators established on %s", id));
                 }
-                switchboard.ringCast(new Message(
-                                                 id,
-                                                 ReplicatorMessage.REPLICATORS_ESTABLISHED),
-                                     allMembers);
+                if (isLeader()) {
+                    tally.decrementAndGet();
+                } else {
+                    switchboard.ringCast(new Message(
+                                                     id,
+                                                     ReplicatorMessage.REPLICATORS_ESTABLISHED),
+                                         allMembers);
+                }
                 fsm.replicatorsEstablished();
             }
         };
 
         // Can't replicate back to self
-        ArrayList<Node> contacts = new ArrayList<Node>(inactiveMembers);
+        ArrayList<Node> contacts = new ArrayList<Node>(
+                                                       Arrays.asList(joiningMembers));
         contacts.remove(id);
 
         if (contacts.isEmpty()) {
-            rendezvousAction.run();
-            return;
+            fsm.replicatorsReady();
+            return rendezvousAction;
         }
 
         final ArrayList<Replicator> replicators = new ArrayList<Replicator>();
@@ -694,6 +715,7 @@ public class Coordinator implements Member {
         rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer);
 
         fsm.replicatorsReady();
+        return null;
     }
 
     /**
@@ -809,7 +831,7 @@ public class Coordinator implements Member {
             log.info(String.format("Replicators reported established on %s (coordinator %s)",
                                    member, id));
         }
-        tally.incrementAndGet();
+        tally.decrementAndGet();
         fsm.replicatorsEstablished();
     }
 
@@ -817,7 +839,7 @@ public class Coordinator implements Member {
      * @return true if the tally is equal to the required size
      */
     protected boolean tallyComplete() {
-        return tally.intValue() == targetTally;
+        return tally.get() == 0;
     }
 
     /**
@@ -876,5 +898,18 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
+    }
+
+    @Override
+    public void becomeInactive() {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Spindle %s is now inactivated", id));
+        }
+        active = false;
+        weaver.inactivate();
+    }
+
+    protected boolean hasActiveMembers() {
+        return !activeMembers.isEmpty();
     }
 }

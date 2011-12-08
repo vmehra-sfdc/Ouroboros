@@ -44,6 +44,5 @@ public enum BootstrapMessage implements MemberDispatch {
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
         switchboard.dispatchToMember(this, sender, arguments, time);
-        switchboard.forwardToNextInRing(new Message(sender, this, arguments));
     }
 }

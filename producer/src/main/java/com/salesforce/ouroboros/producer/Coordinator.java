@@ -92,6 +92,11 @@ public class Coordinator implements Member {
     }
 
     @Override
+    public void becomeInactive() {
+        active = false;
+    }
+
+    @Override
     public void destabilize() {
         fsm.destabilize();
     }
@@ -109,6 +114,7 @@ public class Coordinator implements Member {
                 }
                 producer.setProducerRing(ring);
                 fsm.bootstrapped();
+                switchboard.forwardToNextInRing(new Message(sender, type, arguments));
                 break;
             }
             case BOOTSTRAP_SPINDLES: {
@@ -119,6 +125,7 @@ public class Coordinator implements Member {
                     activeWeavers.add(node);
                 }
                 producer.remapWeavers(ring);
+                switchboard.forwardToNextInRing(new Message(sender, type, arguments));
                 break;
             }
             default:
@@ -326,12 +333,12 @@ public class Coordinator implements Member {
                                           : inactiveMembers.last().equals(self);
     }
 
-    protected void setJoiningMembers(Node[] joiningMembers) {
-        this.joiningMembers = joiningMembers;
-    }
-
     protected void openChannel(UUID channel) {
         // TODO Auto-generated method stub
 
+    }
+
+    protected void setJoiningMembers(Node[] joiningMembers) {
+        this.joiningMembers = joiningMembers;
     }
 }

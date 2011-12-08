@@ -197,7 +197,9 @@ public class Replicator implements CommunicationsHandler {
         try {
             rendezvous.meet();
         } catch (BrokenBarrierException e) {
-            log.log(Level.WARNING, "Replication rendezvous cancelled", e);
+            log.log(Level.WARNING,
+                    String.format("Replication rendezvous has been previously cancelled on %s",
+                                  bundle.getId()), e);
             handler.close();
             return;
         }

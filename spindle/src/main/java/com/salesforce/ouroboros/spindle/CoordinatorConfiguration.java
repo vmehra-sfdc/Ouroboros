@@ -12,8 +12,9 @@ public class CoordinatorConfiguration {
     private InetSocketAddress   xeroxAddress       = new InetSocketAddress(
                                                                            "127.0.0.1",
                                                                            0);
-    private Executor            xeroxes            = Executors.newSingleThreadExecutor(new LabeledThreadFactory(
-                                                                                                                "xerox"));
+    private Executor            xeroxes            = Executors.newFixedThreadPool(3,
+                                                                                  new LabeledThreadFactory(
+                                                                                                           "xerox"));
     private final SocketOptions xeroxSocketOptions = new SocketOptions();
 
     /**

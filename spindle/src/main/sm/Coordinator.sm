@@ -54,36 +54,45 @@ Entry {
         Failover{}
         
     stabilize
-    	[ctxt.isLeader()]
+    	[!ctxt.hasActiveMembers() && ctxt.isLeader()]
     	Stable/push(BootstrapFSM::Bootstrap){}
         
     stabilize
-    	Stable/push(ReplicatorFSM::EstablishReplicators){}
+    	[!ctxt.hasActiveMembers()]
+    	Bootstrapping{}
+    	
+    stabilize
+    	Stable{}
 
 	destabilize
-		nil {}
+		nil{}
 		
 	replicatorsEstablishmentCancelled
-		nil {}
+		nil{}
 }
 
-Stable{
+Stable {
 	replicatorsEstablished
-		nil {}
+		nil{}
 		
     rebalance(joiningMembers: Node[])
         [ctxt.isLeader()]
-        AwaitingTakeover/push(ControllerFSM::CoordinateRebalance) {
+        Rebalance/push(ControllerFSM::CoordinateReplicators) {
         	setJoiningMembers(joiningMembers);
         }
     
     rebalance
-        Rebalance{}
+        Rebalance/push(ReplicatorFSM::EstablishReplicators){}
 }
 
-Failover{
+Failover {
     failedOver
-        Stable/push(ReplicatorFSM::EstablishReplicators){}
+        Stable{}
+}
+
+Bootstrapping {
+	bootstrapped
+    	Stable/push(ReplicatorFSM::EstablishReplicators){}
 }
 
 Rebalance
@@ -91,6 +100,13 @@ Entry {
     rebalance();
 }
 {
+	replicatorsEstablished
+		[ctxt.isLeader()] 
+        AwaitingTakeover/push(ControllerFSM::CoordinateRebalance){}
+        
+	replicatorsEstablished
+		nil{}
+        
 	rebalanced
 		AwaitingTakeover{}
 		
@@ -107,7 +123,7 @@ AwaitingTakeover {
 
 Shutdown {
 	destabilize
-		nil {}
+		nil{}
 }
 
 Default {
@@ -133,24 +149,17 @@ Entry{
 	coordinateReplicators();
 }
 {
-    replicatorsEstablished
-    	nil{}
-		
 	replicatorsReady
-		ReplicatorsReady{}
-}
-
-ReplicatorsReady
-Entry {
-    connectReplicators();
-}
-{
+		nil {
+    		connectReplicators();
+    	}
+		
     replicatorsEstablished
         [ctxt.tallyComplete()]
         pop(replicatorsEstablished) {}
         
     replicatorsEstablished
-        nil {}
+        nil{}
 }
 
 CoordinateRebalance
@@ -168,19 +177,18 @@ Entry{
 }
 {
 	rebalanced
-		nil {}
+		nil{}
 		
 	memberRebalanced
 		[ctxt.tallyComplete()]
 		CoordinateTakeover{}
 		
 	memberRebalanced
-		nil {}
+		nil{}
 		
 }
 
-CoordinateTakeover
-{
+CoordinateTakeover {
 	memberTakeoverComplete
 		[ctxt.tallyComplete()]
 		pop(commitTakeover) {
@@ -188,7 +196,7 @@ CoordinateTakeover
 		}
 		
 	memberTakeoverComplete
-		nil {}
+		nil{}
 }
 
 Default { 
@@ -198,14 +206,15 @@ Default {
 %%
 %map ReplicatorFSM
 %%
-EstablishReplicators{
+EstablishReplicators {
 	coordinateReplicators
 		push(ControllerFSM::CoordinateReplicators) {}
 	
 	replicatorsEstablishmentCancelled
-		nil {
+		nil{
 			destabilizePartition();
 		}
+		
 	replicatorsReady
 	   ReplicatorsReady{}
 }
@@ -215,7 +224,7 @@ ReplicatorsReady {
         pop(replicatorsEstablished){}
     
     replicatorsEstablishmentTimeout
-        nil {
+        nil{
             destabilizePartition();
         }
 	replicatorsReady
@@ -224,7 +233,7 @@ ReplicatorsReady {
 
 Default { 
     destabilize
-        pop(destabilize) {}
+        pop(destabilize){}
 }
 %%
 %map BootstrapFSM 
@@ -234,6 +243,9 @@ Bootstrap {
 		CoordinateBootstrap{
 			setJoiningMembers(joiningMembers);
 		}
+		
+	replicatorsEstablished
+		pop(bootstrapped){}
 }
 
 CoordinateBootstrap
@@ -243,13 +255,10 @@ Entry{
 {
 	bootstrapped
 		push(ControllerFSM::CoordinateReplicators){}
-	
-	replicatorsEstablished
-		pop(replicatorsEstablished){}
 }
 
 Default { 
     destabilize
-        pop(destabilize) {}
+        pop(destabilize){}
 }
 %%
