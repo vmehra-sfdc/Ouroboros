@@ -73,7 +73,6 @@ public class TestReplicator {
         }).when(socketChannel).read(isA(ByteBuffer.class));
 
         assertEquals(ReplicatorFSM.Suspended, replicator.getState());
-        replicator.bind();
         replicator.accept(handler);
         assertEquals(ReplicatorFSM.Established, replicator.getState());
     }

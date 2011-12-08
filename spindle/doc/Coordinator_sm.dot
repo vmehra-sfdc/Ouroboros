@@ -332,14 +332,14 @@ digraph Coordinator {
         "BootstrapFSM::Bootstrap" -> "BootstrapFSM::CoordinateBootstrap"
             [label="bootstrapSystem/\l"];
 
-        "BootstrapFSM::Bootstrap" -> "BootstrapFSM::pop(bootstrapped)"
-            [label="replicatorsEstablished/\l"];
-
         "BootstrapFSM::Bootstrap" -> "BootstrapFSM::pop(destabilize)"
             [label="destabilize/\l"];
 
         "BootstrapFSM::CoordinateBootstrap" -> "BootstrapFSM::CoordinateBootstrap::ControllerFSM"
             [label="bootstrapped/\lpush(ControllerFSM::CoordinateReplicators)\l"];
+
+        "BootstrapFSM::CoordinateBootstrap" -> "BootstrapFSM::pop(bootstrapped)"
+            [label="replicatorsEstablished/\l"];
 
         "BootstrapFSM::CoordinateBootstrap" -> "BootstrapFSM::pop(destabilize)"
             [label="destabilize/\l"];

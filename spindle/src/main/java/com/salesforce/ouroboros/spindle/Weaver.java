@@ -29,8 +29,6 @@ import static com.salesforce.ouroboros.util.Utils.point;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.util.Collection;
 import java.util.HashMap;
@@ -49,6 +47,7 @@ import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.WeaverConfigation.RootDirectory;
+import com.salesforce.ouroboros.spindle.replication.HandshakeHandler;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
@@ -66,48 +65,11 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class Weaver implements Bundle {
 
-    private class ReplicatorFactory implements CommunicationsHandlerFactory {
+    private class ReplicatorHandshakeFactory implements
+            CommunicationsHandlerFactory {
         @Override
-        public Replicator createCommunicationsHandler(SocketChannel channel) {
-            try {
-                channel.configureBlocking(true);
-            } catch (IOException e) {
-                throw new IllegalStateException(
-                                                String.format("Unable to configure blocking for socket channel: %s",
-                                                              channel), e);
-            }
-            Node node;
-            try {
-                node = readHandshake(channel);
-            } catch (ClosedChannelException e) {
-                return null;
-            } catch (IOException e) {
-                throw new IllegalStateException(
-                                                String.format("Unable to read handshake from: %s",
-                                                              channel), e);
-            }
-            if (node == null) {
-                try {
-                    channel.close();
-                } catch (IOException e) {
-                    log.log(Level.FINEST,
-                            String.format("Error closing socket channel: %s",
-                                          channel), e);
-                    throw new IllegalStateException(
-                                                    String.format("Error reading replication handshake from socket channel: %s",
-                                                                  channel));
-                }
-            }
-            Replicator replicator = replicators.get(node);
-            replicator.bind();
-            try {
-                channel.configureBlocking(false);
-            } catch (IOException e) {
-                throw new IllegalStateException(
-                                                String.format("Unable to configure nonblocking for socket channel: %s",
-                                                              channel), e);
-            }
-            return replicator;
+        public HandshakeHandler createCommunicationsHandler(SocketChannel channel) {
+            return new HandshakeHandler(Weaver.this);
         }
     }
 
@@ -159,7 +121,7 @@ public class Weaver implements Bundle {
                                                             configuration.getReplicationSocketOptions(),
                                                             configuration.getReplicationAddress(),
                                                             configuration.getReplicators(),
-                                                            new ReplicatorFactory());
+                                                            new ReplicatorHandshakeFactory());
         spindleHandler = new ServerSocketChannelHandler(
                                                         WEAVER_SPINDLE,
                                                         configuration.getSpindleSocketOptions(),
@@ -302,6 +264,10 @@ public class Weaver implements Bundle {
     public Node[] getReplicationPair(UUID channel) {
         List<Node> pair = weaverRing.hash(point(channel), 2);
         return new Node[] { pair.get(0), pair.get(1) };
+    }
+
+    public Replicator getReplicator(Node node) {
+        return replicators.get(node);
     }
 
     public void inactivate() {
@@ -531,23 +497,6 @@ public class Weaver implements Bundle {
                              replicationHandler.getLocalAddress());
     }
 
-    private Node readHandshake(SocketChannel channel) throws IOException {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("reading replicator handshake on %s from %s",
-                                   id, channel));
-        }
-        ByteBuffer handshake = ByteBuffer.allocate(HANDSHAKE_SIZE);
-        channel.read(handshake);
-        handshake.flip();
-        int magic = handshake.getInt();
-        if (MAGIC != magic) {
-            log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
-                                      channel, magic));
-            return null;
-        }
-        return new Node(handshake);
-    }
-
     /**
      * indicates which end initiates a connection
      * 
@@ -578,10 +527,10 @@ public class Weaver implements Bundle {
                     || !oldPair.get(1).equals(newPair.get(1))) {
                     remapped.put(channel,
                                  new Node[][] {
-                                                 new Node[] { oldPair.get(0),
-                                                                 oldPair.get(1) },
-                                                 new Node[] { newPair.get(0),
-                                                                 newPair.get(1) } });
+                                         new Node[] { oldPair.get(0),
+                                                 oldPair.get(1) },
+                                         new Node[] { newPair.get(0),
+                                                 newPair.get(1) } });
                 }
             }
         }

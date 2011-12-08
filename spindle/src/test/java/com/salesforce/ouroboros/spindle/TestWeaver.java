@@ -134,9 +134,10 @@ public class TestWeaver {
         Rendezvous rendezvous = mock(Rendezvous.class);
         SocketOptions options = new SocketOptions();
         options.setTimeout(100);
+        options.setConnect_time(100);
         ServerSocketChannel server = ServerSocketChannel.open();
-        server.configureBlocking(true);
         options.configure(server.socket());
+        server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
         ContactInformation info = new ContactInformation(
                                                          new InetSocketAddress(

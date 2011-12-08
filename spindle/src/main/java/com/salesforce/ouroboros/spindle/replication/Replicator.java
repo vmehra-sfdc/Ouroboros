@@ -69,39 +69,37 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class Replicator implements CommunicationsHandler {
 
-    public static final int           HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
+    public static final int         HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
 
-    public static final int           MAGIC          = 0x1638;
-    private static final Logger       log            = Logger.getLogger(Replicator.class.getCanonicalName());
+    public static final int         MAGIC          = 0x1638;
+    private static final Logger     log            = Logger.getLogger(Replicator.class.getCanonicalName());
 
-    private final ReplicatingAppender appender;
-    private final Bundle              bundle;
-    private final Duplicator          duplicator     = new Duplicator();
-    private final ReplicatorContext   fsm            = new ReplicatorContext(
-                                                                             this);
-    private SocketChannelHandler      handler;
-    private final ByteBuffer          handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private boolean                   inError;
-    private final boolean             originator;
-    private final Node                partner;
-    private final Rendezvous          rendezvous;
+    private ReplicatingAppender     appender;
+    private final Bundle            bundle;
+    private final Duplicator        duplicator     = new Duplicator();
+    private final ReplicatorContext fsm            = new ReplicatorContext(this);
+    private SocketChannelHandler    handler;
+    private final ByteBuffer        handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private boolean                 inError;
+    private final Node              partner;
+    private final Rendezvous        rendezvous;
 
     public Replicator(Bundle bundle, Node partner, boolean originator,
                       Rendezvous rendezvous) {
-        appender = new ReplicatingAppender(bundle);
+        if (originator) {
+            appender = new ReplicatingAppender(bundle);
+        }
         this.bundle = bundle;
         this.partner = partner;
-        this.originator = originator;
         this.rendezvous = rendezvous;
     }
 
     @Override
     public void accept(SocketChannelHandler handler) {
-        assert !originator : "This replicator does not accept connections";
+        assert !willOriginate() : "This replicator does not accept connections";
         this.handler = handler;
-    }
-
-    public void bind() {
+        appender = new ReplicatingAppender(bundle);
+        handler.resetHandler(this);
         fsm.established();
     }
 
@@ -116,7 +114,7 @@ public class Replicator implements CommunicationsHandler {
 
     public void connect(Map<Node, ContactInformation> yellowPages,
                         ServerSocketChannelHandler handler) throws IOException {
-        assert originator : "This replicator does not originate connections";
+        assert willOriginate() : "This replicator does not originate connections";
         ContactInformation contactInformation = yellowPages.get(partner);
         assert contactInformation != null : String.format("Contact information for %s is missing",
                                                           partner);
@@ -129,23 +127,9 @@ public class Replicator implements CommunicationsHandler {
 
     @Override
     public void connect(SocketChannelHandler handler) {
-        assert originator : "This replicator does not originate connections";
+        assert willOriginate() : "This replicator does not originate connections";
         this.handler = handler;
         fsm.handshake();
-    }
-
-    /**
-     * @return the appender
-     */
-    public ReplicatingAppender getAppender() {
-        return appender;
-    }
-
-    /**
-     * @return the duplicator
-     */
-    public Duplicator getDuplicator() {
-        return duplicator;
     }
 
     public Node getPartner() {
@@ -157,10 +141,6 @@ public class Replicator implements CommunicationsHandler {
      */
     public ReplicatorState getState() {
         return fsm.getState();
-    }
-
-    public boolean originatesConnection() {
-        return originator;
     }
 
     @Override
@@ -179,7 +159,7 @@ public class Replicator implements CommunicationsHandler {
      * @return true if the receiver is not connected and originates connections
      */
     public boolean willOriginate() {
-        return handler == null && originator;
+        return handler == null && appender != null;
     }
 
     @Override
