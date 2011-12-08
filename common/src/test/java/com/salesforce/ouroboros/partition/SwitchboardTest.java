@@ -162,13 +162,16 @@ public class SwitchboardTest {
         view.add(testNode2.processId);
         view.stablize();
 
+        UUID viewId = UUID.randomUUID();
         Switchboard switchboard = new Switchboard(node, partition,
-                                                  UUID.randomUUID());
+                                                  viewId);
         switchboard.setMember(member);
         switchboard.partitionEvent(view, 0);
         switchboard.add(node);
         switchboard.add(testNode);
         switchboard.add(testNode2);
+
+        switchboard.getFsm().setState(SwitchboardFSM.Advertising);
 
         Answer<Void> answer = new Answer<Void>() {
             @Override
