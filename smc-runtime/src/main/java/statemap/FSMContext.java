@@ -168,8 +168,8 @@ public abstract class FSMContext
     {
         if (getLog().isLoggable(Level.FINER))
         {
-            getLog().finer(String.format("ENTER STATE     : %s",
-                                     state.getName()));
+            getLog().finer(String.format("ENTER STATE     : %s [%s]",
+                                     state.getName(), _name));
         }
 
         // clearState() is not called when a transition has
@@ -220,7 +220,15 @@ public abstract class FSMContext
 
     @Override
     public String toString() {
-        return String.format("%s[current=%s, previous=%s, transition=%s]", getClass().getCanonicalName(), _state, _previousState, _transition);
+        return String.format("%s[name=%s, current=%s, previous=%s, transition=%s]", getClass().getName(), _name, _state, _previousState, _transition);
+    }
+    
+    public String getName() {
+        return _name;
+    }
+    
+    public void setName(String name) {
+        _name = name;
     }
 
 //---------------------------------------------------------------

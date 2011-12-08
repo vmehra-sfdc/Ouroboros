@@ -557,7 +557,7 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
         _source.println("            {");
         _source.print(_indent);
         _source.println("                context.getLog().finest(");
-        _source.println("                    \"TRANSITION   : Default\");");
+        _source.println("                    \"TRANSITION   : Default [\" + context.getName() + \"]\");");
         _source.println("            }");
         _source.println(); 
         _source.println("            throw (");
@@ -1205,7 +1205,7 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
         _source.print(mapName);
         _source.print('.');
         _source.print(stateName);
-        _source.println("\");");
+        _source.println(" [\" + context.getName() + \"]\");");
         _source.print(_indent);
         _source.println("    }");
 
@@ -1430,7 +1430,7 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
             _source.print(mapName);
             _source.print('.');
             _source.print(stateName);
-            _source.println(".Exit(context)\");");
+            _source.println(".Exit(context) [\" + context.getName() + \"]\");");
             _source.print(indent2);
             _source.println("}");
             _source.println();
@@ -1448,7 +1448,7 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
             _source.print(mapName);
             _source.print('.');
             _source.print(stateName);
-            _source.println(".Exit(context)\");");
+            _source.println(".Exit(context) [\" + context.getName() + \"]\");");
             _source.print(indent2);
             _source.println("    }");
             _source.println();
@@ -1491,7 +1491,7 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
             }
             _source.print(')');
 
-            _source.println("\");");
+            _source.println(" [\" + context.getName() + \"]\");");
             _source.print(_indent);
             _source.println("}");
             _source.println();
@@ -1592,7 +1592,7 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
             }
             _source.print(')');
 
-            _source.println("\");");
+            _source.println(" [\" + context.getName() + \"]\");");
             _source.print(_indent);
             _source.println("}");
             _source.println();
@@ -1665,7 +1665,7 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
             _source.print(mapName);
             _source.print('.');
             _source.print(stateName);
-            _source.println(".Entry(context)\");");
+            _source.println(".Entry(context) [\" + context.getName() + \"]\");");
             _source.print(indent3);
             _source.println("}");
             _source.println();
@@ -1684,7 +1684,7 @@ public final class SmcJavaGenerator extends SmcCodeGenerator {
             _source.print(mapName);
             _source.print('.');
             _source.print(stateName);
-            _source.println(".Entry(context)\");");
+            _source.println(".Entry(context) [\" + context.getName() + \"]\");");
             _source.print(indent3);
             _source.println("}");
         }
