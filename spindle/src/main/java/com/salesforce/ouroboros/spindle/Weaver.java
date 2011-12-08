@@ -66,7 +66,7 @@ import com.salesforce.ouroboros.util.Rendezvous;
 public class Weaver implements Bundle {
 
     private class ReplicatorHandshakeFactory implements
-            CommunicationsHandlerFactory {
+                    CommunicationsHandlerFactory {
         @Override
         public HandshakeHandler createCommunicationsHandler(SocketChannel channel) {
             return new HandshakeHandler(Weaver.this);
@@ -348,9 +348,9 @@ public class Weaver implements Bundle {
         assert previous == null : String.format("Replicator already opend on weaver %s to weaver %s",
                                                 id, node);
         if (!originator) {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Waiting for replication inbound connection to weaver %s from new weaver %s",
-                                       id, node));
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("Waiting for replication inbound connection to weaver %s from new weaver %s",
+                                        id, node));
             }
         }
         return replicator;
@@ -527,10 +527,10 @@ public class Weaver implements Bundle {
                     || !oldPair.get(1).equals(newPair.get(1))) {
                     remapped.put(channel,
                                  new Node[][] {
-                                         new Node[] { oldPair.get(0),
-                                                 oldPair.get(1) },
-                                         new Node[] { newPair.get(0),
-                                                 newPair.get(1) } });
+                                                 new Node[] { oldPair.get(0),
+                                                                 oldPair.get(1) },
+                                                 new Node[] { newPair.get(0),
+                                                                 newPair.get(1) } });
                 }
             }
         }

@@ -38,7 +38,7 @@ import com.salesforce.ouroboros.partition.SwitchboardDispatch;
  * 
  */
 public enum ViewElectionMessage implements SwitchboardDispatch {
-    VOTE;
+    VOTE, NEW_VIEW_ID;
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,

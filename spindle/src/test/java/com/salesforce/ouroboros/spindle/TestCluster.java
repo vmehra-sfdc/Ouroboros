@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle;
 
 import static com.salesforce.ouroboros.spindle.Util.waitFor;
 import static java.util.Arrays.asList;
+import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
@@ -39,7 +40,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Timer;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -60,6 +60,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
@@ -185,9 +186,10 @@ public class TestCluster {
 
         @Bean(initMethod = "start", destroyMethod = "terminate")
         public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(memberNode(),
+            Switchboard switchboard = new Switchboard(
+                                                      memberNode(),
                                                       partition(),
-                                                      UUID.randomUUID());
+                                                      Generators.timeBasedGenerator());
             return switchboard;
         }
 
@@ -497,6 +499,14 @@ public class TestCluster {
 
         log.info("Asserting full partition has stabilized");
         assertPartitionStable(coordinators);
+
+        for (Coordinator coordinator : partitionA) {
+            assertTrue(coordinator.isActive());
+        }
+
+        for (Coordinator coordinator : partitionB) {
+            assertFalse(coordinator.isActive());
+        }
     }
 
     private List<AnnotationConfigApplicationContext> createMembers() {

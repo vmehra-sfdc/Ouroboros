@@ -55,6 +55,7 @@ import org.smartfrog.services.anubis.partition.views.View;
 
 import statemap.StateUndefinedException;
 
+import com.fasterxml.uuid.NoArgGenerator;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardState;
 import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
@@ -168,6 +169,7 @@ public class Switchboard {
     private final SwitchboardContext                 fsm             = new SwitchboardContext(
                                                                                               this);
     private final Gate                               inboundGate     = new Gate();
+    private final NoArgGenerator                     viewIdGenerator;
     private boolean                                  leader          = false;
     private Member                                   member;
     private SortedSet<Node>                          members         = new ConcurrentSkipListSet<Node>();
@@ -183,11 +185,10 @@ public class Switchboard {
     private UUID                                     viewId;
     private final ConcurrentMap<UUID, AtomicInteger> votes           = new ConcurrentHashMap<UUID, AtomicInteger>();
 
-    public Switchboard(Node node, Partition p, UUID viewId) {
+    public Switchboard(Node node, Partition p, NoArgGenerator viewIdGenerator) {
         inboundGate.close();
         self = node;
         partition = p;
-        this.viewId = viewId;
         messageProcessor = Executors.newSingleThreadExecutor(new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -207,6 +208,8 @@ public class Switchboard {
                 return daemon;
             }
         });
+        this.viewIdGenerator = viewIdGenerator;
+        viewId = this.viewIdGenerator.generate();
     }
 
     /**
@@ -280,6 +283,11 @@ public class Switchboard {
                     tally.incrementAndGet();
                 }
                 fsm.voteReceived();
+                break;
+            case NEW_VIEW_ID:
+                assert arguments.length == 1 : "No view id in new view message";
+                viewId = (UUID) arguments[0];
+                fsm.established();
                 break;
             default:
                 throw new IllegalStateException(
@@ -396,7 +404,7 @@ public class Switchboard {
         if (neighbor == -1) {
             if (log.isLoggable(Level.FINEST)) {
                 log.finest(String.format("Ring does not have right neighbor of %s",
-                                       self));
+                                         self));
             }
             send(message, self);
         } else {
@@ -419,7 +427,7 @@ public class Switchboard {
         if (ring.size() <= 1) {
             if (log.isLoggable(Level.FINEST)) {
                 log.finest(String.format("Ring does not have right neighbor of %s",
-                                       self));
+                                         self));
             }
             send(message, self);
         } else {
@@ -531,13 +539,18 @@ public class Switchboard {
         Arrays.sort(results);
         Result result = results[results.length - 1];
 
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("View elected: %s on %s", result.vote, self));
+        if (log.isLoggable(Level.FINE)) {
+            log.fine(String.format("View elected: %s on %s", result.vote, self));
         }
         UUID previousViewId = viewId;
-        viewId = result.vote;
-        if (!viewId.equals(previousViewId)) {
+        if (!result.vote.equals(previousViewId)) {
             member.becomeInactive();
+        }
+        if (leader) {
+            ringCast(new Message(
+                                 self,
+                                 ViewElectionMessage.NEW_VIEW_ID,
+                                 new Serializable[] { viewIdGenerator.generate() }));
         }
     }
 
@@ -616,8 +629,7 @@ public class Switchboard {
         inboundGate.close();
         stable.set(false);
         if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Destabilizing partition on: %s, view: %s, leader: %s",
-                                   self, view, leader));
+            log.info(String.format("Destabilizing partition on: %s", self));
         }
         previousMembers.addAll(members);
         deadMembers.clear();

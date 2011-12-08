@@ -662,8 +662,8 @@ public class Coordinator implements Member {
             @Override
             public void run() {
                 rendezvous = null;
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Replicators established on %s", id));
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine(String.format("Replicators established on %s", id));
                 }
                 if (isLeader()) {
                     tally.decrementAndGet();
@@ -704,8 +704,8 @@ public class Coordinator implements Member {
                 fsm.replicatorsEstablishmentCancelled();
             }
         };
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Establishment of replicators initiated on %s",
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Establishment of replicators initiated on %s",
                                    id));
         }
         rendezvous = new Rendezvous(contacts.size(), rendezvousAction,

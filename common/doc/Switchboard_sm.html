@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=6>
+        <th colspan=7>
           Transition
         </th>
       </tr>
@@ -35,6 +35,9 @@
         </th>
         <th>
           discoveryComplete
+        </th>
+        <th>
+          established
         </th>
         <th>
           stabilized
@@ -61,6 +64,8 @@
           <pre>
 cleanUp();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -110,6 +115,8 @@ cleanUp();
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -131,16 +138,46 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [ctxt.votingComplete()]
-  Advertising
-  {
-    electView();
-  }
+  EstablishViewId
+  {}
 
   ElectView
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          EstablishViewId
+        </td>
+        <td>
+          <pre>
+    electView();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Advertising
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -172,10 +209,14 @@ cleanUp();
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
           Stopped
+        </td>
+        <td>
         </td>
         <td>
         </td>

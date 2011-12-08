@@ -58,6 +58,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
@@ -197,9 +198,10 @@ public class TestProducerChannelBuffer {
 
         @Bean(initMethod = "start", destroyMethod = "terminate")
         public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(memberNode(),
+            Switchboard switchboard = new Switchboard(
+                                                      memberNode(),
                                                       partition(),
-                                                      UUID.randomUUID());
+                                                      Generators.timeBasedGenerator());
             return switchboard;
         }
 

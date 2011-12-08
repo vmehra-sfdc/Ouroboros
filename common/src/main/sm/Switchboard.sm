@@ -68,12 +68,19 @@ Entry{
 {
 	voteReceived
 		[ctxt.votingComplete()]
-		Advertising{
-			electView();
-		}
+		EstablishViewId{}
 
 	voteReceived
 		nil{}
+}
+
+EstablishViewId
+Entry{
+	electView();
+}
+{
+	established
+		Advertising{}
 }
 
 Advertising

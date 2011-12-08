@@ -61,8 +61,8 @@ public class HandshakeHandler implements CommunicationsHandler {
     @Override
     public void accept(SocketChannelHandler handler) {
         this.handler = handler;
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Receiving handshake on %s", weaver.getId()));
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Receiving handshake on %s", weaver.getId()));
         }
         readReady();
     }

@@ -48,7 +48,7 @@ public class Node implements Comparable<Node>, Serializable {
      * 
      */
     public class NodeSkipStrategy implements
-            ConsistentHashFunction.SkipStrategy<Node> {
+                    ConsistentHashFunction.SkipStrategy<Node> {
         @Override
         public boolean isSkippable(List<Node> previous, Node bucket) {
             for (Node node : previous) {
@@ -142,7 +142,6 @@ public class Node implements Comparable<Node>, Serializable {
      */
     @Override
     public String toString() {
-        return "Node [processId=" + processId + ", machineId=" + machineId
-               + ", rackId=" + rackId + ", capacity=" + capacity + "]";
+        return String.format("Node[%s]", processId);
     }
 }
