@@ -252,15 +252,15 @@ public class Switchboard {
                          Serializable[] arguments, long time) {
         switch (type) {
             case DISCOVERY_COMPLETE:
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Discovery complete on %s", self));
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine(String.format("Discovery complete on %s", self));
                 }
                 fsm.discoveryComplete();
                 break;
             default:
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Discovery of node %s = %s", self,
-                                           type));
+                if (log.isLoggable(Level.FINER)) {
+                    log.finer(String.format("Discovery of node %s = %s", self,
+                                            type));
                 }
                 discover(sender);
                 member.dispatch(type, sender, arguments, time);
@@ -394,8 +394,8 @@ public class Switchboard {
         assert message != null : "Message must not be null";
         int neighbor = view.rightNeighborOf(self.processId);
         if (neighbor == -1) {
-            if (log.isLoggable(Level.FINE)) {
-                log.fine(String.format("Ring does not have right neighbor of %s",
+            if (log.isLoggable(Level.FINEST)) {
+                log.finest(String.format("Ring does not have right neighbor of %s",
                                        self));
             }
             send(message, self);
@@ -417,8 +417,8 @@ public class Switchboard {
         assert ring != null : "Ring must not be null";
 
         if (ring.size() <= 1) {
-            if (log.isLoggable(Level.FINE)) {
-                log.fine(String.format("Ring does not have right neighbor of %s",
+            if (log.isLoggable(Level.FINEST)) {
+                log.finest(String.format("Ring does not have right neighbor of %s",
                                        self));
             }
             send(message, self);
@@ -483,8 +483,8 @@ public class Switchboard {
             return;
         }
         if (node == self.processId) {
-            if (log.isLoggable(Level.FINE)) {
-                log.fine(String.format("Sending %s to self", msg));
+            if (log.isLoggable(Level.FINEST)) {
+                log.finest(String.format("Sending %s to self", msg));
             }
             try {
                 processMessage(msg, self.processId, System.currentTimeMillis());
@@ -503,8 +503,8 @@ public class Switchboard {
                                           msg, node, self));
             }
         } else {
-            if (log.isLoggable(Level.FINE)) {
-                log.fine(String.format("Sending %s to %s", msg, node));
+            if (log.isLoggable(Level.FINEST)) {
+                log.finest(String.format("Sending %s to %s", msg, node));
             }
             connection.sendObject(msg);
         }
@@ -563,10 +563,6 @@ public class Switchboard {
         }
         previousMembers.clear();
         stable.set(true);
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("members = %s, new members = %s, dead members = %s on %s",
-                                    members, getNewMembers(), deadMembers, self));
-        }
         inboundGate.open();
     }
 
@@ -574,6 +570,11 @@ public class Switchboard {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Partition stable and discovery complete on %s",
                                    self));
+        }
+        if (log.isLoggable(Level.FINEST)) {
+            log.finest(String.format("members = %s, new members = %s, dead members = %s on %s",
+                                     members, getNewMembers(), deadMembers,
+                                     self));
         }
         member.stabilized();
     }
@@ -611,7 +612,7 @@ public class Switchboard {
      * @param leader
      *            - the leader
      */
-    void destabilize(View view, int leader) {
+    protected void destabilize(View view, int leader) {
         inboundGate.close();
         stable.set(false);
         if (log.isLoggable(Level.INFO)) {
@@ -631,23 +632,18 @@ public class Switchboard {
      *            - the member
      */
     synchronized void discover(Node sender) {
-        if (!view.contains(sender.processId)) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.warning(String.format("discovery received from member %s, which is not in the view of %s",
-                                          sender, self));
-            }
-            return;
-        }
-        if (leader && members.add(sender)
+        assert view.contains(sender.processId) : String.format("discovery received from member %s, which is not in the view of %s",
+                                                               sender, self);
+        if (members.add(sender) && leader
             && members.size() == view.cardinality()) {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("All members discovered on %s", self));
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("All members discovered on %s", self));
             }
             ringCast(new Message(self, DiscoveryMessage.DISCOVERY_COMPLETE));
         } else {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("member %s discovered on %s", sender,
-                                       self));
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("member %s discovered on %s", sender,
+                                        self));
             }
         }
     }

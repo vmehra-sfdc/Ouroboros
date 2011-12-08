@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle;
 
 import static com.salesforce.ouroboros.spindle.Util.waitFor;
 import static java.util.Arrays.asList;
-import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
@@ -469,14 +468,11 @@ public class TestCluster {
         for (ControlNode member : groupA) {
             assertEquals(A, member.getPartition());
         }
-        log.info("Asserting partition A have stabilized");
+        log.info("Asserting partition A has stabilized");
         assertPartitionStable(partitionA);
 
         for (Coordinator coordinator : partitionA) {
             assertTrue("Coordinator is not active", coordinator.isActive());
-        }
-        for (Coordinator coordinator : partitionB) {
-            assertFalse("Coordinator is active", coordinator.isActive());
         }
 
         // The other partition should still be unstable.
@@ -500,7 +496,7 @@ public class TestCluster {
         }
 
         log.info("Asserting full partition has stabilized");
-        assertPartitionBootstrapping(coordinators);
+        assertPartitionStable(coordinators);
     }
 
     private List<AnnotationConfigApplicationContext> createMembers() {
@@ -536,7 +532,7 @@ public class TestCluster {
                 public boolean value() {
                     return CoordinatorFSM.Stable == c.getState();
                 }
-            }, 60000, 100);
+            }, 120000, 1000);
         }
     }
 }

@@ -68,7 +68,9 @@ public class Coordinator implements Member {
     private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
     private final SortedSet<Node>               inactiveWeavers = new ConcurrentSkipListSet<Node>();
     private Node[]                              joiningMembers  = new Node[0];
+    @SuppressWarnings("unused")
     private Node[]                              joiningWeavers  = new Node[0];
+    @SuppressWarnings("unused")
     private ConsistentHashFunction<Node>        nextWeaverRing;
     private final Producer                      producer;
     private final Node                          self;
@@ -80,6 +82,7 @@ public class Coordinator implements Member {
                                                                   throws IOException {
         this.producer = producer;
         self = producer.getId();
+        fsm.setName(Integer.toString(self.processId));
         switchboard.setMember(this);
         this.switchboard = switchboard;
     }
@@ -106,6 +109,10 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case BOOTSTAP_PRODUCERS: {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Bootstrapping producers on: %s",
+                                           self));
+                }
                 ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
                 for (Node node : (Node[]) arguments[0]) {
                     ring.add(node, node.capacity);
@@ -113,8 +120,9 @@ public class Coordinator implements Member {
                     activeMembers.add(node);
                 }
                 producer.setProducerRing(ring);
+                switchboard.forwardToNextInRing(new Message(sender, type,
+                                                            arguments));
                 fsm.bootstrapped();
-                switchboard.forwardToNextInRing(new Message(sender, type, arguments));
                 break;
             }
             case BOOTSTRAP_SPINDLES: {
@@ -125,7 +133,8 @@ public class Coordinator implements Member {
                     activeWeavers.add(node);
                 }
                 producer.remapWeavers(ring);
-                switchboard.forwardToNextInRing(new Message(sender, type, arguments));
+                switchboard.forwardToNextInRing(new Message(sender, type,
+                                                            arguments));
                 break;
             }
             default:

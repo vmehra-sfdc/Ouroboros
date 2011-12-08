@@ -174,6 +174,8 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case BOOTSTAP_PRODUCERS:
+                switchboard.forwardToNextInRing(new Message(sender, type,
+                                                            arguments));
                 break;
             case BOOTSTRAP_SPINDLES:
                 if (log.isLoggable(Level.INFO)) {
@@ -181,7 +183,8 @@ public class Coordinator implements Member {
                 }
                 bootstrap((Node[]) arguments[0]);
                 if (!isLeader()) {
-                    switchboard.ringCast(new Message(sender, type, arguments));
+                    switchboard.forwardToNextInRing(new Message(sender, type,
+                                                                arguments));
                 }
                 fsm.bootstrapped();
                 break;
@@ -911,5 +914,16 @@ public class Coordinator implements Member {
 
     protected boolean hasActiveMembers() {
         return !activeMembers.isEmpty();
+    }
+
+    public String toString() {
+        return String.format("Coordinator for spindle [%s]", id.processId);
+    }
+
+    protected void printState() {
+        System.out.println(String.format("Coordinator [%s], active=%s, leader=%s, active=%s, inactive=%s, dead=%s",
+                                         id.processId, active, isLeader(),
+                                         activeMembers, inactiveMembers,
+                                         switchboard.getDeadMembers()));
     }
 }

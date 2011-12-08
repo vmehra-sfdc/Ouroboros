@@ -98,6 +98,10 @@ public class Replicator implements CommunicationsHandler {
     public void accept(SocketChannelHandler handler) {
         assert !willOriginate() : "This replicator does not accept connections";
         this.handler = handler;
+        if (log.isLoggable(Level.FINE)) {
+            log.fine(String.format("Handshake accepted on %s from %s",
+                                   bundle.getId(), partner));
+        }
         appender = new ReplicatingAppender(bundle);
         handler.resetHandler(this);
         fsm.established();
@@ -118,9 +122,9 @@ public class Replicator implements CommunicationsHandler {
         ContactInformation contactInformation = yellowPages.get(partner);
         assert contactInformation != null : String.format("Contact information for %s is missing",
                                                           partner);
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Initiating replication connection to new weaver %s",
-                                   partner));
+        if (log.isLoggable(Level.FINE)) {
+            log.fine(String.format("Initiating replication connection from %s to new weaver %s",
+                                   bundle.getId(), partner));
         }
         handler.connectTo(contactInformation.replication, this);
     }
@@ -129,6 +133,10 @@ public class Replicator implements CommunicationsHandler {
     public void connect(SocketChannelHandler handler) {
         assert willOriginate() : "This replicator does not originate connections";
         this.handler = handler;
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Starting handshake from %s to %s",
+                                    bundle.getId(), partner));
+        }
         fsm.handshake();
     }
 
