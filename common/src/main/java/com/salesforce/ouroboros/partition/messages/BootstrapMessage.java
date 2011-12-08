@@ -29,7 +29,6 @@ import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.MemberDispatch;
-import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 
 /**

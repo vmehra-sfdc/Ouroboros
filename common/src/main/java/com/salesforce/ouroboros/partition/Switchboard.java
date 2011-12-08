@@ -141,13 +141,6 @@ public class Switchboard {
         public void objectNotification(final Object obj, final int sender,
                                        final long time) {
             if (obj instanceof Message) {
-                if (!stable.get()) {
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Partition is not stable, ignoring inbound %s on: %s",
-                                               obj, self));
-                    }
-                    return;
-                }
                 try {
                     messageProcessor.execute(new Runnable() {
                         @Override
