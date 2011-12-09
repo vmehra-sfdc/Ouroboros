@@ -93,7 +93,6 @@ public class TestCoordinator {
                                                   switchboard,
                                                   weaver,
                                                   new CoordinatorConfiguration());
-        Node requester = new Node(-1, -1, -1);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -147,14 +146,12 @@ public class TestCoordinator {
         when(weaver.getReplicationPair(primary)).thenReturn(getPair(primary,
                                                                     ring));
         when(weaver.getReplicationPair(mirror)).thenReturn(getPair(mirror, ring));
-        coordinator.open(primary, requester);
-        coordinator.open(mirror, requester);
-        coordinator.close(primary, requester);
-        coordinator.close(mirror, requester);
+        coordinator.open(primary);
+        coordinator.open(mirror);
+        coordinator.close(primary);
+        coordinator.close(mirror);
         verify(weaver).close(primary);
         verify(weaver).close(mirror);
-        verify(switchboard, new Times(2)).send(isA(Message.class),
-                                               eq(requester));
     }
 
     @Test
@@ -257,43 +254,27 @@ public class TestCoordinator {
                                                   switchboard,
                                                   weaver,
                                                   new CoordinatorConfiguration());
-        Node requester = new Node(-1, -1, -1);
+        coordinator.setActive(true);
         Node node1 = new Node(1, 1, 1);
-        Node node2 = new Node(2, 1, 1);
-        Node node3 = new Node(3, 1, 1);
+        Node node2 = new Node(2, 2, 2);
+
+        coordinator.getActiveMembers().add(localNode);
+        coordinator.getActiveMembers().add(node1);
 
         when(weaver.getId()).thenReturn(localNode);
 
-        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
-        ring.add(localNode, 1);
-        ring.add(node1, 1);
-        ring.add(node2, 1);
-        ring.add(node3, 1);
-        coordinator.setNextRing(ring);
-        coordinator.commitNextRing();
-        UUID primary = null;
-        while (primary == null) {
-            UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(point(test), 2);
-            if (pair.get(0).equals(localNode)) {
-                primary = test;
-            }
-        }
-        UUID mirror = null;
-        while (mirror == null) {
-            UUID test = UUID.randomUUID();
-            List<Node> pair = ring.hash(point(test), 2);
-            if (pair.get(1).equals(localNode)) {
-                mirror = test;
-            }
-        }
-        when(weaver.getReplicationPair(primary)).thenReturn(getPair(primary,
-                                                                    ring));
-        when(weaver.getReplicationPair(mirror)).thenReturn(getPair(mirror, ring));
-        coordinator.open(primary, requester);
-        coordinator.openMirror(mirror, requester);
-        verify(weaver).openPrimary(eq(primary), isA(Node.class));
-        verify(weaver).openMirror(eq(mirror), isA(Node.class));
+        UUID primary = UUID.randomUUID();
+        UUID mirror = UUID.randomUUID();
+
+        when(weaver.getReplicationPair(primary)).thenReturn(new Node[] {
+                                                                            localNode,
+                                                                            node2 });
+        when(weaver.getReplicationPair(mirror)).thenReturn(new Node[] { node1,
+                                                                           localNode });
+        coordinator.open(primary);
+        coordinator.open(mirror);
+        verify(weaver).openPrimary(eq(primary), (Node) eq(null));
+        verify(weaver).openMirror(eq(mirror));
     }
 
     @Test

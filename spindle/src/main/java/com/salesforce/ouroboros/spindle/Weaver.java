@@ -292,20 +292,19 @@ public class Weaver implements Bundle {
      * 
      * @param channel
      *            - The new subscription
-     * @param primary
-     *            - the primary node for this subscription
      */
-    public boolean openMirror(UUID channel, Node primary) {
-        // This node is the mirror for the event channel
+    public void openMirror(UUID channel) {
+        if (channels.get(channel) != null) {
+            return;
+        }
         if (log.isLoggable(Level.INFO)) {
             log.fine(String.format(" Weaver[%s] is the mirror for the new subscription %s",
                                    id, channel));
         }
-        EventChannel ec = new EventChannel(Role.MIRROR, channel,
-                                           roots.hash(point(channel)),
-                                           maxSegmentSize,
-                                           replicators.get(primary));
-        return null == channels.putIfAbsent(channel, ec);
+        channels.put(channel,
+                     new EventChannel(Role.MIRROR, channel,
+                                      roots.hash(point(channel)),
+                                      maxSegmentSize, null));
     }
 
     /**
@@ -316,17 +315,23 @@ public class Weaver implements Bundle {
      * @param mirror
      *            - the mirror node for this subscription
      */
-    public boolean openPrimary(UUID channel, Node mirror) {
+    public void openPrimary(UUID channel, Node mirror) {
+        if (channels.get(channel) != null) {
+            return;
+        }
         // This node is the primary for the event channel
         if (log.isLoggable(Level.INFO)) {
             log.fine(String.format(" Weaver[%s] is the primary for the new subscription %s",
                                    id, channel));
         }
-        EventChannel ec = new EventChannel(Role.PRIMARY, channel,
-                                           roots.hash(point(channel)),
-                                           maxSegmentSize,
-                                           replicators.get(mirror));
-        return null == channels.putIfAbsent(channel, ec);
+        Replicator replicator = null;
+        if (mirror != null) {
+            replicator = replicators.get(mirror);
+        }
+        channels.put(channel,
+                     new EventChannel(Role.PRIMARY, channel,
+                                      roots.hash(point(channel)),
+                                      maxSegmentSize, replicator));
     }
 
     /**

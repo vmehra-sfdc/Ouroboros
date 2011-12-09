@@ -528,7 +528,7 @@ public class TestCluster {
                     return CoordinatorFSM.Bootstrapping == c.getState()
                            || BootstrapFSM.Bootstrap == c.getState();
                 }
-            }, 30000, 100);
+            }, 60000, 100);
         }
     }
 
@@ -542,7 +542,7 @@ public class TestCluster {
                 public boolean value() {
                     return CoordinatorFSM.Stable == c.getState();
                 }
-            }, 120000, 1000);
+            }, 60000, 1000);
         }
     }
 }

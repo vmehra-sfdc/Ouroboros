@@ -63,7 +63,6 @@ import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.transfer.Sink;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
-import com.salesforce.ouroboros.util.Association;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
 
@@ -137,31 +136,8 @@ public class Coordinator implements Member {
      * @param channel
      *            - the id of the channel to close
      */
-    public void close(UUID channel, Node requester) {
-        Node[] pair = weaver.getReplicationPair(channel);
-        if (activeMembers.contains(pair[0])) {
-            switchboard.send(new Message(id, ChannelMessage.CLOSE_MIRROR,
-                                         new Association<Node, UUID>(requester,
-                                                                     channel)),
-                             pair[1]);
-        } else {
-            switchboard.send(new Message(id, ChannelMessage.CLOSED, channel),
-                             requester);
-        }
+    public void close(UUID channel) {
         weaver.close(channel);
-    }
-
-    /**
-     * Close the channel if the node is a primary or mirror of the existing
-     * channel.
-     * 
-     * @param channel
-     *            - the id of the channel to close
-     */
-    public void closeMirror(UUID channel, Node requester) {
-        weaver.close(channel);
-        switchboard.send(new Message(id, ChannelMessage.CLOSED, channel),
-                         requester);
     }
 
     @Override
@@ -200,24 +176,17 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case OPEN: {
-                open((UUID) arguments[0], sender);
-                break;
-            }
-            case OPEN_MIRROR: {
-                @SuppressWarnings("unchecked")
-                Association<Node, UUID> ass = (Association<Node, UUID>) arguments[0];
-                openMirror(ass.value, ass.key);
+                open((UUID) arguments[0]);
                 break;
             }
             case CLOSE: {
-                close((UUID) arguments[0], sender);
+                close((UUID) arguments[0]);
                 break;
             }
-            case CLOSE_MIRROR: {
-                @SuppressWarnings("unchecked")
-                Association<Node, UUID> ass = (Association<Node, UUID>) arguments[0];
-                closeMirror(ass.value, ass.key);
-            }
+            case PRIMARY_OPENED:
+                break;
+            case MIRROR_OPENED:
+                break;
             default: {
                 if (log.isLoggable(Level.WARNING)) {
                     log.warning(String.format("Invalid target %s for channel message: %s",
@@ -414,50 +383,37 @@ public class Coordinator implements Member {
      * @param channel
      *            - the id of the channel to open
      */
-    public void open(UUID channel, Node requester) {
-        Node[] pair = weaver.getReplicationPair(channel);
-        if (!weaver.openPrimary(channel, pair[1])) {
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Channel is already opened %s", channel));
-            }
+    public void open(UUID channel) {
+        if (!active) {
             return;
-        } else if (activeMembers.contains(pair[1])) {
-            switchboard.send(new Message(id, ChannelMessage.OPEN_MIRROR,
-                                         new Association<Node, UUID>(requester,
-                                                                     channel)),
-                             pair[1]);
-        } else {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Opening primary for channel %s on mirror %s, primary %s is dead",
-                                       channel, id, pair[0]));
-            }
-            switchboard.send(new Message(id, ChannelMessage.OPENED, channel),
-                             requester);
         }
-    }
-
-    /**
-     * Open the new channel if this node is a primary or mirror of the new
-     * channel.
-     * 
-     * @param channel
-     *            - the id of the channel to open
-     */
-    public void openMirror(UUID channel, Node requester) {
         Node[] pair = weaver.getReplicationPair(channel);
-        if (!weaver.openMirror(channel, pair[0])) {
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Channel is already opened on mirror %s",
-                                        channel));
+        if (id.equals(pair[0])) {
+            // This node is the primary
+            if (activeMembers.contains(pair[1])) {
+                weaver.openPrimary(channel, pair[1]);
+            } else {
+                weaver.openPrimary(channel, null);
+                switchboard.ringCast(new Message(id,
+                                                 ChannelMessage.MIRROR_OPENED,
+                                                 channel));
             }
-        } else {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Opening mirror for channel %s on %s",
-                                       channel, id));
+            switchboard.ringCast(new Message(id, ChannelMessage.PRIMARY_OPENED,
+                                             channel));
+        } else if (id.equals(pair[1])) {
+            // This node is the secondary.
+            if (activeMembers.contains(pair[0])) {
+                // Primary is active
+                weaver.openMirror(channel);
+            } else {
+                weaver.openPrimary(channel, null);
+                switchboard.ringCast(new Message(id,
+                                                 ChannelMessage.PRIMARY_OPENED,
+                                                 channel));
             }
+            switchboard.ringCast(new Message(id, ChannelMessage.MIRROR_OPENED,
+                                             channel));
         }
-        switchboard.send(new Message(id, ChannelMessage.OPENED, channel),
-                         requester);
     }
 
     @Override
@@ -706,7 +662,7 @@ public class Coordinator implements Member {
         };
         if (log.isLoggable(Level.FINER)) {
             log.finer(String.format("Establishment of replicators initiated on %s",
-                                   id));
+                                    id));
         }
         rendezvous = new Rendezvous(contacts.size(), rendezvousAction,
                                     cancellationAction);
@@ -891,6 +847,15 @@ public class Coordinator implements Member {
     void setJoiningMembers(Node[] joiningMembers) {
         assert joiningMembers != null : "joining members must not be null";
         this.joiningMembers = joiningMembers;
+    }
+
+    /**
+     * Test access to set the active state of the receiver
+     * 
+     * @param active
+     */
+    void setActive(boolean active) {
+        this.active = active;
     }
 
     /**

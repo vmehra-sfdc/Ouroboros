@@ -99,12 +99,11 @@ public class TestWeaver {
         UUID channel2 = UUID.randomUUID();
         assertFalse(channel.equals(channel2));
         Node id = new Node(0, 0, 0);
-        Node primary = new Node(1, 0, 0);
         WeaverConfigation config = new WeaverConfigation();
         config.setId(id);
         config.addRoot(root);
         Weaver weaver = new Weaver(config);
-        weaver.openMirror(channel, primary);
+        weaver.openMirror(channel);
         EventChannel eventChannel = weaver.eventChannelFor(channel);
         assertNotNull(eventChannel);
         assertTrue(eventChannel.isMirror());
@@ -205,18 +204,16 @@ public class TestWeaver {
         }
 
         UUID mirror = null;
-        Node primaryNode = null;
         while (mirror == null) {
             UUID test = UUID.randomUUID();
             List<Node> pair = ring.hash(Utils.point(test), 2);
             if (pair.get(1).equals(localNode)) {
                 mirror = test;
-                primaryNode = pair.get(0);
             }
         }
 
         weaver.openPrimary(primary, mirrorNode);
-        weaver.openMirror(mirror, primaryNode);
+        weaver.openMirror(mirror);
 
         ConsistentHashFunction<Node> newRing = ring.clone();
         newRing.remove(weaver.getReplicationPair(primary)[1]);

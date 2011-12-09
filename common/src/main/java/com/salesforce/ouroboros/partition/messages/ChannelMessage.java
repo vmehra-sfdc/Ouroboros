@@ -29,6 +29,7 @@ import java.io.Serializable;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.MemberDispatch;
+import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 
 /**
@@ -37,11 +38,12 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * 
  */
 public enum ChannelMessage implements MemberDispatch {
-    CLOSE, CLOSE_MIRROR, CLOSED, OPEN, OPEN_MIRROR, OPENED;
+    CLOSE, OPEN, PRIMARY_OPENED, MIRROR_OPENED;
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
         switchboard.dispatchToMember(this, sender, arguments, time);
+        switchboard.forwardToNextInRing(new Message(sender, this, arguments));
     }
 }

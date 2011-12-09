@@ -148,10 +148,10 @@ public class Coordinator implements Member {
     public void dispatch(ChannelMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
-            case OPENED: {
+            case PRIMARY_OPENED: {
                 break;
             }
-            case CLOSED: {
+            case MIRROR_OPENED: {
                 break;
             }
             default: {

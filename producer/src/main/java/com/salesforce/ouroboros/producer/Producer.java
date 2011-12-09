@@ -207,7 +207,7 @@ public class Producer {
             ChannelState state = channelState.get(channel);
             if (state == null) {
                 if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Push to a channel which does not exist: %s",
+                    log.info(String.format("Push to a channel that does not exist: %s",
                                            channel));
                 }
                 throw new UnknownChannelException(
