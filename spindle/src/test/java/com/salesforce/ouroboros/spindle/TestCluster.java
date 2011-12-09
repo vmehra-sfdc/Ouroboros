@@ -421,10 +421,15 @@ public class TestCluster {
     public void testPartitioning() throws Exception {
         coordinators.get(coordinators.size() - 1).initiateBootstrap();
 
+        int majorPartitionSize = ((coordinators.size()) / 2) + 1;
+        int minorPartitionSize = coordinators.size() - majorPartitionSize;
+
+        System.out.println(String.format("Major partition size: %s, minor partition size: %s",
+                                         majorPartitionSize, minorPartitionSize));
+
         assertPartitionStable(coordinators);
         assertPartitionActive(coordinators);
 
-        int minorPartitionSize = configs.length / 2;
         BitView A = new BitView();
         BitView B = new BitView();
         BitView All = new BitView();
@@ -432,38 +437,33 @@ public class TestCluster {
         List<Coordinator> partitionA = new ArrayList<Coordinator>();
         List<Coordinator> partitionB = new ArrayList<Coordinator>();
 
-        int i = 0;
-        for (Coordinator coordinator : coordinators) {
-            if (i++ % 2 == 0) {
-                partitionA.add(coordinator);
-            } else {
-                partitionB.add(coordinator);
-            }
-        }
-
-        CountDownLatch latchA = new CountDownLatch(minorPartitionSize);
+        CountDownLatch latchA = new CountDownLatch(majorPartitionSize);
         List<ControlNode> groupA = new ArrayList<ControlNode>();
 
         CountDownLatch latchB = new CountDownLatch(minorPartitionSize);
         List<ControlNode> groupB = new ArrayList<ControlNode>();
 
-        i = 0;
-        for (ControlNode member : partition) {
+        for (int i = 0; i < majorPartitionSize; i++) {
+            ControlNode member = partition.get(i);
+            partitionA.add(coordinators.get(i));
             All.add(member.getIdentity());
-            if (i++ % 2 == 0) {
-                groupA.add(member);
-                member.latch = latchA;
-                member.cardinality = minorPartitionSize;
-                A.add(member.getIdentity());
-            } else {
-                groupB.add(member);
-                member.latch = latchB;
-                member.cardinality = minorPartitionSize;
-                B.add(member.getIdentity());
-            }
+            groupA.add(member);
+            member.latch = latchA;
+            member.cardinality = majorPartitionSize;
+            A.add(member.getIdentity());
         }
 
-        log.info("asymmetric partitioning: " + A);
+        for (int i = majorPartitionSize; i < coordinators.size(); i++) {
+            ControlNode member = partition.get(i);
+            partitionB.add(coordinators.get(i));
+            All.add(member.getIdentity());
+            groupB.add(member);
+            member.latch = latchB;
+            member.cardinality = minorPartitionSize;
+            B.add(member.getIdentity());
+        }
+
+        log.info(String.format("Major partition %s, minor partition %s", A, B));
         controller.asymPartition(A);
         log.info("Awaiting stability of minor partition A");
         latchA.await(60, TimeUnit.SECONDS);
@@ -475,7 +475,7 @@ public class TestCluster {
         assertPartitionActive(partitionA);
 
         // The other partition should still be unstable.
-        assertEquals(configs.length / 2, latchB.getCount());
+        assertEquals(minorPartitionSize, latchB.getCount());
 
         // reform
         log.info("Reforming partition");

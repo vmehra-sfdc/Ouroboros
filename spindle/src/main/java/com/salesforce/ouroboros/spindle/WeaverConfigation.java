@@ -71,7 +71,7 @@ public class WeaverConfigation {
                                                                                              0);
     private int                       replicationQueueSize           = DEFAULT_REPLICATION_QUEUE_SIZE;
     private final SocketOptions       replicationSocketOptions       = new SocketOptions();
-    private Executor                  replicators                    = Executors.newFixedThreadPool(3,
+    private Executor                  replicators                    = Executors.newFixedThreadPool(10,
                                                                                                     new LabeledThreadFactory(
                                                                                                                              "replicator"));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();

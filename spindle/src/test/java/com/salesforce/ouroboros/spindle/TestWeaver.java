@@ -132,8 +132,7 @@ public class TestWeaver {
     public void testOpenReplicator() throws Exception {
         Rendezvous rendezvous = mock(Rendezvous.class);
         SocketOptions options = new SocketOptions();
-        options.setTimeout(100);
-        options.setConnect_time(100);
+        options.setTimeout(1000);
         ServerSocketChannel server = ServerSocketChannel.open();
         options.configure(server.socket());
         server.configureBlocking(true);
