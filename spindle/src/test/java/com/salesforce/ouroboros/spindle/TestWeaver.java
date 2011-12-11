@@ -39,6 +39,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -156,8 +157,8 @@ public class TestWeaver {
         config.addRoot(root);
         Weaver weaver = new Weaver(config);
         weaver.start();
-        weaver.openReplicator(mirror, info, rendezvous);
-        weaver.connectReplicators(yellowPages);
+        Replicator replicator = weaver.openReplicator(mirror, info, rendezvous);
+        weaver.connectReplicators(Arrays.asList(replicator), yellowPages);
         SocketChannel connected = server.accept();
         assertNotNull(connected);
         assertTrue(connected.isConnected());

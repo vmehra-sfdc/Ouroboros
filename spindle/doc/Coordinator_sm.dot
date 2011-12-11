@@ -243,9 +243,6 @@ digraph Coordinator {
         "ReplicatorFSM::EstablishReplicators"
             [label="{EstablishReplicators}"];
 
-        "ReplicatorFSM::ReplicatorsReady"
-            [label="{ReplicatorsReady}"];
-
         "ReplicatorFSM::pop(destabilize)"
             [label="" width=1]
 
@@ -268,19 +265,10 @@ digraph Coordinator {
         "ReplicatorFSM::EstablishReplicators" -> "ReplicatorFSM::EstablishReplicators::ControllerFSM"
             [label="coordinateReplicators/\lpush(ControllerFSM::CoordinateReplicators)\l"];
 
-        "ReplicatorFSM::EstablishReplicators" -> "ReplicatorFSM::ReplicatorsReady"
-            [label="replicatorsReady/\l"];
-
-        "ReplicatorFSM::EstablishReplicators" -> "ReplicatorFSM::pop(destabilize)"
-            [label="destabilize/\l"];
-
-        "ReplicatorFSM::ReplicatorsReady" -> "ReplicatorFSM::pop(replicatorsEstablished)"
+        "ReplicatorFSM::EstablishReplicators" -> "ReplicatorFSM::pop(replicatorsEstablished)"
             [label="replicatorsEstablished/\l"];
 
-        "ReplicatorFSM::ReplicatorsReady" -> "ReplicatorFSM::ReplicatorsReady"
-            [label="replicatorsReady/\l"];
-
-        "ReplicatorFSM::ReplicatorsReady" -> "ReplicatorFSM::pop(destabilize)"
+        "ReplicatorFSM::EstablishReplicators" -> "ReplicatorFSM::pop(destabilize)"
             [label="destabilize/\l"];
 
         "ReplicatorFSM::pop(destabilize)" -> "ReplicatorFSM::%end"

@@ -155,11 +155,6 @@ Entry{
 	coordinateReplicators();
 }
 {
-	replicatorsReady
-		nil {
-    		connectReplicators();
-    	}
-		
     replicatorsEstablished
         [ctxt.tallyComplete()]
         pop(replicatorsEstablished) {}
@@ -221,20 +216,8 @@ EstablishReplicators {
 			destabilizePartition();
 		}
 		
-	replicatorsReady
-	   ReplicatorsReady{}
-}
-
-ReplicatorsReady {
     replicatorsEstablished
         pop(replicatorsEstablished){}
-    
-    replicatorsEstablishmentTimeout
-        nil{
-            destabilizePartition();
-        }
-	replicatorsReady
-	   ReplicatorsReady{}
 }
 
 Default { 

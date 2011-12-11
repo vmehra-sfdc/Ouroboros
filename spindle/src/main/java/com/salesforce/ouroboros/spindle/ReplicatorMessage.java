@@ -39,24 +39,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * 
  */
 public enum ReplicatorMessage implements MemberDispatch {
-    CONNECT_REPLICATORS {
-        /**
-         * Forwarding done before action
-         */
-        @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable[] arguments, long time) {
-            if (!(switchboard.getMember() instanceof Coordinator)) {
-                log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
-                                          this, switchboard.getMember()));
-            }
-            Coordinator coordinator = (Coordinator) switchboard.getMember();
-            switchboard.forwardToNextInRing(new Message(sender, this, arguments),
-                                            coordinator.getAllMembers());
-            coordinator.dispatch(this, sender, arguments, time);
-        }
-    },
-    READY_REPLICATORS, REPLICATORS_ESTABLISHED {
+    ESTABLISH_REPLICATORS, REPLICATORS_ESTABLISHED {
         /**
          * Forwarding must be done at dispatch site
          */

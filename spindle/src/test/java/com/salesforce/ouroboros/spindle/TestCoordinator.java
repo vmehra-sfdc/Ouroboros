@@ -40,6 +40,7 @@ import static org.mockito.Mockito.when;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -267,16 +268,17 @@ public class TestCoordinator {
         UUID mirror = UUID.randomUUID();
 
         when(weaver.getReplicationPair(primary)).thenReturn(new Node[] {
-                                                                            localNode,
-                                                                            node2 });
+                                                                    localNode,
+                                                                    node2 });
         when(weaver.getReplicationPair(mirror)).thenReturn(new Node[] { node1,
-                                                                           localNode });
+                                                                   localNode });
         coordinator.open(primary);
         coordinator.open(mirror);
         verify(weaver).openPrimary(eq(primary), (Node) eq(null));
         verify(weaver).openMirror(eq(mirror));
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     public void testOpenReplicators() throws Exception {
         ScheduledExecutorService timer = mock(ScheduledExecutorService.class);
@@ -319,7 +321,7 @@ public class TestCoordinator {
                                                               node3));
         coordinator.setJoiningMembers(coordinator.getActiveMembers().toArray(new Node[0]));
         coordinator.getFsm().setState(ReplicatorFSM.EstablishReplicators);
-        coordinator.readyReplicators();
+        coordinator.establishReplicators();
         Rendezvous rendezvous = coordinator.getRendezvous();
         assertNotNull(rendezvous);
         assertEquals(3, rendezvous.getParties());
@@ -327,6 +329,7 @@ public class TestCoordinator {
         verify(weaver).openReplicator(node1, contactInformation1, rendezvous);
         verify(weaver).openReplicator(node2, contactInformation2, rendezvous);
         verify(weaver).openReplicator(node3, contactInformation3, rendezvous);
+        verify(weaver).connectReplicators(isA(Collection.class), isA(Map.class));
     }
 
     private Node[] getPair(UUID channel, ConsistentHashFunction<Node> ring) {

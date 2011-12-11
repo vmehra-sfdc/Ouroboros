@@ -157,15 +157,17 @@ public class Weaver implements Bundle {
      * Connect the originating replicators using the yellow pages to determine
      * endpoints
      * 
+     * @param replicators
+     *            - the collection of replicators to connnect
+     * 
      * @param yellowPages
      *            - the contact information for the nodes
      */
-    public void connectReplicators(Map<Node, ContactInformation> yellowPages) {
-        for (Replicator replicator : replicators.values()) {
+    public void connectReplicators(Collection<Replicator> replicators,
+                                   Map<Node, ContactInformation> yellowPages) {
+        for (Replicator replicator : replicators) {
             try {
-                if (replicator.willOriginate()) {
-                    replicator.connect(yellowPages, replicationHandler);
-                }
+                replicator.connect(yellowPages, replicationHandler);
             } catch (IOException e) {
                 if (log.isLoggable(Level.WARNING)) {
                     log.log(Level.WARNING,

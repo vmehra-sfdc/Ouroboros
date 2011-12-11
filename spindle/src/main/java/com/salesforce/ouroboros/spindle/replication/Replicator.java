@@ -117,8 +117,7 @@ public class Replicator implements CommunicationsHandler {
 
     public void connect(Map<Node, ContactInformation> yellowPages,
                         ServerSocketChannelHandler handler) throws IOException {
-        assert this.handler == null : "This replicator has already been established";
-        assert willOriginate() : "This replicator does not originate connections";
+        assert this.handler == null && appender != null : "This replicator does not originate connections";
         ContactInformation contactInformation = yellowPages.get(partner);
         assert contactInformation != null : String.format("Contact information for %s is missing",
                                                           partner);
@@ -131,7 +130,7 @@ public class Replicator implements CommunicationsHandler {
 
     @Override
     public void connect(SocketChannelHandler handler) {
-        assert willOriginate() : "This replicator does not originate connections";
+        assert this.handler == null && appender != null : "This replicator does not originate connections";
         this.handler = handler;
         if (log.isLoggable(Level.FINER)) {
             log.finer(String.format("Starting handshake from %s to %s",
@@ -163,13 +162,6 @@ public class Replicator implements CommunicationsHandler {
     public void replicate(ReplicatedBatchHeader header, EventChannel channel,
                           Segment segment, Acknowledger acknowledger) {
         duplicator.replicate(header, channel, segment, acknowledger);
-    }
-
-    /**
-     * @return true if the receiver is not connected and originates connections
-     */
-    public boolean willOriginate() {
-        return handler == null && appender != null;
     }
 
     @Override

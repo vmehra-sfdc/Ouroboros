@@ -282,11 +282,8 @@ public class Coordinator implements Member {
     public void dispatch(ReplicatorMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
-            case READY_REPLICATORS:
-                Runnable rendezvousAction = readyReplicators();
-                if (rendezvousAction != null) {
-                    rendezvousAction.run();
-                }
+            case ESTABLISH_REPLICATORS:
+                establishReplicators();
                 break;
             case REPLICATORS_ESTABLISHED:
                 if (isLeader()) {
@@ -296,12 +293,6 @@ public class Coordinator implements Member {
                                                                 arguments),
                                                     allMembers);
                 }
-                break;
-            case CONNECT_REPLICATORS:
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Connecting replicators on %s", id));
-                }
-                weaver.connectReplicators(yellowPages);
                 break;
             default:
                 throw new IllegalStateException(
@@ -508,15 +499,6 @@ public class Coordinator implements Member {
         // TODO
     }
 
-    protected void connectReplicators() {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Coordinating replicators connect on %s", id));
-        }
-        switchboard.ringCast(new Message(id,
-                                         ReplicatorMessage.CONNECT_REPLICATORS),
-                             allMembers);
-    }
-
     protected void coordinateBootstrap() {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating bootstrap on %s", id));
@@ -559,7 +541,7 @@ public class Coordinator implements Member {
             log.info(String.format("Coordinating establishment of the replicators on %s",
                                    id));
         }
-        Message message = new Message(id, ReplicatorMessage.READY_REPLICATORS);
+        Message message = new Message(id, ReplicatorMessage.ESTABLISH_REPLICATORS);
         switchboard.ringCast(message, allMembers);
     }
 
@@ -641,12 +623,8 @@ public class Coordinator implements Member {
 
     /**
      * Open the replicators to the the new members.
-     * 
-     * @return the rendezvous action to run if the group contains a single
-     *         member - i.e. this member. Or null if the rendezvous action will
-     *         be triggered normally
      */
-    protected Runnable readyReplicators() {
+    protected void establishReplicators() {
         rendezvous = null;
 
         Runnable rendezvousAction = new Runnable() {
@@ -677,8 +655,7 @@ public class Coordinator implements Member {
         }
 
         if (contacts.isEmpty()) {
-            fsm.replicatorsReady();
-            return rendezvousAction;
+            rendezvousAction.run();
         }
 
         final ArrayList<Replicator> replicators = new ArrayList<Replicator>();
@@ -710,9 +687,7 @@ public class Coordinator implements Member {
                                                   rendezvous));
         }
         rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer);
-
-        fsm.replicatorsReady();
-        return null;
+        weaver.connectReplicators(replicators, yellowPages);
     }
 
     /**

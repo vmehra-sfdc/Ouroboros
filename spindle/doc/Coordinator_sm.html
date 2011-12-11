@@ -400,7 +400,7 @@ cleanUp();
         <th colspan=2>
           Actions
         </th>
-        <th colspan=9>
+        <th colspan=8>
           Transition
         </th>
       </tr>
@@ -433,9 +433,6 @@ cleanUp();
           replicatorsEstablished
         </th>
         <th>
-          replicatorsReady
-        </th>
-        <th>
           <b>Default</b>
         </th>
       </tr>
@@ -459,8 +456,6 @@ cleanUp();
     commitFailover();
   }
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -509,14 +504,6 @@ cleanUp();
           </pre>
         </td>
         <td>
-          <pre>
-  CoordinateReplicators
-  {
-    connectReplicators();
-  }
-          </pre>
-        </td>
-        <td>
         </td>
       </tr>
       <tr>
@@ -543,8 +530,6 @@ cleanUp();
   Rebalance
   {}
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -592,8 +577,6 @@ cleanUp();
         </td>
         <td>
         </td>
-        <td>
-        </td>
       </tr>
       <tr>
         <td>
@@ -629,8 +612,6 @@ cleanUp();
         </td>
         <td>
         </td>
-        <td>
-        </td>
       </tr>
     </table>
     <p>
@@ -645,7 +626,7 @@ cleanUp();
         <th colspan=2>
           Actions
         </th>
-        <th colspan=7>
+        <th colspan=5>
           Transition
         </th>
       </tr>
@@ -669,12 +650,6 @@ cleanUp();
           replicatorsEstablishmentCancelled
         </th>
         <th>
-          replicatorsEstablishmentTimeout
-        </th>
-        <th>
-          replicatorsReady
-        </th>
-        <th>
           <b>Default</b>
         </th>
       </tr>
@@ -695,6 +670,10 @@ cleanUp();
         <td>
         </td>
         <td>
+          <pre>
+  pop(replicatorsEstablished)
+  {}
+          </pre>
         </td>
         <td>
           <pre>
@@ -702,51 +681,6 @@ cleanUp();
   {
     destabilizePartition();
   }
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  ReplicatorsReady
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          ReplicatorsReady
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  pop(replicatorsEstablished)
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  ReplicatorsReady
-  {
-    destabilizePartition();
-  }
-          </pre>
-        </td>
-        <td>
-          <pre>
-  ReplicatorsReady
-  {}
           </pre>
         </td>
         <td>
