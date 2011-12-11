@@ -81,14 +81,15 @@ public class Replicator implements CommunicationsHandler {
     private SocketChannelHandler    handler;
     private final ByteBuffer        handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
     private boolean                 inError;
-    private final Node              partner;
-    private final Rendezvous        rendezvous;
+    private Node                    partner;
+    private Rendezvous              rendezvous;
 
-    public Replicator(Bundle bundle, Node partner, boolean originator,
-                      Rendezvous rendezvous) {
-        if (originator) {
-            appender = new ReplicatingAppender(bundle);
-        }
+    public Replicator(Bundle bundle) {
+        this.bundle = bundle;
+    }
+
+    public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
+        appender = new ReplicatingAppender(bundle);
         this.bundle = bundle;
         this.partner = partner;
         this.rendezvous = rendezvous;
@@ -96,15 +97,11 @@ public class Replicator implements CommunicationsHandler {
 
     @Override
     public void accept(SocketChannelHandler handler) {
-        assert !willOriginate() : "This replicator does not accept connections";
-        this.handler = handler;
-        if (log.isLoggable(Level.FINE)) {
-            log.fine(String.format("Handshake accepted on %s from %s",
-                                   bundle.getId(), partner));
-        }
+        assert this.handler == null : "This replicator has already been established";
+        assert appender == null : "This replicator does not accept handshakes";
         appender = new ReplicatingAppender(bundle);
-        handler.resetHandler(this);
-        fsm.established();
+        this.handler = handler;
+        fsm.acceptHandshake();
     }
 
     public void close() {
@@ -113,11 +110,14 @@ public class Replicator implements CommunicationsHandler {
 
     @Override
     public void closing() {
-        bundle.closeReplicator(partner);
+        if (partner != null) {
+            bundle.closeReplicator(partner);
+        }
     }
 
     public void connect(Map<Node, ContactInformation> yellowPages,
                         ServerSocketChannelHandler handler) throws IOException {
+        assert this.handler == null : "This replicator has already been established";
         assert willOriginate() : "This replicator does not originate connections";
         ContactInformation contactInformation = yellowPages.get(partner);
         assert contactInformation != null : String.format("Contact information for %s is missing",
@@ -137,7 +137,7 @@ public class Replicator implements CommunicationsHandler {
             log.finer(String.format("Starting handshake from %s to %s",
                                     bundle.getId(), partner));
         }
-        fsm.handshake();
+        fsm.initiateHandshake();
     }
 
     public Node getPartner() {
@@ -155,6 +155,8 @@ public class Replicator implements CommunicationsHandler {
     public void readReady() {
         if (fsm.getState() == ReplicatorFSM.Established) {
             appender.readReady();
+        } else {
+            fsm.readReady();
         }
     }
 
@@ -182,14 +184,24 @@ public class Replicator implements CommunicationsHandler {
     protected void established() {
         duplicator.connect(handler);
         appender.accept(handler);
-        try {
-            rendezvous.meet();
-        } catch (BrokenBarrierException e) {
-            log.log(Level.WARNING,
-                    String.format("Replication rendezvous has been previously cancelled on %s",
-                                  bundle.getId()), e);
-            handler.close();
-            return;
+        if (rendezvous != null) {
+            try {
+                rendezvous.meet();
+            } catch (BrokenBarrierException e) {
+                log.log(Level.WARNING,
+                        String.format("Replication rendezvous has been previously cancelled on %s",
+                                      bundle.getId()), e);
+                handler.close();
+                return;
+            }
+        }
+    }
+
+    protected void inboundHandshake() {
+        if (readHandshake()) {
+            fsm.established();
+        } else {
+            handler.selectForRead();
         }
     }
 
@@ -197,7 +209,7 @@ public class Replicator implements CommunicationsHandler {
         return inError;
     }
 
-    protected void processHandshake() {
+    protected void outboundHandshake() {
         handshake.putInt(MAGIC);
         bundle.getId().serialize(handshake);
         handshake.flip();
@@ -207,6 +219,40 @@ public class Replicator implements CommunicationsHandler {
         } else {
             handler.selectForWrite();
         }
+    }
+
+    protected boolean readHandshake() {
+        try {
+            handler.getChannel().read(handshake);
+        } catch (IOException e) {
+            log.log(Level.WARNING,
+                    String.format("unable to read handshake on %s",
+                                  handler.getChannel()), e);
+            inError = true;
+            return false;
+        }
+        if (handshake.hasRemaining()) {
+            return false;
+        }
+        handshake.flip();
+        int magic = handshake.getInt();
+        if (MAGIC != magic) {
+            log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
+                                      handler.getChannel(), magic));
+            inError = true;
+            return false;
+        }
+        if (log.isLoggable(Level.FINEST)) {
+            log.finest(String.format("Inbound handshake completed on %s, partner: %s",
+                                     bundle.getId(), partner));
+        }
+        partner = new Node(handshake);
+        bundle.map(partner, this);
+        return true;
+    }
+
+    protected void selectForRead() {
+        handler.selectForRead();
     }
 
     protected void selectForWrite() {

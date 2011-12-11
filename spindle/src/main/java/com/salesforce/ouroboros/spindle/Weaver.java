@@ -47,7 +47,6 @@ import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.WeaverConfigation.RootDirectory;
-import com.salesforce.ouroboros.spindle.replication.HandshakeHandler;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
@@ -65,11 +64,10 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class Weaver implements Bundle {
 
-    private class ReplicatorHandshakeFactory implements
-                    CommunicationsHandlerFactory {
+    private class ReplicatorFactory implements CommunicationsHandlerFactory {
         @Override
-        public HandshakeHandler createCommunicationsHandler(SocketChannel channel) {
-            return new HandshakeHandler(Weaver.this);
+        public Replicator createCommunicationsHandler(SocketChannel channel) {
+            return new Replicator(Weaver.this);
         }
     }
 
@@ -121,7 +119,7 @@ public class Weaver implements Bundle {
                                                             configuration.getReplicationSocketOptions(),
                                                             configuration.getReplicationAddress(),
                                                             configuration.getReplicators(),
-                                                            new ReplicatorHandshakeFactory());
+                                                            new ReplicatorFactory());
         spindleHandler = new ServerSocketChannelHandler(
                                                         WEAVER_SPINDLE,
                                                         configuration.getSpindleSocketOptions(),
@@ -343,21 +341,14 @@ public class Weaver implements Bundle {
      *            - the contact information for the node
      * @param rendezvous
      *            - the rendezvous used to sychronize connectivity
+     * @return the Replicator to the node
      */
     public Replicator openReplicator(Node node, ContactInformation info,
                                      Rendezvous rendezvous) {
-        boolean originator = thisEndInitiatesConnectionsTo(node);
-        Replicator replicator = new Replicator(this, node, originator,
-                                               rendezvous);
+        Replicator replicator = new Replicator(this, node, rendezvous);
         Replicator previous = replicators.putIfAbsent(node, replicator);
         assert previous == null : String.format("Replicator already opend on weaver %s to weaver %s",
                                                 id, node);
-        if (!originator) {
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Waiting for replication inbound connection to weaver %s from new weaver %s",
-                                        id, node));
-            }
-        }
         return replicator;
     }
 
@@ -503,17 +494,6 @@ public class Weaver implements Bundle {
     }
 
     /**
-     * indicates which end initiates a connection
-     * 
-     * @param target
-     *            - the other end of the intended connection
-     * @return - true if this end initiates the connection, false otherwise
-     */
-    private boolean thisEndInitiatesConnectionsTo(Node target) {
-        return id.compareTo(target) < 0;
-    }
-
-    /**
      * Answer the remapped primary/mirror pairs using the nextRing
      * 
      * @param nextRing
@@ -532,13 +512,23 @@ public class Weaver implements Bundle {
                     || !oldPair.get(1).equals(newPair.get(1))) {
                     remapped.put(channel,
                                  new Node[][] {
-                                                 new Node[] { oldPair.get(0),
-                                                                 oldPair.get(1) },
-                                                 new Node[] { newPair.get(0),
-                                                                 newPair.get(1) } });
+                                         new Node[] { oldPair.get(0),
+                                                 oldPair.get(1) },
+                                         new Node[] { newPair.get(0),
+                                                 newPair.get(1) } });
                 }
             }
         }
         return remapped;
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.Bundle#map(com.salesforce.ouroboros.Node, com.salesforce.ouroboros.spindle.replication.Replicator)
+     */
+    @Override
+    public void map(Node partner, Replicator replicator) {
+        Replicator previous = replicators.put(partner, replicator);
+        assert previous == null : String.format("No replicator should have been mapped to %s on %s",
+                                                partner, replicator);
     }
 }

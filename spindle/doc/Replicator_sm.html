@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=5>
+        <th colspan=7>
           Transition
         </th>
       </tr>
@@ -27,13 +27,19 @@
          Exit
         </th>
         <th>
+          acceptHandshake
+        </th>
+        <th>
           bind
         </th>
         <th>
           established
         </th>
         <th>
-          handshake
+          initiateHandshake
+        </th>
+        <th>
+          readReady
         </th>
         <th>
           writeReady
@@ -51,6 +57,12 @@
         <td>
         </td>
         <td>
+          <pre>
+  InboundHandshake
+  {}
+          </pre>
+        </td>
+        <td>
         </td>
         <td>
           <pre>
@@ -63,6 +75,8 @@
   OutboundHandshake
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -90,15 +104,21 @@ established();
         </td>
         <td>
         </td>
+        <td>
+        </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
-          OutboundHandshake
+          InboundHandshake
         </td>
         <td>
           <pre>
-processHandshake();
+inboundHandshake();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -109,6 +129,52 @@ processHandshake();
   Established
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.inError() && !ctxt.readHandshake()]
+  InboundHandshake
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          OutboundHandshake
+        </td>
+        <td>
+          <pre>
+    outboundHandshake();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -139,6 +205,10 @@ processHandshake();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>

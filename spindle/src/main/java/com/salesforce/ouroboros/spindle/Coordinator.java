@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -127,6 +126,15 @@ public class Coordinator implements Member {
                                          weaver.getId(),
                                          DiscoveryMessage.ADVERTISE_CHANNEL_BUFFER,
                                          info, active));
+    }
+
+    @Override
+    public void becomeInactive() {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Spindle %s is now inactivated", id));
+        }
+        active = false;
+        weaver.inactivate();
     }
 
     /**
@@ -430,6 +438,22 @@ public class Coordinator implements Member {
         xeroxHandler.terminate();
     }
 
+    @Override
+    public String toString() {
+        return String.format("Coordinator for spindle [%s]", id.processId);
+    }
+
+    /**
+     * indicates which end initiates a connection
+     * 
+     * @param target
+     *            - the other end of the intended connection
+     * @return - true if this end initiates the connection, false otherwise
+     */
+    private boolean thisEndInitiatesConnectionsTo(Node target) {
+        return id.compareTo(target) < 0;
+    }
+
     protected void bootstrap(Node[] bootsrappingMembers) {
         joiningMembers = bootsrappingMembers;
         active = true;
@@ -586,6 +610,10 @@ public class Coordinator implements Member {
         }
     }
 
+    protected boolean hasActiveMembers() {
+        return !activeMembers.isEmpty();
+    }
+
     protected boolean isActive() {
         return active;
     }
@@ -602,6 +630,13 @@ public class Coordinator implements Member {
         }
         return inactiveMembers.size() == 0 ? true
                                           : inactiveMembers.last().equals(id);
+    }
+
+    protected void printState() {
+        System.out.println(String.format("Coordinator [%s], active=%s, leader=%s, active=%s, inactive=%s, dead=%s",
+                                         id.processId, active, isLeader(),
+                                         activeMembers, inactiveMembers,
+                                         switchboard.getDeadMembers()));
     }
 
     /**
@@ -633,10 +668,13 @@ public class Coordinator implements Member {
             }
         };
 
-        // Can't replicate back to self
-        ArrayList<Node> contacts = new ArrayList<Node>(
-                                                       Arrays.asList(joiningMembers));
-        contacts.remove(id);
+        // Only make the outbound connections this node initiates, and ignore the loopback connection
+        ArrayList<Node> contacts = new ArrayList<Node>();
+        for (Node node : joiningMembers) {
+            if (!node.equals(id) && thisEndInitiatesConnectionsTo(node)) {
+                contacts.add(node);
+            }
+        }
 
         if (contacts.isEmpty()) {
             fsm.replicatorsReady();
@@ -840,6 +878,15 @@ public class Coordinator implements Member {
     }
 
     /**
+     * Test access to set the active state of the receiver
+     * 
+     * @param active
+     */
+    void setActive(boolean active) {
+        this.active = active;
+    }
+
+    /**
      * Set the joining members of the receiver
      * 
      * @param joiningMembers
@@ -850,15 +897,6 @@ public class Coordinator implements Member {
     }
 
     /**
-     * Test access to set the active state of the receiver
-     * 
-     * @param active
-     */
-    void setActive(boolean active) {
-        this.active = active;
-    }
-
-    /**
      * Set the consistent hash function for the next weaver processs ring.
      * 
      * @param ring
@@ -866,29 +904,5 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
-    }
-
-    @Override
-    public void becomeInactive() {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Spindle %s is now inactivated", id));
-        }
-        active = false;
-        weaver.inactivate();
-    }
-
-    protected boolean hasActiveMembers() {
-        return !activeMembers.isEmpty();
-    }
-
-    public String toString() {
-        return String.format("Coordinator for spindle [%s]", id.processId);
-    }
-
-    protected void printState() {
-        System.out.println(String.format("Coordinator [%s], active=%s, leader=%s, active=%s, inactive=%s, dead=%s",
-                                         id.processId, active, isLeader(),
-                                         activeMembers, inactiveMembers,
-                                         switchboard.getDeadMembers()));
     }
 }

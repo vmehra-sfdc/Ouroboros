@@ -17,6 +17,9 @@ digraph Replicator {
         "ReplicatorFSM::Established"
             [label="{Established}"];
 
+        "ReplicatorFSM::InboundHandshake"
+            [label="{InboundHandshake}"];
+
         "ReplicatorFSM::OutboundHandshake"
             [label="{OutboundHandshake}"];
 
@@ -34,7 +37,19 @@ digraph Replicator {
             [label="established/\l"];
 
         "ReplicatorFSM::Suspended" -> "ReplicatorFSM::OutboundHandshake"
-            [label="handshake/\l"];
+            [label="initiateHandshake/\l"];
+
+        "ReplicatorFSM::Suspended" -> "ReplicatorFSM::InboundHandshake"
+            [label="acceptHandshake/\l"];
+
+        "ReplicatorFSM::InboundHandshake" -> "ReplicatorFSM::Closed"
+            [label="readReady/\l"];
+
+        "ReplicatorFSM::InboundHandshake" -> "ReplicatorFSM::Established"
+            [label="readReady/\l"];
+
+        "ReplicatorFSM::InboundHandshake" -> "ReplicatorFSM::Established"
+            [label="established/\l"];
 
         "ReplicatorFSM::OutboundHandshake" -> "ReplicatorFSM::Closed"
             [label="writeReady/\l"];

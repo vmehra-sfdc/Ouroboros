@@ -44,19 +44,45 @@ Suspended{
 	established
 		Established{}
 		
-	handshake
+	initiateHandshake
 		OutboundHandshake{}
+		
+	acceptHandshake
+	   InboundHandshake{}
 }
 
 Established
 Entry{
 	established();
 }
-{}
+{
+}
+
+InboundHandshake
+Entry{
+    inboundHandshake();
+}
+{
+    readReady
+        [!ctxt.inError() && !ctxt.readHandshake()]
+        nil{
+            selectForRead();
+        }
+        
+    readReady
+        [ctxt.inError()]
+        Closed{}
+        
+    readReady
+        Established{}
+        
+    established
+        Established{}
+}
 
 OutboundHandshake
 Entry{
-	processHandshake();
+	outboundHandshake();
 }
 {
 	writeReady

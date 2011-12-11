@@ -36,6 +36,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
 import org.junit.Test;
+import org.mockito.internal.verification.Times;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
@@ -57,10 +58,9 @@ public class TestReplicator {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
         when(handler.getChannel()).thenReturn(socketChannel);
-        Rendezvous rendezvous = mock(Rendezvous.class);
         final Node node = new Node(0x1639, 0x1640, 0x1650);
 
-        Replicator replicator = new Replicator(bundle, node, false, rendezvous);
+        Replicator replicator = new Replicator(bundle);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -74,7 +74,11 @@ public class TestReplicator {
 
         assertEquals(ReplicatorFSM.Suspended, replicator.getState());
         replicator.accept(handler);
+        assertEquals(ReplicatorFSM.InboundHandshake, replicator.getState());
+        replicator.readReady();
         assertEquals(ReplicatorFSM.Established, replicator.getState());
+        verify(handler).selectForRead();
+        verify(socketChannel, new Times(2)).read(isA(ByteBuffer.class));
     }
 
     @Test
@@ -87,7 +91,7 @@ public class TestReplicator {
         Rendezvous rendezvous = mock(Rendezvous.class);
         when(bundle.getId()).thenReturn(node);
 
-        Replicator replicator = new Replicator(bundle, node, true, rendezvous);
+        Replicator replicator = new Replicator(bundle, node, rendezvous);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override

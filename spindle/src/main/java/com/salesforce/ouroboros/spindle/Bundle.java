@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.spindle;
 import java.util.UUID;
 
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
@@ -85,4 +86,12 @@ public interface Bundle {
      * @param acknowledger
      */
     void map(Node producer, Acknowledger acknowledger);
+
+    /**
+     * Map the partner node to the replicator
+     * 
+     * @param partner
+     * @param replicator
+     */
+    void map(Node partner, Replicator replicator);
 }
