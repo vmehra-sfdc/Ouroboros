@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=7>
+        <th colspan=6>
           Transition
         </th>
       </tr>
@@ -28,10 +28,6 @@
         </th>
         <th>
           destabilize
-          <br>
-          (View,
-          <br>
-          int)
         </th>
         <th>
           discoveryComplete
@@ -47,9 +43,6 @@
           int)
         </th>
         <th>
-          unstable
-        </th>
-        <th>
           voteReceived
         </th>
         <th>
@@ -62,12 +55,16 @@
         </td>
         <td>
           <pre>
-cleanUp();
+destabilizePartition();
           </pre>
         </td>
         <td>
         </td>
         <td>
+          <pre>
+  Unstable
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -79,12 +76,6 @@ cleanUp();
   {
     stabilize(view, leader);
   }
-          </pre>
-        </td>
-        <td>
-          <pre>
-  Unstable
-  {}
           </pre>
         </td>
         <td>
@@ -115,8 +106,6 @@ cleanUp();
         </td>
         <td>
         </td>
-        <td>
-        </td>
       </tr>
       <tr>
         <td>
@@ -126,8 +115,6 @@ cleanUp();
           <pre>
     vote();
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -179,8 +166,6 @@ cleanUp();
         </td>
         <td>
         </td>
-        <td>
-        </td>
       </tr>
       <tr>
         <td>
@@ -209,14 +194,10 @@ cleanUp();
         </td>
         <td>
         </td>
-        <td>
-        </td>
       </tr>
       <tr>
         <td>
           Stopped
-        </td>
-        <td>
         </td>
         <td>
         </td>

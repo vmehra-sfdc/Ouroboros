@@ -205,8 +205,8 @@ public class Weaver implements Bundle {
     public void failover(Collection<Node> deadMembers) {
         for (Node node : deadMembers) {
             if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Removing weaver[%s] from the partition",
-                                       node));
+                log.info(String.format("Removing %s from the partition on %s",
+                                       node, id));
             }
             closeReplicator(node);
         }
@@ -218,13 +218,13 @@ public class Weaver implements Bundle {
                 if (channel.isPrimary()) {
                     // The mirror for this channel has died
                     if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Mirror for %s has died, old mirror: %s",
-                                               channelId, pair[1]));
+                        log.info(String.format("%s is primary, mirror for %s has died, old mirror: %s",
+                                               id, channelId, pair[1]));
                     }
                 } else {
                     // This node is now the primary for the channel, xerox state to the new mirror
                     if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Weaver[%s] assuming primary role for: %s, old primary: %s",
+                        log.info(String.format("%s assuming primary role for: %s, old primary: %s",
                                                id, channelId, pair[1]));
                     }
                     channel.setPrimary();

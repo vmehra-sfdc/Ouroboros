@@ -122,7 +122,6 @@ public class SwitchboardFunctionalTest {
 
         @Override
         public void advertise() {
-            System.err.println("advertising");
             switchboard.ringCast(new Message(
                                              node,
                                              DiscoveryMessage.ADVERTISE_CONSUMER));

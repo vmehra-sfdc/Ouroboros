@@ -39,9 +39,6 @@ digraph Switchboard {
         "SwitchboardFSM::Unstable" -> "SwitchboardFSM::ElectView"
             [label="stabilized/\l"];
 
-        "SwitchboardFSM::Unstable" -> "SwitchboardFSM::Unstable"
-            [label="destabilize/\l"];
-
         "SwitchboardFSM::Stable" -> "SwitchboardFSM::Unstable"
             [label="destabilize/\l"];
 

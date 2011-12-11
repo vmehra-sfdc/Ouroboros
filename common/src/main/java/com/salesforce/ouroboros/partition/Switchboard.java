@@ -188,6 +188,7 @@ public class Switchboard {
     public Switchboard(Node node, Partition p, NoArgGenerator viewIdGenerator) {
         inboundGate.close();
         self = node;
+        fsm.setName(Integer.toString(self.processId));
         partition = p;
         messageProcessor = Executors.newSingleThreadExecutor(new ThreadFactory() {
             @Override
@@ -619,18 +620,14 @@ public class Switchboard {
 
     /**
      * Destabilize the partition
-     * 
-     * @param view
-     *            - the view
-     * @param leader
-     *            - the leader
      */
-    protected void destabilize(View view, int leader) {
-        inboundGate.close();
-        stable.set(false);
+    protected void destabilizePartition() {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Destabilizing partition on: %s", self));
         }
+        votes.clear();
+        inboundGate.close();
+        stable.set(false);
         previousMembers.addAll(members);
         deadMembers.clear();
         members.clear();
@@ -673,18 +670,11 @@ public class Switchboard {
         if (view.isStable()) {
             fsm.stabilized(view, leaderNode);
         } else {
-            fsm.destabilize(view, leaderNode);
+            fsm.destabilize();
         }
     }
 
     SwitchboardContext getFsm() {
         return fsm;
-    }
-
-    /**
-     * clean up any state upon destabilizing.
-     */
-    protected void cleanUp() {
-        votes.clear();
     }
 }

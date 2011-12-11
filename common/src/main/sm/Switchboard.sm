@@ -42,16 +42,16 @@
 %%
 Unstable
 Entry{
-	cleanUp();
+	destabilizePartition();
 } 
 {
 	stabilized(view: View, leader: int)
 		ElectView {
 			stabilize(view, leader);
 		}
-		
-	unstable
-		nil{}
+        
+    destabilize()
+        nil{}
 }
 
 Stable
@@ -99,9 +99,7 @@ Default {
 	stabilized(view: View, leader: int)
 		nil{}
 		
-	destabilize(view: View, leader: int)
-		Unstable{
-			destabilize(view, leader);
-		}
+	destabilize()
+		Unstable{}
 }
 %%
