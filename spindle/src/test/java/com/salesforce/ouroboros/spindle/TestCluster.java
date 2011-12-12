@@ -77,8 +77,6 @@ import com.salesforce.ouroboros.spindle.Util.Condition;
 public class TestCluster {
 
     public static class ControlNode extends NodeData {
-        static final Logger log = Logger.getLogger(ControlNode.class.getCanonicalName());
-
         int                 cardinality;
         CountDownLatch      latch;
 
@@ -321,9 +319,9 @@ public class TestCluster {
         }
     }
 
-    static int                               testPort1;
-    static int                               testPort2;
-    private static final Logger              log     = Logger.getLogger(TestCluster.class.getCanonicalName());
+    private static final Logger                      log     = Logger.getLogger(TestCluster.class.getCanonicalName());
+    static int                                       testPort1;
+    static int                                       testPort2;
 
     static {
         String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
@@ -334,21 +332,26 @@ public class TestCluster {
         testPort2 = Integer.parseInt(port);
     }
 
-    final Class<?>[]                         configs = new Class[] { w0.class,
-                    w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
-                    w7.class, w8.class, w9.class    };
-
-    MyController                             controller;
-    AnnotationConfigApplicationContext       controllerContext;
-    List<Coordinator>                        coordinators;
-    CountDownLatch                           initialLatch;
-    List<AnnotationConfigApplicationContext> memberContexts;
-    List<ControlNode>                        partition;
+    private final Class<?>[]                                 configs = new Class[] {
+                    w0.class, w1.class, w2.class, w3.class, w4.class, w5.class,
+                    w6.class, w7.class, w8.class, w9.class  };
+    private MyController                             controller;
+    private AnnotationConfigApplicationContext       controllerContext;
+    private List<Coordinator>                        coordinators;
+    private List<ControlNode>                        fullPartition;
+    private BitView                                  fullView;
+    private List<ControlNode>                        majorGroup;
+    private List<Coordinator>                        majorPartition;
+    private BitView                                  majorView;
+    private List<AnnotationConfigApplicationContext> memberContexts;
+    private List<ControlNode>                        minorGroup;
+    private List<Coordinator>                        minorPartition;
+    private BitView                                  minorView;
 
     @Before
     public void starUp() throws Exception {
         log.info("Setting up initial partition");
-        initialLatch = new CountDownLatch(configs.length);
+        CountDownLatch initialLatch = new CountDownLatch(configs.length);
         controllerContext = new AnnotationConfigApplicationContext(
                                                                    MyControllerConfig.class);
         controller = controllerContext.getBean(MyController.class);
@@ -361,14 +364,14 @@ public class TestCluster {
             success = initialLatch.await(120, TimeUnit.SECONDS);
             assertTrue("Initial partition did not acheive stability", success);
             log.info("Initial partition stable");
-            partition = new ArrayList<ControlNode>();
+            fullPartition = new ArrayList<ControlNode>();
             coordinators = new ArrayList<Coordinator>();
             for (AnnotationConfigApplicationContext context : memberContexts) {
                 ControlNode node = (ControlNode) controller.getNode(context.getBean(Identity.class));
                 assertNotNull("Can't find node: "
                                               + context.getBean(Identity.class),
                               node);
-                partition.add(node);
+                fullPartition.add(node);
                 Coordinator coordinator = context.getBean(Coordinator.class);
                 assertNotNull("Can't find coordinator in context: " + context,
                               coordinator);
@@ -381,6 +384,38 @@ public class TestCluster {
         }
 
         assertPartitionBootstrapping(coordinators);
+
+        majorView = new BitView();
+        minorView = new BitView();
+        fullView = new BitView();
+
+        majorPartition = new ArrayList<Coordinator>();
+        minorPartition = new ArrayList<Coordinator>();
+
+        majorGroup = new ArrayList<ControlNode>();
+        minorGroup = new ArrayList<ControlNode>();
+
+        int majorPartitionSize = ((coordinators.size()) / 2) + 1;
+
+        // Form the major partition
+        for (int i = 0; i < majorPartitionSize; i++) {
+            ControlNode member = fullPartition.get(i);
+            majorPartition.add(coordinators.get(i));
+            fullView.add(member.getIdentity());
+            majorGroup.add(member);
+            majorView.add(member.getIdentity());
+        }
+
+        // Form the minor partition
+        for (int i = majorPartitionSize; i < coordinators.size(); i++) {
+            ControlNode member = fullPartition.get(i);
+            minorPartition.add(coordinators.get(i));
+            fullView.add(member.getIdentity());
+            minorGroup.add(member);
+            minorView.add(member.getIdentity());
+        }
+
+        log.info(String.format("Major partition %s, minor partition %s", majorView, minorView));
     }
 
     @After
@@ -404,8 +439,7 @@ public class TestCluster {
         }
         memberContexts = null;
         controller = null;
-        partition = null;
-        initialLatch = null;
+        fullPartition = null;
     }
 
     /**
@@ -419,85 +453,65 @@ public class TestCluster {
      */
     @Test
     public void testPartitioning() throws Exception {
+
+        CountDownLatch latchA = latch(majorGroup);
+        CountDownLatch latchB = latch(minorGroup);
+
+        log.info("Bootstrapping the spindles");
         coordinators.get(coordinators.size() - 1).initiateBootstrap();
-
-        int majorPartitionSize = ((coordinators.size()) / 2) + 1;
-        int minorPartitionSize = coordinators.size() - majorPartitionSize;
-
-        System.out.println(String.format("Major partition size: %s, minor partition size: %s",
-                                         majorPartitionSize, minorPartitionSize));
 
         assertPartitionStable(coordinators);
         assertPartitionActive(coordinators);
 
-        BitView A = new BitView();
-        BitView B = new BitView();
-        BitView All = new BitView();
+        log.info("Asymmetrically partitioning");
+        controller.asymPartition(majorView);
 
-        List<Coordinator> partitionA = new ArrayList<Coordinator>();
-        List<Coordinator> partitionB = new ArrayList<Coordinator>();
-
-        CountDownLatch latchA = new CountDownLatch(majorPartitionSize);
-        List<ControlNode> groupA = new ArrayList<ControlNode>();
-
-        CountDownLatch latchB = new CountDownLatch(minorPartitionSize);
-        List<ControlNode> groupB = new ArrayList<ControlNode>();
-
-        for (int i = 0; i < majorPartitionSize; i++) {
-            ControlNode member = partition.get(i);
-            partitionA.add(coordinators.get(i));
-            All.add(member.getIdentity());
-            groupA.add(member);
-            member.latch = latchA;
-            member.cardinality = majorPartitionSize;
-            A.add(member.getIdentity());
-        }
-
-        for (int i = majorPartitionSize; i < coordinators.size(); i++) {
-            ControlNode member = partition.get(i);
-            partitionB.add(coordinators.get(i));
-            All.add(member.getIdentity());
-            groupB.add(member);
-            member.latch = latchB;
-            member.cardinality = minorPartitionSize;
-            B.add(member.getIdentity());
-        }
-
-        log.info(String.format("Major partition %s, minor partition %s", A, B));
-        controller.asymPartition(A);
         log.info("Awaiting stability of minor partition A");
-        latchA.await(60, TimeUnit.SECONDS);
-        for (ControlNode member : groupA) {
-            assertEquals(A, member.getPartition());
+        assertTrue("major partition did not stabilize",
+                   latchA.await(60, TimeUnit.SECONDS));
+
+        log.info("Major partition has stabilized");
+
+        // Check to see everything is as expected.
+        for (ControlNode member : majorGroup) {
+            assertEquals(majorView, member.getPartition());
         }
-        log.info("Asserting partition A has stabilized");
-        assertPartitionStable(partitionA);
-        assertPartitionActive(partitionA);
+
+        // major partition should be stable and active
+        assertPartitionStable(majorPartition);
+        assertPartitionActive(majorPartition);
 
         // The other partition should still be unstable.
-        assertEquals(minorPartitionSize, latchB.getCount());
+        assertEquals(minorGroup.size(), latchB.getCount());
 
         // reform
-        log.info("Reforming partition");
-
-        CountDownLatch latch = new CountDownLatch(configs.length);
-        for (ControlNode node : partition) {
+        CountDownLatch latch = new CountDownLatch(fullPartition.size());
+        for (ControlNode node : fullPartition) {
             node.latch = latch;
-            node.cardinality = configs.length;
+            node.cardinality = fullPartition.size();
         }
 
+        // Clear the partition
+        log.info("Reforming partition");
         controller.clearPartitions();
-        log.info("Awaiting stability of reformed major partition");
-        latch.await(60, TimeUnit.SECONDS);
 
-        for (ControlNode member : partition) {
-            assertEquals(All, member.getPartition());
+        log.info("Awaiting stability of reformed partition");
+        assertTrue("Full partition did not stablize",
+                   latch.await(60, TimeUnit.SECONDS));
+
+        log.info("Full partition has stabilized");
+
+        // Check to see everything is kosher
+        for (ControlNode member : fullPartition) {
+            assertEquals(fullView, member.getPartition());
         }
 
-        log.info("Asserting full partition has stabilized");
+        // Entire partition should be stable
         assertPartitionStable(coordinators);
-        assertPartitionActive(partitionA);
-        assertPartitionInactive(partitionB);
+
+        // Only the major partition should be stable
+        assertPartitionActive(majorPartition);
+        assertPartitionInactive(minorPartition);
     }
 
     private List<AnnotationConfigApplicationContext> createMembers() {
@@ -506,6 +520,20 @@ public class TestCluster {
             contexts.add(new AnnotationConfigApplicationContext(config));
         }
         return contexts;
+    }
+
+    protected void assertPartitionActive(List<Coordinator> partition)
+                                                                     throws InterruptedException {
+        for (Coordinator coordinator : partition) {
+            final Coordinator c = coordinator;
+            waitFor("Coordinator never entered the bootstrapping state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return c.isActive();
+                }
+            }, 120000, 100);
+        }
     }
 
     protected void assertPartitionBootstrapping(List<Coordinator> partition)
@@ -518,6 +546,20 @@ public class TestCluster {
                 public boolean value() {
                     return CoordinatorFSM.Bootstrapping == c.getState()
                            || BootstrapFSM.Bootstrap == c.getState();
+                }
+            }, 120000, 100);
+        }
+    }
+
+    protected void assertPartitionInactive(List<Coordinator> partition)
+                                                                       throws InterruptedException {
+        for (Coordinator coordinator : partition) {
+            final Coordinator c = coordinator;
+            waitFor("Coordinator never entered the bootstrapping state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return !c.isActive();
                 }
             }, 120000, 100);
         }
@@ -537,31 +579,12 @@ public class TestCluster {
         }
     }
 
-    protected void assertPartitionActive(List<Coordinator> partition)
-                                                                     throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
-            waitFor("Coordinator never entered the bootstrapping state: "
-                    + coordinator, new Condition() {
-                @Override
-                public boolean value() {
-                    return c.isActive();
-                }
-            }, 120000, 100);
+    protected CountDownLatch latch(List<ControlNode> group) {
+        CountDownLatch latch = new CountDownLatch(group.size());
+        for (ControlNode member : group) {
+            member.latch = latch;
+            member.cardinality = group.size();
         }
-    }
-
-    protected void assertPartitionInactive(List<Coordinator> partition)
-                                                                       throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
-            waitFor("Coordinator never entered the bootstrapping state: "
-                    + coordinator, new Condition() {
-                @Override
-                public boolean value() {
-                    return !c.isActive();
-                }
-            }, 120000, 100);
-        }
+        return latch;
     }
 }

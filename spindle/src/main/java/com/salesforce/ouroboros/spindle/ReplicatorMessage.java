@@ -65,8 +65,8 @@ public enum ReplicatorMessage implements MemberDispatch {
                                       this, switchboard.getMember()));
         }
         Coordinator coordinator = (Coordinator) switchboard.getMember();
-        coordinator.dispatch(this, sender, arguments, time);
         switchboard.forwardToNextInRing(new Message(sender, this, arguments),
                                         coordinator.getAllMembers());
+        coordinator.dispatch(this, sender, arguments, time);
     }
 }
