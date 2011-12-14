@@ -50,6 +50,7 @@ import com.salesforce.ouroboros.spindle.WeaverConfigation.RootDirectory;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
+import com.salesforce.ouroboros.spindle.transfer.Sink;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
@@ -63,11 +64,17 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * 
  */
 public class Weaver implements Bundle {
-
     private class ReplicatorFactory implements CommunicationsHandlerFactory {
         @Override
         public Replicator createCommunicationsHandler(SocketChannel channel) {
             return new Replicator(Weaver.this);
+        }
+    }
+
+    private class SinkFactory implements CommunicationsHandlerFactory {
+        @Override
+        public Sink createCommunicationsHandler(SocketChannel channel) {
+            return new Sink(Weaver.this);
         }
     }
 
@@ -81,6 +88,7 @@ public class Weaver implements Bundle {
     private static final Logger                     log               = Logger.getLogger(Weaver.class.getCanonicalName());
     private static final String                     WEAVER_REPLICATOR = "Weaver Replicator";
     private static final String                     WEAVER_SPINDLE    = "Weaver Spindle";
+    private static final String                     WEAVER_XEROX      = "Weaver Xerox";
     static final int                                HANDSHAKE_SIZE    = Node.BYTE_LENGTH + 4;
     static final int                                MAGIC             = 0x1638;
 
@@ -94,6 +102,7 @@ public class Weaver implements Bundle {
     private final ConsistentHashFunction<File>      roots             = new ConsistentHashFunction<File>();
     private final ServerSocketChannelHandler        spindleHandler;
     private ConsistentHashFunction<Node>            weaverRing        = new ConsistentHashFunction<Node>();
+    private final ServerSocketChannelHandler        xeroxHandler;
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
@@ -126,10 +135,16 @@ public class Weaver implements Bundle {
                                                         configuration.getSpindleAddress(),
                                                         configuration.getSpindles(),
                                                         new SpindleFactory());
+        xeroxHandler = new ServerSocketChannelHandler(
+                                                      WEAVER_XEROX,
+                                                      configuration.getXeroxSocketOptions(),
+                                                      configuration.getXeroxAddress(),
+                                                      configuration.getXeroxes(),
+                                                      new SinkFactory());
         contactInfo = new ContactInformation(
                                              spindleHandler.getLocalAddress(),
                                              replicationHandler.getLocalAddress(),
-                                             null);
+                                             xeroxHandler.getLocalAddress());
     }
 
     public void bootstrap(Node[] bootsrappingMembers) {
@@ -174,6 +189,34 @@ public class Weaver implements Bundle {
                             String.format("Error connecting originating replicator from %s to %s",
                                           id, replicator.getPartner()), e);
                 }
+            }
+        }
+    }
+
+    /**
+     * Connnect and start the xeroxes.
+     * 
+     * @param xeroxes
+     * @param yellowPages
+     * @param rendezvous
+     */
+    public void connectXeroxes(Map<Node, Xerox> xeroxes,
+                               Map<Node, ContactInformation> yellowPages,
+                               Rendezvous rendezvous) {
+        for (Map.Entry<Node, Xerox> entry : xeroxes.entrySet()) {
+            try {
+                Xerox xerox = entry.getValue();
+                xerox.setRendezvous(rendezvous);
+                xeroxHandler.connectTo(yellowPages.get(entry.getKey()).xerox,
+                                       xerox);
+            } catch (IOException e) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.log(Level.INFO,
+                            String.format("Error connecting xerox from %s to %s",
+                                          id, entry.getKey()), e);
+                }
+                rendezvous.cancel();
+                return;
             }
         }
     }
@@ -287,6 +330,16 @@ public class Weaver implements Bundle {
         acknowledgers.put(producer, acknowledger);
     }
 
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.Bundle#map(com.salesforce.ouroboros.Node, com.salesforce.ouroboros.spindle.replication.Replicator)
+     */
+    @Override
+    public void map(Node partner, Replicator replicator) {
+        Replicator previous = replicators.put(partner, replicator);
+        assert previous == null : String.format("No replicator should have been mapped to %s on %s",
+                                                partner, replicator);
+    }
+
     /**
      * Add the subscription with the receiver as the mirror for this channel
      * 
@@ -362,7 +415,6 @@ public class Weaver implements Bundle {
      * 
      * @param xeroxes
      *            - the map of Nodes to Xeroxes
-     * @param rendezvous
      * 
      * @param channel
      *            - the id of the channel to rebalance
@@ -370,9 +422,9 @@ public class Weaver implements Bundle {
      *            - the pair of nodes that are the new primary/mirror
      *            responsible for the channel
      */
-    public void rebalance(Map<Node, Xerox> xeroxes, Rendezvous rendezvous,
-                          UUID channel, Node[] originalPair,
-                          Node[] remappedPair, Collection<Node> deadMembers) {
+    public void rebalance(Map<Node, Xerox> xeroxes, UUID channel,
+                          Node[] originalPair, Node[] remappedPair,
+                          Collection<Node> deadMembers) {
         EventChannel eventChannel = channels.get(channel);
         assert eventChannel != null : String.format("The event channel to rebalance does not exist: %s",
                                                     channel);
@@ -384,7 +436,7 @@ public class Weaver implements Bundle {
                     // Xerox state to the new mirror
                     Xerox xerox = xeroxes.get(remappedPair[1]);
                     if (xerox == null) {
-                        xerox = new Xerox(remappedPair[1], rendezvous);
+                        xerox = new Xerox(remappedPair[1]);
                         xeroxes.put(remappedPair[1], xerox);
                     }
                     xerox.addChannel(eventChannel);
@@ -393,14 +445,14 @@ public class Weaver implements Bundle {
                 // Xerox state to new primary and mirror
                 Xerox xerox = xeroxes.get(remappedPair[0]);
                 if (xerox == null) {
-                    xerox = new Xerox(remappedPair[0], rendezvous);
+                    xerox = new Xerox(remappedPair[0]);
                     xeroxes.put(remappedPair[0], xerox);
                 }
                 xerox.addChannel(eventChannel);
 
                 xerox = xeroxes.get(remappedPair[1]);
                 if (xerox == null) {
-                    xerox = new Xerox(remappedPair[1], rendezvous);
+                    xerox = new Xerox(remappedPair[1]);
                     xeroxes.put(remappedPair[1], xerox);
                 }
                 xerox.addChannel(eventChannel);
@@ -411,7 +463,7 @@ public class Weaver implements Bundle {
                 // Xerox state to the new primary
                 Xerox xerox = xeroxes.get(remappedPair[0]);
                 if (xerox == null) {
-                    xerox = new Xerox(remappedPair[0], rendezvous);
+                    xerox = new Xerox(remappedPair[0]);
                     xeroxes.put(remappedPair[0], xerox);
                 }
                 xerox.addChannel(eventChannel);
@@ -428,7 +480,7 @@ public class Weaver implements Bundle {
                 // Xerox state to the new primary
                 Xerox xerox = xeroxes.get(remappedPair[0]);
                 if (xerox == null) {
-                    xerox = new Xerox(remappedPair[0], rendezvous);
+                    xerox = new Xerox(remappedPair[0]);
                     xeroxes.put(remappedPair[0], xerox);
                 }
                 xerox.addChannel(eventChannel);
@@ -437,14 +489,14 @@ public class Weaver implements Bundle {
             // Xerox state to the new primary and mirror
             Xerox xerox = xeroxes.get(remappedPair[0]);
             if (xerox == null) {
-                xerox = new Xerox(remappedPair[0], rendezvous);
+                xerox = new Xerox(remappedPair[0]);
                 xeroxes.put(remappedPair[0], xerox);
             }
             xerox.addChannel(eventChannel);
 
             xerox = xeroxes.get(remappedPair[1]);
             if (xerox == null) {
-                xerox = new Xerox(remappedPair[1], rendezvous);
+                xerox = new Xerox(remappedPair[1]);
                 xeroxes.put(remappedPair[1], xerox);
             }
             xerox.addChannel(eventChannel);
@@ -457,7 +509,7 @@ public class Weaver implements Bundle {
 
             Xerox xerox = xeroxes.get(remappedPair[1]);
             if (xerox == null) {
-                xerox = new Xerox(remappedPair[1], rendezvous);
+                xerox = new Xerox(remappedPair[1]);
                 xeroxes.put(remappedPair[1], xerox);
             }
             xerox.addChannel(eventChannel);
@@ -475,6 +527,7 @@ public class Weaver implements Bundle {
     public void start() {
         spindleHandler.start();
         replicationHandler.start();
+        xeroxHandler.start();
     }
 
     /**
@@ -483,6 +536,7 @@ public class Weaver implements Bundle {
     public void terminate() {
         spindleHandler.terminate();
         replicationHandler.terminate();
+        xeroxHandler.terminate();
         for (EventChannel channel : channels.values()) {
             channel.close();
         }
@@ -514,23 +568,13 @@ public class Weaver implements Bundle {
                     || !oldPair.get(1).equals(newPair.get(1))) {
                     remapped.put(channel,
                                  new Node[][] {
-                                         new Node[] { oldPair.get(0),
-                                                 oldPair.get(1) },
-                                         new Node[] { newPair.get(0),
-                                                 newPair.get(1) } });
+                                                 new Node[] { oldPair.get(0),
+                                                                 oldPair.get(1) },
+                                                 new Node[] { newPair.get(0),
+                                                                 newPair.get(1) } });
                 }
             }
         }
         return remapped;
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.spindle.Bundle#map(com.salesforce.ouroboros.Node, com.salesforce.ouroboros.spindle.replication.Replicator)
-     */
-    @Override
-    public void map(Node partner, Replicator replicator) {
-        Replicator previous = replicators.put(partner, replicator);
-        assert previous == null : String.format("No replicator should have been mapped to %s on %s",
-                                                partner, replicator);
     }
 }

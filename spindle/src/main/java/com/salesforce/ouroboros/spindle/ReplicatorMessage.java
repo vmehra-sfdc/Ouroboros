@@ -39,19 +39,36 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * 
  */
 public enum ReplicatorMessage implements MemberDispatch {
-    ESTABLISH_REPLICATORS, REPLICATORS_ESTABLISHED {
+    BEGIN_REBALANCE {
+        @Override
+        protected void disptach(Coordinator coordinator, Node sender,
+                                Serializable[] arguments, long time,
+                                Switchboard switchboard) {
+            coordinator.dispatch(this, sender, arguments, time);
+            switchboard.forwardToNextInRing(new Message(sender, this, arguments),
+                                            coordinator.getAllMembers());
+        }
+    },
+    ESTABLISH_REPLICATORS {
+        @Override
+        protected void disptach(Coordinator coordinator, Node sender,
+                                Serializable[] arguments, long time,
+                                Switchboard switchboard) {
+            switchboard.forwardToNextInRing(new Message(sender, this, arguments),
+                                            coordinator.getAllMembers());
+            coordinator.dispatch(this, sender, arguments, time);
+        }
+    },
+    REPLICATORS_ESTABLISHED {
         /**
          * Forwarding must be done at dispatch site
          */
         @Override
-        public void dispatch(Switchboard switchboard, Node sender,
-                             Serializable[] arguments, long time) {
-            if (!(switchboard.getMember() instanceof Coordinator)) {
-                log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
-                                          this, switchboard.getMember()));
-            }
-            Coordinator coordinator = (Coordinator) switchboard.getMember();
+        protected void disptach(Coordinator coordinator, Node sender,
+                                Serializable[] arguments, long time,
+                                Switchboard switchboard) {
             coordinator.dispatch(this, sender, arguments, time);
+
         }
     };
 
@@ -64,9 +81,12 @@ public enum ReplicatorMessage implements MemberDispatch {
             log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
                                       this, switchboard.getMember()));
         }
-        Coordinator coordinator = (Coordinator) switchboard.getMember();
-        switchboard.forwardToNextInRing(new Message(sender, this, arguments),
-                                        coordinator.getAllMembers());
-        coordinator.dispatch(this, sender, arguments, time);
+        disptach((Coordinator) switchboard.getMember(), sender, arguments,
+                 time, switchboard);
+
     }
+
+    abstract protected void disptach(Coordinator coordinator, Node sender,
+                                     Serializable[] arguments, long time,
+                                     Switchboard switchboard);
 }

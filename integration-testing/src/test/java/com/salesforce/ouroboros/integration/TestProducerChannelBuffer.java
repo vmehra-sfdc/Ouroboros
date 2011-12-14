@@ -275,8 +275,7 @@ public class TestProducerChannelBuffer {
             return new com.salesforce.ouroboros.spindle.Coordinator(
                                                                     timer(),
                                                                     switchboard(),
-                                                                    weaver(),
-                                                                    new com.salesforce.ouroboros.spindle.CoordinatorConfiguration());
+                                                                    weaver());
         }
 
         /* (non-Javadoc)
