@@ -75,11 +75,11 @@ public class Coordinator implements Member {
 
     private boolean                             active          = false;
     private final SortedSet<Node>               activeMembers   = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>               allMembers      = new ConcurrentSkipListSet<Node>();
     private final CoordinatorContext            fsm             = new CoordinatorContext(
                                                                                          this);
     private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
     private Node[]                              joiningMembers  = new Node[0];
+    private final SortedSet<Node>               nextMembership  = new ConcurrentSkipListSet<Node>();
     private ConsistentHashFunction<Node>        nextRing;
     private Rendezvous                          rendezvous;
     private final Node                          self;
@@ -190,7 +190,6 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case ADVERTISE_CHANNEL_BUFFER:
-                allMembers.add(sender);
                 if ((Boolean) arguments[1]) {
                     activeMembers.add(sender);
                 } else {
@@ -232,7 +231,7 @@ public class Coordinator implements Member {
                 } else {
                     switchboard.forwardToNextInRing(new Message(sender, type,
                                                                 arguments),
-                                                    allMembers);
+                                                    nextMembership);
                 }
                 break;
             }
@@ -277,7 +276,7 @@ public class Coordinator implements Member {
                 } else {
                     switchboard.forwardToNextInRing(new Message(sender, type,
                                                                 arguments),
-                                                    allMembers);
+                                                    nextMembership);
                 }
                 break;
             default:
@@ -426,14 +425,14 @@ public class Coordinator implements Member {
     }
 
     protected void beginRebalance(Node[] joiningMembers) {
-        this.joiningMembers = joiningMembers;
+        setJoiningMembers(joiningMembers);
         switchboard.ringCast(new Message(self,
                                          ReplicatorMessage.BEGIN_REBALANCE));
     }
 
     protected void bootstrap(Node[] bootsrappingMembers) {
-        joiningMembers = bootsrappingMembers;
         active = true;
+        setJoiningMembers(bootsrappingMembers);
         for (Node node : bootsrappingMembers) {
             activeMembers.add(node);
             inactiveMembers.remove(node);
@@ -464,6 +463,7 @@ public class Coordinator implements Member {
         nextRing = null;
         tally.set(0);
         joiningMembers = new Node[0];
+        nextMembership.clear();
     }
 
     protected void commitFailover() {
@@ -490,7 +490,7 @@ public class Coordinator implements Member {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating bootstrap on %s", self));
         }
-        tally.set(joiningMembers.length);
+        tally.set(nextMembership.size());
         switchboard.ringCast(new Message(self,
                                          BootstrapMessage.BOOTSTRAP_SPINDLES,
                                          (Serializable) joiningMembers));
@@ -512,7 +512,7 @@ public class Coordinator implements Member {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Coordinating rebalancing on %s", self));
         }
-        tally.set(allMembers.size());
+        tally.set(nextMembership.size());
         switchboard.ringCast(new Message(
                                          self,
                                          RebalanceMessage.PREPARE_FOR_REBALANCE,
@@ -529,10 +529,10 @@ public class Coordinator implements Member {
             log.info(String.format("Coordinating establishment of the replicators on %s",
                                    self));
         }
-        tally.set(allMembers.size());
+        tally.set(nextMembership.size());
         Message message = new Message(self,
                                       ReplicatorMessage.ESTABLISH_REPLICATORS);
-        switchboard.ringCast(message, allMembers);
+        switchboard.ringCast(message, nextMembership);
     }
 
     /**
@@ -541,8 +541,7 @@ public class Coordinator implements Member {
     protected void coordinateTakeover() {
         rendezvous = null;
         switchboard.ringCast(new Message(self,
-                                         RebalanceMessage.INITIATE_REBALANCE),
-                             allMembers);
+                                         RebalanceMessage.INITIATE_REBALANCE));
     }
 
     /**
@@ -572,7 +571,7 @@ public class Coordinator implements Member {
                     switchboard.ringCast(new Message(
                                                      self,
                                                      ReplicatorMessage.REPLICATORS_ESTABLISHED),
-                                         allMembers);
+                                         nextMembership);
                 }
                 fsm.replicatorsEstablished();
             }
@@ -642,14 +641,18 @@ public class Coordinator implements Member {
      */
     protected void filterSystemMembership() {
         Collection<Node> deadMembers = switchboard.getDeadMembers();
-        allMembers.removeAll(deadMembers);
         activeMembers.removeAll(deadMembers);
         inactiveMembers.removeAll(deadMembers);
+        nextMembership.clear();
+        nextMembership.addAll(activeMembers);
         if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Filtered membership on %s, all  = %s, active = %s, inactive = %s",
-                                    self, allMembers, activeMembers,
-                                    inactiveMembers));
+            log.finer(String.format("Filtered membership on %s, active = %s, inactive = %s",
+                                    self, activeMembers, inactiveMembers));
         }
+    }
+
+    protected SortedSet<Node> getNextMembership() {
+        return nextMembership;
     }
 
     protected boolean hasActiveMembers() {
@@ -714,7 +717,7 @@ public class Coordinator implements Member {
                 switchboard.ringCast(new Message(
                                                  self,
                                                  RebalancedMessage.MEMBER_REBALANCED),
-                                     allMembers);
+                                     nextMembership);
 
             }
         };
@@ -759,7 +762,7 @@ public class Coordinator implements Member {
      *            - the list of weavers that are joining the process group
      */
     protected void rebalance(Node[] joiningMembers) {
-        this.joiningMembers = joiningMembers;
+        setJoiningMembers(joiningMembers);
         calculateNextRing();
         fsm.rebalance();
     }
@@ -769,10 +772,10 @@ public class Coordinator implements Member {
      * and commit the takeover
      */
     protected void rebalanced() {
-        for (Node node : joiningMembers) {
-            activeMembers.add(node);
-            inactiveMembers.remove(node);
-        }
+        activeMembers.clear();
+        activeMembers.addAll(nextMembership);
+        inactiveMembers.removeAll(nextMembership);
+        joiningMembers = new Node[0];
         commitNextRing();
         active = true;
         fsm.commitTakeover();
@@ -807,10 +810,6 @@ public class Coordinator implements Member {
      */
     SortedSet<Node> getActiveMembers() {
         return activeMembers;
-    }
-
-    SortedSet<Node> getAllMembers() {
-        return allMembers;
     }
 
     /**
@@ -855,6 +854,9 @@ public class Coordinator implements Member {
     void setJoiningMembers(Node[] joiningMembers) {
         assert joiningMembers != null : "joining members must not be null";
         this.joiningMembers = joiningMembers;
+        for (Node node : joiningMembers) {
+            nextMembership.add(node);
+        }
     }
 
     /**

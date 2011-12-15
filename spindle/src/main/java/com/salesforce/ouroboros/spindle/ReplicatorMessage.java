@@ -46,7 +46,7 @@ public enum ReplicatorMessage implements MemberDispatch {
                                 Switchboard switchboard) {
             coordinator.dispatch(this, sender, arguments, time);
             switchboard.forwardToNextInRing(new Message(sender, this, arguments),
-                                            coordinator.getAllMembers());
+                                            coordinator.getNextMembership());
         }
     },
     ESTABLISH_REPLICATORS {
@@ -55,7 +55,7 @@ public enum ReplicatorMessage implements MemberDispatch {
                                 Serializable[] arguments, long time,
                                 Switchboard switchboard) {
             switchboard.forwardToNextInRing(new Message(sender, this, arguments),
-                                            coordinator.getAllMembers());
+                                            coordinator.getNextMembership());
             coordinator.dispatch(this, sender, arguments, time);
         }
     },

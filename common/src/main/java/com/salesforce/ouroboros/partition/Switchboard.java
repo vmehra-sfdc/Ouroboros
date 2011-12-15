@@ -345,7 +345,7 @@ public class Switchboard {
      *            - the set of nodes forming the ring
      */
     public void forwardToNextInRing(Message message, SortedSet<Node> ring) {
-        if (self.equals(message.sender)) {
+        if (ring.isEmpty() || self.equals(message.sender)) {
             if (log.isLoggable(Level.FINEST)) {
                 log.finest(String.format("Ring cast of %s complete on %s",
                                          message, self));
