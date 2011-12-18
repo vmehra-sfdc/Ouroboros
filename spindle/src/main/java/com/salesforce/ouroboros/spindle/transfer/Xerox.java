@@ -63,19 +63,18 @@ public class Xerox implements CommunicationsHandler {
     private boolean                   inError           = false;
     private final Node                node;
     private long                      position;
-    private final Rendezvous          rendezvous;
+    private Rendezvous                rendezvous;
     private Deque<Segment>            segments;
     private long                      segmentSize;
     private final long                transferSize;
 
-    public Xerox(Node toNode, int transferSize, Rendezvous rendezvous) {
-        node = toNode;
-        this.transferSize = transferSize;
-        this.rendezvous = rendezvous;
+    public Xerox(Node toNode) {
+        this(toNode, DEFAULT_TXFR_SIZE);
     }
 
-    public Xerox(Node toNode, Rendezvous rendezvous) {
-        this(toNode, DEFAULT_TXFR_SIZE, rendezvous);
+    public Xerox(Node toNode, int transferSize) {
+        node = toNode;
+        this.transferSize = transferSize;
     }
 
     @Override
@@ -123,6 +122,14 @@ public class Xerox implements CommunicationsHandler {
     @Override
     public void readReady() {
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * @param rendezvous
+     *            the rendezvous to set
+     */
+    public void setRendezvous(Rendezvous rendezvous) {
+        this.rendezvous = rendezvous;
     }
 
     @Override
@@ -182,7 +189,7 @@ public class Xerox implements CommunicationsHandler {
         }
         currentChannel = channels.pop();
         segments = currentChannel.getSegmentStack();
-
+        buffer.clear();
         buffer.putInt(MAGIC);
         buffer.putInt(segments.size());
         buffer.putLong(currentChannel.getId().getMostSignificantBits());

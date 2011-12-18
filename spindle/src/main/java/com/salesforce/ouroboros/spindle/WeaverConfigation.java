@@ -59,8 +59,10 @@ public class WeaverConfigation {
     public static final long          DEFAULT_PARTITION_TIMEOUT      = 60;
     public static final TimeUnit      DEFAULT_PARTITION_TIMEOUT_UNIT = TimeUnit.SECONDS;
     public static final int           DEFAULT_REPLICATION_QUEUE_SIZE = 100;
-
     public static final String        DEFAULT_STATE_NAME             = "weavers";
+    private static final String       REPLICATOR                     = "replicator";
+    private static final String       SPINDLE                        = "spindle";
+    private static final String       XEROX                          = "xerox";
 
     private Node                      id;
     private long                      maxSegmentSize                 = DEFAULT_MAX_SEGMENTSIZE;
@@ -73,16 +75,23 @@ public class WeaverConfigation {
     private final SocketOptions       replicationSocketOptions       = new SocketOptions();
     private Executor                  replicators                    = Executors.newFixedThreadPool(10,
                                                                                                     new LabeledThreadFactory(
-                                                                                                                             "replicator"));
+                                                                                                                             REPLICATOR));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
     private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
     private Executor                  spindles                       = Executors.newFixedThreadPool(3,
                                                                                                     new LabeledThreadFactory(
-                                                                                                                             "spindle"));
+                                                                                                                             SPINDLE));
     private final SocketOptions       spindleSocketOptions           = new SocketOptions();
     private String                    stateName                      = DEFAULT_STATE_NAME;
+    private InetSocketAddress         xeroxAddress                   = new InetSocketAddress(
+                                                                                             "127.0.0.1",
+                                                                                             0);
+    private Executor                  xeroxes                        = Executors.newFixedThreadPool(3,
+                                                                                                    new LabeledThreadFactory(
+                                                                                                                             XEROX));
+    private final SocketOptions       xeroxSocketOptions             = new SocketOptions();
 
     public void addRoot(File directory) {
         addRoot(directory, 1);
@@ -184,6 +193,27 @@ public class WeaverConfigation {
     }
 
     /**
+     * @return the xeroxAddress
+     */
+    public InetSocketAddress getXeroxAddress() {
+        return xeroxAddress;
+    }
+
+    /**
+     * @return the xeroxes
+     */
+    public Executor getXeroxes() {
+        return xeroxes;
+    }
+
+    /**
+     * @return the xeroxSocketOptions
+     */
+    public SocketOptions getXeroxSocketOptions() {
+        return xeroxSocketOptions;
+    }
+
+    /**
      * @param id
      *            the id to set
      */
@@ -261,6 +291,22 @@ public class WeaverConfigation {
      */
     public void setStateName(String stateName) {
         this.stateName = stateName;
+    }
+
+    /**
+     * @param xeroxAddress
+     *            the xeroxAddress to set
+     */
+    public void setXeroxAddress(InetSocketAddress xeroxAddress) {
+        this.xeroxAddress = xeroxAddress;
+    }
+
+    /**
+     * @param xeroxes
+     *            the xeroxes to set
+     */
+    public void setXeroxes(Executor xeroxes) {
+        this.xeroxes = xeroxes;
     }
 
     public void validate() {

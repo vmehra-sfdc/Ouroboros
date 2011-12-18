@@ -101,6 +101,9 @@ public class Replicator implements CommunicationsHandler {
         assert appender == null : "This replicator does not accept handshakes";
         appender = new ReplicatingAppender(bundle);
         this.handler = handler;
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Accepting handshake on %s", bundle.getId()));
+        }
         fsm.acceptHandshake();
     }
 
@@ -234,11 +237,11 @@ public class Replicator implements CommunicationsHandler {
             inError = true;
             return false;
         }
+        partner = new Node(handshake);
         if (log.isLoggable(Level.FINEST)) {
             log.finest(String.format("Inbound handshake completed on %s, partner: %s",
                                      bundle.getId(), partner));
         }
-        partner = new Node(handshake);
         bundle.map(partner, this);
         return true;
     }

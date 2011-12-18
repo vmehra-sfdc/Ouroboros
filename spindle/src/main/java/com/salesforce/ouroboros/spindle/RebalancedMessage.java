@@ -30,7 +30,6 @@ import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.MemberDispatch;
-import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 
 /**
@@ -52,7 +51,5 @@ public enum RebalancedMessage implements MemberDispatch {
         }
         Coordinator coordinator = (Coordinator) switchboard.getMember();
         coordinator.dispatch(this, sender, arguments, time);
-        switchboard.forwardToNextInRing(new Message(sender, this, arguments),
-                                        coordinator.getAllMembers());
     }
 }

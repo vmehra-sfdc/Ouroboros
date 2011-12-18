@@ -89,11 +89,7 @@ public class TestCoordinator {
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(
-                                                  timer,
-                                                  switchboard,
-                                                  weaver,
-                                                  new CoordinatorConfiguration());
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -163,11 +159,7 @@ public class TestCoordinator {
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(
-                                                  timer,
-                                                  switchboard,
-                                                  weaver,
-                                                  new CoordinatorConfiguration());
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -211,11 +203,7 @@ public class TestCoordinator {
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
         Switchboard switchboard = mock(Switchboard.class);
-        Coordinator coordinator = new Coordinator(
-                                                  timer,
-                                                  switchboard,
-                                                  weaver,
-                                                  new CoordinatorConfiguration());
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
         Answer<Void> answer = new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
@@ -250,11 +238,7 @@ public class TestCoordinator {
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(
-                                                  timer,
-                                                  switchboard,
-                                                  weaver,
-                                                  new CoordinatorConfiguration());
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
         coordinator.setActive(true);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 2, 2);
@@ -268,10 +252,10 @@ public class TestCoordinator {
         UUID mirror = UUID.randomUUID();
 
         when(weaver.getReplicationPair(primary)).thenReturn(new Node[] {
-                                                                    localNode,
-                                                                    node2 });
+                                                                            localNode,
+                                                                            node2 });
         when(weaver.getReplicationPair(mirror)).thenReturn(new Node[] { node1,
-                                                                   localNode });
+                                                                           localNode });
         coordinator.open(primary);
         coordinator.open(mirror);
         verify(weaver).openPrimary(eq(primary), (Node) eq(null));
@@ -286,11 +270,7 @@ public class TestCoordinator {
         Switchboard switchboard = mock(Switchboard.class);
         when(weaver.getId()).thenReturn(new Node(0, 0, 0));
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(
-                                                  timer,
-                                                  switchboard,
-                                                  weaver,
-                                                  new CoordinatorConfiguration());
+        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);

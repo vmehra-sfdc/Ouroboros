@@ -84,6 +84,12 @@ public class Switchboard {
         void advertise();
 
         /**
+         * The member is part of a new view and must start in the inactive
+         * state.
+         */
+        void becomeInactive();
+
+        /**
          * The partition has been destabilized
          */
         void destabilize();
@@ -107,12 +113,6 @@ public class Switchboard {
          * The partition has stabilized.
          */
         void stabilized();
-
-        /**
-         * The member is part of a new view and must start in the inactive
-         * state.
-         */
-        void becomeInactive();
 
     }
 
@@ -345,7 +345,7 @@ public class Switchboard {
      *            - the set of nodes forming the ring
      */
     public void forwardToNextInRing(Message message, SortedSet<Node> ring) {
-        if (self.equals(message.sender)) {
+        if (ring.isEmpty() || self.equals(message.sender)) {
             if (log.isLoggable(Level.FINEST)) {
                 log.finest(String.format("Ring cast of %s complete on %s",
                                          message, self));
@@ -357,6 +357,10 @@ public class Switchboard {
 
     public Collection<Node> getDeadMembers() {
         return deadMembers;
+    }
+
+    public Node getId() {
+        return self;
     }
 
     public Member getMember() {
@@ -524,6 +528,22 @@ public class Switchboard {
     }
 
     /**
+     * Destabilize the partition
+     */
+    protected void destabilizePartition() {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Destabilizing partition on: %s", self));
+        }
+        votes.clear();
+        inboundGate.close();
+        stable.set(false);
+        previousMembers.addAll(members);
+        deadMembers.clear();
+        members.clear();
+        member.destabilize();
+    }
+
+    /**
      * Distributed election of the correct view. After the election, if this
      * node's previous view is the elected view, this node remains an active
      * member. Otherwise, if this node's previous view is not the elected view,
@@ -619,22 +639,6 @@ public class Switchboard {
     }
 
     /**
-     * Destabilize the partition
-     */
-    protected void destabilizePartition() {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Destabilizing partition on: %s", self));
-        }
-        votes.clear();
-        inboundGate.close();
-        stable.set(false);
-        previousMembers.addAll(members);
-        deadMembers.clear();
-        members.clear();
-        member.destabilize();
-    }
-
-    /**
      * Discover the member
      * 
      * @param sender
@@ -657,6 +661,10 @@ public class Switchboard {
         }
     }
 
+    SwitchboardContext getFsm() {
+        return fsm;
+    }
+
     /**
      * The partition has changed state.
      * 
@@ -672,9 +680,5 @@ public class Switchboard {
         } else {
             fsm.destabilize();
         }
-    }
-
-    SwitchboardContext getFsm() {
-        return fsm;
     }
 }

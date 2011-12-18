@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=12>
+        <th colspan=13>
           Transition
         </th>
       </tr>
@@ -25,6 +25,9 @@
         </th>
         <th>
          Exit
+        </th>
+        <th>
+          beginRebalance
         </th>
         <th>
           bootstrapped
@@ -73,6 +76,8 @@
           <pre>
 cleanUp();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -139,6 +144,12 @@ cleanUp();
         </td>
         <td>
           <pre>
+  Rebalancing/push(CoordinatorFSM::Stable)
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
   Stable
   {}
           </pre>
@@ -154,17 +165,13 @@ cleanUp();
           </pre>
         </td>
         <td>
-          <pre>
-  Rebalance/push(CoordinatorFSM::Stable)
-  {}
-          </pre>
         </td>
         <td>
           <pre>
 [ctxt.isLeader()]
-  Rebalance/push(CoordinatorFSM::Stable)
+  Rebalancing/push(CoordinatorFSM::Stable)
   {
-    setJoiningMembers(joiningMembers);
+    beginRebalance(joiningMembers);
   }
           </pre>
         </td>
@@ -188,6 +195,8 @@ cleanUp();
       <tr>
         <td>
           Failover
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -231,6 +240,8 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Stable/push(CoordinatorFSM::Bootstrapping)
   {}
@@ -251,6 +262,57 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Rebalancing
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  push(CoordinatorFSM::Rebalancing)
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Rebalance
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[ctxt.isLeader()]
+  AwaitingTakeover/push(CoordinatorFSM::Rebalancing)
+  {}
+
+  Rebalancing
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -283,6 +345,8 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Rebalance
   {
@@ -297,14 +361,6 @@ cleanUp();
           </pre>
         </td>
         <td>
-          <pre>
-[ctxt.isLeader()]
-  AwaitingTakeover/push(CoordinatorFSM::Rebalance)
-  {}
-
-  Rebalance
-  {}
-          </pre>
         </td>
         <td>
         </td>
@@ -316,6 +372,8 @@ cleanUp();
       <tr>
         <td>
           AwaitingTakeover
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -363,6 +421,8 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Shutdown
   {}
@@ -400,7 +460,7 @@ cleanUp();
         <th colspan=2>
           Actions
         </th>
-        <th colspan=8>
+        <th colspan=9>
           Transition
         </th>
       </tr>
@@ -412,6 +472,12 @@ cleanUp();
          Exit
         </th>
         <th>
+          beginRebalance
+        </th>
+        <th>
+          commitTakeover
+        </th>
+        <th>
           destabilize
         </th>
         <th>
@@ -419,9 +485,6 @@ cleanUp();
         </th>
         <th>
           memberRebalanced
-        </th>
-        <th>
-          memberTakeoverComplete
         </th>
         <th>
           rebalance
@@ -450,14 +513,16 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
           <pre>
   pop(failedOver)
   {
     commitFailover();
   }
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -480,6 +545,12 @@ cleanUp();
           </pre>
         </td>
         <td>
+        </td>
+        <td>
+          <pre>
+  CoordinateReplicators
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -526,6 +597,8 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Rebalance
   {}
@@ -544,8 +617,12 @@ cleanUp();
         </td>
         <td>
           <pre>
-    coordinateTakeover();
+    rebalance();
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -562,8 +639,6 @@ cleanUp();
   Rebalance
   {}
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -583,10 +658,9 @@ cleanUp();
           CoordinateTakeover
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
+          <pre>
+    coordinateTakeover();
+          </pre>
         </td>
         <td>
         </td>
@@ -594,15 +668,17 @@ cleanUp();
         </td>
         <td>
           <pre>
-[ctxt.tallyComplete()]
   pop(commitTakeover)
   {
     commitTakeover();
   }
-
-  CoordinateTakeover
-  {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -626,7 +702,7 @@ cleanUp();
         <th colspan=2>
           Actions
         </th>
-        <th colspan=5>
+        <th colspan=4>
           Transition
         </th>
       </tr>
@@ -636,9 +712,6 @@ cleanUp();
         </th>
         <th>
          Exit
-        </th>
-        <th>
-          coordinateReplicators
         </th>
         <th>
           destabilize
@@ -660,12 +733,6 @@ cleanUp();
         <td>
         </td>
         <td>
-        </td>
-        <td>
-          <pre>
-  push(ReplicatorFSM::EstablishReplicators)
-  {}
-          </pre>
         </td>
         <td>
         </td>
