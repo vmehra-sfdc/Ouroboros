@@ -533,7 +533,7 @@ public class SwitchboardFunctionalTest {
                              public boolean value() {
                                  return member.stabilized;
                              }
-                         }, 20000, 100);
+                         }, 60000, 100);
         }
     }
 
