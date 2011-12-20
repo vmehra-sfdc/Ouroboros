@@ -114,7 +114,13 @@ public class Acknowledger {
 
     protected boolean writeAck() {
         try {
-            handler.getChannel().write(buffer);
+            if (handler.getChannel().write(buffer) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Unable to write batch commit acknowledgement: %s",

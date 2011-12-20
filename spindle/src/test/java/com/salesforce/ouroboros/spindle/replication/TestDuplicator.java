@@ -92,7 +92,7 @@ public class TestDuplicator {
 
         private void readHeader() {
             try {
-                for (boolean read = header.read(inbound); !read; read = header.read(inbound)) {
+                for (header.read(inbound); header.hasRemaining(); header.read(inbound)) {
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {
@@ -167,7 +167,6 @@ public class TestDuplicator {
                                                        timestamp, 0),
                              eventChannel, segment, acknowledger);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
-
             @Override
             public boolean value() {
                 replicator.writeReady();

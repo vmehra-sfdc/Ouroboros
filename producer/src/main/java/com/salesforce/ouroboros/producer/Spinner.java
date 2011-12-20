@@ -201,7 +201,13 @@ public class Spinner implements CommunicationsHandler {
 
     protected boolean writeHandshake() {
         try {
-            handler.getChannel().write(handshake);
+            if (handler.getChannel().write(handshake) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             log.log(Level.WARNING, "Unable to write handshake", e);
             inError = true;

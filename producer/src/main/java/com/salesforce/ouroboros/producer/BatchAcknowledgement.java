@@ -79,7 +79,13 @@ public class BatchAcknowledgement {
 
     private boolean readAcknowledgement() {
         try {
-            handler.getChannel().read(ackBuffer);
+            if (handler.getChannel().read(ackBuffer) < 0) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info("closing channel");
+                }
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING, "Error reading batch acknowlegement", e);

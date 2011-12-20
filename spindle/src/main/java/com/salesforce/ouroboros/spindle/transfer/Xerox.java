@@ -238,7 +238,13 @@ public class Xerox implements CommunicationsHandler {
 
     protected boolean writeChannelHeader() {
         try {
-            handler.getChannel().write(buffer);
+            if (handler.getChannel().write(buffer) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Error writing handshake for %s on %s",
@@ -255,7 +261,13 @@ public class Xerox implements CommunicationsHandler {
 
     protected boolean writeSegmentHeader() {
         try {
-            handler.getChannel().write(buffer);
+            if(handler.getChannel().write(buffer) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Error writing header for %s on %s",

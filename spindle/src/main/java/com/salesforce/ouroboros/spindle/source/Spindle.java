@@ -137,7 +137,13 @@ public class Spindle implements CommunicationsHandler {
 
     protected boolean readHandshake() {
         try {
-            handler.getChannel().read(handshake);
+            if (handler.getChannel().read(handshake) < 0) { 
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             inError = true;
             log.log(Level.WARNING, String.format("Error reading handshake"), e);

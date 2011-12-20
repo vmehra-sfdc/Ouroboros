@@ -26,6 +26,7 @@
 package com.salesforce.ouroboros;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -67,7 +68,8 @@ public class TestEvent {
         FileOutputStream fos = new FileOutputStream(tmpFile);
         FileChannel segment = fos.getChannel();
         written.rewind();
-        assertTrue(written.write(segment));
+        written.write(segment);
+        assertFalse(written.hasRemaining());
         segment.close();
 
         assertEquals(magic, written.getMagic());
