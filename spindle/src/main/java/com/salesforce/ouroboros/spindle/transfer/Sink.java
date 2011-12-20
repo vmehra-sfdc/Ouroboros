@@ -228,7 +228,7 @@ public class Sink implements CommunicationsHandler {
             } catch (Throwable e) {
                 if (log.isLoggable(Level.WARNING)) {
                     log.log(Level.WARNING,
-                            String.format("Unable to create channel % on %s",
+                            String.format("Unable to create channel %s on %s",
                                           channelId, bundle.getId()), e);
                 }
                 return false;

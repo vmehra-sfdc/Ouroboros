@@ -111,7 +111,7 @@ cleanUp();
         </td>
         <td>
           <pre>
-[ctxt.isActive() && ctxt.isLeader()]
+[ctxt.isActiveLeader()]
   Stable/push(CoordinatorFSM::Unstable)
   {}
 
@@ -119,7 +119,7 @@ cleanUp();
   Failover
   {}
 
-[!ctxt.hasActiveMembers() && ctxt.isLeader()]
+[!ctxt.hasActiveMembers() && ctxt.isInactiveLeader()]
   Stable/push(CoordinatorFSM::Unstable)
   {}
 
@@ -168,7 +168,7 @@ cleanUp();
         </td>
         <td>
           <pre>
-[ctxt.isLeader()]
+[ctxt.isActiveLeader()]
   Rebalancing/push(CoordinatorFSM::Stable)
   {
     beginRebalance(joiningMembers);
@@ -306,7 +306,7 @@ cleanUp();
         </td>
         <td>
           <pre>
-[ctxt.isLeader()]
+[ctxt.isActiveLeader()]
   AwaitingTakeover/push(CoordinatorFSM::Rebalancing)
   {}
 

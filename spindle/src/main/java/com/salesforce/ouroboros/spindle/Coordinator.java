@@ -116,6 +116,7 @@ public class Coordinator implements Member {
         }
         active = false;
         weaver.inactivate();
+        cleanUp();
     }
 
     /**
@@ -147,7 +148,7 @@ public class Coordinator implements Member {
                     log.info(String.format("Bootstrapping spindles on %s", self));
                 }
                 bootstrap((Node[]) arguments[0]);
-                if (!isLeader()) {
+                if (!isInactiveLeader()) {
                     switchboard.forwardToNextInRing(new Message(sender, type,
                                                                 arguments));
                 }
@@ -223,7 +224,7 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case MEMBER_REBALANCED: {
-                if (isLeader()) {
+                if (isActiveLeader()) {
                     log.info(String.format("%s marked as rebalanced on %s",
                                            sender, self));
                     tally.decrementAndGet();
@@ -271,7 +272,7 @@ public class Coordinator implements Member {
                 establishReplicators();
                 break;
             case REPLICATORS_ESTABLISHED:
-                if (isLeader()) {
+                if (isActiveLeader()) {
                     replicatorsEstablished(sender);
                 } else {
                     switchboard.forwardToNextInRing(new Message(sender, type,
@@ -284,6 +285,10 @@ public class Coordinator implements Member {
                                                 String.format("Invalid replicator message: %s",
                                                               type));
         }
+    }
+
+    public Node getId() {
+        return self;
     }
 
     /**
@@ -310,7 +315,7 @@ public class Coordinator implements Member {
      * Initiate the bootstrapping of the weaver ring.
      */
     public void initiateBootstrap(Node[] joiningMembers) {
-        if (!isLeader() || active) {
+        if (!isInactiveLeader()) {
             throw new IllegalStateException(
                                             "This node must be inactive and the leader to initiate rebalancing");
         }
@@ -343,7 +348,7 @@ public class Coordinator implements Member {
      * Initiate the rebalancing of the weaver ring.
      */
     public void initiateRebalance(Node[] joiningMembers) {
-        if (!isLeader() || !active) {
+        if (!isActiveLeader()) {
             throw new IllegalStateException(
                                             "This node must be active and the leader to initiate rebalancing");
         }
@@ -565,7 +570,7 @@ public class Coordinator implements Member {
                     log.fine(String.format("Replicators established on %s",
                                            self));
                 }
-                if (isLeader()) {
+                if (isActiveLeader()) {
                     tally.decrementAndGet();
                 } else {
                     switchboard.ringCast(new Message(
@@ -664,23 +669,36 @@ public class Coordinator implements Member {
     }
 
     /**
-     * Answer true if the receiver is the leader of the group
+     * Answer true if the receiver is active and the leader of the active group
      * 
      * @return
      */
-    protected boolean isLeader() {
+    protected boolean isActiveLeader() {
         if (active) {
             return activeMembers.size() == 0 ? true
                                             : activeMembers.last().equals(self);
         }
-        return inactiveMembers.size() == 0 ? true
-                                          : inactiveMembers.last().equals(self);
+        return false;
+    }
+
+    /**
+     * Answer true if the receiver is not active and the leader of the inactive
+     * group
+     * 
+     * @return
+     */
+    protected boolean isInactiveLeader() {
+        if (!active) {
+            return inactiveMembers.size() == 0 ? true
+                                              : inactiveMembers.last().equals(self);
+        }
+        return false;
     }
 
     protected void printState() {
-        System.out.println(String.format("Coordinator [%s], active=%s, leader=%s, active=%s, inactive=%s, dead=%s",
-                                         self.processId, active, isLeader(),
-                                         activeMembers, inactiveMembers,
+        System.out.println(String.format("Coordinator [%s], active=%s, active=%s, inactive=%s, dead=%s",
+                                         self.processId, active, activeMembers,
+                                         inactiveMembers,
                                          switchboard.getDeadMembers()));
     }
 

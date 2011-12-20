@@ -581,7 +581,8 @@ public class TestCluster {
         // Rebalance the open channels across the major partition
         log.info("Initiating rebalance on majority partition");
         Coordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
-        assertTrue("coordinator is not the leader", partitionLeader.isLeader());
+        assertTrue("coordinator is not the leader",
+                   partitionLeader.isActiveLeader());
         partitionLeader.initiateRebalance();
 
         assertPartitionStable(majorPartition);
@@ -614,6 +615,20 @@ public class TestCluster {
         // Only the major partition should be stable
         assertPartitionActive(majorPartition);
         assertPartitionInactive(minorPartition);
+
+        log.info("Activating minor partition");
+        // Now add the minor partition back into the active set
+        ArrayList<Node> minorPartitionNodes = new ArrayList<Node>();
+        for (Coordinator c : minorPartition) {
+            minorPartitionNodes.add(c.getId());
+        }
+        partitionLeader.initiateRebalance(minorPartitionNodes.toArray(new Node[0]));
+
+        // Entire partition should be stable 
+        assertPartitionStable(coordinators);
+
+        // Entire partition should be stable
+        assertPartitionActive(coordinators);
     }
 
     private List<AnnotationConfigApplicationContext> createMembers() {
@@ -634,7 +649,7 @@ public class TestCluster {
                 public boolean value() {
                     return c.isActive();
                 }
-            }, 120000, 100);
+            }, 120000, 1000);
         }
     }
 
@@ -649,7 +664,7 @@ public class TestCluster {
                     return CoordinatorFSM.Bootstrapping == c.getState()
                            || BootstrapFSM.Bootstrap == c.getState();
                 }
-            }, 120000, 100);
+            }, 120000, 1000);
         }
     }
 
@@ -663,7 +678,7 @@ public class TestCluster {
                 public boolean value() {
                     return !c.isActive();
                 }
-            }, 120000, 100);
+            }, 120000, 1000);
         }
     }
 
