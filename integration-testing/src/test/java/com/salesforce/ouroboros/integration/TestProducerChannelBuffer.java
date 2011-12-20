@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +55,7 @@ import org.smartfrog.services.anubis.partition.test.controller.NodeData;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.View;
 import org.smartfrog.services.anubis.partition.wire.msg.Heartbeat;
+import org.smartfrog.services.anubis.partition.wire.security.WireSecurity;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -62,6 +64,7 @@ import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
+import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -104,9 +107,13 @@ public class TestProducerChannelBuffer {
 
         public MyController(Timer timer, long checkPeriod, long expirePeriod,
                             Identity partitionIdentity, long heartbeatTimeout,
-                            long heartbeatInterval) {
+                            long heartbeatInterval,
+                            SocketOptions socketOptions,
+                            Executor dispatchExecutor, WireSecurity wireSecurity)
+                                                                                 throws IOException {
             super(timer, checkPeriod, expirePeriod, partitionIdentity,
-                  heartbeatTimeout, heartbeatInterval);
+                  heartbeatTimeout, heartbeatInterval, socketOptions,
+                  dispatchExecutor, wireSecurity);
         }
 
         @Override
@@ -154,9 +161,11 @@ public class TestProducerChannelBuffer {
         }
 
         @Override
-        protected Controller constructController() throws UnknownHostException {
+        protected Controller constructController() throws IOException {
             return new MyController(timer(), 1000, 300000, partitionIdentity(),
-                                    heartbeatTimeout(), heartbeatInterval());
+                                    heartbeatTimeout(), heartbeatInterval(),
+                                    socketOptions(), dispatchExecutor(),
+                                    wireSecurity());
         }
 
         @Override
