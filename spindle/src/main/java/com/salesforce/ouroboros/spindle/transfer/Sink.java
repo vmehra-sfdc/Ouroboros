@@ -30,6 +30,7 @@ import static com.salesforce.ouroboros.spindle.transfer.Xerox.MAGIC;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -186,7 +187,19 @@ public class Sink implements CommunicationsHandler {
 
     protected boolean readChannelHeader() {
         try {
-            handler.getChannel().read(buffer);
+            if (handler.getChannel().read(buffer) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                error = true;
+                return false;
+            }
+        } catch (ClosedChannelException e) {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine("Closing channel");
+            }
+            error = true;
+            return false;
         } catch (IOException e) {
             error = true;
             if (log.isLoggable(Level.WARNING)) {
@@ -215,7 +228,7 @@ public class Sink implements CommunicationsHandler {
             } catch (Throwable e) {
                 if (log.isLoggable(Level.WARNING)) {
                     log.log(Level.WARNING,
-                            String.format("Unable to create channel % on %s",
+                            String.format("Unable to create channel %s on %s",
                                           channelId, bundle.getId()), e);
                 }
                 return false;
@@ -231,7 +244,13 @@ public class Sink implements CommunicationsHandler {
 
     protected boolean readSegmentHeader() {
         try {
-            handler.getChannel().read(buffer);
+            if (handler.getChannel().read(buffer) < 0) { 
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                error = true;
+                return false;
+            }
         } catch (IOException e) {
             error = true;
             if (log.isLoggable(Level.WARNING)) {

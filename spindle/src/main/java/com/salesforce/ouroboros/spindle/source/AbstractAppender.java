@@ -152,7 +152,13 @@ abstract public class AbstractAppender {
     protected boolean devNull() {
         long read;
         try {
-            read = handler.getChannel().read(devNull);
+            if ((read = handler.getChannel().read(devNull)) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during append", e);
             error();
@@ -204,15 +210,16 @@ abstract public class AbstractAppender {
     }
 
     protected boolean readBatchHeader() {
-        boolean read;
         try {
-            read = batchHeader.read(handler.getChannel());
+            if (batchHeader.read(handler.getChannel()) < 0) {
+                inError = true;
+            }
         } catch (IOException e) {
             log.log(Level.SEVERE, "Exception during batch header read", e);
             error();
             return false;
         }
-        if (read) {
+        if (!batchHeader.hasRemaining()) {
             if (log.isLoggable(Level.FINER)) {
                 log.finer(String.format("Batch header read, header=%s",
                                         batchHeader));

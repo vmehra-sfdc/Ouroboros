@@ -39,6 +39,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Timer;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -51,6 +52,7 @@ import org.smartfrog.services.anubis.partition.test.controller.NodeData;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.View;
 import org.smartfrog.services.anubis.partition.wire.msg.Heartbeat;
+import org.smartfrog.services.anubis.partition.wire.security.WireSecurity;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -59,6 +61,7 @@ import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
+import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.partition.Util.Condition;
@@ -100,9 +103,13 @@ public class SwitchboardFunctionalTest {
 
         public MyController(Timer timer, long checkPeriod, long expirePeriod,
                             Identity partitionIdentity, long heartbeatTimeout,
-                            long heartbeatInterval) {
+                            long heartbeatInterval,
+                            SocketOptions socketOptions,
+                            Executor dispatchExecutor, WireSecurity wireSecurity)
+                                                                                 throws IOException {
             super(timer, checkPeriod, expirePeriod, partitionIdentity,
-                  heartbeatTimeout, heartbeatInterval);
+                  heartbeatTimeout, heartbeatInterval, socketOptions,
+                  dispatchExecutor, wireSecurity);
         }
 
         @Override
@@ -199,9 +206,11 @@ public class SwitchboardFunctionalTest {
         }
 
         @Override
-        protected Controller constructController() throws UnknownHostException {
+        protected Controller constructController() throws IOException {
             return new MyController(timer(), 1000, 300000, partitionIdentity(),
-                                    heartbeatTimeout(), heartbeatInterval());
+                                    heartbeatTimeout(), heartbeatInterval(),
+                                    socketOptions(), dispatchExecutor(),
+                                    wireSecurity());
         }
 
         @Override
@@ -533,7 +542,7 @@ public class SwitchboardFunctionalTest {
                              public boolean value() {
                                  return member.stabilized;
                              }
-                         }, 20000, 100);
+                         }, 60000, 100);
         }
     }
 

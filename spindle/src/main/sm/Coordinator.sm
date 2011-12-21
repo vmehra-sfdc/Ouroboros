@@ -46,7 +46,7 @@ Entry {
 }
 {
 	stabilize
-	   [ctxt.isActive() && ctxt.isLeader()]
+	   [ctxt.isActiveLeader()]
 	   Stable/push(ControllerFSM::CoordinateFailover){}
 		
     stabilize
@@ -54,7 +54,7 @@ Entry {
         Failover{}
         
     stabilize
-    	[!ctxt.hasActiveMembers() && ctxt.isLeader()]
+    	[!ctxt.hasActiveMembers() && ctxt.isInactiveLeader()]
     	Stable/push(BootstrapFSM::Bootstrap){}
         
     stabilize
@@ -82,7 +82,7 @@ Stable {
 	    nil{}
 		
     rebalance(joiningMembers: Node[])
-        [ctxt.isLeader()]
+        [ctxt.isActiveLeader()]
         Rebalancing/push(ControllerFSM::CoordinateReplicators) {
         	beginRebalance(joiningMembers);
         }
@@ -106,7 +106,7 @@ Rebalancing{
 		push(ControllerFSM::CoordinateReplicators){}
 		
 	replicatorsEstablished
-		[ctxt.isLeader()] 
+		[ctxt.isActiveLeader()] 
         AwaitingTakeover/push(ControllerFSM::CoordinateRebalance){}
         
 	replicatorsEstablished
@@ -181,14 +181,10 @@ Entry{
 }
 {
 	rebalance
-		Rebalance{}
-}
-
-Rebalance
-Entry {
-	rebalance();
-}
-{ 
+		nil{
+			rebalance();
+		}
+		
 	rebalanced
 		nil{}
 		

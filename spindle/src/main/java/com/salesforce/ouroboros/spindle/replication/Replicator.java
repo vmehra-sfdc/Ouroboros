@@ -218,7 +218,13 @@ public class Replicator implements CommunicationsHandler {
 
     protected boolean readHandshake() {
         try {
-            handler.getChannel().read(handshake);
+            if (handler.getChannel().read(handshake) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("unable to read handshake on %s",
@@ -256,7 +262,13 @@ public class Replicator implements CommunicationsHandler {
 
     protected boolean writeHandshake() {
         try {
-            handler.getChannel().write(handshake);
+            if (handler.getChannel().write(handshake) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Unable to write handshake from: %s",

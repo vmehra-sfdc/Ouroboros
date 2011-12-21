@@ -158,16 +158,18 @@ public final class Duplicator {
         return false;
     }
 
-    protected boolean writeHeader() {
-        boolean written = false;
+    protected boolean writeHeader() { 
         try {
-            written = current.header.write(handler.getChannel());
+            if (current.header.write(handler.getChannel()) < 0) {
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Unable to write batch header: %s",
                                   current.header), e);
             inError = true;
         }
-        return written;
+        return !current.header.hasRemaining();
     }
 }

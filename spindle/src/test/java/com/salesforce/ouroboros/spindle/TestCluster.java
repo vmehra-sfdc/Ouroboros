@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Timer;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -57,6 +58,7 @@ import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.BitView;
 import org.smartfrog.services.anubis.partition.views.View;
 import org.smartfrog.services.anubis.partition.wire.msg.Heartbeat;
+import org.smartfrog.services.anubis.partition.wire.security.WireSecurity;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -65,6 +67,7 @@ import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
+import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -104,9 +107,13 @@ public class TestCluster {
 
         public MyController(Timer timer, long checkPeriod, long expirePeriod,
                             Identity partitionIdentity, long heartbeatTimeout,
-                            long heartbeatInterval) {
+                            long heartbeatInterval,
+                            SocketOptions socketOptions,
+                            Executor dispatchExecutor, WireSecurity wireSecurity)
+                                                                                 throws IOException {
             super(timer, checkPeriod, expirePeriod, partitionIdentity,
-                  heartbeatTimeout, heartbeatInterval);
+                  heartbeatTimeout, heartbeatInterval, socketOptions,
+                  dispatchExecutor, wireSecurity);
         }
 
         @Override
@@ -138,9 +145,11 @@ public class TestCluster {
         }
 
         @Override
-        protected Controller constructController() throws UnknownHostException {
+        protected Controller constructController() throws IOException {
             return new MyController(timer(), 1000, 300000, partitionIdentity(),
-                                    heartbeatTimeout(), heartbeatInterval());
+                                    heartbeatTimeout(), heartbeatInterval(),
+                                    socketOptions(), dispatchExecutor(),
+                                    wireSecurity());
         }
 
         @Override
@@ -572,7 +581,8 @@ public class TestCluster {
         // Rebalance the open channels across the major partition
         log.info("Initiating rebalance on majority partition");
         Coordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
-        assertTrue("coordinator is not the leader", partitionLeader.isLeader());
+        assertTrue("coordinator is not the leader",
+                   partitionLeader.isActiveLeader());
         partitionLeader.initiateRebalance();
 
         assertPartitionStable(majorPartition);
@@ -605,6 +615,20 @@ public class TestCluster {
         // Only the major partition should be stable
         assertPartitionActive(majorPartition);
         assertPartitionInactive(minorPartition);
+
+        log.info("Activating minor partition");
+        // Now add the minor partition back into the active set
+        ArrayList<Node> minorPartitionNodes = new ArrayList<Node>();
+        for (Coordinator c : minorPartition) {
+            minorPartitionNodes.add(c.getId());
+        }
+        partitionLeader.initiateRebalance(minorPartitionNodes.toArray(new Node[0]));
+
+        // Entire partition should be stable 
+        assertPartitionStable(coordinators);
+
+        // Entire partition should be stable
+        assertPartitionActive(coordinators);
     }
 
     private List<AnnotationConfigApplicationContext> createMembers() {
@@ -625,7 +649,7 @@ public class TestCluster {
                 public boolean value() {
                     return c.isActive();
                 }
-            }, 120000, 100);
+            }, 120000, 1000);
         }
     }
 
@@ -640,7 +664,7 @@ public class TestCluster {
                     return CoordinatorFSM.Bootstrapping == c.getState()
                            || BootstrapFSM.Bootstrap == c.getState();
                 }
-            }, 120000, 100);
+            }, 120000, 1000);
         }
     }
 
@@ -654,7 +678,7 @@ public class TestCluster {
                 public boolean value() {
                     return !c.isActive();
                 }
-            }, 120000, 100);
+            }, 120000, 1000);
         }
     }
 

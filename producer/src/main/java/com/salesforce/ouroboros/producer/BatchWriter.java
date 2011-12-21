@@ -218,7 +218,13 @@ public class BatchWriter {
 
     protected boolean writePayload() {
         try {
-            handler.getChannel().write(batch.peekFirst());
+            if (handler.getChannel().write(batch.peekFirst()) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,

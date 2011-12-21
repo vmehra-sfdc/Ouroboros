@@ -148,12 +148,11 @@ public class EventHeader implements Cloneable {
      * 
      * @param channel
      *            - the channel to read from
-     * @return true if the header has been completely read from the channel
+     * @return the number of bytes read, or -1 if the channel is closed.
      * @throws IOException
      */
-    public boolean read(ReadableByteChannel channel) throws IOException {
-        channel.read(bytes);
-        return !bytes.hasRemaining();
+    public int read(ReadableByteChannel channel) throws IOException {
+        return channel.read(bytes);
     }
 
     /**
@@ -185,14 +184,12 @@ public class EventHeader implements Cloneable {
      * 
      * @param channel
      *            - the channel to write the contents of the receiver
-     * @return true if all the bytes of the receiver have been written to the
-     *         channel, false if bytes are still remaining
+     * @return the number of bytes written, or -1 if the channel is closed.
      * @throws IOException
      *             - if problems occur during write
      */
-    public boolean write(WritableByteChannel channel) throws IOException {
-        channel.write(bytes);
-        return !bytes.hasRemaining();
+    public int write(WritableByteChannel channel) throws IOException {
+        return channel.write(bytes);
     }
 
     protected void initialize(int size, int magic, int crc32) {

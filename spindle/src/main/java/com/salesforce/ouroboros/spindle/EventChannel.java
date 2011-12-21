@@ -151,7 +151,12 @@ public class EventChannel {
         id = channelId;
         channel = new File(root, channelId.toString().replace('-', '/'));
         this.maxSegmentSize = maxSegmentSize;
-        if (!channel.mkdirs()) {
+
+        channel.mkdirs();
+
+        if (channel.exists() && channel.isDirectory()) {
+            deleteDirectory(channel);
+        } else {
             String msg = String.format("Unable to create channel directory for channel: %s",
                                        channel);
             log.severe(msg);
@@ -195,6 +200,15 @@ public class EventChannel {
      */
     public void close() {
         deleteDirectory(channel);
+        if (!channel.delete()) {
+            log.severe(String.format("Cannot delete channel root directory: %s",
+                                     channel));
+        } else {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Deleted channel root directory: %s",
+                                       channel));
+            }
+        }
     }
 
     /**

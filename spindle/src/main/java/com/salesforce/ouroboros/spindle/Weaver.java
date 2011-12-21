@@ -316,10 +316,12 @@ public class Weaver implements Bundle {
     public void inactivate() {
         spindleHandler.closeOpenHandlers();
         replicationHandler.closeOpenHandlers();
+        xeroxHandler.closeOpenHandlers();
         for (EventChannel channel : channels.values()) {
             channel.close();
         }
         channels.clear();
+        replicators.clear();
     }
 
     /* (non-Javadoc)
@@ -336,8 +338,8 @@ public class Weaver implements Bundle {
     @Override
     public void map(Node partner, Replicator replicator) {
         Replicator previous = replicators.put(partner, replicator);
-        assert previous == null : String.format("No replicator should have been mapped to %s on %s",
-                                                partner, replicator);
+        assert previous == null : String.format("Replicator has already been mapped to %s on %s",
+                                                partner, id);
     }
 
     /**
