@@ -479,7 +479,7 @@ public class Coordinator implements Member {
      * Commit the calculated next ring as the current weaver ring
      */
     protected void commitNextRing() {
-        weaver.setRing(nextRing);
+        weaver.commitRing(nextRing);
         nextRing = null;
     }
 
@@ -759,8 +759,9 @@ public class Coordinator implements Member {
                                    self));
         }
         for (Entry<UUID, Node[][]> entry : remapped.entrySet()) {
-            weaver.rebalance(xeroxes, entry.getKey(), entry.getValue()[0],
-                             entry.getValue()[1], deadMembers);
+            weaver.rebalance(xeroxes, entry.getKey(), entry.getValue()[0][0],
+                             entry.getValue()[0][1], entry.getValue()[1][0],
+                             entry.getValue()[1][1], deadMembers);
         }
 
         if (xeroxes.isEmpty()) {

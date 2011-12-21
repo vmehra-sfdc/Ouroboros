@@ -26,8 +26,10 @@
 package com.salesforce.ouroboros.spindle;
 
 import static com.salesforce.ouroboros.spindle.Util.waitFor;
+import static com.salesforce.ouroboros.util.Utils.point;
 import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
@@ -75,6 +77,8 @@ import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.spindle.Util.Condition;
+import com.salesforce.ouroboros.util.ConsistentHashFunction;
+import com.salesforce.ouroboros.util.MersenneTwister;
 
 /**
  * 
@@ -350,15 +354,23 @@ public class TestCluster {
     private MyController                             controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<Coordinator>                        coordinators;
+    private List<Weaver>                             weavers;
     private List<ControlNode>                        fullPartition;
+    private List<Node>                               fullPartitionId;
     private BitView                                  fullView;
     private List<ControlNode>                        majorGroup;
     private List<Coordinator>                        majorPartition;
+    private List<Node>                               majorPartitionId;
+    private List<Weaver>                             majorWeavers;
+    private List<Weaver>                             minorWeavers;
     private BitView                                  majorView;
     private List<AnnotationConfigApplicationContext> memberContexts;
     private List<ControlNode>                        minorGroup;
     private List<Coordinator>                        minorPartition;
+    private List<Node>                               minorPartitionId;
     private BitView                                  minorView;
+    private MersenneTwister                          twister = new MersenneTwister(
+                                                                                   666);
 
     @Before
     public void starUp() throws Exception {
@@ -378,6 +390,8 @@ public class TestCluster {
             log.info("Initial partition stable");
             fullPartition = new ArrayList<ControlNode>();
             coordinators = new ArrayList<Coordinator>();
+            weavers = new ArrayList<Weaver>();
+            fullPartitionId = new ArrayList<Node>();
             for (AnnotationConfigApplicationContext context : memberContexts) {
                 ControlNode node = (ControlNode) controller.getNode(context.getBean(Identity.class));
                 assertNotNull("Can't find node: "
@@ -385,9 +399,11 @@ public class TestCluster {
                               node);
                 fullPartition.add(node);
                 Coordinator coordinator = context.getBean(Coordinator.class);
+                fullPartitionId.add(coordinator.getId());
                 assertNotNull("Can't find coordinator in context: " + context,
                               coordinator);
                 coordinators.add(coordinator);
+                weavers.add(context.getBean(Weaver.class));
             }
         } finally {
             if (!success) {
@@ -407,24 +423,36 @@ public class TestCluster {
         majorGroup = new ArrayList<ControlNode>();
         minorGroup = new ArrayList<ControlNode>();
 
+        majorPartitionId = new ArrayList<Node>();
+        minorPartitionId = new ArrayList<Node>();
+
+        majorWeavers = new ArrayList<Weaver>();
+        minorWeavers = new ArrayList<Weaver>();
+
         int majorPartitionSize = ((coordinators.size()) / 2) + 1;
 
         // Form the major partition
         for (int i = 0; i < majorPartitionSize; i++) {
             ControlNode member = fullPartition.get(i);
-            majorPartition.add(coordinators.get(i));
+            Coordinator coordinator = coordinators.get(i);
+            majorPartitionId.add(fullPartitionId.get(i));
+            majorPartition.add(coordinator);
             fullView.add(member.getIdentity());
             majorGroup.add(member);
             majorView.add(member.getIdentity());
+            majorWeavers.add(weavers.get(i));
         }
 
         // Form the minor partition
         for (int i = majorPartitionSize; i < coordinators.size(); i++) {
             ControlNode member = fullPartition.get(i);
-            minorPartition.add(coordinators.get(i));
+            Coordinator coordinator = coordinators.get(i);
+            minorPartitionId.add(coordinator.getId());
+            minorPartition.add(coordinator);
             fullView.add(member.getIdentity());
             minorGroup.add(member);
             minorView.add(member.getIdentity());
+            minorWeavers.add(weavers.get(i));
         }
 
         log.info(String.format("Major partition %s, minor partition %s",
@@ -528,15 +556,17 @@ public class TestCluster {
     }
 
     /**
-     * Test the rebalancing of the system upon partitioning and reformation
+     * Test the rebalancing of the system upon partitioning and reformation.
+     * Bootstrap the cluster, create a number of channels. Partition the cluster
+     * and ensure that cluster stabilizes and fails over correctly. Reform the
+     * partion and ensure that the entire cluster is stable, but on the major
+     * partition is active. Activate the minor partition members, ensuring that
+     * the cluster rebalances and stabilizes.
      * 
      * @throws Exception
      */
     @Test
     public void testRebalancing() throws Exception {
-
-        CountDownLatch latchA = latch(majorGroup);
-        CountDownLatch latchB = latch(minorGroup);
 
         log.info("Bootstrapping the spindles");
         Coordinator coordinator = coordinators.get(coordinators.size() - 1);
@@ -549,13 +579,27 @@ public class TestCluster {
 
         int numOfChannels = 100;
         Switchboard master = memberContexts.get(memberContexts.size() - 1).getBean(Switchboard.class);
-        UUID[] channels = new UUID[numOfChannels];
+        ArrayList<UUID> channels = new ArrayList<UUID>();
         for (int i = 0; i < numOfChannels; i++) {
-            channels[i] = UUID.randomUUID();
-            log.info(String.format("Opening channel: %s", channels[i]));
+            UUID channel = new UUID(twister.nextLong(), twister.nextLong());
+            channels.add(channel);
+            log.info(String.format("Opening channel: %s", channel));
             master.ringCast(new Message(master.getId(), ChannelMessage.OPEN,
-                                        new Serializable[] { channels[i] }));
+                                        new Serializable[] { channel }));
         }
+
+        Thread.sleep(2000);
+
+        // Construct the hash ring that maps the channels to nodes
+        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+        for (Node node : fullPartitionId) {
+            ring.add(node, node.capacity);
+        }
+
+        assertChannelMappings(channels, weavers, ring);
+
+        CountDownLatch latchA = latch(majorGroup);
+        // CountDownLatch latchB = latch(minorGroup);
 
         log.info("Asymmetrically partitioning");
         controller.asymPartition(majorView);
@@ -576,7 +620,26 @@ public class TestCluster {
         assertPartitionActive(majorPartition);
 
         // The other partition should still be unstable.
-        assertEquals(minorGroup.size(), latchB.getCount());
+        // assertEquals(minorGroup.size(), latchB.getCount());
+
+        // Filter out all the channels with a primary and secondary on the minor partition
+        List<UUID> lostChannels = new ArrayList<UUID>();
+        for (UUID channel : channels) {
+            if (minorPartitionId.containsAll(ring.hash(point(channel), 2))) {
+                lostChannels.add(channel);
+            }
+        }
+        channels.removeAll(lostChannels);
+        assertFailoverChannelMappings(channels, majorPartitionId, majorWeavers,
+                                      ring);
+
+        for (UUID channel : lostChannels) {
+            for (Weaver weaver : majorWeavers) {
+                assertNull(String.format("%s should not be hosting lost channel %s",
+                                         weaver.getId(), channel),
+                           weaver.eventChannelFor(channel));
+            }
+        }
 
         // Rebalance the open channels across the major partition
         log.info("Initiating rebalance on majority partition");
@@ -588,11 +651,7 @@ public class TestCluster {
         assertPartitionStable(majorPartition);
 
         // reform
-        CountDownLatch latch = new CountDownLatch(fullPartition.size());
-        for (ControlNode node : fullPartition) {
-            node.latch = latch;
-            node.cardinality = fullPartition.size();
-        }
+        CountDownLatch latch = latch(fullPartition);
 
         // Clear the partition
         log.info("Reforming partition");
@@ -616,6 +675,19 @@ public class TestCluster {
         assertPartitionActive(majorPartition);
         assertPartitionInactive(minorPartition);
 
+        ring = new ConsistentHashFunction<Node>();
+        for (Node node : majorPartitionId) {
+            ring.add(node, node.capacity);
+        }
+        assertChannelMappings(channels, majorWeavers, ring);
+        for (UUID channel : lostChannels) {
+            for (Weaver weaver : majorWeavers) {
+                assertNull(String.format("%s should not be hosting lost channel %s",
+                                         weaver.getId(), channel),
+                           weaver.eventChannelFor(channel));
+            }
+        }
+
         log.info("Activating minor partition");
         // Now add the minor partition back into the active set
         ArrayList<Node> minorPartitionNodes = new ArrayList<Node>();
@@ -627,8 +699,22 @@ public class TestCluster {
         // Entire partition should be stable 
         assertPartitionStable(coordinators);
 
-        // Entire partition should be stable
+        // Entire partition should be active
         assertPartitionActive(coordinators);
+
+        // Everything should be back to normal
+        ring = new ConsistentHashFunction<Node>();
+        for (Node node : fullPartitionId) {
+            ring.add(node, node.capacity);
+        }
+        assertChannelMappings(channels, weavers, ring);
+        for (UUID channel : lostChannels) {
+            for (Weaver weaver : weavers) {
+                assertNull(String.format("%s should not be hosting lost channel %s",
+                                         weaver.getId(), channel),
+                           weaver.eventChannelFor(channel));
+            }
+        }
     }
 
     private List<AnnotationConfigApplicationContext> createMembers() {
@@ -703,5 +789,97 @@ public class TestCluster {
             member.cardinality = group.size();
         }
         return latch;
+    }
+
+    protected void assertChannelMappings(List<UUID> channels,
+                                         List<Weaver> weaverGroup,
+                                         ConsistentHashFunction<Node> ring) {
+        for (UUID channel : channels) {
+            List<Node> mapping = ring.hash(point(channel), 2);
+            Node primary = mapping.get(0);
+            Node mirror = mapping.get(1);
+            for (Weaver weaver : weaverGroup) {
+                if (primary.equals(weaver.getId())) {
+                    EventChannel eventChannel = weaver.eventChannelFor(channel);
+                    assertNotNull(String.format("%s should be the primary for %s, but doesn't host it",
+                                                primary, channel), eventChannel);
+                    assertTrue(String.format("%s should be the primary for %s, but is mirror",
+                                             primary, channel),
+                               eventChannel.isPrimary());
+                } else {
+                    if (mirror.equals(weaver.getId())) {
+                        EventChannel eventChannel = weaver.eventChannelFor(channel);
+                        assertNotNull(String.format("%s should be the mirror for %s, but doesn't host it",
+                                                    mirror, channel),
+                                      eventChannel);
+                        assertTrue(String.format("%s should be the mirror for %s, but is primary",
+                                                 mirror, channel),
+                                   eventChannel.isMirror());
+                    } else {
+                        assertNull(String.format("%s claims to host %s, but isn't marked as primary or mirror",
+                                                 weaver.getId(), channel),
+                                   weaver.eventChannelFor(channel));
+                    }
+                }
+            }
+        }
+    }
+
+    protected void assertFailoverChannelMappings(List<UUID> channels,
+                                                 List<Node> idGroup,
+                                                 List<Weaver> weaverGroup,
+                                                 ConsistentHashFunction<Node> ring) {
+        for (UUID channel : channels) {
+            List<Node> mapping = ring.hash(point(channel), 2);
+            Node primary = mapping.get(0);
+            Node mirror = mapping.get(1);
+            for (Weaver weaver : weaverGroup) {
+                if (!idGroup.contains(primary)) {
+                    if (mirror.equals(weaver.getId())) {
+                        EventChannel eventChannel = weaver.eventChannelFor(channel);
+                        assertNotNull(String.format("%s should be the failed over primary for %s, but doesn't host it",
+                                                    mirror, channel),
+                                      eventChannel);
+                        assertTrue(String.format("%s should be the failed over primary for %s, but is mirror",
+                                                 mirror, channel),
+                                   eventChannel.isPrimary());
+                    }
+                } else if (!idGroup.contains(mirror)) {
+                    if (primary.equals(weaver.getId())) {
+                        EventChannel eventChannel = weaver.eventChannelFor(channel);
+                        assertNotNull(String.format("%s should remain the primary for %s, but doesn't host it",
+                                                    primary, channel),
+                                      eventChannel);
+                        assertTrue(String.format("%s should remain the primary for %s, but is mirror",
+                                                 primary, channel),
+                                   eventChannel.isPrimary());
+                    }
+                } else {
+                    if (primary.equals(weaver.getId())) {
+                        EventChannel eventChannel = weaver.eventChannelFor(channel);
+                        assertNotNull(String.format("%s should be the primary for %s, but doesn't host it",
+                                                    primary, channel),
+                                      eventChannel);
+                        assertTrue(String.format("%s should be the primary for %s, but is mirror",
+                                                 primary, channel),
+                                   eventChannel.isPrimary());
+                    } else {
+                        if (mirror.equals(weaver.getId())) {
+                            EventChannel eventChannel = weaver.eventChannelFor(channel);
+                            assertNotNull(String.format("%s should be the mirror for %s, but doesn't host it",
+                                                        mirror, channel),
+                                          eventChannel);
+                            assertTrue(String.format("%s should be the mirror for %s, but is primary",
+                                                     mirror, channel),
+                                       eventChannel.isMirror());
+                        } else {
+                            assertNull(String.format("%s claims to host %s, but isn't marked as primary or mirror",
+                                                     weaver.getId(), channel),
+                                       weaver.eventChannelFor(channel));
+                        }
+                    }
+                }
+            }
+        }
     }
 }

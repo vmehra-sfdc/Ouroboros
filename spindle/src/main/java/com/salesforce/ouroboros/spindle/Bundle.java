@@ -49,13 +49,13 @@ public interface Bundle {
     void closeReplicator(Node partnerId);
 
     /**
-     * Answer the created event channel corresponding to the channel id
+     * Answer the xeroxed event channel corresponding to the channel id
      * 
      * @param channelId
      *            - the id of the channel
      * @return the create EventChannel for this id
      */
-    EventChannel createEventChannelFor(UUID channelId);
+    EventChannel xeroxEventChannel(UUID channelId);
 
     /**
      * Answer the event channel corresponding to the channel id

@@ -61,19 +61,21 @@ public class Xerox implements CommunicationsHandler {
     private final XeroxContext        fsm               = new XeroxContext(this);
     private SocketChannelHandler      handler;
     private boolean                   inError           = false;
-    private final Node                node;
+    private final Node                to;
+    private final Node                from;
     private long                      position;
     private Rendezvous                rendezvous;
     private Deque<Segment>            segments;
     private long                      segmentSize;
     private final long                transferSize;
 
-    public Xerox(Node toNode) {
-        this(toNode, DEFAULT_TXFR_SIZE);
+    public Xerox(Node from, Node toNode) {
+        this(from, toNode, DEFAULT_TXFR_SIZE);
     }
 
-    public Xerox(Node toNode, int transferSize) {
-        node = toNode;
+    public Xerox(Node from, Node toNode, int transferSize) {
+        this.from = from;
+        to = toNode;
         this.transferSize = transferSize;
     }
 
@@ -112,7 +114,7 @@ public class Xerox implements CommunicationsHandler {
      * @return the node
      */
     public Node getNode() {
-        return node;
+        return to;
     }
 
     public XeroxState getState() {
@@ -182,13 +184,18 @@ public class Xerox implements CommunicationsHandler {
             } catch (BrokenBarrierException e) {
                 log.log(Level.SEVERE,
                         String.format("Rendezvous has already been met in xeroxing channel %s to %s",
-                                      currentChannel.getId(), node), e);
+                                      currentChannel.getId(), to), e);
             }
             fsm.channelsEmpty();
             return;
         }
         currentChannel = channels.pop();
         segments = currentChannel.getSegmentStack();
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Starting Xerox of %s from %s to %s, segments: %s",
+                                   currentChannel.getId(), from, to,
+                                   segments.size()));
+        }
         buffer.clear();
         buffer.putInt(MAGIC);
         buffer.putInt(segments.size());
@@ -218,6 +225,10 @@ public class Xerox implements CommunicationsHandler {
                     e);
             inError = true;
             return;
+        }
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Starting Xerox of segment %s from %s to %s",
+                                   currentSegment, from, to));
         }
         buffer.clear();
         buffer.putLong(MAGIC);
@@ -261,7 +272,7 @@ public class Xerox implements CommunicationsHandler {
 
     protected boolean writeSegmentHeader() {
         try {
-            if(handler.getChannel().write(buffer) < 0) {
+            if (handler.getChannel().write(buffer) < 0) {
                 if (log.isLoggable(Level.FINE)) {
                     log.fine("Closing channel");
                 }

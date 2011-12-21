@@ -61,6 +61,7 @@ public class TestXerox {
         SocketChannel socket = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(socket);
+        Node fromNode = new Node(0, 0, 0);
         Node node = new Node(0x1639, 0x1640, 0x1641);
         Rendezvous rendezvous = mock(Rendezvous.class);
         EventChannel channel = mock(EventChannel.class);
@@ -117,7 +118,7 @@ public class TestXerox {
         when(channel.getId()).thenReturn(id);
 
         int transferSize = 1024;
-        Xerox xerox = new Xerox(node, transferSize);
+        Xerox xerox = new Xerox(fromNode, node, transferSize);
         xerox.setRendezvous(rendezvous);
         xerox.addChannel(channel);
         assertEquals(XeroxFSM.Suspended, xerox.getState());

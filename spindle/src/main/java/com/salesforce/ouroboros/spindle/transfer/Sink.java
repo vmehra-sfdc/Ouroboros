@@ -224,7 +224,7 @@ public class Sink implements CommunicationsHandler {
             segmentCount = buffer.getInt();
             UUID channelId = new UUID(buffer.getLong(), buffer.getLong());
             try {
-                channel = bundle.createEventChannelFor(channelId);
+                channel = bundle.xeroxEventChannel(channelId);
             } catch (Throwable e) {
                 if (log.isLoggable(Level.WARNING)) {
                     log.log(Level.WARNING,
