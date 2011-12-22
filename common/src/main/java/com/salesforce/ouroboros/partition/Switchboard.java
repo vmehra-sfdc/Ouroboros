@@ -195,8 +195,8 @@ public class Switchboard {
             public Thread newThread(Runnable r) {
                 Thread daemon = new Thread(
                                            r,
-                                           String.format("Message processor for <%s>",
-                                                         member));
+                                           String.format("Message processor for %s",
+                                                         self));
                 daemon.setDaemon(true);
                 daemon.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
                     @Override
