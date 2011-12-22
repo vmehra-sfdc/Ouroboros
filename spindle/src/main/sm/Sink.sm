@@ -36,17 +36,41 @@
 %package com.salesforce.ouroboros.spindle.transfer
 %access public
 
-%start SinkFSM::Suspended
+%start SinkFSM::Initial
 %map SinkFSM
-%% 
+%%
+Initial {
+	accept
+		ReadChannelCount{}
+}
+ReadChannelCount
+Entry {
+	getChannelCount();
+}
+{
+		
+	finished
+		Suspended{}
+		
+	readReady
+		[!ctxt.readChannelCount()]
+		nil{
+			selectForRead();
+		}
+		
+	readReady
+		[ctxt.inError()]
+		Closed{}
+
+	readReady
+		Suspended{}
+}
+
 Suspended
 Entry {
 	selectForRead();
 }
 {
-	accept
-		ReadChannelHeader{}
-
 	readReady
 		ReadChannelHeader{}
 }
@@ -97,6 +121,9 @@ Entry {
 	readReady
 		CopySegment{}
 		
+	noMoreChannels
+		Ack{}
+		
 	noSegments
 		Suspended{}
 }
@@ -127,11 +154,37 @@ Entry {
 		ReadSegmentHeader{}
 }
 
+Ack
+Entry {
+	sendAck();
+}
+{
+	finished
+		Finished {}
+		
+	writeReady
+		[!ctxt.writeAck()]
+		nil{
+			selectForWrite();
+		}
+		
+	writeReady
+		[ctxt.inError()]
+		Closed{}
+
+	writeReady
+		Finished{}
+}
+
+Finished {
+	readReady
+		nil{}
+}
+
 Closed
 Entry {
 	close();
 }
-{
-}
+{}
  
 %%

@@ -11,6 +11,12 @@ digraph Sink {
         // States (Nodes)
         //
 
+        "SinkFSM::Initial"
+            [label="{Initial}"];
+
+        "SinkFSM::ReadChannelCount"
+            [label="{ReadChannelCount}"];
+
         "SinkFSM::Suspended"
             [label="{Suspended}"];
 
@@ -23,6 +29,12 @@ digraph Sink {
         "SinkFSM::CopySegment"
             [label="{CopySegment}"];
 
+        "SinkFSM::Ack"
+            [label="{Ack}"];
+
+        "SinkFSM::Finished"
+            [label="{Finished}"];
+
         "SinkFSM::Closed"
             [label="{Closed}"];
 
@@ -33,8 +45,17 @@ digraph Sink {
         // Transitions (Edges)
         //
 
-        "SinkFSM::Suspended" -> "SinkFSM::ReadChannelHeader"
+        "SinkFSM::Initial" -> "SinkFSM::ReadChannelCount"
             [label="accept/\l"];
+
+        "SinkFSM::ReadChannelCount" -> "SinkFSM::Suspended"
+            [label="finished/\l"];
+
+        "SinkFSM::ReadChannelCount" -> "SinkFSM::Closed"
+            [label="readReady/\l"];
+
+        "SinkFSM::ReadChannelCount" -> "SinkFSM::Suspended"
+            [label="readReady/\l"];
 
         "SinkFSM::Suspended" -> "SinkFSM::ReadChannelHeader"
             [label="readReady/\l"];
@@ -60,6 +81,9 @@ digraph Sink {
         "SinkFSM::ReadSegmentHeader" -> "SinkFSM::CopySegment"
             [label="readReady/\l"];
 
+        "SinkFSM::ReadSegmentHeader" -> "SinkFSM::Ack"
+            [label="noMoreChannels/\l"];
+
         "SinkFSM::ReadSegmentHeader" -> "SinkFSM::Suspended"
             [label="noSegments/\l"];
 
@@ -75,7 +99,16 @@ digraph Sink {
         "SinkFSM::CopySegment" -> "SinkFSM::ReadSegmentHeader"
             [label="readReady/\l"];
 
-        "%start" -> "SinkFSM::Suspended"
+        "SinkFSM::Ack" -> "SinkFSM::Finished"
+            [label="finished/\l"];
+
+        "SinkFSM::Ack" -> "SinkFSM::Closed"
+            [label="writeReady/\l"];
+
+        "SinkFSM::Ack" -> "SinkFSM::Finished"
+            [label="writeReady/\l"];
+
+        "%start" -> "SinkFSM::Initial"
     }
 
 }

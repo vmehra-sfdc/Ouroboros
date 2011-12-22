@@ -123,7 +123,7 @@ public class Xerox implements CommunicationsHandler {
 
     @Override
     public void readReady() {
-        throw new UnsupportedOperationException();
+        fsm.readReady();
     }
 
     /**
@@ -137,6 +137,10 @@ public class Xerox implements CommunicationsHandler {
     @Override
     public void writeReady() {
         fsm.writeReady();
+    }
+
+    protected void cancelRendezvous() {
+        rendezvous.cancel();
     }
 
     protected boolean copy() {
@@ -179,13 +183,6 @@ public class Xerox implements CommunicationsHandler {
 
     protected void nextChannel() {
         if (channels.isEmpty()) {
-            try {
-                rendezvous.meet();
-            } catch (BrokenBarrierException e) {
-                log.log(Level.SEVERE,
-                        String.format("Rendezvous has already been met in xeroxing channel %s to %s",
-                                      currentChannel.getId(), to), e);
-            }
             fsm.channelsEmpty();
             return;
         }
@@ -243,6 +240,57 @@ public class Xerox implements CommunicationsHandler {
         }
     }
 
+    protected boolean readAck() {
+        try {
+            if (handler.getChannel().read(buffer) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
+        } catch (IOException e) {
+            log.log(Level.WARNING,
+                    String.format("Error reading acknowledgement on %s",
+                                  handler.getChannel()), e);
+            inError = true;
+            return false;
+        }
+        if (!buffer.hasRemaining()) {
+            buffer.flip();
+            if (buffer.getInt() != MAGIC) {
+                log.log(Level.SEVERE,
+                        String.format("Invalid acknowlegement from %s on %s",
+                                      to, from));
+                inError = true;
+                return false;
+            }
+            try {
+                rendezvous.meet();
+            } catch (BrokenBarrierException e) {
+                log.log(Level.SEVERE,
+                        String.format("Rendezvous has already been met in xeroxing %s to %s",
+                                      from, to), e);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    protected void receiveAck() {
+        buffer.clear();
+        buffer.limit(4); 
+        if (readAck()) {
+            fsm.finished();
+        } else {
+            handler.selectForRead();
+        }
+    }
+
+    protected void selectForRead() {
+        handler.selectForRead();
+    }
+
     protected void selectForWrite() {
         handler.selectForWrite();
     }
@@ -271,6 +319,36 @@ public class Xerox implements CommunicationsHandler {
     }
 
     protected boolean writeSegmentHeader() {
+        try {
+            if (handler.getChannel().write(buffer) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                inError = true;
+                return false;
+            }
+        } catch (IOException e) {
+            log.log(Level.WARNING,
+                    String.format("Error writing header for %s on %s",
+                                  currentSegment, handler.getChannel()), e);
+            inError = true;
+            return false;
+        }
+        return !buffer.hasRemaining();
+    }
+
+    protected void sendChannelCount() {
+        buffer.putInt(MAGIC);
+        buffer.putInt(channels.size());
+        buffer.flip();
+        if (writeChannelCount()) {
+            fsm.finished();
+        } else {
+            handler.selectForWrite();
+        }
+    }
+
+    protected boolean writeChannelCount() {
         try {
             if (handler.getChannel().write(buffer) < 0) {
                 if (log.isLoggable(Level.FINE)) {
