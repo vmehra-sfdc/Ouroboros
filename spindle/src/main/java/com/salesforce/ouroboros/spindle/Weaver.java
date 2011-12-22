@@ -438,12 +438,15 @@ public class Weaver implements Bundle {
                                                eventChannel.getId(), id,
                                                remappedMirror));
                     }
-                    Xerox xerox = xeroxes.get(remappedMirror);
-                    if (xerox == null) {
-                        xerox = new Xerox(id, remappedMirror);
-                        xeroxes.put(remappedMirror, xerox);
+                    xeroxTo(eventChannel, remappedMirror, xeroxes);
+                } else if (id.equals(remappedMirror)) {
+                    // Self becomes the new mirror
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
+                                               eventChannel.getId(), id));
+                        eventChannel.setPrimary();
                     }
-                    xerox.addChannel(eventChannel);
+                    xeroxTo(eventChannel, remappedPrimary, xeroxes);
                 } else {
                     // Xerox state to new primary and mirror
                     if (log.isLoggable(Level.INFO)) {
@@ -451,19 +454,8 @@ public class Weaver implements Bundle {
                                                eventChannel.getId(), id,
                                                remappedPrimary, remappedMirror));
                     }
-                    Xerox xerox = xeroxes.get(remappedPrimary);
-                    if (xerox == null) {
-                        xerox = new Xerox(id, remappedPrimary);
-                        xeroxes.put(remappedPrimary, xerox);
-                    }
-                    xerox.addChannel(eventChannel);
-
-                    xerox = xeroxes.get(remappedMirror);
-                    if (xerox == null) {
-                        xerox = new Xerox(id, remappedMirror);
-                        xeroxes.put(remappedMirror, xerox);
-                    }
-                    xerox.addChannel(eventChannel);
+                    xeroxTo(eventChannel, remappedPrimary, xeroxes);
+                    xeroxTo(eventChannel, remappedMirror, xeroxes);
                 }
             } else if (!id.equals(remappedPrimary)) {
                 // mirror is up
@@ -473,12 +465,7 @@ public class Weaver implements Bundle {
                                            eventChannel.getId(), id,
                                            remappedPrimary));
                 }
-                Xerox xerox = xeroxes.get(remappedPrimary);
-                if (xerox == null) {
-                    xerox = new Xerox(id, remappedPrimary);
-                    xeroxes.put(remappedPrimary, xerox);
-                }
-                xerox.addChannel(eventChannel);
+                xeroxTo(eventChannel, remappedPrimary, xeroxes);
             }
         } else if (deadMembers.contains(originalPrimary)) {
             assert id.equals(originalMirror);
@@ -492,12 +479,16 @@ public class Weaver implements Bundle {
                                            eventChannel.getId(), id,
                                            remappedPrimary));
                 }
-                Xerox xerox = xeroxes.get(remappedPrimary);
-                if (xerox == null) {
-                    xerox = new Xerox(id, remappedPrimary);
-                    xeroxes.put(remappedPrimary, xerox);
+                xeroxTo(eventChannel, remappedPrimary, xeroxes);
+            } else if (id.equals(remappedPrimary)) {
+                // Self becomes the new primary
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
+                                           eventChannel.getId(), id,
+                                           remappedMirror));
+                    eventChannel.setPrimary();
                 }
-                xerox.addChannel(eventChannel);
+                xeroxTo(eventChannel, remappedMirror, xeroxes);
             } else {
                 // Xerox state to the new primary and mirror
                 if (log.isLoggable(Level.INFO)) {
@@ -505,19 +496,8 @@ public class Weaver implements Bundle {
                                            eventChannel.getId(), id,
                                            remappedPrimary, remappedMirror));
                 }
-                Xerox xerox = xeroxes.get(remappedPrimary);
-                if (xerox == null) {
-                    xerox = new Xerox(id, remappedPrimary);
-                    xeroxes.put(remappedPrimary, xerox);
-                }
-                xerox.addChannel(eventChannel);
-
-                xerox = xeroxes.get(remappedMirror);
-                if (xerox == null) {
-                    xerox = new Xerox(id, remappedMirror);
-                    xeroxes.put(remappedMirror, xerox);
-                }
-                xerox.addChannel(eventChannel);
+                xeroxTo(eventChannel, remappedPrimary, xeroxes);
+                xeroxTo(eventChannel, remappedMirror, xeroxes);
             }
         } else if (!id.equals(remappedMirror)) {
             assert id.equals(originalMirror);
@@ -527,13 +507,18 @@ public class Weaver implements Bundle {
                 log.info(String.format("Rebalancing for %s from old mirror %s to new mirror %s",
                                        eventChannel.getId(), id, remappedMirror));
             }
-            Xerox xerox = xeroxes.get(remappedMirror);
-            if (xerox == null) {
-                xerox = new Xerox(id, remappedMirror);
-                xeroxes.put(remappedMirror, xerox);
-            }
-            xerox.addChannel(eventChannel);
+            xeroxTo(eventChannel, remappedMirror, xeroxes);
         }
+    }
+
+    protected void xeroxTo(EventChannel eventChannel, Node node,
+                           Map<Node, Xerox> xeroxes) {
+        Xerox xerox = xeroxes.get(node);
+        if (xerox == null) {
+            xerox = new Xerox(id, node);
+            xeroxes.put(node, xerox);
+        }
+        xerox.addChannel(eventChannel);
     }
 
     public void setRing(ConsistentHashFunction<Node> nextRing) {
@@ -605,8 +590,16 @@ public class Weaver implements Bundle {
             EventChannel channel = entry.getValue();
             if (channel != null) {
                 if (pair[0].equals(id)) {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Rebalancing, %s is primary for channel %s",
+                                               id, channelId));
+                    }
                     channel.setPrimary();
                 } else if (pair[1].equals(id)) {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Rebalancing, %s is mirror for channel %s",
+                                               id, channelId));
+                    }
                     channel.setMirror();
                 } else {
                     if (log.isLoggable(Level.INFO)) {

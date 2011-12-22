@@ -630,9 +630,11 @@ public class TestCluster {
             }
         }
         channels.removeAll(lostChannels);
+
         assertFailoverChannelMappings(channels, majorPartitionId, majorWeavers,
                                       ring);
 
+        // verify lost channels aren't hosted on the major partition
         for (UUID channel : lostChannels) {
             for (Weaver weaver : majorWeavers) {
                 assertNull(String.format("%s should not be hosting lost channel %s",
@@ -680,6 +682,8 @@ public class TestCluster {
             ring.add(node, node.capacity);
         }
         assertChannelMappings(channels, majorWeavers, ring);
+
+        // validate the lost channels aren't hosted on the major partition members
         for (UUID channel : lostChannels) {
             for (Weaver weaver : majorWeavers) {
                 assertNull(String.format("%s should not be hosting lost channel %s",
@@ -708,6 +712,8 @@ public class TestCluster {
             ring.add(node, node.capacity);
         }
         assertChannelMappings(channels, weavers, ring);
+
+        // validate lost channels aren't mapped on the partition members
         for (UUID channel : lostChannels) {
             for (Weaver weaver : weavers) {
                 assertNull(String.format("%s should not be hosting lost channel %s",
