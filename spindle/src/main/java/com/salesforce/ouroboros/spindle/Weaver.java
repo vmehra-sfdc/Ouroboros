@@ -448,38 +448,28 @@ public class Weaver implements Bundle {
                 if (id.equals(remappedPrimary)) {
                     // if self is still the primary
                     // Xerox state to the new mirror
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Rebalancing for %s from primary %s to new mirror %s",
-                                               eventChannel.getId(), id,
-                                               remappedMirror));
-                    }
+                    infoLog("Rebalancing for %s from primary %s to new mirror %s",
+                            eventChannel.getId(), id, remappedMirror);
                     xeroxTo(eventChannel, remappedMirror, xeroxes);
                 } else if (id.equals(remappedMirror)) {
                     // Self becomes the new mirror
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
-                                               eventChannel.getId(), id));
-                        eventChannel.setPrimary();
-                    }
+                    infoLog("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
+                            eventChannel.getId(), id);
+                    eventChannel.setPrimary();
                     xeroxTo(eventChannel, remappedPrimary, xeroxes);
                 } else {
                     // Xerox state to new primary and mirror
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Rebalancing for %s from old primary %s to new primary %s, new mirror %s",
-                                               eventChannel.getId(), id,
-                                               remappedPrimary, remappedMirror));
-                    }
+                    infoLog("Rebalancing for %s from old primary %s to new primary %s, new mirror %s",
+                            eventChannel.getId(), id, remappedPrimary,
+                            remappedMirror);
                     xeroxTo(eventChannel, remappedPrimary, xeroxes);
                     xeroxTo(eventChannel, remappedMirror, xeroxes);
                 }
             } else if (!id.equals(remappedPrimary)) {
                 // mirror is up
                 // Xerox state to the new primary
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Rebalancing for %s from old primary %s to new primary %s",
-                                           eventChannel.getId(), id,
-                                           remappedPrimary));
-                }
+                infoLog("Rebalancing for %s from old primary %s to new primary %s",
+                        eventChannel.getId(), id, remappedPrimary);
                 xeroxTo(eventChannel, remappedPrimary, xeroxes);
                 if (id.equals(remappedMirror)) {
                     eventChannel.setMirror();
@@ -492,28 +482,20 @@ public class Weaver implements Bundle {
             if (id.equals(remappedMirror)) {
                 // Self is still the mirror
                 // Xerox state to the new primary
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Rebalancing for %s from mirror %s to new primary %s",
-                                           eventChannel.getId(), id,
-                                           remappedPrimary));
-                }
+                infoLog("Rebalancing for %s from mirror %s to new primary %s",
+                        eventChannel.getId(), id, remappedPrimary);
                 xeroxTo(eventChannel, remappedPrimary, xeroxes);
             } else if (id.equals(remappedPrimary)) {
                 // Self becomes the new primary
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
-                                           eventChannel.getId(), id,
-                                           remappedMirror));
-                }
+                infoLog("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
+                        eventChannel.getId(), id, remappedMirror);
                 eventChannel.setPrimary();
                 xeroxTo(eventChannel, remappedMirror, xeroxes);
             } else {
                 // Xerox state to the new primary and mirror
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s",
-                                           eventChannel.getId(), id,
-                                           remappedPrimary, remappedMirror));
-                }
+                infoLog("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s",
+                        eventChannel.getId(), id, remappedPrimary,
+                        remappedMirror);
                 xeroxTo(eventChannel, remappedPrimary, xeroxes);
                 xeroxTo(eventChannel, remappedMirror, xeroxes);
             }
@@ -522,10 +504,8 @@ public class Weaver implements Bundle {
             assert id.equals(originalMirror);
             // primary is up
             // Xerox state to the new mirror
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Rebalancing for %s from old mirror %s to new mirror %s",
-                                       eventChannel.getId(), id, remappedMirror));
-            }
+            infoLog("Rebalancing for %s from old mirror %s to new mirror %s",
+                    eventChannel.getId(), id, remappedMirror);
             xeroxTo(eventChannel, remappedMirror, xeroxes);
         }
     }
@@ -628,5 +608,12 @@ public class Weaver implements Bundle {
      */
     public void setNextRing(ConsistentHashFunction<Node> ring) {
         nextRing = ring;
+    }
+
+    private void infoLog(String logString, Object... args) {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Rebalancing for %s from primary %s to new mirror %s",
+                                   args));
+        }
     }
 }
