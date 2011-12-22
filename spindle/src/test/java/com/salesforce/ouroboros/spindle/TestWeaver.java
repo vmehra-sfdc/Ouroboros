@@ -218,7 +218,8 @@ public class TestWeaver {
         ConsistentHashFunction<Node> newRing = ring.clone();
         newRing.remove(weaver.getReplicationPair(primary)[1]);
         newRing.remove(weaver.getReplicationPair(mirror)[0]);
-        Map<UUID, Node[][]> remapped = weaver.remap(newRing);
+        weaver.setNextRing(newRing);
+        Map<UUID, Node[][]> remapped = weaver.remap();
         assertNotNull(remapped);
         assertEquals(2, remapped.size());
         assertNotNull(remapped.get(primary));

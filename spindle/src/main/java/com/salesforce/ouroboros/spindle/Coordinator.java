@@ -80,7 +80,6 @@ public class Coordinator implements Member {
     private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
     private Node[]                              joiningMembers  = new Node[0];
     private final SortedSet<Node>               nextMembership  = new ConcurrentSkipListSet<Node>();
-    private ConsistentHashFunction<Node>        nextRing;
     private Rendezvous                          rendezvous;
     private final Node                          self;
     private final Switchboard                   switchboard;
@@ -251,6 +250,9 @@ public class Coordinator implements Member {
                 rebalance((Node[]) arguments[0]);
                 break;
             case INITIATE_REBALANCE:
+                rebalance();
+                break;
+            case TAKEOVER:
                 rebalanced();
                 break;
             case REBALANCE_COMPLETE:
@@ -457,7 +459,7 @@ public class Coordinator implements Member {
         for (Node node : joiningMembers) {
             newRing.add(node, node.capacity);
         }
-        nextRing = newRing;
+        weaver.setNextRing(newRing);
     }
 
     protected void cleanUp() {
@@ -465,7 +467,7 @@ public class Coordinator implements Member {
             rendezvous.cancel();
             rendezvous = null;
         }
-        nextRing = null;
+        weaver.setNextRing(null);
         tally.set(0);
         joiningMembers = new Node[0];
         nextMembership.clear();
@@ -479,8 +481,7 @@ public class Coordinator implements Member {
      * Commit the calculated next ring as the current weaver ring
      */
     protected void commitNextRing() {
-        weaver.commitRing(nextRing);
-        nextRing = null;
+        weaver.commitRing();
     }
 
     /**
@@ -544,9 +545,7 @@ public class Coordinator implements Member {
      * Coordinate the takeover of the completion of the rebalancing
      */
     protected void coordinateTakeover() {
-        rendezvous = null;
-        switchboard.ringCast(new Message(self,
-                                         RebalanceMessage.INITIATE_REBALANCE));
+        switchboard.ringCast(new Message(self, RebalanceMessage.TAKEOVER));
     }
 
     /**
@@ -706,7 +705,7 @@ public class Coordinator implements Member {
      * Rebalance the weaver process group.
      */
     protected void rebalance() {
-        rebalance(weaver.remap(nextRing), switchboard.getDeadMembers());
+        rebalance(weaver.remap(), switchboard.getDeadMembers());
     }
 
     /**
@@ -885,6 +884,12 @@ public class Coordinator implements Member {
      *            - the updated consistent hash function
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
-        nextRing = ring;
+        weaver.setNextRing(ring);
+    }
+
+    protected void rebalancePrepared() {
+        rendezvous = null;
+        switchboard.ringCast(new Message(self,
+                                         RebalanceMessage.INITIATE_REBALANCE));
     }
 }

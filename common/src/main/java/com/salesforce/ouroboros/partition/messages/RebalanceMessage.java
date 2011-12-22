@@ -38,7 +38,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * 
  */
 public enum RebalanceMessage implements MemberDispatch {
-    INITIATE_REBALANCE, PREPARE_FOR_REBALANCE, REBALANCE_COMPLETE;
+    INITIATE_REBALANCE, PREPARE_FOR_REBALANCE, TAKEOVER, REBALANCE_COMPLETE;
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
