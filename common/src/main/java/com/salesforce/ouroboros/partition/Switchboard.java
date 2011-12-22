@@ -202,8 +202,8 @@ public class Switchboard {
                     @Override
                     public void uncaughtException(Thread t, Throwable e) {
                         log.log(Level.SEVERE,
-                                "Uncaught exception on message processing thread",
-                                e);
+                                String.format("Uncaught exception on message processing thread on %s",
+                                              self), e);
                     }
                 });
                 return daemon;
