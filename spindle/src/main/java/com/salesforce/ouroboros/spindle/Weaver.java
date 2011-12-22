@@ -455,7 +455,7 @@ public class Weaver implements Bundle {
                     // Self becomes the new mirror
                     infoLog("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
                             eventChannel.getId(), id);
-                    eventChannel.setPrimary();
+                    eventChannel.setMirror();
                     xeroxTo(eventChannel, remappedPrimary, xeroxes);
                 } else {
                     // Xerox state to new primary and mirror
