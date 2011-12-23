@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=6>
+        <th colspan=8>
           Transition
         </th>
       </tr>
@@ -36,10 +36,16 @@
           finished
         </th>
         <th>
+          noMoreChannels
+        </th>
+        <th>
           noSegments
         </th>
         <th>
           readReady
+        </th>
+        <th>
+          writeReady
         </th>
         <th>
           <b>Default</b>
@@ -47,12 +53,97 @@
       </tr>
       <tr>
         <td>
+          Initial
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReadChannelCount
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReadChannelCount
+        </td>
+        <td>
+          <pre>
+getChannelCount();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Suspended
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.readChannelCount()]
+  ReadChannelCount
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Suspended
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
           Suspended
         </td>
         <td>
           <pre>
-selectForRead();
+    selectForRead();
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -63,16 +154,6 @@ selectForRead();
           </pre>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  ReadChannelHeader
-  {}
-          </pre>
         </td>
         <td>
         </td>
@@ -83,7 +164,7 @@ selectForRead();
         </td>
         <td>
           <pre>
-nextChannel();
+    nextChannel();
           </pre>
         </td>
         <td>
@@ -105,6 +186,8 @@ nextChannel();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [!ctxt.readChannelHeader()]
   ReadChannelHeader
@@ -119,6 +202,8 @@ nextChannel();
   ReadSegmentHeader
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -146,6 +231,12 @@ nextChannel();
         </td>
         <td>
           <pre>
+  Ack
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
   Suspended
   {}
           </pre>
@@ -165,6 +256,8 @@ nextChannel();
   CopySegment
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -193,6 +286,8 @@ nextChannel();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [ctxt.isLastSegment()]
   Suspended
@@ -214,6 +309,83 @@ nextChannel();
         </td>
         <td>
         </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Ack
+        </td>
+        <td>
+          <pre>
+    sendAck();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Finished
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.writeAck()]
+  Ack
+  {
+    selectForWrite();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Finished
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Finished
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Finished
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -223,6 +395,10 @@ nextChannel();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>

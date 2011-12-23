@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=6>
+        <th colspan=7>
           Transition
         </th>
       </tr>
@@ -39,6 +39,9 @@
           initiateCopy
         </th>
         <th>
+          readReady
+        </th>
+        <th>
           writeReady
         </th>
         <th>
@@ -47,7 +50,39 @@
       </tr>
       <tr>
         <td>
-          Suspended
+          Initial
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  WriteChannelCount
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          WriteChannelCount
+        </td>
+        <td>
+          <pre>
+sendChannelCount();
+          </pre>
         </td>
         <td>
         </td>
@@ -66,6 +101,50 @@
         <td>
         </td>
         <td>
+          <pre>
+[!ctxt.writeChannelCount()]
+  WriteChannelCount
+  {
+    selectForWrite();
+  }
+
+[ctxt.inError()]
+  Error
+  {}
+
+  Suspended
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Suspended
+        </td>
+        <td>
+          <pre>
+    selectForWrite();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  WriteChannelHeader
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -76,7 +155,7 @@
         </td>
         <td>
           <pre>
-nextChannel();
+    nextChannel();
           </pre>
         </td>
         <td>
@@ -98,6 +177,8 @@ nextChannel();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [!ctxt.writeChannelHeader()]
   WriteChannelHeader
@@ -106,7 +187,7 @@ nextChannel();
   }
 
 [ctxt.inError()]
-  Closed
+  Error
   {}
 
   WriteSegmentHeader
@@ -144,6 +225,8 @@ nextChannel();
           </pre>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [!ctxt.writeSegmentHeader()]
   WriteSegmentHeader
@@ -152,7 +235,7 @@ nextChannel();
   }
 
 [ctxt.inError()]
-  Closed
+  Error
   {}
 
   CopySegment
@@ -186,6 +269,8 @@ nextChannel();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [!ctxt.copy()]
   CopySegment
@@ -194,7 +279,7 @@ nextChannel();
   }
 
 [ctxt.inError()]
-  Closed
+  Error
   {}
 
   WriteSegmentHeader
@@ -207,6 +292,59 @@ nextChannel();
       <tr>
         <td>
           Finished
+        </td>
+        <td>
+          <pre>
+    receiveAck();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Closed
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.readAck()]
+  Finished
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Error
+  {}
+
+  Closed
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
+  Finished
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Error
+        </td>
+        <td>
+          <pre>
+    cancelRendezvous();
+          </pre>
         </td>
         <td>
         </td>
@@ -233,6 +371,8 @@ nextChannel();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>

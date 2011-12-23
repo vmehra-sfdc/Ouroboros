@@ -36,11 +36,42 @@
 %package com.salesforce.ouroboros.spindle.transfer
 %access public
 
-%start XeroxFSM::Suspended
+%start XeroxFSM::Initial
 %map XeroxFSM
 %% 
-Suspended {
+Initial {
 	connect
+		WriteChannelCount{}
+}
+
+WriteChannelCount
+Entry {
+	sendChannelCount();
+}
+{
+	finished
+		WriteChannelHeader{}
+		
+	writeReady
+		[!ctxt.writeChannelCount()]
+		nil {
+			selectForWrite();
+		}
+		
+	writeReady
+		[ctxt.inError()]
+		Error{}
+		
+	writeReady
+		Suspended{}
+}
+
+Suspended
+Entry {
+	selectForWrite();
+}
+{
+	writeReady
 		WriteChannelHeader{}
 }
 
@@ -60,7 +91,7 @@ Entry{
 		
 	writeReady
 		[ctxt.inError()]
-		Closed{}
+		Error{}
 		
 	writeReady
 		WriteSegmentHeader{}
@@ -83,7 +114,7 @@ Entry {
 		
 	writeReady
 		[ctxt.inError()]
-		Closed{}
+		Error{}
 		
 	writeReady
 		CopySegment{
@@ -114,19 +145,46 @@ Entry{
 		
 	writeReady
 		[ctxt.inError()]
-		Closed{}
+		Error{}
 		
 	writeReady
 		WriteSegmentHeader{}
 }
 
-Finished {
+Finished
+Entry {
+	receiveAck();
 }
+{
+	finished
+		Closed{}
+		
+	readReady
+		[!ctxt.readAck()]
+		nil {
+			selectForRead();
+		}
+	
+	readReady
+		[ctxt.inError()]
+		Error{}
+	
+	readReady 
+		Closed{}
+		
+	writeReady
+		nil{}
+}
+
+Error
+Entry {
+	cancelRendezvous();
+}
+{}
 
 Closed
 Entry {
 	close();
 }
-{
-}
+{}
 %%

@@ -116,12 +116,7 @@ Rebalancing{
 		Rebalance{}
 }
 
-Rebalance
-Entry {
-    rebalance();
-}
-{
-        
+Rebalance{
 	rebalanced
 		AwaitingTakeover{}
 		
@@ -181,10 +176,15 @@ Entry{
 }
 {
 	rebalance
-		nil{
-			rebalance();
-		}
+		Rebalance{}
 		
+}
+
+Rebalance
+Entry {
+	rebalancePrepared();
+}
+{
 	rebalanced
 		nil{}
 		
@@ -194,7 +194,6 @@ Entry{
 		
 	memberRebalanced
 		nil{}
-		
 }
 
 CoordinateTakeover

@@ -97,6 +97,7 @@ public class Weaver implements Bundle {
     private final ContactInformation                contactInfo;
     private final Node                              id;
     private final long                              maxSegmentSize;
+    private ConsistentHashFunction<Node>            nextRing;
     private final ServerSocketChannelHandler        replicationHandler;
     private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
     private final ConsistentHashFunction<File>      roots             = new ConsistentHashFunction<File>();
@@ -222,15 +223,29 @@ public class Weaver implements Bundle {
     }
 
     @Override
-    public EventChannel createEventChannelFor(UUID channel) {
-        // This node is the primary for the event channel
-        if (log.isLoggable(Level.INFO)) {
-            log.fine(String.format(" Weaver[%s] created a new channel for %s",
-                                   id, channel));
+    public EventChannel xeroxEventChannel(UUID channel) {
+        if (log.isLoggable(Level.FINE)) {
+            log.fine(String.format("%s created a new channel for %s", id,
+                                   channel));
         }
-        EventChannel ec = new EventChannel(channel, roots.hash(point(channel)),
-                                           maxSegmentSize);
-        channels.put(channel, ec);
+
+        List<Node> pair = nextRing.hash(point(channel), 2);
+        Role role;
+        Replicator replicator = null;
+        if (id.equals(pair.get(0))) {
+            role = Role.PRIMARY;
+            replicator = replicators.get(pair.get(0));
+            assert replicator == null : String.format("Replicator for %s is null on %s",
+                                                      channel, id);
+        } else {
+            role = Role.MIRROR;
+        }
+        EventChannel ec = new EventChannel(role, channel,
+                                           roots.hash(point(channel)),
+                                           maxSegmentSize, replicator);
+        EventChannel previous = channels.put(channel, ec);
+        assert previous == null : String.format("Xeroxed event channel %s is currently hosted on %s",
+                                                channel, id);
         return ec;
     }
 
@@ -257,21 +272,16 @@ public class Weaver implements Bundle {
             UUID channelId = entry.getKey();
             EventChannel channel = entry.getValue();
             Node[] pair = getReplicationPair(channelId);
-            if (deadMembers.contains(pair[0]) || deadMembers.contains(pair[1])) {
-                if (channel.isPrimary()) {
-                    // The mirror for this channel has died
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("%s is primary, mirror for %s has died, old mirror: %s",
-                                               id, channelId, pair[1]));
-                    }
-                } else {
-                    // This node is now the primary for the channel, xerox state to the new mirror
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("%s assuming primary role for: %s, old primary: %s",
-                                               id, channelId, pair[1]));
-                    }
-                    channel.setPrimary();
+            if (!id.equals(pair[0]) && deadMembers.contains(pair[0])
+                && channel != null) {
+                assert channel.isMirror() : String.format("%s thinks it is the primary for % when it should be the mirror",
+                                                          id, channel.getId());
+                // This node is now the primary for the channel, xerox state to the new mirror
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("%s assuming primary role for: %s, old primary: %s",
+                                           id, channelId, pair[0]));
                 }
+                channel.setPrimary();
             }
         }
     }
@@ -353,7 +363,7 @@ public class Weaver implements Bundle {
             return;
         }
         if (log.isLoggable(Level.INFO)) {
-            log.fine(String.format(" Weaver[%s] is the mirror for the new subscription %s",
+            log.info(String.format(" %s is the mirror for the new subscription %s",
                                    id, channel));
         }
         channels.put(channel,
@@ -376,7 +386,7 @@ public class Weaver implements Bundle {
         }
         // This node is the primary for the event channel
         if (log.isLoggable(Level.INFO)) {
-            log.fine(String.format(" Weaver[%s] is the primary for the new subscription %s",
+            log.info(String.format("%s is the primary for the new subscription %s",
                                    id, channel));
         }
         Replicator replicator = null;
@@ -425,98 +435,89 @@ public class Weaver implements Bundle {
      *            responsible for the channel
      */
     public void rebalance(Map<Node, Xerox> xeroxes, UUID channel,
-                          Node[] originalPair, Node[] remappedPair,
+                          Node originalPrimary, Node originalMirror,
+                          Node remappedPrimary, Node remappedMirror,
                           Collection<Node> deadMembers) {
         EventChannel eventChannel = channels.get(channel);
         assert eventChannel != null : String.format("The event channel to rebalance does not exist: %s",
                                                     channel);
-        if (eventChannel.isPrimary()) {
+        if (id.equals(originalPrimary)) {
             // self is the primary
-            if (deadMembers.contains(originalPair[1])) {
+            if (deadMembers.contains(originalMirror)) {
                 // mirror is down
-                if (id.equals(remappedPair[0])) {
+                if (id.equals(remappedPrimary)) {
+                    // if self is still the primary
                     // Xerox state to the new mirror
-                    Xerox xerox = xeroxes.get(remappedPair[1]);
-                    if (xerox == null) {
-                        xerox = new Xerox(remappedPair[1]);
-                        xeroxes.put(remappedPair[1], xerox);
-                    }
-                    xerox.addChannel(eventChannel);
-                    return;
+                    infoLog("Rebalancing for %s from primary %s to new mirror %s",
+                            eventChannel.getId(), id, remappedMirror);
+                    xeroxTo(eventChannel, remappedMirror, xeroxes);
+                } else if (id.equals(remappedMirror)) {
+                    // Self becomes the new mirror
+                    infoLog("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
+                            eventChannel.getId(), id);
+                    eventChannel.setMirror();
+                    xeroxTo(eventChannel, remappedPrimary, xeroxes);
+                } else {
+                    // Xerox state to new primary and mirror
+                    infoLog("Rebalancing for %s from old primary %s to new primary %s, new mirror %s",
+                            eventChannel.getId(), id, remappedPrimary,
+                            remappedMirror);
+                    xeroxTo(eventChannel, remappedPrimary, xeroxes);
+                    xeroxTo(eventChannel, remappedMirror, xeroxes);
                 }
-                // Xerox state to new primary and mirror
-                Xerox xerox = xeroxes.get(remappedPair[0]);
-                if (xerox == null) {
-                    xerox = new Xerox(remappedPair[0]);
-                    xeroxes.put(remappedPair[0], xerox);
-                }
-                xerox.addChannel(eventChannel);
-
-                xerox = xeroxes.get(remappedPair[1]);
-                if (xerox == null) {
-                    xerox = new Xerox(remappedPair[1]);
-                    xeroxes.put(remappedPair[1], xerox);
-                }
-                xerox.addChannel(eventChannel);
-                return;
-            }
-            // mirror is up
-            if (!id.equals(remappedPair[0])) {
+            } else if (!id.equals(remappedPrimary)) {
+                // mirror is up
                 // Xerox state to the new primary
-                Xerox xerox = xeroxes.get(remappedPair[0]);
-                if (xerox == null) {
-                    xerox = new Xerox(remappedPair[0]);
-                    xeroxes.put(remappedPair[0], xerox);
+                infoLog("Rebalancing for %s from old primary %s to new primary %s",
+                        eventChannel.getId(), id, remappedPrimary);
+                xeroxTo(eventChannel, remappedPrimary, xeroxes);
+                if (id.equals(remappedMirror)) {
+                    eventChannel.setMirror();
                 }
-                xerox.addChannel(eventChannel);
-                return;
             }
-
-            return; // Nothing to do
-        }
-
-        // self is the secondary
-        if (deadMembers.contains(originalPair[0])) {
+        } else if (deadMembers.contains(originalPrimary)) {
+            assert id.equals(originalMirror);
+            // self is the secondary
             // primary is down
-            if (id.equals(remappedPair[1])) {
+            if (id.equals(remappedMirror)) {
+                // Self is still the mirror
                 // Xerox state to the new primary
-                Xerox xerox = xeroxes.get(remappedPair[0]);
-                if (xerox == null) {
-                    xerox = new Xerox(remappedPair[0]);
-                    xeroxes.put(remappedPair[0], xerox);
-                }
-                xerox.addChannel(eventChannel);
-                return;
+                infoLog("Rebalancing for %s from mirror %s to new primary %s",
+                        eventChannel.getId(), id, remappedPrimary);
+                xeroxTo(eventChannel, remappedPrimary, xeroxes);
+            } else if (id.equals(remappedPrimary)) {
+                // Self becomes the new primary
+                infoLog("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
+                        eventChannel.getId(), id, remappedMirror);
+                eventChannel.setPrimary();
+                xeroxTo(eventChannel, remappedMirror, xeroxes);
+            } else {
+                // Xerox state to the new primary and mirror
+                infoLog("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s",
+                        eventChannel.getId(), id, remappedPrimary,
+                        remappedMirror);
+                xeroxTo(eventChannel, remappedPrimary, xeroxes);
+                xeroxTo(eventChannel, remappedMirror, xeroxes);
             }
-            // Xerox state to the new primary and mirror
-            Xerox xerox = xeroxes.get(remappedPair[0]);
-            if (xerox == null) {
-                xerox = new Xerox(remappedPair[0]);
-                xeroxes.put(remappedPair[0], xerox);
-            }
-            xerox.addChannel(eventChannel);
-
-            xerox = xeroxes.get(remappedPair[1]);
-            if (xerox == null) {
-                xerox = new Xerox(remappedPair[1]);
-                xeroxes.put(remappedPair[1], xerox);
-            }
-            xerox.addChannel(eventChannel);
-            return;
-        }
-
-        // primary is up
-        if (!id.equals(remappedPair[1])) {
+        } else if (!id.equals(remappedMirror)
+                   && !remappedMirror.equals(originalPrimary)) {
+            assert id.equals(originalMirror);
+            // primary is up
             // Xerox state to the new mirror
-
-            Xerox xerox = xeroxes.get(remappedPair[1]);
-            if (xerox == null) {
-                xerox = new Xerox(remappedPair[1]);
-                xeroxes.put(remappedPair[1], xerox);
-            }
-            xerox.addChannel(eventChannel);
+            infoLog("Rebalancing for %s from old mirror %s to new mirror %s",
+                    eventChannel.getId(), id, remappedMirror);
+            xeroxTo(eventChannel, remappedMirror, xeroxes);
         }
-        // nothing to do
+    }
+
+    protected void xeroxTo(EventChannel eventChannel, Node node,
+                           Map<Node, Xerox> xeroxes) {
+        Xerox xerox = xeroxes.get(node);
+        if (xerox == null) {
+            xerox = new Xerox(id, node);
+            xeroxes.put(node, xerox);
+        }
+        xerox.addChannel(eventChannel);
     }
 
     public void setRing(ConsistentHashFunction<Node> nextRing) {
@@ -546,7 +547,7 @@ public class Weaver implements Bundle {
 
     @Override
     public String toString() {
-        return String.format("Weaver[%s], spindle endpoint: %s, replicator endpoint: %s",
+        return String.format("Weaver %s, spindle endpoint: %s, replicator endpoint: %s",
                              id, spindleHandler.getLocalAddress(),
                              replicationHandler.getLocalAddress());
     }
@@ -559,7 +560,7 @@ public class Weaver implements Bundle {
      * @return the remapping of channels hosted on this node that have changed
      *         their primary or mirror in the new hash ring
      */
-    protected Map<UUID, Node[][]> remap(ConsistentHashFunction<Node> nextRing) {
+    protected Map<UUID, Node[][]> remap() {
         Map<UUID, Node[][]> remapped = new HashMap<UUID, Node[][]>();
         for (UUID channel : channels.keySet()) {
             long channelPoint = point(channel);
@@ -578,5 +579,41 @@ public class Weaver implements Bundle {
             }
         }
         return remapped;
+    }
+
+    public void commitRing() {
+        weaverRing = nextRing;
+        for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
+            UUID channelId = entry.getKey();
+            Node[] pair = getReplicationPair(channelId);
+            EventChannel channel = entry.getValue();
+            if (channel != null) {
+                if (!pair[0].equals(id) && !pair[1].equals(id)) {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Rebalancing, closing channel %s on %s",
+                                               channelId, id));
+                    }
+                    channels.remove(channelId);
+                    channel.close();
+                }
+            }
+        }
+    }
+
+    /**
+     * Set the consistent hash function for the next weaver processs ring.
+     * 
+     * @param ring
+     *            - the updated consistent hash function
+     */
+    public void setNextRing(ConsistentHashFunction<Node> ring) {
+        nextRing = ring;
+    }
+
+    private void infoLog(String logString, Object... args) {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Rebalancing for %s from primary %s to new mirror %s",
+                                   args));
+        }
     }
 }

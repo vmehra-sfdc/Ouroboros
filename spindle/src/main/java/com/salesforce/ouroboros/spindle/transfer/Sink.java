@@ -62,6 +62,7 @@ public class Sink implements CommunicationsHandler {
     private SocketChannelHandler handler;
     private int                  segmentCount;
     private long                 segmentSize;
+    private int                  channelCount;
 
     public Sink(Bundle bundle) {
         this.bundle = bundle;
@@ -105,7 +106,7 @@ public class Sink implements CommunicationsHandler {
 
     @Override
     public void writeReady() {
-        throw new UnsupportedOperationException();
+        fsm.writeReady();
     }
 
     protected void close() {
@@ -173,7 +174,11 @@ public class Sink implements CommunicationsHandler {
 
     protected void nextSegment() {
         if (segmentCount == 0) {
-            fsm.noSegments();
+            if (channelCount == 0) {
+                fsm.noMoreChannels();
+            } else {
+                fsm.noSegments();
+            }
             return;
         }
         segmentCount--;
@@ -224,7 +229,7 @@ public class Sink implements CommunicationsHandler {
             segmentCount = buffer.getInt();
             UUID channelId = new UUID(buffer.getLong(), buffer.getLong());
             try {
-                channel = bundle.createEventChannelFor(channelId);
+                channel = bundle.xeroxEventChannel(channelId);
             } catch (Throwable e) {
                 if (log.isLoggable(Level.WARNING)) {
                     log.log(Level.WARNING,
@@ -237,6 +242,7 @@ public class Sink implements CommunicationsHandler {
                 log.info(String.format("Sink started for channel %s on %s",
                                        channelId, bundle.getId()));
             }
+            channelCount--;
             return true;
         }
         return false;
@@ -244,7 +250,7 @@ public class Sink implements CommunicationsHandler {
 
     protected boolean readSegmentHeader() {
         try {
-            if (handler.getChannel().read(buffer) < 0) { 
+            if (handler.getChannel().read(buffer) < 0) {
                 if (log.isLoggable(Level.FINE)) {
                     log.fine("Closing channel");
                 }
@@ -295,5 +301,102 @@ public class Sink implements CommunicationsHandler {
 
     protected void selectForRead() {
         handler.selectForRead();
+    }
+
+    protected void getChannelCount() {
+        buffer.limit(8);
+        if (readChannelCount()) {
+            fsm.finished();
+        } else {
+            handler.selectForRead();
+        }
+    }
+
+    protected boolean readChannelCount() {
+        try {
+            if (handler.getChannel().read(buffer) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                error = true;
+                return false;
+            }
+        } catch (ClosedChannelException e) {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine("Closing channel");
+            }
+            error = true;
+            return false;
+        } catch (IOException e) {
+            error = true;
+            if (log.isLoggable(Level.WARNING)) {
+                log.log(Level.WARNING,
+                        String.format("Error reading handshake on %s",
+                                      bundle.getId()), e);
+            }
+            return false;
+        }
+        if (!buffer.hasRemaining()) {
+            buffer.flip();
+            long magic = buffer.getInt();
+            if (MAGIC != magic) {
+                error = true;
+                if (log.isLoggable(Level.WARNING)) {
+                    log.warning(String.format("Invalid handshake magic value %s",
+                                              magic));
+                }
+                return false;
+            }
+            channelCount = buffer.getInt();
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Expecting %s channels", channelCount));
+            }
+            buffer.limit(BUFFER_SIZE);
+            buffer.clear();
+            return true;
+        }
+        return false;
+    }
+
+    protected void sendAck() {
+        buffer.clear();
+        buffer.putInt(MAGIC);
+        buffer.flip();
+        if (writeAck()) {
+            fsm.finished();
+        } else {
+            handler.selectForWrite();
+        }
+    }
+
+    protected boolean writeAck() {
+        try {
+            if (handler.getChannel().write(buffer) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                error = true;
+                return false;
+            }
+        } catch (ClosedChannelException e) {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine("Closing channel");
+            }
+            error = true;
+            return false;
+        } catch (IOException e) {
+            error = true;
+            if (log.isLoggable(Level.WARNING)) {
+                log.log(Level.WARNING,
+                        String.format("Error reading handshake on %s",
+                                      bundle.getId()), e);
+            }
+            return false;
+        }
+        return !buffer.hasRemaining();
+    }
+
+    protected void selectForWrite() {
+        handler.selectForWrite();
     }
 }
