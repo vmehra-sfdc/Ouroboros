@@ -19,6 +19,7 @@
     </licenses>
 
     <modules>
+        <module>smc</module>
         <module>smc-runtime</module>
         <module>smc-plugin</module>
         <module>common</module>
