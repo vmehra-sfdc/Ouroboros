@@ -457,10 +457,10 @@ public class SwitchboardFunctionalTest {
 
     static {
         String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
-                                         "24010");
+                                         "24110");
         testPort1 = Integer.parseInt(port);
         port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
-                                  "24020");
+                                  "24220");
         testPort2 = Integer.parseInt(port);
     }
 
@@ -473,6 +473,8 @@ public class SwitchboardFunctionalTest {
 
     @Before
     public void setUp() throws Exception {
+        testPort1++;
+        testPort2++;
         log.info("Setting up initial partition");
         initialLatch = new CountDownLatch(configs.length);
         controllerContext = new AnnotationConfigApplicationContext(

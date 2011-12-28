@@ -341,10 +341,10 @@ public class TestCluster {
 
     static {
         String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
-                                         "24010");
+                                         "24510");
         testPort1 = Integer.parseInt(port);
         port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
-                                  "24020");
+                                  "24320");
         testPort2 = Integer.parseInt(port);
     }
 
@@ -374,6 +374,8 @@ public class TestCluster {
 
     @Before
     public void starUp() throws Exception {
+        testPort1++;
+        testPort2++;
         log.info("Setting up initial partition");
         CountDownLatch initialLatch = new CountDownLatch(configs.length);
         controllerContext = new AnnotationConfigApplicationContext(

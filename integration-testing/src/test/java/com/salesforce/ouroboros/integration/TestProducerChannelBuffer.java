@@ -328,10 +328,10 @@ public class TestProducerChannelBuffer {
     private static final Logger        log = Logger.getLogger(TestProducerChannelBuffer.class.getCanonicalName());
     static {
         String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
-                                         "24010");
+                                         "24020");
         testPort1 = Integer.parseInt(port);
         port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
-                                  "24020");
+                                  "24040");
         testPort2 = Integer.parseInt(port);
     }
 
@@ -344,6 +344,8 @@ public class TestProducerChannelBuffer {
 
     @Before
     public void starUp() throws Exception {
+        testPort1++;
+        testPort2++;
         log.info("Setting up initial partition");
         initialLatch = new CountDownLatch(2);
         controllerContext = new AnnotationConfigApplicationContext(
