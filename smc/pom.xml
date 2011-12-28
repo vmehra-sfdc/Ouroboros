@@ -14,5 +14,6 @@
 	<modules>
 		<module>smc-plugin</module>
 		<module>smc-runtime</module>
+		<module>smc-extension</module>
 	</modules>
 </project>
