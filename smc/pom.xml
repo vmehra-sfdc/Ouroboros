@@ -7,8 +7,12 @@
 		<version>0.0.1-SNAPSHOT</version>
 		<relativePath>..</relativePath>
 	</parent>
-	<artifactId>smc</artifactId>
+	<artifactId>smc.app</artifactId>
 	<packaging>pom</packaging>
 	<name>State Machine Compiler</name>
 	<description>A state machine compiler for Java, with Maven plugin</description>
+	<modules>
+		<module>smc-plugin</module>
+		<module>smc-runtime</module>
+	</modules>
 </project>

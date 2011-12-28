@@ -4,7 +4,7 @@
 	xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
-		<artifactId>ouroboros.app</artifactId>
+		<artifactId>smc.app</artifactId>
 		<groupId>com.salesforce.ouroboros</groupId>
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
@@ -71,7 +71,7 @@
 						<phase>generate-resources</phase>
 						<configuration>
 							<target>
-								<unzip src="${basedir}/../lib/Smc.jar" dest="${basedir}/target/classes">
+								<unzip src="${basedir}/lib/Smc.jar" dest="${basedir}/target/classes">
 									<patternset>
 										<exclude name="META-INF/**" />
 									</patternset>
