@@ -19,7 +19,6 @@
     </licenses>
 
     <modules>
-        <module>smc</module>
         <module>common</module>
         <module>spindle</module>
         <module>producer</module>

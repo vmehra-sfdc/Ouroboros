@@ -44,7 +44,7 @@
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
-			<groupId>smc</groupId>
+			<groupId>com.salesforce.smc</groupId>
 			<artifactId>smc-runtime</artifactId>
 			<version>6.1.0-SNAPSHOT</version>
 			<type>jar</type>
@@ -55,7 +55,7 @@
 	<build>
 		<plugins>
 			<plugin>
-				<groupId>com.salesforce.ouroboros</groupId>
+				<groupId>com.salesforce.smc</groupId>
 				<artifactId>smc-plugin</artifactId>
 				<version>6.1.0-SNAPSHOT</version>
 				<executions>
@@ -92,7 +92,7 @@
 								<pluginExecution>
 									<pluginExecutionFilter>
 										<groupId>
-											com.salesforce.ouroboros
+											com.salesforce.smc
 										</groupId>
 										<artifactId>
 											smc-plugin
