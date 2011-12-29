@@ -184,7 +184,7 @@ public class Switchboard {
     private NodeIdSet                                view;
     private UUID                                     viewId;
     private final ConcurrentMap<UUID, AtomicInteger> votes           = new ConcurrentHashMap<UUID, AtomicInteger>();
-    private final AtomicInteger                      tally           = new AtomicInteger();
+    private final AtomicInteger                      tally           = new AtomicInteger(0);
 
     public Switchboard(Node node, Partition p, NoArgGenerator viewIdGenerator) {
         inboundGate.close();
