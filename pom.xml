@@ -1,64 +1,70 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <groupId>com.salesforce.ouroboros</groupId>
-    <artifactId>ouroboros.app</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <packaging>pom</packaging>
-    <name>Ouroboros Umbrella Module</name>
-    <description>The umbrella module for Ouroboros</description>
-    <url>https://github.com/sfdc-hhildebrand/Ouroboros</url>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.salesforce.ouroboros</groupId>
+	<artifactId>ouroboros.app</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
+	<name>Ouroboros Umbrella Module</name>
+	<description>The umbrella module for Ouroboros</description>
+	<url>https://github.com/sfdc-hhildebrand/Ouroboros</url>
 
-    <licenses>
-        <license>
-            <name>BSD 3-Clause License</name>
-            <url>http://www.opensource.org/licenses/BSD-3-Clause</url>
-            <distribution>repo</distribution>
-        </license>
-    </licenses>
+	<licenses>
+		<license>
+			<name>BSD 3-Clause License</name>
+			<url>http://www.opensource.org/licenses/BSD-3-Clause</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
 
-    <modules>
-        <module>common</module>
-        <module>spindle</module>
-        <module>producer</module>
-        <module>integration-testing</module>
-    </modules>
-    
-    <repositories>
-    	<repository>
-    		<id>Ouroboros-CI</id>
-    		<name>Ouroboros Jenkins Maven Repo</name>
-    		<url>http://107.20.139.173:8080/plugin/repository/everything/</url>
-    	</repository>
-    </repositories>
+	<modules>
+		<module>common</module>
+		<module>spindle</module>
+		<module>producer</module>
+		<module>integration-testing</module>
+	</modules>
 
-    <build>
-        <plugins>
-            <plugin>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.3.2</version>
-                <configuration>
-                    <source>1.6</source>
-                    <target>1.6</target>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.8</version>
-                <configuration>
-                    <systemPropertyVariables>
+	<repositories>
+		<repository>
+			<id>Ouroboros-CI</id>
+			<name>Ouroboros Jenkins Maven Repo</name>
+			<url>http://107.20.139.173:8080/plugin/repository/everything/</url>
+		</repository>
+	</repositories>
+	<pluginRepositories>
+		<pluginRepository>
+			<id>Ouroboros-CI</id>
+			<name>Ouroboros Jenkins Maven Repo</name>
+			<url>http://107.20.139.173:8080/plugin/repository/everything/</url>
+		</pluginRepository>
+	</pluginRepositories>
+
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>2.3.2</version>
+				<configuration>
+					<source>1.6</source>
+					<target>1.6</target>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>2.8</version>
+				<configuration>
+					<systemPropertyVariables>
 						<java.rmi.server.hostname>127.0.0.1</java.rmi.server.hostname>
-                        <java.util.logging.config.file>logging.properties</java.util.logging.config.file>
-                        <java.net.preferIPv4Stack>true</java.net.preferIPv4Stack>
-                    </systemPropertyVariables>
+						<java.util.logging.config.file>logging.properties</java.util.logging.config.file>
+						<java.net.preferIPv4Stack>true</java.net.preferIPv4Stack>
+					</systemPropertyVariables>
 					<argLine>-ea</argLine>
 					<argLine>-XX:ReservedCodeCacheSize=128m</argLine>
 					<argLine>-Xms512m</argLine>
 					<argLine>-Xmx512m</argLine>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
 </project>
