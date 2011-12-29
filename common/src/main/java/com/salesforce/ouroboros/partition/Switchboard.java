@@ -184,6 +184,7 @@ public class Switchboard {
     private NodeIdSet                                view;
     private UUID                                     viewId;
     private final ConcurrentMap<UUID, AtomicInteger> votes           = new ConcurrentHashMap<UUID, AtomicInteger>();
+    private final AtomicInteger                      tally           = new AtomicInteger();
 
     public Switchboard(Node node, Partition p, NoArgGenerator viewIdGenerator) {
         inboundGate.close();
@@ -278,11 +279,12 @@ public class Switchboard {
             case VOTE:
                 assert arguments.length == 1 : "No view id in vote";
                 AtomicInteger initialTally = new AtomicInteger(1);
-                AtomicInteger tally = votes.putIfAbsent((UUID) arguments[0],
+                AtomicInteger voteTally = votes.putIfAbsent((UUID) arguments[0],
                                                         initialTally);
-                if (tally != null) {
-                    tally.incrementAndGet();
+                if (voteTally != null) {
+                    voteTally.incrementAndGet();
                 }
+                tally.incrementAndGet();
                 fsm.voteReceived();
                 break;
             case NEW_VIEW_ID:
@@ -556,6 +558,7 @@ public class Switchboard {
             results[i++] = new Result(entry.getValue().get(), entry.getKey());
         }
         votes.clear();
+        tally.set(0);
 
         Arrays.sort(results);
         Result result = results[results.length - 1];
@@ -626,11 +629,7 @@ public class Switchboard {
      * @return true if all the members have voted on the majority view.
      */
     protected boolean votingComplete() {
-        int totalVotes = 0;
-        for (AtomicInteger tally : votes.values()) {
-            totalVotes += tally.get();
-        }
-        return totalVotes == view.cardinality();
+        return tally.get() == view.cardinality();
     }
 
     // test access
