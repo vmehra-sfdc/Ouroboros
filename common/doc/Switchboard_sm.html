@@ -33,9 +33,6 @@
           discoveryComplete
         </th>
         <th>
-          established
-        </th>
-        <th>
           stabilized
           <br>
           (View,
@@ -43,7 +40,12 @@
           int)
         </th>
         <th>
-          voteReceived
+          viewEstablished
+        </th>
+        <th>
+          votingComplete
+          <br>
+          (UUID[])
         </th>
         <th>
           <b>Default</b>
@@ -69,14 +71,20 @@ destabilizePartition();
         <td>
         </td>
         <td>
-        </td>
-        <td>
           <pre>
+[ctxt.isLeader()]
+  ConductElection
+  {
+    stabilize(view, leader);
+  }
+
   ElectView
   {
     stabilize(view, leader);
   }
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -112,41 +120,8 @@ destabilizePartition();
           ElectView
         </td>
         <td>
-          <pre>
-    vote();
-          </pre>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-[ctxt.votingComplete()]
-  EstablishViewId
-  {}
-
-  ElectView
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          EstablishViewId
-        </td>
-        <td>
-          <pre>
-    electView();
-          </pre>
         </td>
         <td>
         </td>
@@ -163,6 +138,34 @@ destabilizePartition();
         <td>
         </td>
         <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ConductElection
+        </td>
+        <td>
+          <pre>
+    initiateVoting();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ElectView
+  {
+    establishView(votes);
+  }
+          </pre>
         </td>
         <td>
         </td>

@@ -38,12 +38,20 @@ import com.salesforce.ouroboros.partition.SwitchboardDispatch;
  * 
  */
 public enum ViewElectionMessage implements SwitchboardDispatch {
-    VOTE, NEW_VIEW_ID;
+    VOTE {
+        @Override
+        public void dispatch(Switchboard switchboard, Node sender,
+                             Serializable[] arguments, long time) {
+            switchboard.dispatch(this, sender, arguments, time);
+        }
+    },
+    NEW_VIEW_ID {
+        @Override
+        public void dispatch(Switchboard switchboard, Node sender,
+                             Serializable[] arguments, long time) {
+            switchboard.dispatch(this, sender, arguments, time);
+            switchboard.forwardToNextInRing(new Message(sender, this, arguments));
+        }
+    };
 
-    @Override
-    public void dispatch(Switchboard switchboard, Node sender,
-                         Serializable[] arguments, long time) {
-        switchboard.dispatch(this, sender, arguments, time);
-        switchboard.forwardToNextInRing(new Message(sender, this, arguments));
-    }
 }

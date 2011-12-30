@@ -96,7 +96,8 @@ public class SwitchboardTest {
             public Void answer(InvocationOnMock invocation) throws Throwable {
                 Message message = (Message) invocation.getArguments()[0];
                 assertEquals(ViewElectionMessage.NEW_VIEW_ID, message.type);
-                assertEquals(newViewId, message.arguments[0]);
+                assertEquals(viewId, message.arguments[0]);
+                assertEquals(newViewId, message.arguments[1]);
                 return null;
             }
         };
@@ -104,64 +105,12 @@ public class SwitchboardTest {
 
         switchboard.setMember(member);
         switchboard.partitionEvent(view, 0);
-        assertEquals(SwitchboardFSM.ElectView, switchboard.getState());
+        assertEquals(SwitchboardFSM.ConductElection, switchboard.getState());
         verify(connection).sendObject(isA(Message.class));
         switchboard.dispatch(ViewElectionMessage.VOTE, testNode,
-                             new Serializable[] { viewId }, -1L);
-        switchboard.dispatch(ViewElectionMessage.VOTE, testNode,
-                             new Serializable[] { viewId }, -1L);
+                             new UUID[] { viewId }, -1L);
         switchboard.dispatch(ViewElectionMessage.NEW_VIEW_ID, testNode,
-                             new Serializable[] { newViewId }, -1L);
-        assertEquals(SwitchboardFSM.Advertising, switchboard.getState());
-    }
-
-    @Test
-    public void testAdvertise() {
-        Node node = new Node(0, 0, 0);
-        Node testNode = new Node(1, 0, 0);
-        Partition partition = mock(Partition.class);
-        Member member = mock(Member.class);
-        MessageConnection connection = mock(MessageConnection.class);
-        when(partition.connect(testNode.processId)).thenReturn(connection);
-        BitView view = new BitView();
-        view.add(node.processId);
-        view.add(testNode.processId);
-        view.stablize();
-
-        final UUID viewId = UUID.randomUUID();
-        final UUID newViewId = UUID.randomUUID();
-        NoArgGenerator generator = mock(NoArgGenerator.class);
-        when(generator.generate()).thenReturn(viewId).thenReturn(newViewId);
-        Switchboard switchboard = new Switchboard(node, partition, generator);
-
-        Answer<Void> vote = new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                Message message = (Message) invocation.getArguments()[0];
-                assertEquals(ViewElectionMessage.VOTE, message.type);
-                assertEquals(viewId, message.arguments[0]);
-                return null;
-            }
-        };
-
-        Answer<Void> establish = new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                Message message = (Message) invocation.getArguments()[0];
-                assertEquals(ViewElectionMessage.NEW_VIEW_ID, message.type);
-                assertEquals(newViewId, message.arguments[0]);
-                return null;
-            }
-        };
-        doAnswer(vote).doAnswer(establish).when(connection).sendObject(isA(Message.class));
-        switchboard.setMember(member);
-        switchboard.partitionEvent(view, 0);
-        switchboard.dispatch(ViewElectionMessage.VOTE, testNode,
-                             new Serializable[] { viewId }, -1L);
-        switchboard.dispatch(ViewElectionMessage.VOTE, testNode,
-                             new Serializable[] { viewId }, -1L);
-        switchboard.dispatch(ViewElectionMessage.NEW_VIEW_ID, testNode,
-                             new Serializable[] { newViewId }, -1L);
+                             new Serializable[] { viewId, newViewId }, -1L);
         assertEquals(SwitchboardFSM.Advertising, switchboard.getState());
         verify(member).advertise();
     }
@@ -402,7 +351,7 @@ public class SwitchboardTest {
         Member member = mock(Member.class);
         MessageConnection connection = mock(MessageConnection.class);
         when(partition.connect(testNode.processId)).thenReturn(connection);
-        
+
         Answer<Void> vote = new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
@@ -410,7 +359,7 @@ public class SwitchboardTest {
                 assertEquals(ViewElectionMessage.VOTE, message.type);
                 return null;
             }
-        }; 
+        };
         Answer<Void> establish = new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
@@ -441,11 +390,9 @@ public class SwitchboardTest {
         switchboard.setMember(member);
         switchboard.partitionEvent(view, 0);
         switchboard.dispatch(ViewElectionMessage.VOTE, testNode,
-                             new Serializable[] { viewId }, -1L);
-        switchboard.dispatch(ViewElectionMessage.VOTE, testNode,
-                             new Serializable[] { viewId }, -1L);
+                             new UUID[] { viewId }, -1L);
         switchboard.dispatch(ViewElectionMessage.NEW_VIEW_ID, testNode,
-                             new Serializable[] { viewId }, -1L);
+                             new Serializable[] { viewId, viewId }, -1L);
         switchboard.discover(node);
         switchboard.discover(testNode);
         switchboard.dispatch(DiscoveryMessage.DISCOVERY_COMPLETE, node, null,
