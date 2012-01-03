@@ -120,6 +120,7 @@ public class Coordinator implements Member {
                     activeMembers.add(node);
                 }
                 producer.setProducerRing(ring);
+                active = true;
                 switchboard.forwardToNextInRing(new Message(sender, type,
                                                             arguments));
                 fsm.bootstrapped();
@@ -279,6 +280,11 @@ public class Coordinator implements Member {
     @Override
     public void stabilized() {
         fsm.stabilize();
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Coordinator for producer [%s]", self.processId);
     }
 
     /**

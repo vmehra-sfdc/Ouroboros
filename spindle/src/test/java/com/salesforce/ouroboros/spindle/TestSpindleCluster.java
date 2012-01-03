@@ -85,7 +85,7 @@ import com.salesforce.ouroboros.util.MersenneTwister;
  * @author hhildebrand
  * 
  */
-public class TestCluster {
+public class TestSpindleCluster {
 
     public static class ControlNode extends NodeData {
         int            cardinality;
@@ -335,7 +335,7 @@ public class TestCluster {
         }
     }
 
-    private static final Logger                      log     = Logger.getLogger(TestCluster.class.getCanonicalName());
+    private static final Logger                      log     = Logger.getLogger(TestSpindleCluster.class.getCanonicalName());
     static int                                       testPort1;
     static int                                       testPort2;
 
@@ -373,7 +373,7 @@ public class TestCluster {
                                                                                    666);
 
     @Before
-    public void starUp() throws Exception {
+    public void startUp() throws Exception {
         testPort1++;
         testPort2++;
         log.info("Setting up initial partition");

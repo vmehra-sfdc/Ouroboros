@@ -69,6 +69,7 @@ AwaitingFailover{
 Stable{
 	rebalance
 		Rebalance{}
+		
 	open(channel:UUID)
 		nil {
 			openChannel(channel);
