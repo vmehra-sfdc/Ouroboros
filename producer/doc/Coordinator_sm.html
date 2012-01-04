@@ -81,11 +81,15 @@ cleanUp();
   AwaitingFailover
   {}
 
-[ctxt.isLeader()]
+[!ctxt.hasActiveMembers() && ctxt.isInactiveLeader()]
   Bootstrapping/push(CoordinatorFSM::Unstable)
   {}
 
+[!ctxt.hasActiveMembers()]
   Bootstrapping
+  {}
+
+  Stable
   {}
           </pre>
         </td>

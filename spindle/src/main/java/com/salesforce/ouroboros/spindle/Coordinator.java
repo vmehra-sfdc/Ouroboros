@@ -674,8 +674,8 @@ public class Coordinator implements Member {
      */
     protected boolean isActiveLeader() {
         if (active) {
-            return activeMembers.size() == 0 ? true
-                                            : activeMembers.last().equals(self);
+            return activeMembers.isEmpty() ? true
+                                          : activeMembers.last().equals(self);
         }
         return false;
     }
@@ -688,8 +688,8 @@ public class Coordinator implements Member {
      */
     protected boolean isInactiveLeader() {
         if (!active) {
-            return inactiveMembers.size() == 0 ? true
-                                              : inactiveMembers.last().equals(self);
+            return inactiveMembers.isEmpty() ? true
+                                            : inactiveMembers.last().equals(self);
         }
         return false;
     }

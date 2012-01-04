@@ -45,6 +45,9 @@ digraph Coordinator {
         "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Bootstrapping"
             [label="stabilize/\l"];
 
+        "CoordinatorFSM::Unstable" -> "CoordinatorFSM::Stable"
+            [label="stabilize/\l"];
+
         "CoordinatorFSM::AwaitingFailover" -> "CoordinatorFSM::Stable"
             [label="failedOver/\l"];
 

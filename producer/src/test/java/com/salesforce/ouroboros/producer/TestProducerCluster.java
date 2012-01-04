@@ -69,7 +69,9 @@ import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
+import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.producer.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.producer.Util.Condition;
@@ -532,8 +534,14 @@ public class TestProducerCluster {
         assertPartitionAwaitingFailover(majorPartition);
         assertPartitionActive(majorPartition);
 
-        // The other partition should still be unstable.
-        // assertEquals(minorGroup.size(), latchB.getCount());
+        log.info("Failing over");
+        Switchboard leader = memberContexts.get(0).getBean(Switchboard.class);
+        leader.ringCast(new Message(leader.getId(), FailoverMessage.PREPARE));
+        leader.ringCast(new Message(leader.getId(), FailoverMessage.FAILOVER));
+
+        // major partition should be stable and active
+        assertPartitionStable(majorPartition);
+        assertPartitionActive(majorPartition);
 
         // reform
         CountDownLatch latch = new CountDownLatch(fullPartition.size());
@@ -559,10 +567,15 @@ public class TestProducerCluster {
 
         // Major partition should be awaiting failover
         assertPartitionAwaitingFailover(majorPartition);
+        leader.ringCast(new Message(leader.getId(), FailoverMessage.PREPARE));
+        leader.ringCast(new Message(leader.getId(), FailoverMessage.FAILOVER));
 
         // Only the major partition should be active 
         assertPartitionActive(majorPartition);
         assertPartitionInactive(minorPartition);
+        
+        // Entire partition should be stable
+        assertPartitionStable(coordinators);
     }
 
     private List<AnnotationConfigApplicationContext> createMembers() {

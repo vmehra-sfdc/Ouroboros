@@ -51,11 +51,15 @@ Entry {
 		AwaitingFailover{}
         
     stabilize
-    	[ctxt.isLeader()]
+    	[!ctxt.hasActiveMembers() && ctxt.isInactiveLeader()]
     	Bootstrapping/push(ControllerFSM::Bootstrap){}
         
     stabilize
+    	[!ctxt.hasActiveMembers()]
     	Bootstrapping{}
+    	
+  	stabilize
+  		Stable{}
 		
 	destabilize
 		nil{}

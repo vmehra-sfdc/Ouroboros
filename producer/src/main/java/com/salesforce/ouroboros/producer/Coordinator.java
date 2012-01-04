@@ -195,7 +195,9 @@ public class Coordinator implements Member {
             case PREPARE:
                 break;
             case FAILOVER:
-                failover();
+                if (active) {
+                    failover();
+                }
                 break;
             default: {
                 if (log.isLoggable(Level.WARNING)) {
@@ -256,7 +258,7 @@ public class Coordinator implements Member {
      *            - the bootstrap membership set
      */
     public void initiateBootstrap(Node[] joiningMembers) {
-        if (!isLeader() || active) {
+        if (!isInactiveLeader()) {
             throw new IllegalStateException(
                                             "This node must be inactive and the leader to initiate rebalancing");
         }
@@ -334,20 +336,6 @@ public class Coordinator implements Member {
         return active;
     }
 
-    /**
-     * Answer true if the receiver is the leader of the group
-     * 
-     * @return
-     */
-    protected boolean isLeader() {
-        if (active) {
-            return activeMembers.size() == 0 ? true
-                                            : activeMembers.last().equals(self);
-        }
-        return inactiveMembers.size() == 0 ? true
-                                          : inactiveMembers.last().equals(self);
-    }
-
     protected void openChannel(UUID channel) {
         // TODO Auto-generated method stub
 
@@ -355,5 +343,36 @@ public class Coordinator implements Member {
 
     protected void setJoiningMembers(Node[] joiningMembers) {
         this.joiningMembers = joiningMembers;
+    }
+
+    protected boolean hasActiveMembers() {
+        return !activeMembers.isEmpty();
+    }
+
+    /**
+     * Answer true if the receiver is active and the leader of the active group
+     * 
+     * @return
+     */
+    protected boolean isActiveLeader() {
+        if (active) {
+            return activeMembers.isEmpty() ? true
+                                          : activeMembers.last().equals(self);
+        }
+        return false;
+    }
+
+    /**
+     * Answer true if the receiver is not active and the leader of the inactive
+     * group
+     * 
+     * @return
+     */
+    protected boolean isInactiveLeader() {
+        if (!active) {
+            return inactiveMembers.isEmpty() ? true
+                                            : inactiveMembers.last().equals(self);
+        }
+        return false;
     }
 }
