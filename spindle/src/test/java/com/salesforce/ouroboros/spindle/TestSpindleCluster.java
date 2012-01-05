@@ -148,8 +148,12 @@ public class TestSpindleCluster {
                                              DiscoveryMessage.ADVERTISE_NOOP));
         }
 
-        public boolean await(long timeout, TimeUnit unit)
-                                                         throws InterruptedException {
+        public boolean open(UUID channel, long timeout, TimeUnit unit)
+                                                                      throws InterruptedException {
+            openLatch = new CountDownLatch(2);
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             ChannelMessage.OPEN,
+                                             new Serializable[] { channel }));
             return openLatch.await(timeout, unit);
         }
 
@@ -194,10 +198,6 @@ public class TestSpindleCluster {
         @Override
         public void dispatch(RebalanceMessage type, Node sender,
                              Serializable[] arguments, long time) {
-        }
-
-        public void reset() {
-            openLatch = new CountDownLatch(2);
         }
 
         @Override
@@ -720,14 +720,14 @@ public class TestSpindleCluster {
         log.info("Creating some channels");
 
         int numOfChannels = 100;
-        Switchboard master = memberContexts.get(memberContexts.size() - 1).getBean(Switchboard.class);
         ArrayList<UUID> channels = new ArrayList<UUID>();
         for (int i = 0; i < numOfChannels; i++) {
             UUID channel = new UUID(twister.nextLong(), twister.nextLong());
             channels.add(channel);
             log.info(String.format("Opening channel: %s", channel));
-            master.ringCast(new Message(master.getId(), ChannelMessage.OPEN,
-                                        new Serializable[] { channel }));
+            assertTrue(String.format("Channel %s did not successfully open",
+                                     channel),
+                       clusterMaster.open(channel, 3, TimeUnit.SECONDS));
         }
 
         Thread.sleep(2000);
