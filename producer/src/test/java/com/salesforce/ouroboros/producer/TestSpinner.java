@@ -26,7 +26,6 @@
 package com.salesforce.ouroboros.producer;
 
 import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 import static org.mockito.Matchers.isA;
@@ -77,7 +76,7 @@ public class TestSpinner {
         Producer producer = mock(Producer.class);
         final Node node = new Node(0x1638);
         when(producer.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(producer);
+        Spinner spinner = new Spinner(producer, 100);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -106,7 +105,7 @@ public class TestSpinner {
         Producer producer = mock(Producer.class);
         Node node = new Node(0x1638);
         when(producer.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(producer);
+        Spinner spinner = new Spinner(producer, 100);
         spinner.connect(handler);
 
         long timestamp = 100000L;
@@ -124,11 +123,11 @@ public class TestSpinner {
         @SuppressWarnings("unchecked")
         Batch batch4 = new Batch(mirror, channel, timestamp + 140,
                                  Collections.EMPTY_LIST);
-        assertTrue(spinner.push(batch1));
-        assertTrue(spinner.push(batch2));
-        assertTrue(spinner.push(batch3));
+        spinner.push(batch1);
+        spinner.push(batch2);
+        spinner.push(batch3);
         spinner.closing();
-        assertFalse(spinner.push(batch4));
+        spinner.push(batch4);
 
         SortedMap<BatchIdentity, Batch> pending = spinner.getPending(channel);
         assertNotNull(pending);
@@ -148,7 +147,7 @@ public class TestSpinner {
         Producer producer = mock(Producer.class);
         Node node = new Node(0x1638);
         when(producer.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(producer);
+        Spinner spinner = new Spinner(producer, 100);
         spinner.connect(handler);
 
         Node mirror = new Node(0x1638);

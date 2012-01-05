@@ -38,6 +38,7 @@ import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.producer.SpinnerContext.SpinnerFSM;
 import com.salesforce.ouroboros.producer.SpinnerContext.SpinnerState;
 
@@ -61,13 +62,14 @@ public class Spinner implements CommunicationsHandler {
     private ByteBuffer                               handshake           = ByteBuffer.allocate(HANDSHAKE_BYTE_SIZE);
     private boolean                                  inError;
     private final NavigableMap<BatchIdentity, Batch> pending             = new ConcurrentSkipListMap<BatchIdentity, Batch>();
-    private final BatchWriter                        writer              = new BatchWriter();
+    private final BatchWriter                        writer;
 
-    public Spinner(Producer producer) {
+    public Spinner(Producer producer, int maxQueueLength) {
         this.producer = producer;
         handshake.putInt(MAGIC);
         producer.getId().serialize(handshake);
         handshake.flip();
+        writer = new BatchWriter(maxQueueLength);
     }
 
     @Override
@@ -162,11 +164,11 @@ public class Spinner implements CommunicationsHandler {
      * 
      * @param events
      *            - the batch to push
-     * @return true, if the push is allowed, false if the system is closed or in
-     *         the error state.
+     * @throws RateLimiteExceededException
+     *             - if the batch throughput rate has been exceeded.
      */
-    public boolean push(Batch events) {
-        return writer.push(events, pending);
+    public void push(Batch events) throws RateLimiteExceededException {
+        writer.push(events, pending);
     }
 
     @Override

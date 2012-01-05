@@ -121,8 +121,6 @@ public class Coordinator implements Member {
                 }
                 producer.setProducerRing(ring);
                 active = true;
-                switchboard.forwardToNextInRing(new Message(sender, type,
-                                                            arguments));
                 fsm.bootstrapped();
                 break;
             }
@@ -134,8 +132,6 @@ public class Coordinator implements Member {
                     activeWeavers.add(node);
                 }
                 producer.remapWeavers(ring);
-                switchboard.forwardToNextInRing(new Message(sender, type,
-                                                            arguments));
                 break;
             }
             default:

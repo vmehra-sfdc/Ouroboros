@@ -88,11 +88,13 @@ public class Producer {
 
     private final ConcurrentMap<UUID, ChannelState> channelState      = new ConcurrentHashMap<UUID, ChannelState>();
     private final Controller                        controller;
+    private final int                               maxQueueLength;
     private final Map<UUID, Long>                   mirrors           = new ConcurrentHashMap<UUID, Long>();
     private ConsistentHashFunction<Node>            producerRing      = new ConsistentHashFunction<Node>();
     private final Gate                              publishGate       = new Gate();
     private final AtomicInteger                     publishingThreads = new AtomicInteger(
                                                                                           0);
+    private final int                               retryLimit;
     private final Node                              self;
     private final EventSource                       source;
     private final ChannelHandler                    spinnerHandler;
@@ -116,6 +118,8 @@ public class Producer {
                                             "Spinner Handler",
                                             configuration.getSpinnerSocketOptions(),
                                             configuration.getSpinners());
+        maxQueueLength = configuration.getMaxQueueLength();
+        retryLimit = configuration.getRetryLimit();
     }
 
     /**
@@ -222,16 +226,9 @@ public class Producer {
                 throw new RateLimiteExceededException(
                                                       String.format("The rate limit for this producer has been exceeded"));
             }
-            Node[] pair = getProducerReplicationPair(channel);
-            if (!state.spinner.push(new Batch(pair[1], channel, timestamp,
-                                              events))) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Rate limited, as service temporarily down for channel: %s",
-                                           channel));
-                }
-                throw new RateLimiteExceededException(
-                                                      String.format("The system cannot currently service the push request"));
-            }
+            state.spinner.push(new Batch(
+                                         getProducerReplicationPair(channel)[1],
+                                         channel, timestamp, events));
         } finally {
             publishingThreads.decrementAndGet();
         }
@@ -283,7 +280,30 @@ public class Producer {
             if (remapped != mapping.getValue().spinner) {
                 mapping.getValue().spinner = remapped;
                 for (Batch batch : mapping.getValue().spinner.getPending(mapping.getKey()).values()) {
-                    remapped.push(batch);
+                    boolean delivered = false;
+                    for (int i = 0; i < retryLimit; i++) {
+                        try {
+                            remapped.push(batch);
+                            delivered = true;
+                            break;
+                        } catch (RateLimiteExceededException e) {
+                            int sleepMs = 100 * i;
+                            if (log.isLoggable(Level.INFO)) {
+                                log.info(String.format("Rate limit exceeded sending queued events to new primary for %s, sleeping %s milliseconds on %s",
+                                                       mapping.getKey(),
+                                                       sleepMs, self));
+                            }
+                            try {
+                                Thread.sleep(sleepMs);
+                            } catch (InterruptedException e1) {
+                                return;
+                            }
+                        }
+                    }
+                    if (!delivered) {
+                        log.severe(String.format("Unable to remap queued events on %s for %s due to rate limiting",
+                                                 self, mapping.getKey()));
+                    }
                 }
             }
         }
@@ -366,7 +386,27 @@ public class Producer {
                     ChannelState failedPrimary = entry.getValue();
                     // Fail over to the new primary
                     for (Batch batch : failedPrimary.spinner.getPending(entry.getKey()).values()) {
-                        newPrimary.push(batch);
+                        boolean delivered = false;
+                        for (int i = 0; i < retryLimit; i++) {
+                            try {
+                                newPrimary.push(batch);
+                                delivered = true;
+                                break;
+                            } catch (RateLimiteExceededException e) {
+                                int sleepMs = 100 * i;
+                                if (log.isLoggable(Level.INFO)) {
+                                    log.info(String.format("Rate limit exceeded sending queued events to new primary for %s, sleeping %s milliseconds on %s",
+                                                           entry.getKey(),
+                                                           sleepMs, self));
+                                }
+                                Thread.sleep(sleepMs);
+                            }
+                        }
+                        if (!delivered) {
+                            log.severe(String.format("Unable to failover queued batch %s on %s for %s due to rate limiting",
+                                                     batch, self,
+                                                     entry.getKey()));
+                        }
                     }
                     failedPrimary.spinner = newPrimary;
                 }
@@ -461,7 +501,7 @@ public class Producer {
             ContactInformation info = yellowPages.get(n);
             assert info != null : String.format("Did not find any connection information for node %s",
                                                 n);
-            Spinner spinner = new Spinner(this);
+            Spinner spinner = new Spinner(this, maxQueueLength);
             try {
                 spinnerHandler.connectTo(info.spindle, spinner);
             } catch (IOException e) {

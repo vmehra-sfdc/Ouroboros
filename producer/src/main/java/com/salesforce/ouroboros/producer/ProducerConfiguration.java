@@ -38,8 +38,10 @@ import com.salesforce.ouroboros.util.LabeledThreadFactory;
  */
 public class ProducerConfiguration {
     private double              maximumEventRate             = 2000.0;
+    private int                 maxQueueLength               = 100;
     private double              minimumEventRate             = 500.0;
     private int                 minimumTokenRegenerationTime = 10;
+    private int                 retryLimit                   = 10;
     private int                 sampleFrequency              = 10;
     private int                 sampleWindowSize             = 1000;
     private Executor            spinners                     = Executors.newSingleThreadExecutor(new LabeledThreadFactory(
@@ -55,6 +57,10 @@ public class ProducerConfiguration {
         return maximumEventRate;
     }
 
+    public int getMaxQueueLength() {
+        return maxQueueLength;
+    }
+
     /**
      * @return the minimumEventRate
      */
@@ -67,6 +73,10 @@ public class ProducerConfiguration {
      */
     public int getMinimumTokenRegenerationTime() {
         return minimumTokenRegenerationTime;
+    }
+
+    public int getRetryLimit() {
+        return retryLimit;
     }
 
     /**
@@ -119,6 +129,10 @@ public class ProducerConfiguration {
         this.maximumEventRate = maximumEventRate;
     }
 
+    public void setMaxQueueLength(int maxQueueLength) {
+        this.maxQueueLength = maxQueueLength;
+    }
+
     /**
      * @param minimumEventRate
      *            the minimumEventRate to set
@@ -133,6 +147,10 @@ public class ProducerConfiguration {
      */
     public void setMinimumTokenRegenerationTime(int minimumTokenRegenerationTime) {
         this.minimumTokenRegenerationTime = minimumTokenRegenerationTime;
+    }
+
+    public void setRetryLimit(int resendLimit) {
+        this.retryLimit = resendLimit;
     }
 
     /**

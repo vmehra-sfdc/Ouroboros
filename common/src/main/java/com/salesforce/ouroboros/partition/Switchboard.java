@@ -45,6 +45,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+
 import org.smartfrog.services.anubis.partition.Partition;
 import org.smartfrog.services.anubis.partition.PartitionNotification;
 import org.smartfrog.services.anubis.partition.comms.MessageConnection;
@@ -259,6 +262,13 @@ public class Switchboard {
                 }
                 fsm.discoveryComplete();
                 break;
+            case ADVERTISE_NOOP:
+                if (log.isLoggable(Level.FINER)) {
+                    log.finer(String.format("Discovery of noop node %s = %s",
+                                            self, type));
+                }
+                discover(sender);
+                break;
             default:
                 if (log.isLoggable(Level.FINER)) {
                     log.finer(String.format("Discovery of node %s = %s", self,
@@ -460,10 +470,12 @@ public class Switchboard {
         member = m;
     }
 
+    @PostConstruct
     public void start() {
         partition.register(notification);
     }
 
+    @PreDestroy
     public void terminate() {
         partition.deregister(notification);
     }

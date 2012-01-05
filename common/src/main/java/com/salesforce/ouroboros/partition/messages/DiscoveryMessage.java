@@ -39,7 +39,7 @@ import com.salesforce.ouroboros.partition.SwitchboardDispatch;
  */
 public enum DiscoveryMessage implements SwitchboardDispatch {
     ADVERTISE_CHANNEL_BUFFER, ADVERTISE_CONSUMER, ADVERTISE_PRODUCER,
-    DISCOVERY_COMPLETE;
+    ADVERTISE_NOOP, DISCOVERY_COMPLETE;
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,

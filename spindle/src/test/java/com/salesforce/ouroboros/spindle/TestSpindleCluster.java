@@ -66,14 +66,18 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.uuid.Generators;
-import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.partition.Switchboard.Member;
+import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
+import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
+import com.salesforce.ouroboros.partition.messages.FailoverMessage;
+import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.spindle.Util.Condition;
@@ -86,7 +90,6 @@ import com.salesforce.ouroboros.util.MersenneTwister;
  * 
  */
 public class TestSpindleCluster {
-
     public static class ControlNode extends NodeData {
         int            cardinality;
         CountDownLatch latch;
@@ -130,14 +133,142 @@ public class TestSpindleCluster {
 
     }
 
+    private static class ClusterMaster implements Member {
+        CountDownLatch    openLatch;
+        final Switchboard switchboard;
+
+        public ClusterMaster(Switchboard switchboard) {
+            this.switchboard = switchboard;
+            switchboard.setMember(this);
+        }
+
+        @Override
+        public void advertise() {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             DiscoveryMessage.ADVERTISE_NOOP));
+        }
+
+        public boolean await(long timeout, TimeUnit unit)
+                                                         throws InterruptedException {
+            return openLatch.await(timeout, unit);
+        }
+
+        @Override
+        public void becomeInactive() {
+        }
+
+        @Override
+        public void destabilize() {
+        }
+
+        @Override
+        public void dispatch(BootstrapMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        @Override
+        public void dispatch(ChannelMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+            if (openLatch == null) {
+                return;
+            }
+            switch (type) {
+                case PRIMARY_OPENED:
+                case MIRROR_OPENED:
+                    openLatch.countDown();
+                    break;
+                default:
+            }
+        }
+
+        @Override
+        public void dispatch(DiscoveryMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        @Override
+        public void dispatch(FailoverMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        @Override
+        public void dispatch(RebalanceMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        public void reset() {
+            openLatch = new CountDownLatch(2);
+        }
+
+        @Override
+        public void stabilized() {
+        }
+
+    }
+
     @Configuration
-    static class MyControllerConfig extends ControllerGossipConfiguration {
+    static class ClusterMasterCfg extends GossipConfiguration {
+        @Bean
+        public ClusterMaster clusterMaster() {
+            return new ClusterMaster(switchboard());
+        }
+
+        @Override
+        public int getMagic() {
+            try {
+                return Identity.getMagicFromLocalIpAddress();
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+        }
 
         @Override
         @Bean
-        public DeployedPostProcessor deployedPostProcessor() {
-            return new DeployedPostProcessor();
+        public AnubisLocator locator() {
+            return null;
         }
+
+        @Bean
+        public Node memberNode() {
+            return new Node(node(), node(), node());
+        }
+
+        @Override
+        public int node() {
+            return 0;
+        }
+
+        @Bean
+        public Switchboard switchboard() {
+            Switchboard switchboard = new Switchboard(
+                                                      memberNode(),
+                                                      partition(),
+                                                      Generators.timeBasedGenerator());
+            return switchboard;
+        }
+
+        @Bean
+        public ScheduledExecutorService timer() {
+            return Executors.newSingleThreadScheduledExecutor();
+        }
+
+        @Override
+        protected Collection<InetSocketAddress> seedHosts()
+                                                           throws UnknownHostException {
+            return asList(seedContact1(), seedContact2());
+        }
+
+        InetSocketAddress seedContact1() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort1);
+        }
+
+        InetSocketAddress seedContact2() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort2);
+        }
+    }
+
+    @Configuration
+    static class MyControllerConfig extends ControllerGossipConfiguration {
 
         @Override
         public int magic() {
@@ -197,7 +328,7 @@ public class TestSpindleCluster {
             return new Node(node(), node(), node());
         }
 
-        @Bean(initMethod = "start", destroyMethod = "terminate")
+        @Bean
         public Switchboard switchboard() {
             Switchboard switchboard = new Switchboard(
                                                       memberNode(),
@@ -211,7 +342,7 @@ public class TestSpindleCluster {
             return Executors.newSingleThreadScheduledExecutor();
         }
 
-        @Bean(initMethod = "start", destroyMethod = "terminate")
+        @Bean
         public Weaver weaver() throws IOException {
             return new Weaver(weaverConfiguration());
         }
@@ -244,10 +375,10 @@ public class TestSpindleCluster {
     }
 
     @Configuration
-    static class w0 extends nodeCfg {
+    static class w1 extends nodeCfg {
         @Override
         public int node() {
-            return 0;
+            return 1;
         }
 
         @Override
@@ -258,10 +389,16 @@ public class TestSpindleCluster {
     }
 
     @Configuration
-    static class w1 extends nodeCfg {
+    static class w10 extends nodeCfg {
         @Override
         public int node() {
-            return 1;
+            return 10;
+        }
+
+        @Override
+        protected InetSocketAddress gossipEndpoint()
+                                                    throws UnknownHostException {
+            return seedContact2();
         }
     }
 
@@ -327,12 +464,6 @@ public class TestSpindleCluster {
         public int node() {
             return 9;
         }
-
-        @Override
-        protected InetSocketAddress gossipEndpoint()
-                                                    throws UnknownHostException {
-            return seedContact2();
-        }
     }
 
     private static final Logger                      log     = Logger.getLogger(TestSpindleCluster.class.getCanonicalName());
@@ -341,64 +472,68 @@ public class TestSpindleCluster {
 
     static {
         String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
-                                         "24510");
+                                         "24506");
         testPort1 = Integer.parseInt(port);
         port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
                                   "24320");
         testPort2 = Integer.parseInt(port);
     }
 
+    private ClusterMaster                            clusterMaster;
+    private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs = new Class[] {
-                    w0.class, w1.class, w2.class, w3.class, w4.class, w5.class,
-                    w6.class, w7.class, w8.class, w9.class  };
+            w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
+            w7.class, w8.class, w9.class, w10.class         };
     private MyController                             controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<Coordinator>                        coordinators;
-    private List<Weaver>                             weavers;
     private List<ControlNode>                        fullPartition;
     private List<Node>                               fullPartitionId;
     private BitView                                  fullView;
     private List<ControlNode>                        majorGroup;
     private List<Coordinator>                        majorPartition;
     private List<Node>                               majorPartitionId;
-    private List<Weaver>                             majorWeavers;
-    private List<Weaver>                             minorWeavers;
     private BitView                                  majorView;
+    private List<Weaver>                             majorWeavers;
     private List<AnnotationConfigApplicationContext> memberContexts;
     private List<ControlNode>                        minorGroup;
     private List<Coordinator>                        minorPartition;
     private List<Node>                               minorPartitionId;
     private BitView                                  minorView;
+    private List<Weaver>                             minorWeavers;
     private MersenneTwister                          twister = new MersenneTwister(
                                                                                    666);
+    private List<Weaver>                             weavers;
 
     @Before
     public void startUp() throws Exception {
         testPort1++;
         testPort2++;
         log.info("Setting up initial partition");
-        CountDownLatch initialLatch = new CountDownLatch(configs.length);
+        CountDownLatch initialLatch = new CountDownLatch(configs.length + 1);
         controllerContext = new AnnotationConfigApplicationContext(
                                                                    MyControllerConfig.class);
         controller = controllerContext.getBean(MyController.class);
-        controller.cardinality = configs.length;
+        controller.cardinality = configs.length + 1;
         controller.latch = initialLatch;
+        clusterMasterContext = new AnnotationConfigApplicationContext(
+                                                                      ClusterMasterCfg.class);
+        clusterMaster = clusterMasterContext.getBean(ClusterMaster.class);
         memberContexts = createMembers();
+        fullPartition = new ArrayList<ControlNode>();
+        coordinators = new ArrayList<Coordinator>();
+        weavers = new ArrayList<Weaver>();
         log.info("Awaiting initial partition stability");
         boolean success = false;
         try {
             success = initialLatch.await(120, TimeUnit.SECONDS);
             assertTrue("Initial partition did not acheive stability", success);
             log.info("Initial partition stable");
-            fullPartition = new ArrayList<ControlNode>();
-            coordinators = new ArrayList<Coordinator>();
-            weavers = new ArrayList<Weaver>();
             fullPartitionId = new ArrayList<Node>();
             for (AnnotationConfigApplicationContext context : memberContexts) {
                 ControlNode node = (ControlNode) controller.getNode(context.getBean(Identity.class));
                 assertNotNull("Can't find node: "
-                                              + context.getBean(Identity.class),
-                              node);
+                                      + context.getBean(Identity.class), node);
                 fullPartition.add(node);
                 Coordinator coordinator = context.getBean(Coordinator.class);
                 fullPartitionId.add(coordinator.getId());
@@ -412,6 +547,8 @@ public class TestSpindleCluster {
                 tearDown();
             }
         }
+        ControlNode clusterMasterNode = (ControlNode) controller.getNode(clusterMasterContext.getBean(Identity.class));
+        fullPartition.add(clusterMasterNode);
 
         assertPartitionBootstrapping(coordinators);
 
@@ -444,6 +581,9 @@ public class TestSpindleCluster {
             majorView.add(member.getIdentity());
             majorWeavers.add(weavers.get(i));
         }
+        majorGroup.add(clusterMasterNode);
+        fullView.add(clusterMasterNode.getIdentity());
+        majorView.add(clusterMasterNode.getIdentity());
 
         // Form the minor partition
         for (int i = majorPartitionSize; i < coordinators.size(); i++) {
@@ -733,72 +873,6 @@ public class TestSpindleCluster {
         return contexts;
     }
 
-    protected void assertPartitionActive(List<Coordinator> partition)
-                                                                     throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
-            waitFor("Coordinator never entered the bootstrapping state: "
-                    + coordinator, new Condition() {
-                @Override
-                public boolean value() {
-                    return c.isActive();
-                }
-            }, 120000, 1000);
-        }
-    }
-
-    protected void assertPartitionBootstrapping(List<Coordinator> partition)
-                                                                            throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
-            waitFor("Coordinator never entered the bootstrapping state: "
-                    + coordinator, new Condition() {
-                @Override
-                public boolean value() {
-                    return CoordinatorFSM.Bootstrapping == c.getState()
-                           || BootstrapFSM.Bootstrap == c.getState();
-                }
-            }, 120000, 1000);
-        }
-    }
-
-    protected void assertPartitionInactive(List<Coordinator> partition)
-                                                                       throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
-            waitFor("Coordinator never entered the bootstrapping state: "
-                    + coordinator, new Condition() {
-                @Override
-                public boolean value() {
-                    return !c.isActive();
-                }
-            }, 120000, 1000);
-        }
-    }
-
-    protected void assertPartitionStable(List<Coordinator> partition)
-                                                                     throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
-            waitFor("Coordinator never entered the stable state: "
-                    + coordinator, new Condition() {
-                @Override
-                public boolean value() {
-                    return CoordinatorFSM.Stable == c.getState();
-                }
-            }, 120000, 1000);
-        }
-    }
-
-    protected CountDownLatch latch(List<ControlNode> group) {
-        CountDownLatch latch = new CountDownLatch(group.size());
-        for (ControlNode member : group) {
-            member.latch = latch;
-            member.cardinality = group.size();
-        }
-        return latch;
-    }
-
     protected void assertChannelMappings(List<UUID> channels,
                                          List<Weaver> weaverGroup,
                                          ConsistentHashFunction<Node> ring) {
@@ -889,5 +963,71 @@ public class TestSpindleCluster {
                 }
             }
         }
+    }
+
+    protected void assertPartitionActive(List<Coordinator> partition)
+                                                                     throws InterruptedException {
+        for (Coordinator coordinator : partition) {
+            final Coordinator c = coordinator;
+            waitFor("Coordinator never entered the bootstrapping state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return c.isActive();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    protected void assertPartitionBootstrapping(List<Coordinator> partition)
+                                                                            throws InterruptedException {
+        for (Coordinator coordinator : partition) {
+            final Coordinator c = coordinator;
+            waitFor("Coordinator never entered the bootstrapping state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return CoordinatorFSM.Bootstrapping == c.getState()
+                           || BootstrapFSM.Bootstrap == c.getState();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    protected void assertPartitionInactive(List<Coordinator> partition)
+                                                                       throws InterruptedException {
+        for (Coordinator coordinator : partition) {
+            final Coordinator c = coordinator;
+            waitFor("Coordinator never entered the bootstrapping state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return !c.isActive();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    protected void assertPartitionStable(List<Coordinator> partition)
+                                                                     throws InterruptedException {
+        for (Coordinator coordinator : partition) {
+            final Coordinator c = coordinator;
+            waitFor("Coordinator never entered the stable state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return CoordinatorFSM.Stable == c.getState();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    protected CountDownLatch latch(List<ControlNode> group) {
+        CountDownLatch latch = new CountDownLatch(group.size());
+        for (ControlNode member : group) {
+            member.latch = latch;
+            member.cardinality = group.size();
+        }
+        return latch;
     }
 }

@@ -58,7 +58,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.uuid.Generators;
-import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.SocketOptions;
@@ -189,12 +188,6 @@ public class SwitchboardFunctionalTest {
 
     @Configuration
     static class MyControllerConfig extends ControllerGossipConfiguration {
-
-        @Override
-        @Bean
-        public DeployedPostProcessor deployedPostProcessor() {
-            return new DeployedPostProcessor();
-        }
 
         @Override
         public int magic() {
@@ -427,7 +420,7 @@ public class SwitchboardFunctionalTest {
             return new Node(node(), node(), node());
         }
 
-        @Bean(initMethod = "start", destroyMethod = "terminate")
+        @Bean
         public Switchboard switchboard() {
             Switchboard switchboard = new Switchboard(
                                                       memberNode(),

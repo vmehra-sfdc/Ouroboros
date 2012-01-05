@@ -139,18 +139,12 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case BOOTSTAP_PRODUCERS:
-                switchboard.forwardToNextInRing(new Message(sender, type,
-                                                            arguments));
                 break;
             case BOOTSTRAP_SPINDLES:
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Bootstrapping spindles on %s", self));
                 }
                 bootstrap((Node[]) arguments[0]);
-                if (!isInactiveLeader()) {
-                    switchboard.forwardToNextInRing(new Message(sender, type,
-                                                                arguments));
-                }
                 fsm.bootstrapped();
                 break;
             default:
@@ -434,7 +428,8 @@ public class Coordinator implements Member {
     protected void beginRebalance(Node[] joiningMembers) {
         setJoiningMembers(joiningMembers);
         switchboard.ringCast(new Message(self,
-                                         ReplicatorMessage.BEGIN_REBALANCE));
+                                         ReplicatorMessage.BEGIN_REBALANCE),
+                             nextMembership);
     }
 
     protected void bootstrap(Node[] bootsrappingMembers) {

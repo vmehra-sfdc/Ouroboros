@@ -41,6 +41,9 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.salesforce.ouroboros.ContactInformation;
@@ -527,6 +530,7 @@ public class Weaver implements Bundle {
     /**
      * Start the weaver
      */
+    @PostConstruct
     public void start() {
         spindleHandler.start();
         replicationHandler.start();
@@ -536,6 +540,7 @@ public class Weaver implements Bundle {
     /**
      * Terminate the weaver
      */
+    @PreDestroy
     public void terminate() {
         spindleHandler.terminate();
         replicationHandler.terminate();
@@ -571,10 +576,10 @@ public class Weaver implements Bundle {
                     || !oldPair.get(1).equals(newPair.get(1))) {
                     remapped.put(channel,
                                  new Node[][] {
-                                                 new Node[] { oldPair.get(0),
-                                                                 oldPair.get(1) },
-                                                 new Node[] { newPair.get(0),
-                                                                 newPair.get(1) } });
+                                         new Node[] { oldPair.get(0),
+                                                 oldPair.get(1) },
+                                         new Node[] { newPair.get(0),
+                                                 newPair.get(1) } });
                 }
             }
         }

@@ -137,7 +137,7 @@ public class TestSpinnerSpindle {
         Node coordNode = new Node(2);
         Producer producer = mock(Producer.class);
         when(producer.getId()).thenReturn(coordNode);
-        final Spinner spinner = new Spinner(producer);
+        final Spinner spinner = new Spinner(producer, 10);
 
         spindleHandler.connectTo(spindleAddress, spinner);
 

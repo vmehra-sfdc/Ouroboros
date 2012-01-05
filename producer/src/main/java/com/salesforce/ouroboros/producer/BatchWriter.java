@@ -30,7 +30,8 @@ import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -38,9 +39,9 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.EventHeader;
+import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterFSM;
 import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterState;
-import com.salesforce.ouroboros.util.lockfree.LockFreeQueue;
 
 /**
  * The event action context for the batch writing protocol FSM
@@ -50,16 +51,21 @@ import com.salesforce.ouroboros.util.lockfree.LockFreeQueue;
  */
 public class BatchWriter {
 
-    private static final Logger      log         = Logger.getLogger(BatchWriter.class.getCanonicalName());
-    private static final int         MAGIC       = 0x1638;
+    private static final Logger        log         = Logger.getLogger(BatchWriter.class.getCanonicalName());
+    private static final int           MAGIC       = 0x1638;
 
-    private final BatchHeader        batchHeader = new BatchHeader();
-    private final BatchWriterContext fsm         = new BatchWriterContext(this);
-    private SocketChannelHandler     handler;
-    private final EventHeader        header      = new EventHeader();
-    private boolean                  inError     = false;
-    private final Queue<Batch>       queued      = new LockFreeQueue<Batch>();
-    final Deque<ByteBuffer>          batch       = new LinkedList<ByteBuffer>();
+    private final BatchHeader          batchHeader = new BatchHeader();
+    private final BatchWriterContext   fsm         = new BatchWriterContext(
+                                                                            this);
+    private SocketChannelHandler       handler;
+    private final EventHeader          header      = new EventHeader();
+    private boolean                    inError     = false;
+    private final BlockingQueue<Batch> queued;
+    final Deque<ByteBuffer>            batch       = new LinkedList<ByteBuffer>();
+
+    public BatchWriter(int maxQueueLength) {
+        queued = new ArrayBlockingQueue<Batch>(maxQueueLength);
+    }
 
     public void closing() {
         if (!fsm.isInTransition()) {
@@ -90,21 +96,23 @@ public class BatchWriter {
      * @param pending
      *            - the map of pending events to record the batch, if the push
      *            can continue.
-     * @return true if the events have been scheduled for push, false if the
-     *         receiver cannot push the events
+     * @throws RateLimiteExceededException
+     *             - if the limit on the number of queued batches has been
+     *             exceeded.
      */
-    public boolean push(Batch events, Map<BatchIdentity, Batch> pending) {
+    public void push(Batch events, Map<BatchIdentity, Batch> pending)
+                                                                     throws RateLimiteExceededException {
+        if (!queued.offer(events)) {
+            throw new RateLimiteExceededException(
+                                                  "The maximum number of queued event batches has been exceeded");
+        }
         pending.put(events, events);
-        queued.add(events);
         if (!fsm.isInTransition()) {
             fsm.pushBatch();
         }
         if (fsm.getState() == BatchWriterFSM.Closed) {
             queued.clear();
             pending.remove(events);
-            return false;
-        } else {
-            return true;
         }
     }
 

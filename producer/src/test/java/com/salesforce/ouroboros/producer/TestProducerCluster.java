@@ -63,7 +63,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.uuid.Generators;
-import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.SocketOptions;
@@ -147,12 +146,6 @@ public class TestProducerCluster {
     static class MyControllerConfig extends ControllerGossipConfiguration {
 
         @Override
-        @Bean
-        public DeployedPostProcessor deployedPostProcessor() {
-            return new DeployedPostProcessor();
-        }
-
-        @Override
         public int magic() {
             try {
                 return Identity.getMagicFromLocalIpAddress();
@@ -220,7 +213,7 @@ public class TestProducerCluster {
             return new Source();
         }
 
-        @Bean(initMethod = "start", destroyMethod = "terminate")
+        @Bean
         public Switchboard switchboard() {
             Switchboard switchboard = new Switchboard(
                                                       memberNode(),
@@ -573,7 +566,7 @@ public class TestProducerCluster {
         // Only the major partition should be active 
         assertPartitionActive(majorPartition);
         assertPartitionInactive(minorPartition);
-        
+
         // Entire partition should be stable
         assertPartitionStable(coordinators);
     }
