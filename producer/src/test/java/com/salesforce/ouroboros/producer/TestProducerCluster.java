@@ -32,6 +32,7 @@ import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -70,7 +71,12 @@ import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.partition.Switchboard.Member;
+import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
+import com.salesforce.ouroboros.partition.messages.ChannelMessage;
+import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
+import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
 import com.salesforce.ouroboros.producer.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.producer.Util.Condition;
@@ -140,6 +146,130 @@ public class TestProducerCluster {
         public void opened(UUID channel) {
         }
 
+    }
+
+    private static class ClusterMaster implements Member {
+        final Switchboard switchboard;
+
+        public ClusterMaster(Switchboard switchboard) {
+            this.switchboard = switchboard;
+            switchboard.setMember(this);
+        }
+
+        @Override
+        public void advertise() {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             DiscoveryMessage.ADVERTISE_NOOP));
+        }
+
+        public void prepare() {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             FailoverMessage.PREPARE));
+        }
+
+        public void failover() {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             FailoverMessage.FAILOVER));
+        }
+
+        @Override
+        public void becomeInactive() {
+        }
+
+        @Override
+        public void destabilize() {
+        }
+
+        @Override
+        public void dispatch(BootstrapMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        @Override
+        public void dispatch(ChannelMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        @Override
+        public void dispatch(DiscoveryMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        @Override
+        public void dispatch(FailoverMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        @Override
+        public void dispatch(RebalanceMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        @Override
+        public void stabilized() {
+        }
+
+    }
+
+    @Configuration
+    static class ClusterMasterCfg extends GossipConfiguration {
+        @Bean
+        public ClusterMaster clusterMaster() {
+            return new ClusterMaster(switchboard());
+        }
+
+        @Override
+        public int getMagic() {
+            try {
+                return Identity.getMagicFromLocalIpAddress();
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        @Override
+        @Bean
+        public AnubisLocator locator() {
+            return null;
+        }
+
+        @Bean
+        public Node memberNode() {
+            return new Node(node(), node(), node());
+        }
+
+        @Override
+        public int node() {
+            return 0;
+        }
+
+        @Bean
+        public Switchboard switchboard() {
+            Switchboard switchboard = new Switchboard(
+                                                      memberNode(),
+                                                      partition(),
+                                                      Generators.timeBasedGenerator());
+            return switchboard;
+        }
+
+        @Bean
+        public ScheduledExecutorService timer() {
+            return Executors.newSingleThreadScheduledExecutor();
+        }
+
+        @Override
+        protected Collection<InetSocketAddress> seedHosts()
+                                                           throws UnknownHostException {
+            return asList(seedContact1(), seedContact2());
+        }
+
+        InetSocketAddress seedContact1() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort1);
+        }
+
+        InetSocketAddress seedContact2() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort2);
+        }
     }
 
     @Configuration
@@ -247,10 +377,10 @@ public class TestProducerCluster {
     }
 
     @Configuration
-    static class w0 extends nodeCfg {
+    static class w1 extends nodeCfg {
         @Override
         public int node() {
-            return 0;
+            return 1;
         }
 
         @Override
@@ -261,10 +391,10 @@ public class TestProducerCluster {
     }
 
     @Configuration
-    static class w1 extends nodeCfg {
+    static class w10 extends nodeCfg {
         @Override
         public int node() {
-            return 1;
+            return 10;
         }
     }
 
@@ -351,9 +481,11 @@ public class TestProducerCluster {
         testPort2 = Integer.parseInt(port);
     }
 
+    private ClusterMaster                            clusterMaster;
+    private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs = new Class[] {
-            w0.class, w1.class, w2.class, w3.class, w4.class, w5.class,
-            w6.class, w7.class, w8.class, w9.class          };
+            w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
+            w7.class, w8.class, w9.class, w10.class         };
     private MyController                             controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<Coordinator>                        coordinators;
@@ -381,12 +513,15 @@ public class TestProducerCluster {
         testPort1++;
         testPort2++;
         log.info("Setting up initial partition");
-        CountDownLatch initialLatch = new CountDownLatch(configs.length);
+        CountDownLatch initialLatch = new CountDownLatch(configs.length + 1);
         controllerContext = new AnnotationConfigApplicationContext(
                                                                    MyControllerConfig.class);
         controller = controllerContext.getBean(MyController.class);
-        controller.cardinality = configs.length;
+        controller.cardinality = configs.length + 1;
         controller.latch = initialLatch;
+        clusterMasterContext = new AnnotationConfigApplicationContext(
+                                                                      ClusterMasterCfg.class);
+        clusterMaster = clusterMasterContext.getBean(ClusterMaster.class);
         memberContexts = createMembers();
         log.info("Awaiting initial partition stability");
         boolean success = false;
@@ -415,6 +550,9 @@ public class TestProducerCluster {
                 tearDown();
             }
         }
+
+        ControlNode clusterMasterNode = (ControlNode) controller.getNode(clusterMasterContext.getBean(Identity.class));
+        fullPartition.add(clusterMasterNode);
 
         assertPartitionBootstrapping(coordinators);
 
@@ -447,6 +585,10 @@ public class TestProducerCluster {
             majorView.add(member.getIdentity());
             majorProducers.add(producers.get(i));
         }
+
+        majorGroup.add(clusterMasterNode);
+        fullView.add(clusterMasterNode.getIdentity());
+        majorView.add(clusterMasterNode.getIdentity());
 
         // Form the minor partition
         for (int i = majorPartitionSize; i < coordinators.size(); i++) {
@@ -528,9 +670,8 @@ public class TestProducerCluster {
         assertPartitionActive(majorPartition);
 
         log.info("Failing over");
-        Switchboard leader = memberContexts.get(0).getBean(Switchboard.class);
-        leader.ringCast(new Message(leader.getId(), FailoverMessage.PREPARE));
-        leader.ringCast(new Message(leader.getId(), FailoverMessage.FAILOVER));
+        clusterMaster.prepare();
+        clusterMaster.failover();
 
         // major partition should be stable and active
         assertPartitionStable(majorPartition);
@@ -560,8 +701,11 @@ public class TestProducerCluster {
 
         // Major partition should be awaiting failover
         assertPartitionAwaitingFailover(majorPartition);
-        leader.ringCast(new Message(leader.getId(), FailoverMessage.PREPARE));
-        leader.ringCast(new Message(leader.getId(), FailoverMessage.FAILOVER));
+        // Minor partition should be stable
+        assertPartitionStable(minorPartition);
+
+        clusterMaster.prepare();
+        clusterMaster.failover();
 
         // Only the major partition should be active 
         assertPartitionActive(majorPartition);
@@ -579,20 +723,6 @@ public class TestProducerCluster {
         return contexts;
     }
 
-    protected void assertPartitionAwaitingFailover(List<Coordinator> partition)
-                                                                               throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
-            waitFor("Coordinator never entered the awaiting failover state: "
-                    + coordinator, new Condition() {
-                @Override
-                public boolean value() {
-                    return c.getState() == CoordinatorFSM.AwaitingFailover;
-                }
-            }, 120000, 1000);
-        }
-    }
-
     protected void assertPartitionActive(List<Coordinator> partition)
                                                                      throws InterruptedException {
         for (Coordinator coordinator : partition) {
@@ -602,6 +732,20 @@ public class TestProducerCluster {
                 @Override
                 public boolean value() {
                     return c.isActive();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    protected void assertPartitionAwaitingFailover(List<Coordinator> partition)
+                                                                               throws InterruptedException {
+        for (Coordinator coordinator : partition) {
+            final Coordinator c = coordinator;
+            waitFor("Coordinator never entered the awaiting failover state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return c.getState() == CoordinatorFSM.AwaitingFailover;
                 }
             }, 120000, 1000);
         }
