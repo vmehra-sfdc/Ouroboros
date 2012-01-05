@@ -153,21 +153,6 @@ public class Producer {
         source.closed(channel);
     }
 
-    public void failover(Collection<Node> deadMembers,
-                         Collection<Node> inactiveWeavers,
-                         Map<Node, ContactInformation> yellowPages) {
-        Map<UUID, Long> newPrimaries;
-        try {
-            newPrimaries = failover(deadMembers);
-        } catch (InterruptedException e) {
-            return;
-        }
-        if (newPrimaries.size() != 0) {
-            source.assumePrimary(newPrimaries);
-        }
-        createSpinners(inactiveWeavers, yellowPages);
-    }
-
     public Node getId() {
         return self;
     }
@@ -179,22 +164,21 @@ public class Producer {
      *            - the id of the channel
      */
     public void opened(UUID channel) {
-        mapSpinner(channel);
-        source.opened(channel);
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Channel %s opened on %s %s", channel,
-                                   roleFor(channel), this));
-        }
-    }
-
-    private String roleFor(UUID channel) {
         Node[] pair = getProducerReplicationPair(channel);
-        if (self.equals(pair[0])) {
-            return "primary";
-        } else if (self.equals(pair[1])) {
-            return "mirror";
+        if (self.equals(pair[1])) {
+            mirrors.put(channel, 0L);
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Channel %s opened on mirror %s",
+                                       channel, this));
+            }
+        } else {
+            mapSpinner(channel);
+            source.opened(channel);
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Channel %s opened on primary %s",
+                                       channel, this));
+            }
         }
-        return "UNKNOWN";
     }
 
     /**
@@ -345,13 +329,11 @@ public class Producer {
      * 
      * @param deadMembers
      *            - the deceased
-     * @return the Map of channel ids and their last committed timestamp that
-     *         this node is now serving as the primary producer
      * @throws InterruptedException
      *             - if the thread is interrupted
      */
-    private Map<UUID, Long> failover(Collection<Node> deadMembers)
-                                                                  throws InterruptedException {
+    public void failover(Collection<Node> deadMembers)
+                                                      throws InterruptedException {
         // Coordinate the failover with the publishing threads
         closePublishingGate();
 
@@ -369,20 +351,15 @@ public class Producer {
             UUID channel = entry.getKey();
             Node[] producerPair = getProducerReplicationPair(channel);
             if (deadMembers.contains(producerPair[0])) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("%s is assuming primary role for channel %s from Producer[%s]",
+                                           this, channel,
+                                           producerPair[0].processId));
+                }
                 newPrimaries.put(channel, entry.getValue());
                 mirrored.remove();
-
-                // Map the spinner for this channel
-                Node[] channelPair = getChannelBufferReplicationPair(channel);
-                Spinner spinner = spinners.get(channelPair[0]);
-                if (spinner == null) { // primary is dead, so get mirror
-                    spinner = spinners.get(channelPair[1]);
-                }
-                ChannelState previous = channelState.put(channel,
-                                                         new ChannelState(
-                                                                          spinner,
-                                                                          entry.getValue()));
-                assert previous == null : String.format("Apparently node %s is already primary for %");
+                ChannelState previous = mapSpinner(channel);
+                assert previous == null : String.format("Apparently node %s is already primary for %s");
             }
         }
 
@@ -439,10 +416,12 @@ public class Producer {
         // Let any publishing threads precede
         openPublishingGate();
 
-        return newPrimaries;
+        if (newPrimaries.size() != 0) {
+            source.assumePrimary(newPrimaries);
+        }
     }
 
-    private void mapSpinner(UUID channel) {
+    private ChannelState mapSpinner(UUID channel) {
         Node[] channelPair = getChannelBufferReplicationPair(channel);
         Spinner spinner = spinners.get(channelPair[0]);
         if (spinner == null) {
@@ -457,19 +436,22 @@ public class Producer {
                     log.severe(String.format("Mirror %s for channel %s is down on %s",
                                              channelPair[0], channel, this));
                 }
+                return null;
             } else {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Mapping channel %s to mirror %s on %s",
                                            channel, channelPair[1], this));
                 }
-                channelState.putIfAbsent(channel, new ChannelState(spinner, -1));
+                return channelState.putIfAbsent(channel,
+                                                new ChannelState(spinner, -1));
             }
         } else {
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Mapping channel %s to primary %s on %s",
                                        channel, channelPair[0], this));
             }
-            channelState.putIfAbsent(channel, new ChannelState(spinner, -1));
+            return channelState.putIfAbsent(channel, new ChannelState(spinner,
+                                                                      -1));
         }
     }
 

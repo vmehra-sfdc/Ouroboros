@@ -392,6 +392,11 @@ public class Coordinator implements Member {
             log.info(String.format("Initiating failover on %s", self));
         }
         filterSystemMembership();
+        try {
+            producer.failover(switchboard.getDeadMembers());
+        } catch (InterruptedException e) {
+            return;
+        }
         fsm.failedOver();
     }
 
