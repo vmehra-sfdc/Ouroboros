@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -57,6 +58,9 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * 
  */
 public class Coordinator implements Member {
+    private static enum Pending {
+        PENDING, PRIMARY_OPENED, MIRROR_OPENED
+    };
 
     private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
 
@@ -72,10 +76,11 @@ public class Coordinator implements Member {
     private Node[]                              joiningWeavers  = new Node[0];
     @SuppressWarnings("unused")
     private ConsistentHashFunction<Node>        nextWeaverRing;
+    private final SortedSet<Node>               nextMembership  = new ConcurrentSkipListSet<Node>();
     private final Producer                      producer;
     private final Node                          self;
     private final Switchboard                   switchboard;
-
+    private final ConcurrentMap<UUID, Pending>  pendingChannels = new ConcurrentHashMap<UUID, Coordinator.Pending>();
     private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
 
     public Coordinator(Switchboard switchboard, Producer producer)
@@ -107,6 +112,7 @@ public class Coordinator implements Member {
     @Override
     public void dispatch(BootstrapMessage type, Node sender,
                          Serializable[] arguments, long time) {
+        Node[] nodes = (Node[]) arguments[0];
         switch (type) {
             case BOOTSTAP_PRODUCERS: {
                 if (log.isLoggable(Level.INFO)) {
@@ -114,7 +120,7 @@ public class Coordinator implements Member {
                                            self));
                 }
                 ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
-                for (Node node : (Node[]) arguments[0]) {
+                for (Node node : nodes) {
                     ring.add(node, node.capacity);
                     inactiveMembers.remove(node);
                     activeMembers.add(node);
@@ -126,11 +132,12 @@ public class Coordinator implements Member {
             }
             case BOOTSTRAP_SPINDLES: {
                 ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
-                for (Node node : (Node[]) arguments[0]) {
+                for (Node node : nodes) {
                     ring.add(node, node.capacity);
                     inactiveWeavers.remove(node);
                     activeWeavers.add(node);
                 }
+                producer.createSpinners(activeWeavers, yellowPages);
                 producer.remapWeavers(ring);
                 break;
             }
@@ -145,10 +152,66 @@ public class Coordinator implements Member {
     public void dispatch(ChannelMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
+            case OPEN: {
+                UUID channel = (UUID) arguments[0];
+                if (producer.isResponsibleFor(channel)) {
+                    pendingChannels.put(channel, Pending.PENDING);
+                }
+                break;
+            }
+            case CLOSE: {
+                break;
+            }
             case PRIMARY_OPENED: {
+                UUID channel = (UUID) arguments[0];
+                if (producer.isResponsibleFor(channel)) {
+                    Pending state = pendingChannels.get(channel);
+                    assert state != null : String.format("No pending state for %s on: %",
+                                                         channel, self);
+                    switch (state) {
+                        case PENDING:
+                            pendingChannels.put(channel, Pending.PRIMARY_OPENED);
+                            break;
+                        case PRIMARY_OPENED:
+                            log.severe(String.format("%s already believes that the channel %s has been opened by the primary",
+                                                     self, channel));
+                            break;
+                        case MIRROR_OPENED:
+                            pendingChannels.remove(channel);
+                            producer.opened(channel);
+                            break;
+                        default:
+                            throw new IllegalStateException(
+                                                            String.format("Invalid channel message: %s",
+                                                                          type));
+                    }
+                }
                 break;
             }
             case MIRROR_OPENED: {
+                UUID channel = (UUID) arguments[0];
+                if (producer.isResponsibleFor(channel)) {
+                    Pending state = pendingChannels.get(channel);
+                    assert state != null : String.format("No pending state for %s on: %",
+                                                         channel, self);
+                    switch (state) {
+                        case PENDING:
+                            pendingChannels.put(channel, Pending.MIRROR_OPENED);
+                            break;
+                        case PRIMARY_OPENED:
+                            pendingChannels.remove(channel);
+                            producer.opened(channel);
+                            break;
+                        case MIRROR_OPENED:
+                            log.severe(String.format("%s already believes that the channel %s has been opened by the mirror",
+                                                     self, channel));
+                            break;
+                        default:
+                            throw new IllegalStateException(
+                                                            String.format("Invalid channel message: %s",
+                                                                          type));
+                    }
+                }
                 break;
             }
             default: {
@@ -289,11 +352,13 @@ public class Coordinator implements Member {
      * Remove all dead members and partition out the new members from the
      * members that were part of the previous partition
      */
-    private void filterSystemMembership() {
+    protected void filterSystemMembership() {
         activeMembers.removeAll(switchboard.getDeadMembers());
         activeWeavers.removeAll(switchboard.getDeadMembers());
         inactiveMembers.removeAll(switchboard.getDeadMembers());
         inactiveWeavers.removeAll(switchboard.getDeadMembers());
+        nextMembership.clear();
+        nextMembership.addAll(activeMembers);
     }
 
     /**
@@ -301,6 +366,8 @@ public class Coordinator implements Member {
      */
     protected void cleanUp() {
         joiningMembers = joiningWeavers = new Node[0];
+        pendingChannels.clear();
+        nextMembership.clear();
     }
 
     /**
@@ -337,8 +404,17 @@ public class Coordinator implements Member {
 
     }
 
+    /**
+     * Set the joining members of the receiver
+     * 
+     * @param joiningMembers
+     */
     protected void setJoiningMembers(Node[] joiningMembers) {
+        assert joiningMembers != null : "joining members must not be null";
         this.joiningMembers = joiningMembers;
+        for (Node node : joiningMembers) {
+            nextMembership.add(node);
+        }
     }
 
     protected boolean hasActiveMembers() {

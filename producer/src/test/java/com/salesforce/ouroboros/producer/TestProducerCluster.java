@@ -45,7 +45,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 import org.junit.After;
@@ -67,6 +69,7 @@ import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.partition.Message;
@@ -149,7 +152,9 @@ public class TestProducerCluster {
     }
 
     private static class ClusterMaster implements Member {
-        final Switchboard switchboard;
+        Semaphore                      semaphore = new Semaphore(0);
+        final Switchboard              switchboard;
+        final ScheduledExecutorService timer     = Executors.newSingleThreadScheduledExecutor();
 
         public ClusterMaster(Switchboard switchboard) {
             this.switchboard = switchboard;
@@ -160,6 +165,134 @@ public class TestProducerCluster {
         public void advertise() {
             switchboard.ringCast(new Message(switchboard.getId(),
                                              DiscoveryMessage.ADVERTISE_NOOP));
+        }
+
+        @Override
+        public void becomeInactive() {
+        }
+
+        @Override
+        public void destabilize() {
+        }
+
+        @Override
+        public void dispatch(BootstrapMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+            switch (type) {
+                case BOOTSTRAP_SPINDLES:
+                    semaphore.release();
+                    break;
+                default:
+                    break;
+
+            }
+        }
+
+        @Override
+        public void dispatch(ChannelMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+            semaphore.release();
+        }
+
+        @Override
+        public void dispatch(DiscoveryMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        @Override
+        public void dispatch(FailoverMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        @Override
+        public void dispatch(RebalanceMessage type, Node sender,
+                             Serializable[] arguments, long time) {
+        }
+
+        public void failover() {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             FailoverMessage.FAILOVER));
+        }
+
+        public boolean mirrorOpened(UUID channel, long timeout, TimeUnit unit)
+                                                                              throws InterruptedException {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             ChannelMessage.MIRROR_OPENED,
+                                             new Serializable[] { channel }));
+            return acquire(timeout, unit).get();
+        }
+
+        public boolean open(UUID channel, long timeout, TimeUnit unit)
+                                                                      throws InterruptedException {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             ChannelMessage.OPEN,
+                                             new Serializable[] { channel }));
+            return acquire(timeout, unit).get();
+        }
+
+        public void prepare() {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             FailoverMessage.PREPARE));
+        }
+
+        public boolean primaryOpened(UUID channel, long timeout, TimeUnit unit)
+                                                                               throws InterruptedException {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             ChannelMessage.PRIMARY_OPENED,
+                                             new Serializable[] { channel }));
+            return acquire(timeout, unit).get();
+        }
+
+        public boolean bootstrapSpindles(Node[] spindles, long timeout,
+                                         TimeUnit unit)
+                                                       throws InterruptedException {
+            switchboard.ringCast(new Message(
+                                             switchboard.getId(),
+                                             BootstrapMessage.BOOTSTRAP_SPINDLES,
+                                             (Serializable) spindles));
+            return acquire(timeout, unit).get();
+        }
+
+        @Override
+        public void stabilized() {
+        }
+
+        private AtomicBoolean acquire(long timeout, TimeUnit unit)
+                                                                  throws InterruptedException {
+            final AtomicBoolean acquired = new AtomicBoolean(true);
+            timer.schedule(new Runnable() {
+                @Override
+                public void run() {
+                    acquired.set(false);
+                    semaphore.release();
+                }
+            }, timeout, unit);
+            semaphore.acquire();
+            return acquired;
+        }
+
+    }
+
+    private static class FakeSpindle implements Member {
+        int               PORT = 55555;
+        final Switchboard switchboard;
+
+        public FakeSpindle(Switchboard switchboard) {
+            this.switchboard = switchboard;
+            switchboard.setMember(this);
+        }
+
+        @Override
+        public void advertise() {
+            ContactInformation info = new ContactInformation(
+                                                             new InetSocketAddress(
+                                                                                   "127.0.0.1",
+                                                                                   PORT++),
+                                                             null, null);
+            switchboard.ringCast(new Message(
+                                             switchboard.getId(),
+                                             DiscoveryMessage.ADVERTISE_CHANNEL_BUFFER,
+                                             info, true));
         }
 
         @Override
@@ -195,16 +328,6 @@ public class TestProducerCluster {
                              Serializable[] arguments, long time) {
         }
 
-        public void failover() {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             FailoverMessage.FAILOVER));
-        }
-
-        public void prepare() {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             FailoverMessage.PREPARE));
-        }
-
         @Override
         public void stabilized() {
         }
@@ -216,6 +339,82 @@ public class TestProducerCluster {
         @Bean
         public ClusterMaster clusterMaster() {
             return new ClusterMaster(switchboard());
+        }
+
+        @Override
+        public int getMagic() {
+            try {
+                return Identity.getMagicFromLocalIpAddress();
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        @Override
+        @Bean
+        public AnubisLocator locator() {
+            return null;
+        }
+
+        @Bean
+        public Node memberNode() {
+            return new Node(node(), node(), node());
+        }
+
+        @Override
+        public int node() {
+            return 0;
+        }
+
+        @Bean
+        public Switchboard switchboard() {
+            Switchboard switchboard = new Switchboard(
+                                                      memberNode(),
+                                                      partition(),
+                                                      Generators.timeBasedGenerator());
+            return switchboard;
+        }
+
+        @Bean
+        public ScheduledExecutorService timer() {
+            return Executors.newSingleThreadScheduledExecutor();
+        }
+
+        @Override
+        protected Collection<InetSocketAddress> seedHosts()
+                                                           throws UnknownHostException {
+            return asList(seedContact1(), seedContact2());
+        }
+
+        InetSocketAddress seedContact1() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort1);
+        }
+
+        InetSocketAddress seedContact2() throws UnknownHostException {
+            return new InetSocketAddress("127.0.0.1", testPort2);
+        }
+    }
+
+    @Configuration
+    static class f1 extends FakeSpindleCfg {
+        @Override
+        public int node() {
+            return 1;
+        }
+    }
+
+    @Configuration
+    static class f2 extends FakeSpindleCfg {
+        @Override
+        public int node() {
+            return 2;
+        }
+    }
+
+    static class FakeSpindleCfg extends GossipConfiguration {
+        @Bean
+        public FakeSpindle fakeSpindle() {
+            return new FakeSpindle(switchboard());
         }
 
         @Override
@@ -377,20 +576,6 @@ public class TestProducerCluster {
     }
 
     @Configuration
-    static class w1 extends nodeCfg {
-        @Override
-        public int node() {
-            return 1;
-        }
-
-        @Override
-        protected InetSocketAddress gossipEndpoint()
-                                                    throws UnknownHostException {
-            return seedContact1();
-        }
-    }
-
-    @Configuration
     static class w10 extends nodeCfg {
         @Override
         public int node() {
@@ -399,10 +584,24 @@ public class TestProducerCluster {
     }
 
     @Configuration
-    static class w2 extends nodeCfg {
+    static class w11 extends nodeCfg {
         @Override
         public int node() {
-            return 2;
+            return 11;
+        }
+    }
+
+    @Configuration
+    static class w12 extends nodeCfg {
+        @Override
+        public int node() {
+            return 12;
+        }
+
+        @Override
+        protected InetSocketAddress gossipEndpoint()
+                                                    throws UnknownHostException {
+            return seedContact2();
         }
     }
 
@@ -411,6 +610,12 @@ public class TestProducerCluster {
         @Override
         public int node() {
             return 3;
+        }
+
+        @Override
+        protected InetSocketAddress gossipEndpoint()
+                                                    throws UnknownHostException {
+            return seedContact1();
         }
     }
 
@@ -460,12 +665,6 @@ public class TestProducerCluster {
         public int node() {
             return 9;
         }
-
-        @Override
-        protected InetSocketAddress gossipEndpoint()
-                                                    throws UnknownHostException {
-            return seedContact2();
-        }
     }
 
     private static final Logger                      log     = Logger.getLogger(TestProducerCluster.class.getCanonicalName());
@@ -484,11 +683,13 @@ public class TestProducerCluster {
     private ClusterMaster                            clusterMaster;
     private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs = new Class[] {
-            w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
-            w7.class, w8.class, w9.class, w10.class         };
+            w3.class, w4.class, w5.class, w6.class, w7.class, w8.class,
+            w9.class, w10.class, w11.class, w12.class       };
     private MyController                             controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<Coordinator>                        coordinators;
+    private List<AnnotationConfigApplicationContext> fakeSpindleContexts;
+    private Node[]                                   fakeSpindleNodes;
     private List<ControlNode>                        fullPartition;
     private List<Node>                               fullPartitionId;
     private BitView                                  fullView;
@@ -504,7 +705,6 @@ public class TestProducerCluster {
     private List<Producer>                           minorProducers;
     private BitView                                  minorView;
     private List<Producer>                           producers;
-    @SuppressWarnings("unused")
     private MersenneTwister                          twister = new MersenneTwister(
                                                                                    666);
 
@@ -513,15 +713,18 @@ public class TestProducerCluster {
         testPort1++;
         testPort2++;
         log.info("Setting up initial partition");
-        CountDownLatch initialLatch = new CountDownLatch(configs.length + 1);
+        CountDownLatch initialLatch = new CountDownLatch(configs.length + 3);
         controllerContext = new AnnotationConfigApplicationContext(
                                                                    MyControllerConfig.class);
         controller = controllerContext.getBean(MyController.class);
-        controller.cardinality = configs.length + 1;
+        controller.cardinality = configs.length + 3;
         controller.latch = initialLatch;
         clusterMasterContext = new AnnotationConfigApplicationContext(
                                                                       ClusterMasterCfg.class);
         clusterMaster = clusterMasterContext.getBean(ClusterMaster.class);
+        fakeSpindleContexts = new ArrayList<AnnotationConfigApplicationContext>();
+        fakeSpindleContexts.add(new AnnotationConfigApplicationContext(f1.class));
+        fakeSpindleContexts.add(new AnnotationConfigApplicationContext(f2.class));
         memberContexts = createMembers();
         log.info("Awaiting initial partition stability");
         boolean success = false;
@@ -560,6 +763,16 @@ public class TestProducerCluster {
         minorView = new BitView();
         fullView = new BitView();
 
+        ArrayList<Node> nodes = new ArrayList<Node>();
+        for (AnnotationConfigApplicationContext ctxt : fakeSpindleContexts) {
+            Identity id = ctxt.getBean(Identity.class);
+            fullPartition.add((ControlNode) controller.getNode(id));
+            fullView.add(id);
+            majorView.add(id);
+            nodes.add(ctxt.getBean(Node.class));
+        }
+        fakeSpindleNodes = nodes.toArray(new Node[nodes.size()]);
+
         majorPartition = new ArrayList<Coordinator>();
         minorPartition = new ArrayList<Coordinator>();
 
@@ -589,6 +802,10 @@ public class TestProducerCluster {
         majorGroup.add(clusterMasterNode);
         fullView.add(clusterMasterNode.getIdentity());
         majorView.add(clusterMasterNode.getIdentity());
+        for (AnnotationConfigApplicationContext ctxt : fakeSpindleContexts) {
+            Identity id = ctxt.getBean(Identity.class);
+            majorGroup.add((ControlNode) controller.getNode(id));
+        }
 
         // Form the minor partition
         for (int i = majorPartitionSize; i < coordinators.size(); i++) {
@@ -641,18 +858,26 @@ public class TestProducerCluster {
      */
     @Test
     public void testFailover() throws Exception {
-
-        CountDownLatch latchA = latch(majorGroup);
-        // CountDownLatch latchB = latch(minorGroup);
-
         bootstrap();
 
-        asymmetricallyPartition(latchA);
+        assertTrue("Did not receive the BOOTSTRAP_SPINDLES message",
+                   clusterMaster.bootstrapSpindles(fakeSpindleNodes, 60,
+                                                   TimeUnit.SECONDS));
 
-        // Check to see everything is as expected.
-        for (ControlNode member : majorGroup) {
-            assertEquals(majorView, member.getPartition());
+        ArrayList<UUID> channels = getChannelIds();
+
+        // Open the channels
+        for (UUID channel : channels) {
+            assertTrue("Channel OPEN message not received",
+                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
+            assertTrue("Channel OPEN_PRIMARY message not received",
+                       clusterMaster.primaryOpened(channel, 60,
+                                                   TimeUnit.SECONDS));
+            assertTrue("Channel OPEN_MIRROR message not received",
+                       clusterMaster.mirrorOpened(channel, 60, TimeUnit.SECONDS));
         }
+
+        asymmetricallyPartition();
 
         // major partition should be active and awaiting failover
         assertPartitionAwaitingFailover(majorPartition);
@@ -666,14 +891,7 @@ public class TestProducerCluster {
         assertPartitionStable(majorPartition);
         assertPartitionActive(majorPartition);
 
-        // reform
-        CountDownLatch latch = new CountDownLatch(fullPartition.size());
-        for (ControlNode node : fullPartition) {
-            node.latch = latch;
-            node.cardinality = fullPartition.size();
-        }
-
-        reformPartition(latch);
+        reformPartition();
 
         // Check to see everything is kosher
         for (ControlNode member : fullPartition) {
@@ -707,18 +925,9 @@ public class TestProducerCluster {
      */
     @Test
     public void testPartitioning() throws Exception {
-
-        CountDownLatch latchA = latch(majorGroup);
-        // CountDownLatch latchB = latch(minorGroup);
-
         bootstrap();
 
-        asymmetricallyPartition(latchA);
-
-        // Check to see everything is as expected.
-        for (ControlNode member : majorGroup) {
-            assertEquals(majorView, member.getPartition());
-        }
+        asymmetricallyPartition();
 
         // major partition should be active and awaiting failover
         assertPartitionAwaitingFailover(majorPartition);
@@ -732,14 +941,7 @@ public class TestProducerCluster {
         assertPartitionStable(majorPartition);
         assertPartitionActive(majorPartition);
 
-        // reform
-        CountDownLatch latch = new CountDownLatch(fullPartition.size());
-        for (ControlNode node : fullPartition) {
-            node.latch = latch;
-            node.cardinality = fullPartition.size();
-        }
-
-        reformPartition(latch);
+        reformPartition();
 
         // Check to see everything is kosher
         for (ControlNode member : fullPartition) {
@@ -762,8 +964,8 @@ public class TestProducerCluster {
         assertPartitionStable(coordinators);
     }
 
-    private void asymmetricallyPartition(CountDownLatch latchA)
-                                                               throws InterruptedException {
+    private void asymmetricallyPartition() throws InterruptedException {
+        CountDownLatch latchA = latch(majorGroup);
         log.info("Asymmetrically partitioning");
         controller.asymPartition(majorView);
 
@@ -772,6 +974,11 @@ public class TestProducerCluster {
                    latchA.await(60, TimeUnit.SECONDS));
 
         log.info("Major partition has stabilized");
+
+        // Check to see everything is as expected.
+        for (ControlNode member : majorGroup) {
+            assertEquals(majorView, member.getPartition());
+        }
     }
 
     private void bootstrap() throws InterruptedException {
@@ -790,8 +997,24 @@ public class TestProducerCluster {
         return contexts;
     }
 
-    private void reformPartition(CountDownLatch latch)
-                                                      throws InterruptedException {
+    private ArrayList<UUID> getChannelIds() {
+        int numOfChannels = 100;
+        ArrayList<UUID> channels = new ArrayList<UUID>();
+        for (int i = 0; i < numOfChannels; i++) {
+            UUID channel = new UUID(twister.nextLong(), twister.nextLong());
+            channels.add(channel);
+        }
+        return channels;
+    }
+
+    private void reformPartition() throws InterruptedException {
+
+        // reform
+        CountDownLatch latch = new CountDownLatch(fullPartition.size());
+        for (ControlNode node : fullPartition) {
+            node.latch = latch;
+            node.cardinality = fullPartition.size();
+        }
         // Clear the partition
         log.info("Reforming partition");
         controller.clearPartitions();

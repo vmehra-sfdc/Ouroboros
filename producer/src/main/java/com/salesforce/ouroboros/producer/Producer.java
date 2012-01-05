@@ -181,6 +181,20 @@ public class Producer {
     public void opened(UUID channel) {
         mapSpinner(channel);
         source.opened(channel);
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Channel %s opened on %s %s", channel,
+                                   roleFor(channel), this));
+        }
+    }
+
+    private String roleFor(UUID channel) {
+        Node[] pair = getProducerReplicationPair(channel);
+        if (self.equals(pair[0])) {
+            return "primary";
+        } else if (self.equals(pair[1])) {
+            return "mirror";
+        }
+        return "UNKNOWN";
     }
 
     /**
@@ -428,57 +442,32 @@ public class Producer {
         return newPrimaries;
     }
 
-    /**
-     * Answer the channel buffer process pair responsible for the channel
-     * 
-     * @param channel
-     *            - the id of the channel
-     * @return the array of length 2, containing the primary and mirror Node
-     *         responsible for the channel
-     */
-    private Node[] getChannelBufferReplicationPair(UUID channel) {
-        List<Node> pair = weaverRing.hash(point(channel), 2);
-        return new Node[] { pair.get(0), pair.get(1) };
-    }
-
-    /**
-     * Answer the producer process pair responsible for the channel
-     * 
-     * @param channel
-     *            - the id of the channel
-     * @return the array of length 2, containing the primary and mirror Node
-     *         responsible for the channel
-     */
-    private Node[] getProducerReplicationPair(UUID channel) {
-        List<Node> pair = producerRing.hash(point(channel), 2);
-        return new Node[] { pair.get(0), pair.get(1) };
-    }
-
     private void mapSpinner(UUID channel) {
         Node[] channelPair = getChannelBufferReplicationPair(channel);
         Spinner spinner = spinners.get(channelPair[0]);
         if (spinner == null) {
             if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Primary node %s for channel %s is down, mapping mirror %s",
-                                       channelPair[0], channel, channelPair[1]));
+                log.info(String.format("Primary node %s for channel %s is down, mapping mirror %s on %s",
+                                       channelPair[0], channel, channelPair[1],
+                                       this));
             }
             spinner = spinners.get(channelPair[1]);
             if (spinner == null) {
                 if (log.isLoggable(Level.SEVERE)) {
-                    log.severe(String.format("Mirror %s for channel %s is down",
-                                             channelPair[0], channel));
+                    log.severe(String.format("Mirror %s for channel %s is down on %s",
+                                             channelPair[0], channel, this));
                 }
             } else {
                 if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Mapping channel %s to mirror $s",
-                                           channel, channelPair[1]));
+                    log.info(String.format("Mapping channel %s to mirror %s on %s",
+                                           channel, channelPair[1], this));
                 }
                 channelState.putIfAbsent(channel, new ChannelState(spinner, -1));
             }
         } else {
             if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Mapping channel %s to primary $s",
-                                       channel, channelPair[0]));
+                log.info(String.format("Mapping channel %s to primary %s on %s",
+                                       channel, channelPair[0], this));
             }
             channelState.putIfAbsent(channel, new ChannelState(spinner, -1));
         }
@@ -495,9 +484,9 @@ public class Producer {
     /**
      * Create the spinners to the new set of weavers in the partition.
      */
-    protected void createSpinners(Collection<Node> inactiveWeavers,
+    protected void createSpinners(Collection<Node> weavers,
                                   Map<Node, ContactInformation> yellowPages) {
-        for (Node n : inactiveWeavers) {
+        for (Node n : weavers) {
             ContactInformation info = yellowPages.get(n);
             assert info != null : String.format("Did not find any connection information for node %s",
                                                 n);
@@ -515,11 +504,55 @@ public class Producer {
         }
     }
 
+    /**
+     * Answer the channel buffer process pair responsible for the channel
+     * 
+     * @param channel
+     *            - the id of the channel
+     * @return the array of length 2, containing the primary and mirror Node
+     *         responsible for the channel
+     */
+    protected Node[] getChannelBufferReplicationPair(UUID channel) {
+        assert weaverRing.size() > 1 : String.format("Insufficient weavers in the hashring: %s",
+                                                     weaverRing.size());
+        List<Node> pair = weaverRing.hash(point(channel), 2);
+        return new Node[] { pair.get(0), pair.get(1) };
+    }
+
+    /**
+     * Answer the producer process pair responsible for the channel
+     * 
+     * @param channel
+     *            - the id of the channel
+     * @return the array of length 2, containing the primary and mirror Node
+     *         responsible for the channel
+     */
+    protected Node[] getProducerReplicationPair(UUID channel) {
+        assert producerRing.size() > 1 : String.format("Insufficient producers in the hashring: %s",
+                                                       producerRing.size());
+        List<Node> pair = producerRing.hash(point(channel), 2);
+        return new Node[] { pair.get(0), pair.get(1) };
+    }
+
     protected void openPublishingGate() {
         publishGate.open();
     }
 
     protected void setProducerRing(ConsistentHashFunction<Node> newRing) {
         producerRing = newRing;
+    }
+
+    /**
+     * 
+     * @param channel
+     * @return true if this producer is the primary or secondary for the channel
+     */
+    public boolean isResponsibleFor(UUID channel) {
+        Node[] pair = getProducerReplicationPair(channel);
+        return self.equals(pair[0]) || self.equals(pair[1]);
+    }
+
+    public String toString() {
+        return String.format("Producer[%s]", self.processId);
     }
 }
