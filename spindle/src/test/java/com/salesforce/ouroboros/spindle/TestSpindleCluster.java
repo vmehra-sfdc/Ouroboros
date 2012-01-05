@@ -148,15 +148,6 @@ public class TestSpindleCluster {
                                              DiscoveryMessage.ADVERTISE_NOOP));
         }
 
-        public boolean open(UUID channel, long timeout, TimeUnit unit)
-                                                                      throws InterruptedException {
-            openLatch = new CountDownLatch(2);
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             ChannelMessage.OPEN,
-                                             new Serializable[] { channel }));
-            return openLatch.await(timeout, unit);
-        }
-
         @Override
         public void becomeInactive() {
         }
@@ -198,6 +189,15 @@ public class TestSpindleCluster {
         @Override
         public void dispatch(RebalanceMessage type, Node sender,
                              Serializable[] arguments, long time) {
+        }
+
+        public boolean open(UUID channel, long timeout, TimeUnit unit)
+                                                                      throws InterruptedException {
+            openLatch = new CountDownLatch(2);
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             ChannelMessage.OPEN,
+                                             new Serializable[] { channel }));
+            return openLatch.await(timeout, unit);
         }
 
         @Override
@@ -568,7 +568,7 @@ public class TestSpindleCluster {
         majorWeavers = new ArrayList<Weaver>();
         minorWeavers = new ArrayList<Weaver>();
 
-        int majorPartitionSize = ((coordinators.size()) / 2) + 1;
+        int majorPartitionSize = coordinators.size() / 2 + 1;
 
         // Form the major partition
         for (int i = 0; i < majorPartitionSize; i++) {
@@ -637,28 +637,9 @@ public class TestSpindleCluster {
     @Test
     public void testPartitioning() throws Exception {
 
-        CountDownLatch latchA = latch(majorGroup);
-        // CountDownLatch latchB = latch(minorGroup);
+        bootstrap();
 
-        log.info("Bootstrapping the spindles");
-        coordinators.get(coordinators.size() - 1).initiateBootstrap();
-
-        assertPartitionStable(coordinators);
-        assertPartitionActive(coordinators);
-
-        log.info("Asymmetrically partitioning");
-        controller.asymPartition(majorView);
-
-        log.info("Awaiting stability of minor partition A");
-        assertTrue("major partition did not stabilize",
-                   latchA.await(60, TimeUnit.SECONDS));
-
-        log.info("Major partition has stabilized");
-
-        // Check to see everything is as expected.
-        for (ControlNode member : majorGroup) {
-            assertEquals(majorView, member.getPartition());
-        }
+        asymmetricallyPartition();
 
         // major partition should be stable and active
         assertPartitionStable(majorPartition);
@@ -667,27 +648,7 @@ public class TestSpindleCluster {
         // The other partition should still be unstable.
         // assertEquals(minorGroup.size(), latchB.getCount());
 
-        // reform
-        CountDownLatch latch = new CountDownLatch(fullPartition.size());
-        for (ControlNode node : fullPartition) {
-            node.latch = latch;
-            node.cardinality = fullPartition.size();
-        }
-
-        // Clear the partition
-        log.info("Reforming partition");
-        controller.clearPartitions();
-
-        log.info("Awaiting stability of reformed partition");
-        assertTrue("Full partition did not stablize",
-                   latch.await(60, TimeUnit.SECONDS));
-
-        log.info("Full partition has stabilized");
-
-        // Check to see everything is kosher
-        for (ControlNode member : fullPartition) {
-            assertEquals(fullView, member.getPartition());
-        }
+        reformPartition();
 
         // Entire partition should be stable
         assertPartitionStable(coordinators);
@@ -710,27 +671,9 @@ public class TestSpindleCluster {
     @Test
     public void testRebalancing() throws Exception {
 
-        log.info("Bootstrapping the spindles");
-        Coordinator coordinator = coordinators.get(coordinators.size() - 1);
-        coordinator.initiateBootstrap();
+        bootstrap();
 
-        assertPartitionStable(coordinators);
-        assertPartitionActive(coordinators);
-
-        log.info("Creating some channels");
-
-        int numOfChannels = 100;
-        ArrayList<UUID> channels = new ArrayList<UUID>();
-        for (int i = 0; i < numOfChannels; i++) {
-            UUID channel = new UUID(twister.nextLong(), twister.nextLong());
-            channels.add(channel);
-            log.info(String.format("Opening channel: %s", channel));
-            assertTrue(String.format("Channel %s did not successfully open",
-                                     channel),
-                       clusterMaster.open(channel, 3, TimeUnit.SECONDS));
-        }
-
-        Thread.sleep(2000);
+        ArrayList<UUID> channels = openChannels();
 
         // Construct the hash ring that maps the channels to nodes
         ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
@@ -740,50 +683,19 @@ public class TestSpindleCluster {
 
         assertChannelMappings(channels, weavers, ring);
 
-        CountDownLatch latchA = latch(majorGroup);
-        // CountDownLatch latchB = latch(minorGroup);
-
-        log.info("Asymmetrically partitioning");
-        controller.asymPartition(majorView);
-
-        log.info("Awaiting stability of minor partition A");
-        assertTrue("major partition did not stabilize",
-                   latchA.await(60, TimeUnit.SECONDS));
-
-        log.info("Major partition has stabilized");
-
-        // Check to see everything is as expected.
-        for (ControlNode member : majorGroup) {
-            assertEquals(majorView, member.getPartition());
-        }
+        asymmetricallyPartition();
 
         // major partition should be stable and active
         assertPartitionStable(majorPartition);
         assertPartitionActive(majorPartition);
 
-        // The other partition should still be unstable.
-        // assertEquals(minorGroup.size(), latchB.getCount());
-
         // Filter out all the channels with a primary and secondary on the minor partition
-        List<UUID> lostChannels = new ArrayList<UUID>();
-        for (UUID channel : channels) {
-            if (minorPartitionId.containsAll(ring.hash(point(channel), 2))) {
-                lostChannels.add(channel);
-            }
-        }
-        channels.removeAll(lostChannels);
+        List<UUID> lostChannels = filterChannels(channels, ring);
 
         assertFailoverChannelMappings(channels, majorPartitionId, majorWeavers,
                                       ring);
 
-        // verify lost channels aren't hosted on the major partition
-        for (UUID channel : lostChannels) {
-            for (Weaver weaver : majorWeavers) {
-                assertNull(String.format("%s should not be hosting lost channel %s",
-                                         weaver.getId(), channel),
-                           weaver.eventChannelFor(channel));
-            }
-        }
+        validateLostChannels(lostChannels, majorWeavers);
 
         // Rebalance the open channels across the major partition
         log.info("Initiating rebalance on majority partition");
@@ -794,23 +706,7 @@ public class TestSpindleCluster {
 
         assertPartitionStable(majorPartition);
 
-        // reform
-        CountDownLatch latch = latch(fullPartition);
-
-        // Clear the partition
-        log.info("Reforming partition");
-        controller.clearPartitions();
-
-        log.info("Awaiting stability of reformed partition");
-        assertTrue("Full partition did not stablize",
-                   latch.await(60, TimeUnit.SECONDS));
-
-        log.info("Full partition has stabilized");
-
-        // Check to see everything is kosher
-        for (ControlNode member : fullPartition) {
-            assertEquals(fullView, member.getPartition());
-        }
+        reformPartition();
 
         // Entire partition should be stable
         assertPartitionStable(coordinators);
@@ -825,14 +721,7 @@ public class TestSpindleCluster {
         }
         assertChannelMappings(channels, majorWeavers, ring);
 
-        // validate the lost channels aren't hosted on the major partition members
-        for (UUID channel : lostChannels) {
-            for (Weaver weaver : majorWeavers) {
-                assertNull(String.format("%s should not be hosting lost channel %s",
-                                         weaver.getId(), channel),
-                           weaver.eventChannelFor(channel));
-            }
-        }
+        validateLostChannels(lostChannels, majorWeavers);
 
         log.info("Activating minor partition");
         // Now add the minor partition back into the active set
@@ -856,13 +745,32 @@ public class TestSpindleCluster {
         assertChannelMappings(channels, weavers, ring);
 
         // validate lost channels aren't mapped on the partition members
-        for (UUID channel : lostChannels) {
-            for (Weaver weaver : weavers) {
-                assertNull(String.format("%s should not be hosting lost channel %s",
-                                         weaver.getId(), channel),
-                           weaver.eventChannelFor(channel));
-            }
+        validateLostChannels(lostChannels, weavers);
+    }
+
+    private void asymmetricallyPartition() throws InterruptedException {
+        CountDownLatch latchA = latch(majorGroup);
+        log.info("Asymmetrically partitioning");
+        controller.asymPartition(majorView);
+
+        log.info("Awaiting stability of minor partition A");
+        assertTrue("major partition did not stabilize",
+                   latchA.await(60, TimeUnit.SECONDS));
+
+        log.info("Major partition has stabilized");
+
+        // Check to see everything is as expected.
+        for (ControlNode member : majorGroup) {
+            assertEquals(majorView, member.getPartition());
         }
+    }
+
+    private void bootstrap() throws InterruptedException {
+        log.info("Bootstrapping the spindles");
+        coordinators.get(coordinators.size() - 1).initiateBootstrap();
+
+        assertPartitionStable(coordinators);
+        assertPartitionActive(coordinators);
     }
 
     private List<AnnotationConfigApplicationContext> createMembers() {
@@ -871,6 +779,69 @@ public class TestSpindleCluster {
             contexts.add(new AnnotationConfigApplicationContext(config));
         }
         return contexts;
+    }
+
+    private List<UUID> filterChannels(ArrayList<UUID> channels,
+                                      ConsistentHashFunction<Node> ring) {
+        List<UUID> lostChannels = new ArrayList<UUID>();
+        for (UUID channel : channels) {
+            if (minorPartitionId.containsAll(ring.hash(point(channel), 2))) {
+                lostChannels.add(channel);
+            }
+        }
+        channels.removeAll(lostChannels);
+        return lostChannels;
+    }
+
+    private ArrayList<UUID> openChannels() throws InterruptedException {
+        log.info("Creating some channels");
+
+        int numOfChannels = 100;
+        ArrayList<UUID> channels = new ArrayList<UUID>();
+        for (int i = 0; i < numOfChannels; i++) {
+            UUID channel = new UUID(twister.nextLong(), twister.nextLong());
+            channels.add(channel);
+            log.info(String.format("Opening channel: %s", channel));
+            assertTrue(String.format("Channel %s did not successfully open",
+                                     channel),
+                       clusterMaster.open(channel, 3, TimeUnit.SECONDS));
+        }
+        return channels;
+    }
+
+    private void reformPartition() throws InterruptedException {
+        // reform
+        CountDownLatch latch = new CountDownLatch(fullPartition.size());
+        for (ControlNode node : fullPartition) {
+            node.latch = latch;
+            node.cardinality = fullPartition.size();
+        }
+
+        // Clear the partition
+        log.info("Reforming partition");
+        controller.clearPartitions();
+
+        log.info("Awaiting stability of reformed partition");
+        assertTrue("Full partition did not stablize",
+                   latch.await(60, TimeUnit.SECONDS));
+
+        log.info("Full partition has stabilized");
+
+        // Check to see everything is kosher
+        for (ControlNode member : fullPartition) {
+            assertEquals(fullView, member.getPartition());
+        }
+    }
+
+    private void validateLostChannels(List<UUID> lostChannels,
+                                      List<Weaver> weavers) {
+        for (UUID channel : lostChannels) {
+            for (Weaver weaver : weavers) {
+                assertNull(String.format("%s should not be hosting lost channel %s",
+                                         weaver.getId(), channel),
+                           weaver.eventChannelFor(channel));
+            }
+        }
     }
 
     protected void assertChannelMappings(List<UUID> channels,

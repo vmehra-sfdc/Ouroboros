@@ -162,16 +162,6 @@ public class TestProducerCluster {
                                              DiscoveryMessage.ADVERTISE_NOOP));
         }
 
-        public void prepare() {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             FailoverMessage.PREPARE));
-        }
-
-        public void failover() {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             FailoverMessage.FAILOVER));
-        }
-
         @Override
         public void becomeInactive() {
         }
@@ -203,6 +193,16 @@ public class TestProducerCluster {
         @Override
         public void dispatch(RebalanceMessage type, Node sender,
                              Serializable[] arguments, long time) {
+        }
+
+        public void failover() {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             FailoverMessage.FAILOVER));
+        }
+
+        public void prepare() {
+            switchboard.ringCast(new Message(switchboard.getId(),
+                                             FailoverMessage.PREPARE));
         }
 
         @Override
@@ -631,34 +631,23 @@ public class TestProducerCluster {
     }
 
     /**
-     * Test the partitioning behavior of the Coordinator. Test that we can
-     * asymmetrically partition the coordinators and that the stable partition
-     * stablizes. Then test that we can reform the partition and the reformed
-     * partition stabilzed. Test that the only active members are those that
-     * were part of the minority partition that could stabilize.
+     * Test the failover behavior of the Coordinator. Open a number of channels
+     * on the producers responsible for managing them, push some event batches
+     * to each. Partition the system and assert that the remaining producers
+     * failed over correctly. Recombine the partition, activate the minor
+     * partition members, and assert the correct rebalancing of the producers.
      * 
      * @throws Exception
      */
     @Test
-    public void testPartitioning() throws Exception {
+    public void testFailover() throws Exception {
 
         CountDownLatch latchA = latch(majorGroup);
         // CountDownLatch latchB = latch(minorGroup);
 
-        log.info("Bootstrapping the producers");
-        coordinators.get(coordinators.size() - 1).initiateBootstrap();
+        bootstrap();
 
-        assertPartitionStable(coordinators);
-        assertPartitionActive(coordinators);
-
-        log.info("Asymmetrically partitioning");
-        controller.asymPartition(majorView);
-
-        log.info("Awaiting stability of minor partition A");
-        assertTrue("major partition did not stabilize",
-                   latchA.await(60, TimeUnit.SECONDS));
-
-        log.info("Major partition has stabilized");
+        asymmetricallyPartition(latchA);
 
         // Check to see everything is as expected.
         for (ControlNode member : majorGroup) {
@@ -684,15 +673,7 @@ public class TestProducerCluster {
             node.cardinality = fullPartition.size();
         }
 
-        // Clear the partition
-        log.info("Reforming partition");
-        controller.clearPartitions();
-
-        log.info("Awaiting stability of reformed partition");
-        assertTrue("Full partition did not stablize",
-                   latch.await(60, TimeUnit.SECONDS));
-
-        log.info("Full partition has stabilized");
+        reformPartition(latch);
 
         // Check to see everything is kosher
         for (ControlNode member : fullPartition) {
@@ -715,12 +696,111 @@ public class TestProducerCluster {
         assertPartitionStable(coordinators);
     }
 
+    /**
+     * Test the partitioning behavior of the Coordinator. Test that we can
+     * asymmetrically partition the coordinators and that the stable partition
+     * stablizes. Then test that we can reform the partition and the reformed
+     * partition stabilzed. Test that the only active members are those that
+     * were part of the minority partition that could stabilize.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testPartitioning() throws Exception {
+
+        CountDownLatch latchA = latch(majorGroup);
+        // CountDownLatch latchB = latch(minorGroup);
+
+        bootstrap();
+
+        asymmetricallyPartition(latchA);
+
+        // Check to see everything is as expected.
+        for (ControlNode member : majorGroup) {
+            assertEquals(majorView, member.getPartition());
+        }
+
+        // major partition should be active and awaiting failover
+        assertPartitionAwaitingFailover(majorPartition);
+        assertPartitionActive(majorPartition);
+
+        log.info("Failing over");
+        clusterMaster.prepare();
+        clusterMaster.failover();
+
+        // major partition should be stable and active
+        assertPartitionStable(majorPartition);
+        assertPartitionActive(majorPartition);
+
+        // reform
+        CountDownLatch latch = new CountDownLatch(fullPartition.size());
+        for (ControlNode node : fullPartition) {
+            node.latch = latch;
+            node.cardinality = fullPartition.size();
+        }
+
+        reformPartition(latch);
+
+        // Check to see everything is kosher
+        for (ControlNode member : fullPartition) {
+            assertEquals(fullView, member.getPartition());
+        }
+
+        // Major partition should be awaiting failover
+        assertPartitionAwaitingFailover(majorPartition);
+        // Minor partition should be stable
+        assertPartitionStable(minorPartition);
+
+        clusterMaster.prepare();
+        clusterMaster.failover();
+
+        // Only the major partition should be active 
+        assertPartitionActive(majorPartition);
+        assertPartitionInactive(minorPartition);
+
+        // Entire partition should be stable
+        assertPartitionStable(coordinators);
+    }
+
+    private void asymmetricallyPartition(CountDownLatch latchA)
+                                                               throws InterruptedException {
+        log.info("Asymmetrically partitioning");
+        controller.asymPartition(majorView);
+
+        log.info("Awaiting stability of minor partition A");
+        assertTrue("major partition did not stabilize",
+                   latchA.await(60, TimeUnit.SECONDS));
+
+        log.info("Major partition has stabilized");
+    }
+
+    private void bootstrap() throws InterruptedException {
+        log.info("Bootstrapping the producers");
+        coordinators.get(coordinators.size() - 1).initiateBootstrap();
+
+        assertPartitionStable(coordinators);
+        assertPartitionActive(coordinators);
+    }
+
     private List<AnnotationConfigApplicationContext> createMembers() {
         ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
         for (Class<?> config : configs) {
             contexts.add(new AnnotationConfigApplicationContext(config));
         }
         return contexts;
+    }
+
+    private void reformPartition(CountDownLatch latch)
+                                                      throws InterruptedException {
+        // Clear the partition
+        log.info("Reforming partition");
+        controller.clearPartitions();
+
+        log.info("Awaiting stability of reformed partition");
+        assertTrue("Full partition did not stablize",
+                   latch.await(60, TimeUnit.SECONDS));
+
+        log.info("Full partition has stabilized");
     }
 
     protected void assertPartitionActive(List<Coordinator> partition)
