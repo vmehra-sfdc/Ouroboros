@@ -804,7 +804,7 @@ public class TestSpindleCluster {
             log.info(String.format("Opening channel: %s", channel));
             assertTrue(String.format("Channel %s did not successfully open",
                                      channel),
-                       clusterMaster.open(channel, 3, TimeUnit.SECONDS));
+                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
         }
         return channels;
     }
