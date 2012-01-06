@@ -348,17 +348,9 @@ public class Coordinator implements Member {
         return String.format("Coordinator for producer [%s]", self.processId);
     }
 
-    /**
-     * Remove all dead members and partition out the new members from the
-     * members that were part of the previous partition
-     */
-    protected void filterSystemMembership() {
-        activeMembers.removeAll(switchboard.getDeadMembers());
-        activeWeavers.removeAll(switchboard.getDeadMembers());
-        inactiveMembers.removeAll(switchboard.getDeadMembers());
-        inactiveWeavers.removeAll(switchboard.getDeadMembers());
-        nextMembership.clear();
-        nextMembership.addAll(activeMembers);
+    protected void beginRebalance(Node[] joiningMembers2) {
+        // TODO Auto-generated method stub
+
     }
 
     /**
@@ -368,6 +360,11 @@ public class Coordinator implements Member {
         joiningMembers = joiningWeavers = new Node[0];
         pendingChannels.clear();
         nextMembership.clear();
+    }
+
+    protected void commitTakeover() {
+        // TODO Auto-generated method stub
+
     }
 
     /**
@@ -381,6 +378,20 @@ public class Coordinator implements Member {
         switchboard.ringCast(new Message(self,
                                          BootstrapMessage.BOOTSTAP_PRODUCERS,
                                          (Serializable) joiningMembers));
+    }
+
+    protected void coordinateRebalance() {
+        // TODO Auto-generated method stub
+
+    }
+
+    protected void coordinateTakeover() {
+        // TODO Auto-generated method stub
+
+    }
+
+    protected void destabilizePartition() {
+        switchboard.destabilize();
     }
 
     /**
@@ -400,30 +411,25 @@ public class Coordinator implements Member {
         fsm.failedOver();
     }
 
-    protected boolean isActive() {
-        return active;
-    }
-
-    protected void openChannel(UUID channel) {
-        // TODO Auto-generated method stub
-
-    }
-
     /**
-     * Set the joining members of the receiver
-     * 
-     * @param joiningMembers
+     * Remove all dead members and partition out the new members from the
+     * members that were part of the previous partition
      */
-    protected void setJoiningMembers(Node[] joiningMembers) {
-        assert joiningMembers != null : "joining members must not be null";
-        this.joiningMembers = joiningMembers;
-        for (Node node : joiningMembers) {
-            nextMembership.add(node);
-        }
+    protected void filterSystemMembership() {
+        activeMembers.removeAll(switchboard.getDeadMembers());
+        activeWeavers.removeAll(switchboard.getDeadMembers());
+        inactiveMembers.removeAll(switchboard.getDeadMembers());
+        inactiveWeavers.removeAll(switchboard.getDeadMembers());
+        nextMembership.clear();
+        nextMembership.addAll(activeMembers);
     }
 
     protected boolean hasActiveMembers() {
         return !activeMembers.isEmpty();
+    }
+
+    protected boolean isActive() {
+        return active;
     }
 
     /**
@@ -453,13 +459,31 @@ public class Coordinator implements Member {
         return false;
     }
 
-    protected void beginRebalance(Node[] joiningMembers2) {
+    protected void openChannel(UUID channel) {
         // TODO Auto-generated method stub
 
     }
 
-    protected void coordinateRebalance() {
+    protected void rebalancePrepared() {
         // TODO Auto-generated method stub
 
+    }
+
+    /**
+     * Set the joining members of the receiver
+     * 
+     * @param joiningMembers
+     */
+    protected void setJoiningMembers(Node[] joiningMembers) {
+        assert joiningMembers != null : "joining members must not be null";
+        this.joiningMembers = joiningMembers;
+        for (Node node : joiningMembers) {
+            nextMembership.add(node);
+        }
+    }
+
+    protected boolean tallyComplete() {
+        // TODO Auto-generated method stub
+        return false;
     }
 }

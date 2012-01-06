@@ -23,13 +23,16 @@ digraph Coordinator {
         "CoordinatorFSM::Bootstrapping"
             [label="{Bootstrapping}"];
 
-        "CoordinatorFSM::Rebalancing"
-            [label="{Rebalancing}"];
+        "CoordinatorFSM::Rebalance"
+            [label="{Rebalance}"];
+
+        "CoordinatorFSM::AwaitingTakeover"
+            [label="{AwaitingTakeover}"];
 
         "CoordinatorFSM::Bootstrapping::ControllerFSM"
             [label="{ControllerFSM|O-O\r}"]
 
-        "CoordinatorFSM::Rebalancing::ControllerFSM"
+        "CoordinatorFSM::AwaitingTakeover::ControllerFSM"
             [label="{ControllerFSM|O-O\r}"]
 
         "%start"
@@ -57,8 +60,11 @@ digraph Coordinator {
         "CoordinatorFSM::AwaitingFailover" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
-        "CoordinatorFSM::Stable" -> "CoordinatorFSM::Rebalancing::ControllerFSM"
+        "CoordinatorFSM::Stable" -> "CoordinatorFSM::AwaitingTakeover::ControllerFSM"
             [label="rebalance/\lpush(ControllerFSM::CoordinateRebalance)\l"];
+
+        "CoordinatorFSM::Stable" -> "CoordinatorFSM::Rebalance"
+            [label="beginRebalance/\l"];
 
         "CoordinatorFSM::Stable" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
@@ -69,13 +75,22 @@ digraph Coordinator {
         "CoordinatorFSM::Bootstrapping" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
-        "CoordinatorFSM::Rebalancing" -> "CoordinatorFSM::Unstable"
+        "CoordinatorFSM::Rebalance" -> "CoordinatorFSM::AwaitingTakeover"
+            [label="rebalanced/\l"];
+
+        "CoordinatorFSM::Rebalance" -> "CoordinatorFSM::Unstable"
+            [label="destabilize/\l"];
+
+        "CoordinatorFSM::AwaitingTakeover" -> "CoordinatorFSM::Stable"
+            [label="commitTakeover/\l"];
+
+        "CoordinatorFSM::AwaitingTakeover" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
         "CoordinatorFSM::Bootstrapping::ControllerFSM" -> "CoordinatorFSM::Bootstrapping"
             [label="pop/"]
 
-        "CoordinatorFSM::Rebalancing::ControllerFSM" -> "CoordinatorFSM::Rebalancing"
+        "CoordinatorFSM::AwaitingTakeover::ControllerFSM" -> "CoordinatorFSM::AwaitingTakeover"
             [label="pop/"]
 
         "%start" -> "CoordinatorFSM::Unstable"
@@ -98,10 +113,19 @@ digraph Coordinator {
         "ControllerFSM::CoordinateRebalance"
             [label="{CoordinateRebalance}"];
 
+        "ControllerFSM::Rebalance"
+            [label="{Rebalance}"];
+
+        "ControllerFSM::CoordinateTakeover"
+            [label="{CoordinateTakeover}"];
+
         "ControllerFSM::pop(destabilize)"
             [label="" width=1]
 
         "ControllerFSM::pop(bootstrapped)"
+            [label="" width=1]
+
+        "ControllerFSM::pop(commitTakeover)"
             [label="" width=1]
 
         "ControllerFSM::%end"
@@ -129,7 +153,22 @@ digraph Coordinator {
         "ControllerFSM::CoordinateBootstrap" -> "ControllerFSM::pop(destabilize)"
             [label="destabilize/\l"];
 
+        "ControllerFSM::CoordinateRebalance" -> "ControllerFSM::Rebalance"
+            [label="rebalance/\l"];
+
         "ControllerFSM::CoordinateRebalance" -> "ControllerFSM::pop(destabilize)"
+            [label="destabilize/\l"];
+
+        "ControllerFSM::Rebalance" -> "ControllerFSM::CoordinateTakeover"
+            [label="memberRebalanced/\l"];
+
+        "ControllerFSM::Rebalance" -> "ControllerFSM::pop(destabilize)"
+            [label="destabilize/\l"];
+
+        "ControllerFSM::CoordinateTakeover" -> "ControllerFSM::pop(commitTakeover)"
+            [label="commitTakeover/\l"];
+
+        "ControllerFSM::CoordinateTakeover" -> "ControllerFSM::pop(destabilize)"
             [label="destabilize/\l"];
 
         "ControllerFSM::pop(destabilize)" -> "ControllerFSM::%end"
@@ -137,6 +176,9 @@ digraph Coordinator {
 
         "ControllerFSM::pop(bootstrapped)" -> "ControllerFSM::%end"
             [label="pop(bootstrapped);\l"];
+
+        "ControllerFSM::pop(commitTakeover)" -> "ControllerFSM::%end"
+            [label="pop(commitTakeover);\l"];
 
         "push(ControllerFSM::CoordinateRebalance)" -> "ControllerFSM::CoordinateRebalance"
             [arrowtail=odot];
