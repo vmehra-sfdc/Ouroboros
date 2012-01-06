@@ -534,6 +534,24 @@ public class Producer {
         return self.equals(pair[0]) || self.equals(pair[1]);
     }
 
+    /**
+     * 
+     * @param channel
+     * @return true if this producer is the mirror for the channel
+     */
+    public boolean isActingMirrorFor(UUID channel) {
+        return mirrors.containsKey(channel);
+    }
+
+    /**
+     * 
+     * @param channel
+     * @return true if this producer is the primary for the channel
+     */
+    public boolean isActingPrimaryFor(UUID channel) {
+        return channelState.containsKey(channel);
+    }
+
     public String toString() {
         return String.format("Producer[%s]", self.processId);
     }

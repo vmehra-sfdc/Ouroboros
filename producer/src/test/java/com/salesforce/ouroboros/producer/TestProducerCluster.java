@@ -26,7 +26,9 @@
 package com.salesforce.ouroboros.producer;
 
 import static com.salesforce.ouroboros.producer.Util.waitFor;
+import static com.salesforce.ouroboros.util.Utils.point;
 import static java.util.Arrays.asList;
+import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
@@ -83,6 +85,7 @@ import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
 import com.salesforce.ouroboros.producer.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.producer.Util.Condition;
+import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
 
 /**
@@ -866,16 +869,23 @@ public class TestProducerCluster {
 
         ArrayList<UUID> channels = getChannelIds();
 
+        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+        for (Producer p : producers) {
+            Node n = p.getId();
+            ring.add(n, n.capacity);
+        }
+
         // Open the channels
         for (UUID channel : channels) {
             assertTrue("Channel OPEN message not received",
-                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
+                       clusterMaster.open(channel, 2, TimeUnit.SECONDS));
             assertTrue("Channel OPEN_PRIMARY message not received",
-                       clusterMaster.primaryOpened(channel, 60,
-                                                   TimeUnit.SECONDS));
+                       clusterMaster.primaryOpened(channel, 2, TimeUnit.SECONDS));
             assertTrue("Channel OPEN_MIRROR message not received",
-                       clusterMaster.mirrorOpened(channel, 60, TimeUnit.SECONDS));
+                       clusterMaster.mirrorOpened(channel, 2, TimeUnit.SECONDS));
         }
+
+        assertChannelMappings(channels, producers, ring);
 
         asymmetricallyPartition();
 
@@ -890,6 +900,14 @@ public class TestProducerCluster {
         // major partition should be stable and active
         assertPartitionStable(majorPartition);
         assertPartitionActive(majorPartition);
+
+        // Filter out all the channels with a primary and secondary on the minor partition
+        List<UUID> lostChannels = filterChannels(channels, ring);
+
+        assertFailoverChannelMappings(channels, majorPartitionId,
+                                      majorProducers, ring);
+
+        validateLostChannels(lostChannels, majorProducers);
 
         reformPartition();
 
@@ -912,6 +930,14 @@ public class TestProducerCluster {
 
         // Entire partition should be stable
         assertPartitionStable(coordinators);
+
+        ring = new ConsistentHashFunction<Node>();
+        for (Node node : majorPartitionId) {
+            ring.add(node, node.capacity);
+        }
+        // assertChannelMappings(channels, majorProducers, ring);
+
+        validateLostChannels(lostChannels, majorProducers);
     }
 
     /**
@@ -1104,5 +1130,120 @@ public class TestProducerCluster {
             member.cardinality = group.size();
         }
         return latch;
+    }
+
+    protected void assertChannelMappings(List<UUID> channels,
+                                         List<Producer> producers,
+                                         ConsistentHashFunction<Node> ring) {
+        for (UUID channel : channels) {
+            List<Node> mapping = ring.hash(point(channel), 2);
+            Node primary = mapping.get(0);
+            Node mirror = mapping.get(1);
+            for (Producer producer : producers) {
+                if (primary.equals(producer.getId())) {
+                    assertTrue(String.format("%s should be the primary for %s, but doesn't host it",
+                                             primary, channel),
+                               producer.isActingPrimaryFor(channel));
+                    assertFalse(String.format("%s should be the primary for %s, but believes it is also the mirror",
+                                              primary, channel),
+                                producer.isActingMirrorFor(channel));
+                } else {
+                    if (mirror.equals(producer.getId())) {
+                        assertTrue(String.format("%s should be the mirror for %s, but doesn't host it",
+                                                 mirror, channel),
+                                   producer.isActingMirrorFor(channel));
+                        assertFalse(String.format("%s should be the mirror for %s, but is primary",
+                                                  mirror, channel),
+                                    producer.isActingPrimaryFor(channel));
+                    } else {
+                        assertFalse(String.format("%s claims to host %s as primary, but isn't marked as primary or mirror",
+                                                  producer.getId(), channel),
+                                    producer.isActingPrimaryFor(channel));
+                        assertFalse(String.format("%s claims to host %s as mirror, but isn't marked as mirror",
+                                                  producer.getId(), channel),
+                                    producer.isActingMirrorFor(channel));
+                    }
+                }
+            }
+        }
+    }
+
+    private void validateLostChannels(List<UUID> lostChannels,
+                                      List<Producer> producers) {
+        for (UUID channel : lostChannels) {
+            for (Producer producer : producers) {
+                assertFalse(String.format("%s should not be hosting lost channel %s",
+                                          producer.getId(), channel),
+                            producer.isActingPrimaryFor(channel)
+                                    || producer.isActingPrimaryFor(channel));
+            }
+        }
+    }
+
+    private List<UUID> filterChannels(ArrayList<UUID> channels,
+                                      ConsistentHashFunction<Node> ring) {
+        List<UUID> lostChannels = new ArrayList<UUID>();
+        for (UUID channel : channels) {
+            if (minorPartitionId.containsAll(ring.hash(point(channel), 2))) {
+                lostChannels.add(channel);
+            }
+        }
+        channels.removeAll(lostChannels);
+        return lostChannels;
+    }
+
+    protected void assertFailoverChannelMappings(List<UUID> channels,
+                                                 List<Node> idGroup,
+                                                 List<Producer> producerGroup,
+                                                 ConsistentHashFunction<Node> ring) {
+        for (UUID channel : channels) {
+            List<Node> mapping = ring.hash(point(channel), 2);
+            Node primary = mapping.get(0);
+            Node mirror = mapping.get(1);
+            for (Producer producer : producerGroup) {
+                if (!idGroup.contains(primary)) {
+                    if (mirror.equals(producer.getId())) {
+                        assertTrue(String.format("%s should be the failed over primary for %s, but doesn't host it",
+                                                 mirror, channel),
+                                   producer.isActingPrimaryFor(channel));
+                        assertFalse(String.format("%s should be the failed over primary for %s, but is mirror",
+                                                  mirror, channel),
+                                    producer.isActingMirrorFor(channel));
+                    }
+                } else if (!idGroup.contains(mirror)) {
+                    if (primary.equals(producer.getId())) {
+                        assertTrue(String.format("%s should remain the primary for %s, but doesn't host it",
+                                                 primary, channel),
+                                   producer.isActingPrimaryFor(channel));
+                        assertFalse(String.format("%s should remain the primary for %s, but is mirror",
+                                                  primary, channel),
+                                    producer.isActingMirrorFor(channel));
+                    }
+                } else {
+                    if (primary.equals(producer.getId())) {
+                        assertTrue(String.format("%s should be the primary for %s, but doesn't host it",
+                                                 primary, channel),
+                                   producer.isActingPrimaryFor(channel));
+                        assertFalse(String.format("%s should be the primary for %s, but is mirror",
+                                                  primary, channel),
+                                    producer.isActingMirrorFor(channel));
+                    } else {
+                        if (mirror.equals(producer.getId())) {
+                            assertTrue(String.format("%s should be the mirror for %s, but doesn't host it",
+                                                     mirror, channel),
+                                       producer.isActingMirrorFor(channel));
+                            assertFalse(String.format("%s should be the mirror for %s, but is primary",
+                                                      mirror, channel),
+                                        producer.isActingPrimaryFor(channel));
+                        } else {
+                            assertFalse(String.format("%s claims to host %s, but isn't marked as primary or mirror",
+                                                      producer.getId(), channel),
+                                        producer.isActingMirrorFor(channel)
+                                                || producer.isActingPrimaryFor(channel));
+                        }
+                    }
+                }
+            }
+        }
     }
 }
