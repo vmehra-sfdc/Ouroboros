@@ -42,6 +42,8 @@
         </th>
         <th>
           rebalance
+          <br>
+          (Node[])
         </th>
         <th>
           stabilize
@@ -147,8 +149,11 @@ cleanUp();
         </td>
         <td>
           <pre>
-  Rebalance
-  {}
+[ctxt.isActiveLeader()]
+  Rebalancing/push(CoordinatorFSM::Stable)
+  {
+    beginRebalance(joiningMembers);
+  }
           </pre>
         </td>
         <td>
@@ -185,7 +190,7 @@ cleanUp();
       </tr>
       <tr>
         <td>
-          Rebalance
+          Rebalancing
         </td>
         <td>
         </td>
@@ -286,6 +291,26 @@ cleanUp();
   pop(bootstrapped)
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          CoordinateRebalance
+        </td>
+        <td>
+          <pre>
+    coordinateRebalance();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>

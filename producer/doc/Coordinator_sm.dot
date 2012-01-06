@@ -23,10 +23,13 @@ digraph Coordinator {
         "CoordinatorFSM::Bootstrapping"
             [label="{Bootstrapping}"];
 
-        "CoordinatorFSM::Rebalance"
-            [label="{Rebalance}"];
+        "CoordinatorFSM::Rebalancing"
+            [label="{Rebalancing}"];
 
         "CoordinatorFSM::Bootstrapping::ControllerFSM"
+            [label="{ControllerFSM|O-O\r}"]
+
+        "CoordinatorFSM::Rebalancing::ControllerFSM"
             [label="{ControllerFSM|O-O\r}"]
 
         "%start"
@@ -54,8 +57,8 @@ digraph Coordinator {
         "CoordinatorFSM::AwaitingFailover" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
-        "CoordinatorFSM::Stable" -> "CoordinatorFSM::Rebalance"
-            [label="rebalance/\l"];
+        "CoordinatorFSM::Stable" -> "CoordinatorFSM::Rebalancing::ControllerFSM"
+            [label="rebalance/\lpush(ControllerFSM::CoordinateRebalance)\l"];
 
         "CoordinatorFSM::Stable" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
@@ -66,10 +69,13 @@ digraph Coordinator {
         "CoordinatorFSM::Bootstrapping" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
-        "CoordinatorFSM::Rebalance" -> "CoordinatorFSM::Unstable"
+        "CoordinatorFSM::Rebalancing" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];
 
         "CoordinatorFSM::Bootstrapping::ControllerFSM" -> "CoordinatorFSM::Bootstrapping"
+            [label="pop/"]
+
+        "CoordinatorFSM::Rebalancing::ControllerFSM" -> "CoordinatorFSM::Rebalancing"
             [label="pop/"]
 
         "%start" -> "CoordinatorFSM::Unstable"
@@ -89,6 +95,9 @@ digraph Coordinator {
         "ControllerFSM::CoordinateBootstrap"
             [label="{CoordinateBootstrap}"];
 
+        "ControllerFSM::CoordinateRebalance"
+            [label="{CoordinateRebalance}"];
+
         "ControllerFSM::pop(destabilize)"
             [label="" width=1]
 
@@ -97,6 +106,9 @@ digraph Coordinator {
 
         "ControllerFSM::%end"
             [label="" shape=doublecircle style=filled fillcolor=black width=0.15];
+
+        "push(ControllerFSM::CoordinateRebalance)"
+            [label="" shape=plaintext];
 
         "push(ControllerFSM::Bootstrap)"
             [label="" shape=plaintext];
@@ -117,11 +129,17 @@ digraph Coordinator {
         "ControllerFSM::CoordinateBootstrap" -> "ControllerFSM::pop(destabilize)"
             [label="destabilize/\l"];
 
+        "ControllerFSM::CoordinateRebalance" -> "ControllerFSM::pop(destabilize)"
+            [label="destabilize/\l"];
+
         "ControllerFSM::pop(destabilize)" -> "ControllerFSM::%end"
             [label="pop(destabilize);\l"];
 
         "ControllerFSM::pop(bootstrapped)" -> "ControllerFSM::%end"
             [label="pop(bootstrapped);\l"];
+
+        "push(ControllerFSM::CoordinateRebalance)" -> "ControllerFSM::CoordinateRebalance"
+            [arrowtail=odot];
 
         "push(ControllerFSM::Bootstrap)" -> "ControllerFSM::Bootstrap"
             [arrowtail=odot];

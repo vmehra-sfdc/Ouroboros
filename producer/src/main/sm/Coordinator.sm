@@ -71,8 +71,12 @@ AwaitingFailover{
 }
 
 Stable{
-	rebalance
-		Rebalance{}
+		
+    rebalance(joiningMembers: Node[])
+        [ctxt.isActiveLeader()]
+        Rebalancing/push(ControllerFSM::CoordinateRebalance) {
+        	beginRebalance(joiningMembers);
+        }
 		
 	open(channel:UUID)
 		nil {
@@ -85,7 +89,7 @@ Bootstrapping{
 		Stable{}
 }
 
-Rebalance{}
+Rebalancing{}
 
 Default {
 	destabilize
@@ -108,6 +112,13 @@ Entry{
 {
 	bootstrapped
 		pop(bootstrapped){}
+}
+
+CoordinateRebalance
+Entry {
+	coordinateRebalance();
+}
+{
 }
 
 Default{

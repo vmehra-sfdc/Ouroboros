@@ -264,10 +264,9 @@ public class Producer {
 
     /**
      * Remap the spinners by incorporating the set of new weavers into the
-     * consistent hash ring. This amounts to recalculating the weaver consistent
-     * hash ring and then doing the equivalent of a failover to the newly mapped
-     * primaries: all currently pending pushes for the old primaries will be
-     * reenqueued on the new primaries.
+     * consistent hash ring. This amounts to doing the equivalent of a failover
+     * to the newly mapped primaries: all currently pending pushes for the old
+     * primaries will be reenqueued on the new primaries.
      * 
      * @param nextWeaverRing
      *            - the new weaver hash ring

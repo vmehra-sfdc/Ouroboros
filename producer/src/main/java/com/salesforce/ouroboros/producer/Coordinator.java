@@ -452,4 +452,14 @@ public class Coordinator implements Member {
         }
         return false;
     }
+
+    protected void beginRebalance(Node[] joiningMembers2) {
+        // TODO Auto-generated method stub
+
+    }
+
+    protected void coordinateRebalance() {
+        // TODO Auto-generated method stub
+
+    }
 }
