@@ -47,7 +47,7 @@ import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
+import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorState;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
@@ -267,8 +267,30 @@ public class Coordinator implements Member {
         }
     }
 
-    @Override
     public void dispatch(RebalanceMessage type, Node sender,
+                         Serializable[] arguments, long time,
+                         Switchboard switchboard2) {
+        switch (type) {
+            case PREPARE_FOR_REBALANCE:
+                rebalance((Node[]) arguments[0]);
+                break;
+            case INITIATE_REBALANCE:
+                rebalance();
+                break;
+            case TAKEOVER:
+                rebalanced();
+                break;
+            case REBALANCE_COMPLETE:
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Invalid rebalance message %s",
+                                                              type));
+        }
+    }
+
+    @Override
+    public void dispatch(WeaverRebalanceMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
             case INITIATE_REBALANCE:
@@ -348,9 +370,8 @@ public class Coordinator implements Member {
         return String.format("Coordinator for producer [%s]", self.processId);
     }
 
-    protected void beginRebalance(Node[] joiningMembers2) {
-        // TODO Auto-generated method stub
-
+    protected void beginRebalance(Node[] joiningMembers) {
+        setJoiningMembers(joiningMembers);
     }
 
     /**
@@ -381,8 +402,9 @@ public class Coordinator implements Member {
     }
 
     protected void coordinateRebalance() {
-        // TODO Auto-generated method stub
-
+        switchboard.ringCast(new Message(self,
+                                         RebalanceMessage.INITIATE_REBALANCE),
+                             nextMembership);
     }
 
     protected void coordinateTakeover() {
@@ -460,6 +482,48 @@ public class Coordinator implements Member {
     }
 
     protected void openChannel(UUID channel) {
+        // TODO Auto-generated method stub
+
+    }
+
+    protected void rebalance() {
+        // TODO Auto-generated method stub
+
+    }
+
+    /**
+     * Calculate the rebalancing of the system using the supplied list of
+     * joining producer processes.
+     * 
+     * @param joiningMembers
+     *            - the list of producers that are joining the process group
+     */
+    protected void rebalance(Node[] joiningMembers) {
+        setJoiningMembers(joiningMembers);
+        calculateNextRing();
+        fsm.rebalance();
+    }
+
+    private void calculateNextRing() {
+        // TODO Auto-generated method stub
+
+    }
+
+    /**
+     * The producer cluster has been rebalanced. Switch over to the new
+     * membership and commit the takeover
+     */
+    protected void rebalanced() {
+        activeMembers.clear();
+        activeMembers.addAll(nextMembership);
+        inactiveMembers.removeAll(nextMembership);
+        joiningMembers = new Node[0];
+        commitNextRing();
+        active = true;
+        fsm.commitTakeover();
+    }
+
+    private void commitNextRing() {
         // TODO Auto-generated method stub
 
     }

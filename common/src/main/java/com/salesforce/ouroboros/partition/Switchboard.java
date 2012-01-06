@@ -63,7 +63,7 @@ import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
+import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.partition.messages.ViewElectionMessage;
 import com.salesforce.ouroboros.util.Gate;
 
@@ -107,7 +107,7 @@ public class Switchboard {
         void dispatch(FailoverMessage type, Node sender,
                       Serializable[] arguments, long time);
 
-        void dispatch(RebalanceMessage type, Node sender,
+        void dispatch(WeaverRebalanceMessage type, Node sender,
                       Serializable[] arguments, long time);
 
         /**
@@ -326,7 +326,7 @@ public class Switchboard {
         member.dispatch(type, sender, arguments, time);
     }
 
-    public void dispatchToMember(RebalanceMessage type, Node sender,
+    public void dispatchToMember(WeaverRebalanceMessage type, Node sender,
                                  Serializable[] arguments, long time) {
         member.dispatch(type, sender, arguments, time);
     }

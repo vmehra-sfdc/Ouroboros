@@ -68,7 +68,7 @@ import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
+import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 
 /**
  * 
@@ -168,7 +168,7 @@ public class SwitchboardFunctionalTest {
         }
 
         @Override
-        public void dispatch(RebalanceMessage type, Node sender,
+        public void dispatch(WeaverRebalanceMessage type, Node sender,
                              Serializable[] arguments, long time) {
 
         }

@@ -81,7 +81,7 @@ import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
+import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.producer.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.producer.Util.Condition;
@@ -208,7 +208,7 @@ public class TestProducerCluster {
         }
 
         @Override
-        public void dispatch(RebalanceMessage type, Node sender,
+        public void dispatch(WeaverRebalanceMessage type, Node sender,
                              Serializable[] arguments, long time) {
         }
 
@@ -327,7 +327,7 @@ public class TestProducerCluster {
         }
 
         @Override
-        public void dispatch(RebalanceMessage type, Node sender,
+        public void dispatch(WeaverRebalanceMessage type, Node sender,
                              Serializable[] arguments, long time) {
         }
 

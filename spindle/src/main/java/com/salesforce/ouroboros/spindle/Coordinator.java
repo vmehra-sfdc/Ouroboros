@@ -53,7 +53,7 @@ import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
+import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorState;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
@@ -237,7 +237,7 @@ public class Coordinator implements Member {
     }
 
     @Override
-    public void dispatch(RebalanceMessage type, Node sender,
+    public void dispatch(WeaverRebalanceMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
             case PREPARE_FOR_REBALANCE:
@@ -484,7 +484,7 @@ public class Coordinator implements Member {
      */
     protected void commitTakeover() {
         switchboard.ringCast(new Message(self,
-                                         RebalanceMessage.REBALANCE_COMPLETE));
+                                         WeaverRebalanceMessage.REBALANCE_COMPLETE));
     }
 
     protected void coordinateBootstrap() {
@@ -516,7 +516,7 @@ public class Coordinator implements Member {
         tally.set(nextMembership.size());
         switchboard.ringCast(new Message(
                                          self,
-                                         RebalanceMessage.PREPARE_FOR_REBALANCE,
+                                         WeaverRebalanceMessage.PREPARE_FOR_REBALANCE,
                                          (Serializable) joiningMembers));
     }
 
@@ -540,7 +540,7 @@ public class Coordinator implements Member {
      * Coordinate the takeover of the completion of the rebalancing
      */
     protected void coordinateTakeover() {
-        switchboard.ringCast(new Message(self, RebalanceMessage.TAKEOVER));
+        switchboard.ringCast(new Message(self, WeaverRebalanceMessage.TAKEOVER));
     }
 
     /**
@@ -885,6 +885,6 @@ public class Coordinator implements Member {
     protected void rebalancePrepared() {
         rendezvous = null;
         switchboard.ringCast(new Message(self,
-                                         RebalanceMessage.INITIATE_REBALANCE));
+                                         WeaverRebalanceMessage.INITIATE_REBALANCE));
     }
 }

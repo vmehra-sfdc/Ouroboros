@@ -77,7 +77,7 @@ import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
+import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.spindle.Util.Condition;
@@ -187,7 +187,7 @@ public class TestSpindleCluster {
         }
 
         @Override
-        public void dispatch(RebalanceMessage type, Node sender,
+        public void dispatch(WeaverRebalanceMessage type, Node sender,
                              Serializable[] arguments, long time) {
         }
 
