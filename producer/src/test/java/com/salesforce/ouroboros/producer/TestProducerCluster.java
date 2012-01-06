@@ -878,11 +878,11 @@ public class TestProducerCluster {
         // Open the channels
         for (UUID channel : channels) {
             assertTrue("Channel OPEN message not received",
-                       clusterMaster.open(channel, 2, TimeUnit.SECONDS));
+                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
             assertTrue("Channel OPEN_PRIMARY message not received",
-                       clusterMaster.primaryOpened(channel, 2, TimeUnit.SECONDS));
+                       clusterMaster.primaryOpened(channel, 60, TimeUnit.SECONDS));
             assertTrue("Channel OPEN_MIRROR message not received",
-                       clusterMaster.mirrorOpened(channel, 2, TimeUnit.SECONDS));
+                       clusterMaster.mirrorOpened(channel, 60, TimeUnit.SECONDS));
         }
 
         assertChannelMappings(channels, producers, ring);
