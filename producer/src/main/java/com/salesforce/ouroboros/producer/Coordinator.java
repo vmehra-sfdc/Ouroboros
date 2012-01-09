@@ -27,12 +27,14 @@ package com.salesforce.ouroboros.producer;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -49,6 +51,7 @@ import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorState;
+import com.salesforce.ouroboros.producer.Producer.UpdateState;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
@@ -62,26 +65,23 @@ public class Coordinator implements Member {
         PENDING, PRIMARY_OPENED, MIRROR_OPENED
     };
 
-    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
+    private final static Logger                 log                    = Logger.getLogger(Coordinator.class.getCanonicalName());
 
-    private boolean                             active          = false;
-    private final SortedSet<Node>               activeMembers   = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>               activeWeavers   = new ConcurrentSkipListSet<Node>();
-    private final CoordinatorContext            fsm             = new CoordinatorContext(
-                                                                                         this);
-    private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>               inactiveWeavers = new ConcurrentSkipListSet<Node>();
-    private Node[]                              joiningMembers  = new Node[0];
-    @SuppressWarnings("unused")
-    private Node[]                              joiningWeavers  = new Node[0];
-    @SuppressWarnings("unused")
-    private ConsistentHashFunction<Node>        nextWeaverRing;
-    private final SortedSet<Node>               nextMembership  = new ConcurrentSkipListSet<Node>();
+    private boolean                             active                 = false;
+    private final SortedSet<Node>               activeProducers        = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>               activeWeavers          = new ConcurrentSkipListSet<Node>();
+    private final CoordinatorContext            fsm                    = new CoordinatorContext(
+                                                                                                this);
+    private final SortedSet<Node>               inactiveMembers        = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>               inactiveWeavers        = new ConcurrentSkipListSet<Node>();
+    private Node[]                              joiningProducers       = new Node[0];
+    private final SortedSet<Node>               nextProducerMembership = new ConcurrentSkipListSet<Node>();
     private final Producer                      producer;
     private final Node                          self;
     private final Switchboard                   switchboard;
-    private final ConcurrentMap<UUID, Pending>  pendingChannels = new ConcurrentHashMap<UUID, Coordinator.Pending>();
-    private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
+    private final ConcurrentMap<UUID, Pending>  pendingChannels        = new ConcurrentHashMap<UUID, Coordinator.Pending>();
+    private final Map<Node, ContactInformation> yellowPages            = new ConcurrentHashMap<Node, ContactInformation>();
+    private final AtomicInteger                 tally                  = new AtomicInteger();
 
     public Coordinator(Switchboard switchboard, Producer producer)
                                                                   throws IOException {
@@ -123,7 +123,7 @@ public class Coordinator implements Member {
                 for (Node node : nodes) {
                     ring.add(node, node.capacity);
                     inactiveMembers.remove(node);
-                    activeMembers.add(node);
+                    activeProducers.add(node);
                 }
                 producer.setProducerRing(ring);
                 active = true;
@@ -237,7 +237,7 @@ public class Coordinator implements Member {
                 break;
             case ADVERTISE_PRODUCER:
                 if ((Boolean) arguments[0]) {
-                    activeMembers.add(sender);
+                    activeProducers.add(sender);
                 } else {
                     inactiveMembers.add(sender);
                 }
@@ -267,7 +267,7 @@ public class Coordinator implements Member {
         }
     }
 
-    public void dispatch(RebalanceMessage type, Node sender,
+    public void dispatch(ProducerRebalanceMessage type, Node sender,
                          Serializable[] arguments, long time,
                          Switchboard switchboard2) {
         switch (type) {
@@ -277,6 +277,19 @@ public class Coordinator implements Member {
             case INITIATE_REBALANCE:
                 rebalance();
                 break;
+            case MEMBER_REBALANCED: {
+                if (isActiveLeader()) {
+                    log.info(String.format("%s marked as rebalanced on %s",
+                                           sender, self));
+                    tally.decrementAndGet();
+                    fsm.memberRebalanced();
+                } else {
+                    switchboard.forwardToNextInRing(new Message(sender, type,
+                                                                arguments),
+                                                    nextProducerMembership);
+                }
+                break;
+            }
             case TAKEOVER:
                 rebalanced();
                 break;
@@ -286,6 +299,15 @@ public class Coordinator implements Member {
                 throw new IllegalStateException(
                                                 String.format("Invalid rebalance message %s",
                                                               type));
+        }
+    }
+
+    public void dispatch(UpdateMessage updateMessage, Node sender,
+                         Serializable[] arguments, long time,
+                         Switchboard switchboard2) {
+        Producer.UpdateState[] packet = (UpdateState[]) arguments[1];
+        for (Producer.UpdateState update : packet) {
+
         }
     }
 
@@ -343,7 +365,7 @@ public class Coordinator implements Member {
             throw new IllegalStateException(
                                             "This node must be inactive and the leader to initiate rebalancing");
         }
-        if (activeMembers.size() != 0) {
+        if (activeProducers.size() != 0) {
             throw new IllegalStateException(
                                             "There must be no active members in the partition");
         }
@@ -360,6 +382,35 @@ public class Coordinator implements Member {
         fsm.bootstrapSystem(joiningMembers);
     }
 
+    /**
+     * Initiate the rebalancing of the producer ring using the set of inactive
+     * members
+     */
+    public void initiateRebalance() {
+        initiateRebalance(inactiveMembers.toArray(new Node[inactiveMembers.size()]));
+    }
+
+    /**
+     * Initiate the rebalancing of the producer ring.
+     */
+    public void initiateRebalance(Node[] joiningMembers) {
+        if (!isActiveLeader()) {
+            throw new IllegalStateException(
+                                            "This node must be active and the leader to initiate rebalancing");
+        }
+        if (joiningMembers == null) {
+            throw new IllegalArgumentException(
+                                               "joining members must not be null");
+        }
+        for (Node node : joiningMembers) {
+            if (!inactiveMembers.contains(node)) {
+                throw new IllegalArgumentException(
+                                                   "Joining members must be inactive");
+            }
+        }
+        fsm.rebalance(joiningMembers);
+    }
+
     @Override
     public void stabilized() {
         fsm.stabilize();
@@ -370,22 +421,42 @@ public class Coordinator implements Member {
         return String.format("Coordinator for producer [%s]", self.processId);
     }
 
+    private void calculateNextProducerRing() {
+        ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
+        for (Node node : activeProducers) {
+            newRing.add(node, node.capacity);
+        }
+        for (Node node : joiningProducers) {
+            newRing.add(node, node.capacity);
+        }
+        producer.setNextProducerRing(newRing);
+    }
+
+    private void commitNextProducerRing() {
+        producer.commitProducerRing();
+    }
+
     protected void beginRebalance(Node[] joiningMembers) {
-        setJoiningMembers(joiningMembers);
+        setJoiningProducers(joiningMembers);
     }
 
     /**
      * Clean up any state when destabilizing the partition.
      */
     protected void cleanUp() {
-        joiningMembers = joiningWeavers = new Node[0];
+        joiningProducers = new Node[0];
         pendingChannels.clear();
-        nextMembership.clear();
+        nextProducerMembership.clear();
     }
 
-    protected void commitTakeover() {
-        // TODO Auto-generated method stub
 
+    /**
+     * Commit the takeover of the new primaries and secondaries.
+     */
+    protected void commitTakeover() {
+        switchboard.ringCast(new Message(
+                                         self,
+                                         ProducerRebalanceMessage.REBALANCE_COMPLETE));
     }
 
     /**
@@ -398,18 +469,30 @@ public class Coordinator implements Member {
         }
         switchboard.ringCast(new Message(self,
                                          BootstrapMessage.BOOTSTAP_PRODUCERS,
-                                         (Serializable) joiningMembers));
+                                         (Serializable) joiningProducers));
     }
 
+    /**
+     * The receiver is the controller for the group. Coordinate the rebalancing
+     * of the system by including the new members.
+     */
     protected void coordinateRebalance() {
-        switchboard.ringCast(new Message(self,
-                                         RebalanceMessage.INITIATE_REBALANCE),
-                             nextMembership);
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Coordinating rebalancing on %s", self));
+        }
+        tally.set(nextProducerMembership.size());
+        switchboard.ringCast(new Message(
+                                         self,
+                                         ProducerRebalanceMessage.PREPARE_FOR_REBALANCE,
+                                         (Serializable) joiningProducers));
     }
 
+    /**
+     * Coordinate the takeover of the completion of the rebalancing
+     */
     protected void coordinateTakeover() {
-        // TODO Auto-generated method stub
-
+        switchboard.ringCast(new Message(self,
+                                         ProducerRebalanceMessage.TAKEOVER));
     }
 
     protected void destabilizePartition() {
@@ -438,16 +521,16 @@ public class Coordinator implements Member {
      * members that were part of the previous partition
      */
     protected void filterSystemMembership() {
-        activeMembers.removeAll(switchboard.getDeadMembers());
+        activeProducers.removeAll(switchboard.getDeadMembers());
         activeWeavers.removeAll(switchboard.getDeadMembers());
         inactiveMembers.removeAll(switchboard.getDeadMembers());
         inactiveWeavers.removeAll(switchboard.getDeadMembers());
-        nextMembership.clear();
-        nextMembership.addAll(activeMembers);
+        nextProducerMembership.clear();
+        nextProducerMembership.addAll(activeProducers);
     }
 
     protected boolean hasActiveMembers() {
-        return !activeMembers.isEmpty();
+        return !activeProducers.isEmpty();
     }
 
     protected boolean isActive() {
@@ -461,8 +544,8 @@ public class Coordinator implements Member {
      */
     protected boolean isActiveLeader() {
         if (active) {
-            return activeMembers.isEmpty() ? true
-                                          : activeMembers.last().equals(self);
+            return activeProducers.isEmpty() ? true
+                                            : activeProducers.last().equals(self);
         }
         return false;
     }
@@ -487,8 +570,19 @@ public class Coordinator implements Member {
     }
 
     protected void rebalance() {
-        // TODO Auto-generated method stub
-
+        for (Map.Entry<Node, List<Producer.UpdateState>> remapping : producer.remapProducers().entrySet()) {
+            List<UpdateState> updates = remapping.getValue();
+            int delta = 20;
+            for (int i = 0; i < updates.size();) {
+                List<UpdateState> packet = updates.subList(i, i + delta);
+                switchboard.ringCast(new Message(
+                                                 self,
+                                                 UpdateMessage.UPDATE,
+                                                 new Serializable[] {
+                                                         remapping.getKey(),
+                                                         packet.toArray(new Producer.UpdateState[packet.size()]) }));
+            }
+        }
     }
 
     /**
@@ -499,14 +593,9 @@ public class Coordinator implements Member {
      *            - the list of producers that are joining the process group
      */
     protected void rebalance(Node[] joiningMembers) {
-        setJoiningMembers(joiningMembers);
-        calculateNextRing();
+        setJoiningProducers(joiningMembers);
+        calculateNextProducerRing();
         fsm.rebalance();
-    }
-
-    private void calculateNextRing() {
-        // TODO Auto-generated method stub
-
     }
 
     /**
@@ -514,23 +603,19 @@ public class Coordinator implements Member {
      * membership and commit the takeover
      */
     protected void rebalanced() {
-        activeMembers.clear();
-        activeMembers.addAll(nextMembership);
-        inactiveMembers.removeAll(nextMembership);
-        joiningMembers = new Node[0];
-        commitNextRing();
+        activeProducers.clear();
+        activeProducers.addAll(nextProducerMembership);
+        inactiveMembers.removeAll(nextProducerMembership);
+        joiningProducers = new Node[0];
+        commitNextProducerRing();
         active = true;
         fsm.commitTakeover();
     }
 
-    private void commitNextRing() {
-        // TODO Auto-generated method stub
-
-    }
-
     protected void rebalancePrepared() {
-        // TODO Auto-generated method stub
-
+        switchboard.ringCast(new Message(
+                                         self,
+                                         ProducerRebalanceMessage.INITIATE_REBALANCE));
     }
 
     /**
@@ -538,16 +623,22 @@ public class Coordinator implements Member {
      * 
      * @param joiningMembers
      */
-    protected void setJoiningMembers(Node[] joiningMembers) {
+    protected void setJoiningProducers(Node[] joiningMembers) {
         assert joiningMembers != null : "joining members must not be null";
-        this.joiningMembers = joiningMembers;
+        joiningProducers = joiningMembers;
         for (Node node : joiningMembers) {
-            nextMembership.add(node);
+            nextProducerMembership.add(node);
         }
     }
 
+    /**
+     * @return true if the tally is equal to the required size
+     */
     protected boolean tallyComplete() {
-        // TODO Auto-generated method stub
-        return false;
+        return tally.get() == 0;
+    }
+
+    protected SortedSet<Node> getNextProducerMembership() {
+        return nextProducerMembership;
     }
 }

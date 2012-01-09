@@ -50,6 +50,8 @@ import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.api.producer.UnknownChannelException;
+import com.salesforce.ouroboros.producer.spinner.Batch;
+import com.salesforce.ouroboros.producer.spinner.Spinner;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Gate;
 import com.salesforce.ouroboros.util.rate.Controller;
@@ -100,6 +102,7 @@ public class Producer {
     private final ChannelHandler                    spinnerHandler;
     private final ConcurrentMap<Node, Spinner>      spinners          = new ConcurrentHashMap<Node, Spinner>();
     private ConsistentHashFunction<Node>            weaverRing        = new ConsistentHashFunction<Node>();
+    private ConsistentHashFunction<Node>            nextProducerRing;
 
     public Producer(Node self, EventSource source,
                     ProducerConfiguration configuration) throws IOException {
@@ -238,16 +241,14 @@ public class Producer {
      * channels that this node is serving as the primary have now been moved to
      * a new primary.
      * 
-     * @param nextWeaverRing
-     *            - the new hash ring of weavers
      * @return the update mappings for channels that are moved to new primaries.
      * @throws InterruptedException
      */
-    public Map<Node, List<UpdateState>> remapProducers(ConsistentHashFunction<Node> nextWeaverRing) {
+    public Map<Node, List<UpdateState>> remapProducers() {
         HashMap<Node, List<UpdateState>> remapped = new HashMap<Node, List<UpdateState>>();
         for (Iterator<Entry<UUID, ChannelState>> mappings = channelState.entrySet().iterator(); mappings.hasNext();) {
             Entry<UUID, ChannelState> mapping = mappings.next();
-            Node primary = nextWeaverRing.hash(point(mapping.getKey()));
+            Node primary = nextProducerRing.hash(point(mapping.getKey()));
             if (!primary.equals(self)) {
                 List<UpdateState> updates = remapped.get(primary);
                 if (updates == null) {
@@ -256,7 +257,6 @@ public class Producer {
                 }
                 updates.add(new UpdateState(mapping.getKey(),
                                             mapping.getValue().timestamp));
-                mappings.remove();
             }
         }
         return remapped;
@@ -553,5 +553,21 @@ public class Producer {
 
     public String toString() {
         return String.format("Producer[%s]", self.processId);
+    }
+
+    public void setNextProducerRing(ConsistentHashFunction<Node> newRing) {
+        nextProducerRing = newRing;
+    }
+
+    public void commitProducerRing() {
+        producerRing = nextProducerRing;
+        for (Iterator<Entry<UUID, ChannelState>> mappings = channelState.entrySet().iterator(); mappings.hasNext();) {
+            Entry<UUID, ChannelState> mapping = mappings.next();
+            Node primary = nextProducerRing.hash(point(mapping.getKey()));
+            if (!primary.equals(self)) {
+                mappings.remove();
+            }
+        }
+        nextProducerRing = null;
     }
 }

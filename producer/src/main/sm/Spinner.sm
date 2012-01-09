@@ -33,7 +33,7 @@
 // The FSM of the Spinner handshake protocol
 
 %class Spinner
-%package com.salesforce.ouroboros.producer
+%package com.salesforce.ouroboros.producer.spinner
 
 %access public
 

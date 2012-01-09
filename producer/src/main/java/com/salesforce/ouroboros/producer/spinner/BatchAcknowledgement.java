@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer;
+package com.salesforce.ouroboros.producer.spinner;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -32,7 +32,7 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
-import com.salesforce.ouroboros.producer.BatchAcknowledgementContext.BatchAcknowledgementState;
+import com.salesforce.ouroboros.producer.spinner.BatchAcknowledgementContext.BatchAcknowledgementState;
 
 /**
  * The state machine implementing the batch event acknowledgement protocol

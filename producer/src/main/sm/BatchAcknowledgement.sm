@@ -33,7 +33,7 @@
 // The FSM for writing event batches to channel buffers.
 
 %class BatchAcknowledgement
-%package com.salesforce.ouroboros.producer
+%package com.salesforce.ouroboros.producer.spinner
 %access public
 
 %start BatchAcknowledgementFSM::Suspended

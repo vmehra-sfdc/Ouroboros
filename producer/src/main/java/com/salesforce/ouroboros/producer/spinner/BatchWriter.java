@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer;
+package com.salesforce.ouroboros.producer.spinner;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -40,8 +40,8 @@ import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
-import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterFSM;
-import com.salesforce.ouroboros.producer.BatchWriterContext.BatchWriterState;
+import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterFSM;
+import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterState;
 
 /**
  * The event action context for the batch writing protocol FSM

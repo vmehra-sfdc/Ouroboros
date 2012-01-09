@@ -603,6 +603,7 @@ public class Weaver implements Bundle {
                 }
             }
         }
+        nextRing = null;
     }
 
     /**

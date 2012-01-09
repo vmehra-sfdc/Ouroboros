@@ -25,45 +25,37 @@
  */
 package com.salesforce.ouroboros.producer;
 
-import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.UUID;
+import java.io.Serializable;
+import java.util.logging.Logger;
 
-import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.MemberDispatch;
+import com.salesforce.ouroboros.partition.Message;
+import com.salesforce.ouroboros.partition.Switchboard;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class Batch extends BatchIdentity {
-    public final Collection<ByteBuffer> events;
-    public final Node                   mirror;
-    private final long                  created = System.currentTimeMillis();
+public enum UpdateMessage implements MemberDispatch {
+    UPDATE;
+    private static final Logger log = Logger.getLogger(ProducerRebalanceMessage.class.getCanonicalName());
 
-    public Batch(Node mirror, UUID channel, long timestamp,
-                 Collection<ByteBuffer> events) {
-        super(channel, timestamp);
-        assert events != null : "events must not be null";
-        this.events = events;
-        this.mirror = mirror;
-    }
-
-    /**
-     * @return the interval, in milliseconds, between when the batch was
-     *         submitted and when it was acknowledged
-     */
-    public int interval() {
-        return (int) (System.currentTimeMillis() - created);
-    }
-
-    /* (non-Javadoc)
-     * @see java.lang.Object#toString()
-     */
     @Override
-    public String toString() {
-        return "Batch [#events=" + events.size() + ", created=" + created
-               + ", channel=" + channel + ", timestamp=" + timestamp + "]";
+    public void dispatch(Switchboard switchboard, Node sender,
+                         Serializable[] arguments, long time) {
+        if (!(switchboard.getMember() instanceof Coordinator)) {
+            log.warning(String.format("ReplicatorMessage %s must be targeted at producer coordinator, not %s",
+                                      this, switchboard.getMember()));
+        }
+        Coordinator coordinator = (Coordinator) switchboard.getMember();
+        if (!coordinator.getId().equals(arguments[0])) {
+            switchboard.forwardToNextInRing(new Message(sender, this, arguments),
+                                            coordinator.getNextProducerMembership());
+        }
+        coordinator.dispatch(this, sender, arguments, time, switchboard);
+
     }
+
 }

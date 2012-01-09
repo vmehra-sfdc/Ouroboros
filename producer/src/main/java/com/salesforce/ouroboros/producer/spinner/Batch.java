@@ -1,4 +1,3 @@
-%{
 /**
  * Copyright (c) 2011, salesforce.com, inc.
  * All rights reserved.
@@ -24,130 +23,47 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.ouroboros.producer.spinner;
+
+import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.UUID;
+
+import com.salesforce.ouroboros.BatchIdentity;
+import com.salesforce.ouroboros.Node;
 
 /**
+ * 
  * @author hhildebrand
+ * 
  */
-%}
+public class Batch extends BatchIdentity {
+    public final Collection<ByteBuffer> events;
+    public final Node                   mirror;
+    private final long                  created = System.currentTimeMillis();
 
-// The FSM for writing event batches to channel buffers.
+    public Batch(Node mirror, UUID channel, long timestamp,
+                 Collection<ByteBuffer> events) {
+        super(channel, timestamp);
+        assert events != null : "events must not be null";
+        this.events = events;
+        this.mirror = mirror;
+    }
 
-%class BatchWriter
-%package com.salesforce.ouroboros.producer.spinner
-%access public
+    /**
+     * @return the interval, in milliseconds, between when the batch was
+     *         submitted and when it was acknowledged
+     */
+    public int interval() {
+        return (int) (System.currentTimeMillis() - created);
+    }
 
-%start BatchWriterFSM::Suspended
-%map BatchWriterFSM
-%%
-Suspended {
-	connect
-		[ctxt.hasPendingBatch()]
-		WriteBatchHeader {
-			nextBatch();
-			selectForWrite();
-		}
-		
-	connect
-		[!ctxt.hasPendingBatch()]
-		Waiting {}
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "Batch [#events=" + events.size() + ", created=" + created
+               + ", channel=" + channel + ", timestamp=" + timestamp + "]";
+    }
 }
-
-Waiting {
-	pushBatch
-		WriteBatchHeader {}
-}
-
-WriteBatchHeader
-Entry {
-	nextBatch();
-}
-{
-	writeReady
-		[!ctxt.writeBatchHeader()]
-		nil {
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{
-			close();
-		}
-
-	writeReady
-		WriteEventHeader{}
-		
-	batchHeaderWritten
-		WriteEventHeader{}
-		
-	queuedEmpty
-		Waiting{}
-} 
-
-WriteEventHeader
-Entry {
-	nextEventHeader();
-}
-{
-	writeReady
-		[!ctxt.writeEventHeader()]
-		nil {
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{
-			close();
-		}
-
-	eventHeaderWritten
-		WritePayload{}
-} 
-
-WritePayload
-Entry {
-	nextPayload();
-}
-{
-	writeReady
-		[!ctxt.inError() && !ctxt.writePayload()]
-		nil{
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{
-			close();
-		}
-		
-	writeReady
-		[!ctxt.batch.isEmpty()]
-		WriteEventHeader{}
-	
-	payloadWritten
-		WriteEventHeader{}
-		
-	waiting
-		Waiting{}
-}
-
-Closed {
-}
-
-Default {
-	failover
-		Closed{
-			close();
-		}
-
-	pushBatch
-		nil {}
-
-	close
-		Closed{
-			close();
-		}
-}
-%%

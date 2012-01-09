@@ -30,6 +30,7 @@ import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.MemberDispatch;
+import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 
 /**
@@ -37,45 +38,20 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * @author hhildebrand
  * 
  */
-public enum RebalanceMessage implements MemberDispatch {
-    INITIATE_REBALANCE {
-        @Override
-        protected void disptach(Coordinator coordinator, Node sender,
-                                Serializable[] arguments, long time,
-                                Switchboard switchboard) {
-            // TODO Auto-generated method stub
+public enum ProducerRebalanceMessage implements MemberDispatch {
+    INITIATE_REBALANCE, PREPARE_FOR_REBALANCE, MEMBER_REBALANCED {
 
+        @Override
+        void dispatch(Switchboard switchboard, Node sender,
+                      Serializable[] arguments, long time,
+                      Coordinator coordinator) {
+            coordinator.dispatch(this, sender, arguments, time, switchboard);
         }
+
     },
-    PREPARE_FOR_REBALANCE {
-        @Override
-        protected void disptach(Coordinator coordinator, Node sender,
-                                Serializable[] arguments, long time,
-                                Switchboard switchboard) {
-            // TODO Auto-generated method stub
+    TAKEOVER, REBALANCE_COMPLETE;
 
-        }
-    },
-    TAKEOVER {
-        @Override
-        protected void disptach(Coordinator coordinator, Node sender,
-                                Serializable[] arguments, long time,
-                                Switchboard switchboard) {
-            // TODO Auto-generated method stub
-
-        }
-    },
-    REBALANCE_COMPLETE {
-        @Override
-        protected void disptach(Coordinator coordinator, Node sender,
-                                Serializable[] arguments, long time,
-                                Switchboard switchboard) {
-            // TODO Auto-generated method stub
-
-        }
-    };
-
-    private static final Logger log = Logger.getLogger(RebalanceMessage.class.getCanonicalName());
+    private static final Logger log = Logger.getLogger(ProducerRebalanceMessage.class.getCanonicalName());
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
@@ -84,13 +60,15 @@ public enum RebalanceMessage implements MemberDispatch {
             log.warning(String.format("ReplicatorMessage %s must be targeted at producer coordinator, not %s",
                                       this, switchboard.getMember()));
         }
-        ((Coordinator) switchboard.getMember()).dispatch(this, sender,
-                                                         arguments, time,
-                                                         switchboard);
+        Coordinator coordinator = (Coordinator) switchboard.getMember();
+        dispatch(switchboard, sender, arguments, time, coordinator);
 
     }
 
-    abstract protected void disptach(Coordinator coordinator, Node sender,
-                                     Serializable[] arguments, long time,
-                                     Switchboard switchboard);
+    void dispatch(Switchboard switchboard, Node sender,
+                  Serializable[] arguments, long time, Coordinator coordinator) {
+        coordinator.dispatch(this, sender, arguments, time, switchboard);
+        switchboard.forwardToNextInRing(new Message(sender, this, arguments),
+                                        coordinator.getNextProducerMembership());
+    }
 }
