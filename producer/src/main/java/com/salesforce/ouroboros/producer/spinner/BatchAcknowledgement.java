@@ -101,7 +101,9 @@ public class BatchAcknowledgement {
     }
 
     protected void close() {
-        handler.close();
+        if (handler != null) {
+            handler.close();
+        }
     }
 
     protected boolean inError() {

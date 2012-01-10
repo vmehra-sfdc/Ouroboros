@@ -130,7 +130,9 @@ public class BatchWriter {
     }
 
     protected void close() {
-        handler.close();
+        if (handler != null) {
+            handler.close();
+        }
         batch.clear();
         queued.clear();
     }

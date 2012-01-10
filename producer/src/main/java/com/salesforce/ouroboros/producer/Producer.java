@@ -77,6 +77,11 @@ public class Producer {
             this.channel = channel;
             this.timestamp = timestamp;
         }
+
+        @Override
+        public String toString() {
+            return String.format("%s:%s", channel, timestamp);
+        }
     }
 
     private static class ChannelState {
@@ -239,27 +244,45 @@ public class Producer {
     }
 
     /**
-     * Remap the producers by incorporating the set of new producers into the
-     * consistent hash ring of producers. This remapping may result in event
-     * channels that this node is serving as the primary have now been moved to
-     * a new primary.
+     * Answer the remapped primary/mirror pairs using the nextRing
      * 
-     * @return the update mappings for channels that are moved to new primaries.
-     * @throws InterruptedException
+     * @param nextRing
+     *            - the new weaver hash ring
+     * @return the remapping of channels hosted on this node that have changed
+     *         their primary or mirror in the new hash ring
      */
-    public Map<Node, List<UpdateState>> remapProducers() {
-        HashMap<Node, List<UpdateState>> remapped = new HashMap<Node, List<UpdateState>>();
-        for (Iterator<Entry<UUID, ChannelState>> mappings = channelState.entrySet().iterator(); mappings.hasNext();) {
-            Entry<UUID, ChannelState> mapping = mappings.next();
-            Node primary = nextProducerRing.hash(point(mapping.getKey()));
-            if (!primary.equals(self)) {
-                List<UpdateState> updates = remapped.get(primary);
-                if (updates == null) {
-                    updates = new ArrayList<UpdateState>();
-                    remapped.put(primary, updates);
+    protected Map<UUID, Node[][]> remap() {
+        Map<UUID, Node[][]> remapped = new HashMap<UUID, Node[][]>();
+        for (UUID channel : channelState.keySet()) {
+            long channelPoint = point(channel);
+            List<Node> newPair = nextProducerRing.hash(channelPoint, 2);
+            List<Node> oldPair = producerRing.hash(channelPoint, 2);
+            if (oldPair.contains(self)) {
+                if (!oldPair.get(0).equals(newPair.get(0))
+                    || !oldPair.get(1).equals(newPair.get(1))) {
+                    remapped.put(channel,
+                                 new Node[][] {
+                                         new Node[] { oldPair.get(0),
+                                                 oldPair.get(1) },
+                                         new Node[] { newPair.get(0),
+                                                 newPair.get(1) } });
                 }
-                updates.add(new UpdateState(mapping.getKey(),
-                                            mapping.getValue().timestamp));
+            }
+        }
+        for (UUID channel : mirrors.keySet()) {
+            long channelPoint = point(channel);
+            List<Node> newPair = nextProducerRing.hash(channelPoint, 2);
+            List<Node> oldPair = producerRing.hash(channelPoint, 2);
+            if (oldPair.contains(self)) {
+                if (!oldPair.get(0).equals(newPair.get(0))
+                    || !oldPair.get(1).equals(newPair.get(1))) {
+                    remapped.put(channel,
+                                 new Node[][] {
+                                         new Node[] { oldPair.get(0),
+                                                 oldPair.get(1) },
+                                         new Node[] { newPair.get(0),
+                                                 newPair.get(1) } });
+                }
             }
         }
         return remapped;
@@ -529,11 +552,29 @@ public class Producer {
     /**
      * 
      * @param channel
-     * @return true if this producer is the primary or secondary for the channel
+     * @return true if this producer is the primary or mirror for the channel
      */
     public boolean isResponsibleFor(UUID channel) {
         Node[] pair = getProducerReplicationPair(channel);
         return self.equals(pair[0]) || self.equals(pair[1]);
+    }
+
+    /**
+     * 
+     * @param channel
+     * @return true if this producer is the primary for the channel
+     */
+    public boolean isPrimaryFor(UUID channel) {
+        return self.equals(getProducerReplicationPair(channel)[0]);
+    }
+
+    /**
+     * 
+     * @param channel
+     * @return true if this producer is the mirror for the channel
+     */
+    public boolean isMirrorFor(UUID channel) {
+        return self.equals(getProducerReplicationPair(channel)[0]);
     }
 
     /**
@@ -562,7 +603,12 @@ public class Producer {
         nextProducerRing = newRing;
     }
 
-    public void commitProducerRing() {
+    /**
+     * Commit the producer ring and open the channels we're now the primary for.
+     * 
+     * @param rebalanceUpdates
+     */
+    public void commitProducerRing(List<UpdateState> rebalanceUpdates) {
         producerRing = nextProducerRing;
         for (Iterator<Entry<UUID, ChannelState>> mappings = channelState.entrySet().iterator(); mappings.hasNext();) {
             Entry<UUID, ChannelState> mapping = mappings.next();
@@ -571,6 +617,147 @@ public class Producer {
                 mappings.remove();
             }
         }
+        for (Iterator<Entry<UUID, Long>> mappings = mirrors.entrySet().iterator(); mappings.hasNext();) {
+            Entry<UUID, Long> mapping = mappings.next();
+            List<Node> pair = nextProducerRing.hash(point(mapping.getKey()), 2);
+            if (!pair.get(1).equals(self)) {
+                mappings.remove();
+            }
+        }
+        for (UpdateState update : rebalanceUpdates) {
+            if (isPrimaryFor(update.channel)) {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("%s assuming primary for %s", self,
+                                           update));
+                }
+                mapSpinner(update.channel);
+            } else {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("%s assuming mirror for %s", self,
+                                           update));
+                }
+                mirrors.put(update.channel, update.timestamp);
+            }
+        }
         nextProducerRing = null;
+    }
+
+    /**
+     * Rebalance a channel that this node serves as either the primary or
+     * mirror. Add the list of channels to the map of update states that will
+     * perform the state transfer, if needed, between this node and other nodes
+     * also responsible for the channel
+     * 
+     * @param remapped
+     *            - the map of Nodes to the list of updates for that node
+     * 
+     * @param channel
+     *            - the id of the channel to rebalance
+     */
+    public void rebalance(HashMap<Node, List<UpdateState>> remapped,
+                          UUID channel, Node originalPrimary,
+                          Node originalMirror, Node remappedPrimary,
+                          Node remappedMirror, Collection<Node> deadMembers) {
+        ChannelState state = channelState.get(channel);
+        long timestamp;
+        if (state == null) {
+            Long ts = mirrors.get(channel);
+            assert ts != null : String.format("The event channel  %s to rebalance does not exist on %s",
+                                              channel, self);
+            timestamp = ts;
+        } else {
+            timestamp = state.timestamp;
+        }
+        if (self.equals(originalPrimary)) {
+            // self is the primary
+            if (deadMembers.contains(originalMirror)) {
+                // mirror is down
+                if (self.equals(remappedPrimary)) {
+                    // if self is still the primary
+                    // Xerox state to the new mirror
+                    infoLog("Rebalancing for %s from primary %s to new mirror %s",
+                            channel, self, remappedMirror);
+                    remap(channel, timestamp, remappedMirror, remapped);
+                } else if (self.equals(remappedMirror)) {
+                    // Self becomes the new mirror
+                    infoLog("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
+                            channel, self);
+                    remap(channel, timestamp, self, remapped);
+                    remap(channel, timestamp, remappedPrimary, remapped);
+                } else {
+                    // Xerox state to new primary and mirror
+                    infoLog("Rebalancing for %s from old primary %s to new primary %s, new mirror %s",
+                            channel, self, remappedPrimary, remappedMirror);
+                    remap(channel, timestamp, remappedPrimary, remapped);
+                    remap(channel, timestamp, remappedMirror, remapped);
+                }
+            } else if (!self.equals(remappedPrimary)) {
+                // mirror is up
+                // Xerox state to the new primary
+                infoLog("Rebalancing for %s from old primary %s to new primary %s",
+                        channel, self, remappedPrimary);
+                remap(channel, timestamp, remappedPrimary, remapped);
+                if (self.equals(remappedMirror)) {
+                    remap(channel, timestamp, self, remapped);
+                }
+            }
+        } else if (deadMembers.contains(originalPrimary)) {
+            assert self.equals(originalMirror);
+            // self is the secondary
+            // primary is down
+            if (self.equals(remappedMirror)) {
+                // Self is still the mirror
+                // Xerox state to the new primary
+                infoLog("Rebalancing for %s from mirror %s to new primary %s",
+                        channel, self, remappedPrimary);
+                remap(channel, timestamp, remappedPrimary, remapped);
+            } else if (self.equals(remappedPrimary)) {
+                // Self becomes the new primary
+                infoLog("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
+                        channel, self, remappedMirror);
+                remap(channel, timestamp, self, remapped);
+                remap(channel, timestamp, remappedMirror, remapped);
+            } else {
+                // Xerox state to the new primary and mirror
+                infoLog("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s",
+                        channel, self, remappedPrimary, remappedMirror);
+                remap(channel, timestamp, remappedPrimary, remapped);
+                remap(channel, timestamp, remappedMirror, remapped);
+            }
+        } else if (!self.equals(remappedMirror)
+                   && !remappedMirror.equals(originalPrimary)) {
+            assert self.equals(originalMirror);
+            // primary is up
+            // Xerox state to the new mirror
+            infoLog("Rebalancing for %s from old mirror %s to new mirror %s",
+                    channel, self, remappedMirror);
+            remap(channel, timestamp, remappedMirror, remapped);
+        }
+    }
+
+    protected void remap(UUID channel, long timestamp, Node node,
+                         HashMap<Node, List<UpdateState>> remapped) {
+        UpdateState update = new UpdateState(channel, timestamp);
+        List<UpdateState> updates = remapped.get(node);
+        if (updates == null) {
+            updates = new ArrayList<UpdateState>();
+            remapped.put(node, updates);
+        }
+        updates.add(update);
+    }
+
+    private void infoLog(String logString, Object... args) {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Rebalancing for %s from primary %s to new mirror %s",
+                                   args));
+        }
+    }
+
+    public void inactivate() {
+        // TODO - notify source of inactivation
+        channelState.clear();
+        mirrors.clear();
+        spinners.clear();
+        spinnerHandler.closeOpenHandlers();
     }
 }

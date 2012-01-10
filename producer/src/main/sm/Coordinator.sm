@@ -162,9 +162,7 @@ Entry{
 }
 {
 	commitTakeover
-		pop(commitTakeover) {
-			commitTakeover();
-		}
+		pop(commitTakeover) {}
 }
 
 Default{

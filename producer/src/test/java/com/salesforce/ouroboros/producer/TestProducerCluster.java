@@ -947,7 +947,7 @@ public class TestProducerCluster {
         for (Node node : majorPartitionId) {
             ring.add(node, node.capacity);
         }
-        // assertChannelMappings(channels, majorProducers, ring);
+        assertChannelMappings(channels, majorProducers, ring);
 
         validateLostChannels(lostChannels, majorProducers);
 
@@ -970,10 +970,10 @@ public class TestProducerCluster {
         for (Node node : fullPartitionId) {
             ring.add(node, node.capacity);
         }
-        // assertChannelMappings(channels, producers, ring);
+        assertChannelMappings(channels, producers, ring);
 
         // validate lost channels aren't mapped on the partition members
-        // validateLostChannels(lostChannels, producers);
+        validateLostChannels(lostChannels, producers);
     }
 
     /**

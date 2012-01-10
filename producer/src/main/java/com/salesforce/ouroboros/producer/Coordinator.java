@@ -28,10 +28,13 @@ package com.salesforce.ouroboros.producer;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.UUID;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -103,6 +106,7 @@ public class Coordinator implements Member {
 
     @Override
     public void becomeInactive() {
+        producer.inactivate();
         active = false;
     }
 
@@ -295,8 +299,6 @@ public class Coordinator implements Member {
             case TAKEOVER:
                 rebalanced();
                 break;
-            case REBALANCE_COMPLETE:
-                break;
             default:
                 throw new IllegalStateException(
                                                 String.format("Invalid rebalance message %s",
@@ -435,10 +437,6 @@ public class Coordinator implements Member {
         producer.setNextProducerRing(newRing);
     }
 
-    private void commitNextProducerRing() {
-        producer.commitProducerRing();
-    }
-
     protected void beginRebalance(Node[] joiningMembers) {
         setJoiningProducers(joiningMembers);
     }
@@ -450,16 +448,8 @@ public class Coordinator implements Member {
         joiningProducers = new Node[0];
         pendingChannels.clear();
         nextProducerMembership.clear();
-    }
-
-    /**
-     * Commit the takeover of the new primaries and secondaries.
-     */
-    protected void commitTakeover() {
-        switchboard.ringCast(new Message(
-                                         self,
-                                         ProducerRebalanceMessage.REBALANCE_COMPLETE),
-                             nextProducerMembership);
+        tally.set(0);
+        rebalanceUpdates.clear();
     }
 
     /**
@@ -533,6 +523,10 @@ public class Coordinator implements Member {
         nextProducerMembership.addAll(activeProducers);
     }
 
+    protected SortedSet<Node> getNextProducerMembership() {
+        return nextProducerMembership;
+    }
+
     protected boolean hasActiveMembers() {
         return !activeProducers.isEmpty();
     }
@@ -574,28 +568,46 @@ public class Coordinator implements Member {
     }
 
     protected void rebalance() {
-        for (Map.Entry<Node, List<Producer.UpdateState>> remapping : producer.remapProducers().entrySet()) {
-            List<UpdateState> updates = remapping.getValue();
+        rebalance(producer.remap(), switchboard.getDeadMembers());
+    }
+
+    /**
+     * Rebalance the channels which this node has responsibility for
+     * 
+     * @param remapped
+     *            - the mapping of channels to their new primary/mirror pairs
+     * @param deadMembers
+     *            - the producer nodes that have failed and are no longer part
+     *            of the partition
+     */
+    protected void rebalance(Map<UUID, Node[][]> remappping,
+                             Collection<Node> deadMembers) {
+        HashMap<Node, List<UpdateState>> remapped = new HashMap<Node, List<UpdateState>>();
+        for (Entry<UUID, Node[][]> entry : remappping.entrySet()) {
+            producer.rebalance(remapped, entry.getKey(),
+                               entry.getValue()[0][0], entry.getValue()[0][1],
+                               entry.getValue()[1][0], entry.getValue()[1][1],
+                               deadMembers);
+        }
+
+        for (Map.Entry<Node, List<Producer.UpdateState>> entry : remapped.entrySet()) {
+            List<UpdateState> updates = entry.getValue();
             int delta = 20;
             for (int i = 0; i < updates.size();) {
                 List<UpdateState> packet = updates.subList(i,
                                                            Math.min(i + delta,
                                                                     updates.size()));
                 i += delta;
-                System.out.println(String.format("updating from %s", self));
                 switchboard.ringCast(new Message(
                                                  self,
                                                  UpdateMessage.UPDATE,
                                                  new Serializable[] {
-                                                         remapping.getKey(),
-                                                         packet.toArray(new Producer.UpdateState[packet.size()]) }));
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    return;
-                }
+                                                         entry.getKey(),
+                                                         packet.toArray(new Producer.UpdateState[packet.size()]) }),
+                                     nextProducerMembership);
             }
         }
+
         fsm.rebalanced();
         switchboard.ringCast(new Message(
                                          self,
@@ -625,7 +637,10 @@ public class Coordinator implements Member {
         activeProducers.addAll(nextProducerMembership);
         inactiveMembers.removeAll(nextProducerMembership);
         joiningProducers = new Node[0];
-        commitNextProducerRing();
+        producer.createSpinners(activeWeavers, yellowPages);
+        producer.commitProducerRing(rebalanceUpdates);
+        rebalanceUpdates.clear();
+        nextProducerMembership.clear();
         active = true;
         fsm.commitTakeover();
     }
@@ -657,7 +672,7 @@ public class Coordinator implements Member {
         return tally.get() == 0;
     }
 
-    protected SortedSet<Node> getNextProducerMembership() {
-        return nextProducerMembership;
+    protected SortedSet<Node> getActiveProducers() {
+        return activeProducers;
     }
 }

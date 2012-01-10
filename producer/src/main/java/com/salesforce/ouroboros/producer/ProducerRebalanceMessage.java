@@ -49,7 +49,15 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
         }
 
     },
-    TAKEOVER, REBALANCE_COMPLETE;
+    TAKEOVER {
+        void dispatch(Switchboard switchboard, Node sender,
+                      Serializable[] arguments, long time,
+                      Coordinator coordinator) {
+            coordinator.dispatch(this, sender, arguments, time, switchboard);
+            switchboard.forwardToNextInRing(new Message(sender, this, arguments),
+                                            coordinator.getActiveProducers());
+        }
+    };
 
     private static final Logger log = Logger.getLogger(ProducerRebalanceMessage.class.getCanonicalName());
 
