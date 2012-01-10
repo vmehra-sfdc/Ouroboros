@@ -83,7 +83,7 @@ Stable{
 			openChannel(channel);
 		}
     
-    beginRebalance
+    rebalance
         Rebalance{}
 }
 

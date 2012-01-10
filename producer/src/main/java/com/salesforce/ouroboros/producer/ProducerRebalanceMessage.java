@@ -59,6 +59,7 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
         if (!(switchboard.getMember() instanceof Coordinator)) {
             log.warning(String.format("ReplicatorMessage %s must be targeted at producer coordinator, not %s",
                                       this, switchboard.getMember()));
+            return;
         }
         Coordinator coordinator = (Coordinator) switchboard.getMember();
         dispatch(switchboard, sender, arguments, time, coordinator);

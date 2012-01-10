@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.producer;
 import static com.salesforce.ouroboros.util.Utils.point;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -65,9 +66,11 @@ import com.salesforce.ouroboros.util.rate.controllers.RateLimiter;
  */
 public class Producer {
 
-    public class UpdateState {
-        public final UUID channel;
-        public final long timestamp;
+    public static class UpdateState implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        public final UUID         channel;
+        public final long         timestamp;
 
         public UpdateState(UUID channel, long timestamp) {
             super();

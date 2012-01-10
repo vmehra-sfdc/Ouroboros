@@ -64,7 +64,7 @@ digraph Coordinator {
             [label="rebalance/\lpush(ControllerFSM::CoordinateRebalance)\l"];
 
         "CoordinatorFSM::Stable" -> "CoordinatorFSM::Rebalance"
-            [label="beginRebalance/\l"];
+            [label="rebalance/\l"];
 
         "CoordinatorFSM::Stable" -> "CoordinatorFSM::Unstable"
             [label="destabilize/\l"];

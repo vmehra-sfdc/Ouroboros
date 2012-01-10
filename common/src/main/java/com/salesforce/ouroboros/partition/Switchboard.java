@@ -55,6 +55,7 @@ import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 import org.smartfrog.services.anubis.partition.views.View;
 
 import statemap.StateUndefinedException;
+import statemap.TransitionUndefinedException;
 
 import com.fasterxml.uuid.NoArgGenerator;
 import com.salesforce.ouroboros.Node;
@@ -63,8 +64,8 @@ import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.partition.messages.ViewElectionMessage;
+import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.util.Gate;
 
 /**
@@ -147,7 +148,16 @@ public class Switchboard {
                     messageProcessor.execute(new Runnable() {
                         @Override
                         public void run() {
-                            processMessage((Message) obj, sender, time);
+                            try {
+                                processMessage((Message) obj, sender, time);
+                            } catch (TransitionUndefinedException e) {
+                                if (log.isLoggable(Level.WARNING)) {
+                                    log.log(Level.WARNING,
+                                            String.format("Transition error processing message: %s from: %s on %s",
+                                                          obj, sender,
+                                                          self.processId), e);
+                                }
+                            }
                         }
                     });
                 } catch (RejectedExecutionException e) {

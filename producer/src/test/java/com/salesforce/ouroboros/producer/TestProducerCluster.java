@@ -851,16 +851,18 @@ public class TestProducerCluster {
     }
 
     /**
-     * Test the failover behavior of the Coordinator. Open a number of channels
-     * on the producers responsible for managing them, push some event batches
-     * to each. Partition the system and assert that the remaining producers
-     * failed over correctly. Recombine the partition, activate the minor
-     * partition members, and assert the correct rebalancing of the producers.
+     * Test the failover and rebalancing behavior of the Coordinator. Open a
+     * number of channels on the producers responsible for managing them, push
+     * some event batches to each. Partition the system and assert that the
+     * remaining producers failed over correctly. Rebalance the remaining
+     * producers and verify that the rebalance was performed correctly.
+     * Recombine the partition, activate the minor partition members, and assert
+     * the correct rebalancing of the producers.
      * 
      * @throws Exception
      */
     @Test
-    public void testFailover() throws Exception {
+    public void testRebalance() throws Exception {
         bootstrap();
 
         assertTrue("Did not receive the BOOTSTRAP_SPINDLES message",
@@ -880,7 +882,8 @@ public class TestProducerCluster {
             assertTrue("Channel OPEN message not received",
                        clusterMaster.open(channel, 60, TimeUnit.SECONDS));
             assertTrue("Channel OPEN_PRIMARY message not received",
-                       clusterMaster.primaryOpened(channel, 60, TimeUnit.SECONDS));
+                       clusterMaster.primaryOpened(channel, 60,
+                                                   TimeUnit.SECONDS));
             assertTrue("Channel OPEN_MIRROR message not received",
                        clusterMaster.mirrorOpened(channel, 60, TimeUnit.SECONDS));
         }
@@ -908,6 +911,15 @@ public class TestProducerCluster {
                                       majorProducers, ring);
 
         validateLostChannels(lostChannels, majorProducers);
+
+        // Rebalance the open channels across the major partition
+        log.info("Initiating rebalance on majority partition");
+        Coordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
+        assertTrue("coordinator is not the leader",
+                   partitionLeader.isActiveLeader());
+        partitionLeader.initiateRebalance();
+
+        assertPartitionStable(majorPartition);
 
         reformPartition();
 
@@ -938,6 +950,30 @@ public class TestProducerCluster {
         // assertChannelMappings(channels, majorProducers, ring);
 
         validateLostChannels(lostChannels, majorProducers);
+
+        log.info("Activating minor partition");
+        // Now add the minor partition back into the active set
+        ArrayList<Node> minorPartitionNodes = new ArrayList<Node>();
+        for (Coordinator c : minorPartition) {
+            minorPartitionNodes.add(c.getId());
+        }
+        partitionLeader.initiateRebalance(minorPartitionNodes.toArray(new Node[0]));
+
+        // Entire partition should be stable 
+        assertPartitionStable(coordinators);
+
+        // Entire partition should be active
+        assertPartitionActive(coordinators);
+
+        // Everything should be back to normal
+        ring = new ConsistentHashFunction<Node>();
+        for (Node node : fullPartitionId) {
+            ring.add(node, node.capacity);
+        }
+        // assertChannelMappings(channels, producers, ring);
+
+        // validate lost channels aren't mapped on the partition members
+        // validateLostChannels(lostChannels, producers);
     }
 
     /**

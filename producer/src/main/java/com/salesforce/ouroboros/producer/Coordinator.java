@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.producer;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
@@ -82,6 +83,7 @@ public class Coordinator implements Member {
     private final ConcurrentMap<UUID, Pending>  pendingChannels        = new ConcurrentHashMap<UUID, Coordinator.Pending>();
     private final Map<Node, ContactInformation> yellowPages            = new ConcurrentHashMap<Node, ContactInformation>();
     private final AtomicInteger                 tally                  = new AtomicInteger();
+    private final List<UpdateState>             rebalanceUpdates       = new ArrayList<Producer.UpdateState>();
 
     public Coordinator(Switchboard switchboard, Producer producer)
                                                                   throws IOException {
@@ -307,7 +309,7 @@ public class Coordinator implements Member {
                          Switchboard switchboard2) {
         Producer.UpdateState[] packet = (UpdateState[]) arguments[1];
         for (Producer.UpdateState update : packet) {
-
+            rebalanceUpdates.add(update);
         }
     }
 
@@ -413,6 +415,7 @@ public class Coordinator implements Member {
 
     @Override
     public void stabilized() {
+        filterSystemMembership();
         fsm.stabilize();
     }
 
@@ -449,14 +452,14 @@ public class Coordinator implements Member {
         nextProducerMembership.clear();
     }
 
-
     /**
      * Commit the takeover of the new primaries and secondaries.
      */
     protected void commitTakeover() {
         switchboard.ringCast(new Message(
                                          self,
-                                         ProducerRebalanceMessage.REBALANCE_COMPLETE));
+                                         ProducerRebalanceMessage.REBALANCE_COMPLETE),
+                             nextProducerMembership);
     }
 
     /**
@@ -484,7 +487,8 @@ public class Coordinator implements Member {
         switchboard.ringCast(new Message(
                                          self,
                                          ProducerRebalanceMessage.PREPARE_FOR_REBALANCE,
-                                         (Serializable) joiningProducers));
+                                         (Serializable) joiningProducers),
+                             nextProducerMembership);
     }
 
     /**
@@ -492,7 +496,8 @@ public class Coordinator implements Member {
      */
     protected void coordinateTakeover() {
         switchboard.ringCast(new Message(self,
-                                         ProducerRebalanceMessage.TAKEOVER));
+                                         ProducerRebalanceMessage.TAKEOVER),
+                             nextProducerMembership);
     }
 
     protected void destabilizePartition() {
@@ -507,7 +512,6 @@ public class Coordinator implements Member {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Initiating failover on %s", self));
         }
-        filterSystemMembership();
         try {
             producer.failover(switchboard.getDeadMembers());
         } catch (InterruptedException e) {
@@ -574,15 +578,29 @@ public class Coordinator implements Member {
             List<UpdateState> updates = remapping.getValue();
             int delta = 20;
             for (int i = 0; i < updates.size();) {
-                List<UpdateState> packet = updates.subList(i, i + delta);
+                List<UpdateState> packet = updates.subList(i,
+                                                           Math.min(i + delta,
+                                                                    updates.size()));
+                i += delta;
+                System.out.println(String.format("updating from %s", self));
                 switchboard.ringCast(new Message(
                                                  self,
                                                  UpdateMessage.UPDATE,
                                                  new Serializable[] {
                                                          remapping.getKey(),
                                                          packet.toArray(new Producer.UpdateState[packet.size()]) }));
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    return;
+                }
             }
         }
+        fsm.rebalanced();
+        switchboard.ringCast(new Message(
+                                         self,
+                                         ProducerRebalanceMessage.MEMBER_REBALANCED),
+                             nextProducerMembership);
     }
 
     /**
@@ -615,7 +633,8 @@ public class Coordinator implements Member {
     protected void rebalancePrepared() {
         switchboard.ringCast(new Message(
                                          self,
-                                         ProducerRebalanceMessage.INITIATE_REBALANCE));
+                                         ProducerRebalanceMessage.INITIATE_REBALANCE),
+                             nextProducerMembership);
     }
 
     /**
