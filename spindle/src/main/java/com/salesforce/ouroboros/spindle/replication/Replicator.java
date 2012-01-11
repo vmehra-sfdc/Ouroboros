@@ -89,6 +89,7 @@ public class Replicator implements CommunicationsHandler {
     }
 
     public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
+        fsm.setName(Integer.toString(bundle.getId().processId));
         appender = new ReplicatingAppender(bundle);
         this.bundle = bundle;
         this.partner = partner;

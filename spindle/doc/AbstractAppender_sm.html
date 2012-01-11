@@ -99,7 +99,7 @@ beginAppend();
         </td>
         <td>
           <pre>
-[!ctxt.append()]
+[!ctxt.append() && !ctxt.inError()]
   Append
   {
     selectForRead();
@@ -139,7 +139,7 @@ beginAppend();
         </td>
         <td>
           <pre>
-[!ctxt.devNull()]
+[!ctxt.devNull() && !ctxt.inError()]
   DevNull
   {
     selectForRead();
@@ -187,7 +187,7 @@ beginAppend();
         </td>
         <td>
           <pre>
-[!ctxt.readBatchHeader()]
+[!ctxt.readBatchHeader() && !ctxt.inError()]
   ReadBatchHeader
   {
     selectForRead();

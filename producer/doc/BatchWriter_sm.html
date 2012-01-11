@@ -177,7 +177,7 @@
         </td>
         <td>
           <pre>
-[!ctxt.writeBatchHeader()]
+[!ctxt.writeBatchHeader() && !ctxt.inError()]
   WriteBatchHeader
   {
     selectForWrite();
@@ -231,7 +231,7 @@
         </td>
         <td>
           <pre>
-[!ctxt.writeEventHeader()]
+[!ctxt.writeEventHeader() && !ctxt.inError()]
   WriteEventHeader
   {
     selectForWrite();
@@ -286,21 +286,21 @@
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.writePayload()]
+[!ctxt.writePayload() && !ctxt.inError()]
   WritePayload
   {
     selectForWrite();
   }
+
+[!ctxt.batch.isEmpty() && !ctxt.inError()]
+  WriteEventHeader
+  {}
 
 [ctxt.inError()]
   Closed
   {
     close();
   }
-
-[!ctxt.batch.isEmpty()]
-  WriteEventHeader
-  {}
           </pre>
         </td>
         <td>

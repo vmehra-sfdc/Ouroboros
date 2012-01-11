@@ -63,7 +63,7 @@ Entry {
 }
 {
 	writeReady
-		[!ctxt.writeBatchHeader()]
+		[!ctxt.writeBatchHeader() && !ctxt.inError()]
 		nil {
 			selectForWrite();
 		}
@@ -90,7 +90,7 @@ Entry {
 }
 {
 	writeReady
-		[!ctxt.writeEventHeader()]
+		[!ctxt.writeEventHeader() && !ctxt.inError()]
 		nil {
 			selectForWrite();
 		}
@@ -111,20 +111,20 @@ Entry {
 }
 {
 	writeReady
-		[!ctxt.inError() && !ctxt.writePayload()]
+		[!ctxt.writePayload() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}
+		
+	writeReady
+		[!ctxt.batch.isEmpty() && !ctxt.inError()]
+		WriteEventHeader{}
 		
 	writeReady
 		[ctxt.inError()]
 		Closed{
 			close();
 		}
-		
-	writeReady
-		[!ctxt.batch.isEmpty()]
-		WriteEventHeader{}
 	
 	payloadWritten
 		WriteEventHeader{}

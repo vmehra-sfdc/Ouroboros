@@ -107,7 +107,7 @@ getChannelCount();
         </td>
         <td>
           <pre>
-[!ctxt.readChannelCount()]
+[!ctxt.readChannelCount() && !ctxt.inError()]
   ReadChannelCount
   {
     selectForRead();
@@ -189,7 +189,7 @@ getChannelCount();
         </td>
         <td>
           <pre>
-[!ctxt.readChannelHeader()]
+[!ctxt.readChannelHeader() && !ctxt.inError()]
   ReadChannelHeader
   {
     selectForRead();
@@ -243,7 +243,7 @@ getChannelCount();
         </td>
         <td>
           <pre>
-[!ctxt.readSegmentHeader()]
+[!ctxt.readSegmentHeader() && !ctxt.inError()]
   ReadSegmentHeader
   {
     selectForRead();
@@ -289,11 +289,11 @@ getChannelCount();
         </td>
         <td>
           <pre>
-[ctxt.isLastSegment()]
+[ctxt.isLastSegment() && !ctxt.inError()]
   Suspended
   {}
 
-[!ctxt.copySegment()]
+[!ctxt.copySegment() && !ctxt.inError()]
   CopySegment
   {
     selectForRead();
@@ -341,7 +341,7 @@ getChannelCount();
         </td>
         <td>
           <pre>
-[!ctxt.writeAck()]
+[!ctxt.writeAck() && !ctxt.inError()]
   Ack
   {
     selectForWrite();

@@ -134,7 +134,7 @@ inboundHandshake();
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.readHandshake()]
+[!ctxt.readHandshake() && !ctxt.inError()]
   InboundHandshake
   {
     selectForRead();
@@ -180,7 +180,7 @@ inboundHandshake();
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.writeHandshake()]
+[!ctxt.writeHandshake() && !ctxt.inError()]
   OutboundHandshake
   {
     selectForWrite();

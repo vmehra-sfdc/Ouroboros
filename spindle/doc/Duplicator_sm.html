@@ -103,7 +103,7 @@ processHeader();
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.writeHeader()]
+[!ctxt.writeHeader() && !ctxt.inError()]
   WriteHeader
   {
     selectForWrite();
@@ -145,7 +145,7 @@ processHeader();
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.writeHeader()]
+[!ctxt.writeHeader() && !ctxt.inError()]
   WriteBatch
   {
     selectForWrite();

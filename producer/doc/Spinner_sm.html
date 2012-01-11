@@ -107,7 +107,7 @@ processHandshake();
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.writeHandshake()]
+[!ctxt.writeHandshake() && !ctxt.inError()]
   Handshake
   {
     selectForWrite();

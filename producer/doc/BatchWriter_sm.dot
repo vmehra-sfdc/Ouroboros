@@ -87,10 +87,10 @@ digraph BatchWriter {
         "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::Closed"
             [label="close/\l"];
 
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Closed"
+        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"
             [label="writeReady/\l"];
 
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"
+        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Closed"
             [label="writeReady/\l"];
 
         "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"

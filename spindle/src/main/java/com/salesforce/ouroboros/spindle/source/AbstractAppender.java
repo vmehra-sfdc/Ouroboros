@@ -65,6 +65,7 @@ abstract public class AbstractAppender {
 
     public AbstractAppender(Bundle bundle) {
         super();
+        fsm.setName(Integer.toString(bundle.getId().processId));
         this.bundle = bundle;
         batchHeader = createBatchHeader();
     }
@@ -91,23 +92,26 @@ abstract public class AbstractAppender {
             written = segment.transferFrom(handler.getChannel(), position,
                                            remaining);
         } catch (IOException e) {
-            log.log(Level.SEVERE, "Exception during append", e);
+            log.log(Level.SEVERE,
+                    String.format("Exception during append on %s",
+                                  bundle.getId()), e);
             error();
             return false;
         }
         position += written;
         remaining -= written;
         if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Appending, position=%s, remaining=%s, written=%s",
-                                    position, remaining, written));
+            log.finer(String.format("Appending, position=%s, remaining=%s, written=%s on %s",
+                                    position, remaining, written,
+                                    bundle.getId()));
         }
         if (remaining == 0) {
             try {
                 segment.position(position);
             } catch (IOException e) {
                 log.log(Level.SEVERE,
-                        String.format("Cannot determine position in segment: %s",
-                                      segment), e);
+                        String.format("Cannot determine position on channel %s segment: %s on %s",
+                                      eventChannel, segment, bundle.getId()), e);
                 error();
                 return false;
             }
@@ -124,8 +128,8 @@ abstract public class AbstractAppender {
 
     protected void beginAppend() {
         if (eventChannel == null) {
-            log.warning(String.format("No existing event channel for: %s",
-                                      batchHeader));
+            log.warning(String.format("No existing event channel for: %s on %s",
+                                      batchHeader, bundle.getId()));
             fsm.drain();
             return;
         }
@@ -134,7 +138,8 @@ abstract public class AbstractAppender {
         offset = position = logicalSegment.offset;
         remaining = batchHeader.getBatchByteLength();
         if (eventChannel.isDuplicate(batchHeader)) {
-            log.warning(String.format("Duplicate event batch %s", batchHeader));
+            log.warning(String.format("Duplicate event batch %s received on %s",
+                                      batchHeader, bundle.getId()));
             fsm.drain();
             return;
         }
@@ -160,7 +165,9 @@ abstract public class AbstractAppender {
                 return false;
             }
         } catch (IOException e) {
-            log.log(Level.SEVERE, "Exception during append", e);
+            log.log(Level.SEVERE,
+                    String.format("Exception during append on %s",
+                                  bundle.getId()), e);
             error();
             return false;
         }
@@ -186,7 +193,8 @@ abstract public class AbstractAppender {
             try {
                 segment.close();
             } catch (IOException e) {
-                log.finest(String.format("Error closing segment %s", segment));
+                log.finest(String.format("Error closing segment %s on %s",
+                                         segment, bundle.getId()));
             }
         }
         segment = null;
@@ -215,14 +223,16 @@ abstract public class AbstractAppender {
                 inError = true;
             }
         } catch (IOException e) {
-            log.log(Level.SEVERE, "Exception during batch header read", e);
+            log.log(Level.SEVERE,
+                    String.format("Exception during batch header read on %s",
+                                  bundle.getId()), e);
             error();
             return false;
         }
         if (!batchHeader.hasRemaining()) {
             if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Batch header read, header=%s",
-                                        batchHeader));
+                log.finer(String.format("Batch header read, header=%s on %s",
+                                        batchHeader, bundle.getId()));
             }
             eventChannel = bundle.eventChannelFor(batchHeader.getChannel());
             return true;

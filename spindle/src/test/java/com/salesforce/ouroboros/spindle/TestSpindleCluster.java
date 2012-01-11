@@ -38,6 +38,8 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -69,6 +71,8 @@ import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -81,6 +85,7 @@ import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.spindle.Util.Condition;
+import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
 
@@ -90,6 +95,9 @@ import com.salesforce.ouroboros.util.MersenneTwister;
  * 
  */
 public class TestSpindleCluster {
+    private static final int  MAGIC         = 666;
+    private static final Node PRODUCER_NODE = new Node(666);
+
     public static class ControlNode extends NodeData {
         int            cardinality;
         CountDownLatch latch;
@@ -303,6 +311,7 @@ public class TestSpindleCluster {
     }
 
     static class nodeCfg extends GossipConfiguration {
+
         @Bean
         public Coordinator coordinator() throws IOException {
             return new Coordinator(timer(), switchboard(), weaver());
@@ -356,6 +365,7 @@ public class TestSpindleCluster {
             WeaverConfigation weaverConfigation = new WeaverConfigation();
             weaverConfigation.setId(memberNode());
             weaverConfigation.addRoot(directory);
+            weaverConfigation.setMaxSegmentSize(MAX_SEGMENT_SIZE);
             return weaverConfigation;
         }
 
@@ -466,9 +476,10 @@ public class TestSpindleCluster {
         }
     }
 
-    private static final Logger                      log     = Logger.getLogger(TestSpindleCluster.class.getCanonicalName());
-    static int                                       testPort1;
-    static int                                       testPort2;
+    private static final Logger                      log              = Logger.getLogger(TestSpindleCluster.class.getCanonicalName());
+    private static final int                         MAX_SEGMENT_SIZE = 1024 * 1024;
+    private static int                               testPort1;
+    private static int                               testPort2;
 
     static {
         String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
@@ -481,9 +492,9 @@ public class TestSpindleCluster {
 
     private ClusterMaster                            clusterMaster;
     private AnnotationConfigApplicationContext       clusterMasterContext;
-    private final Class<?>[]                         configs = new Class[] {
+    private final Class<?>[]                         configs          = new Class[] {
             w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
-            w7.class, w8.class, w9.class, w10.class         };
+            w7.class, w8.class, w9.class, w10.class                  };
     private MyController                             controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<Coordinator>                        coordinators;
@@ -501,8 +512,8 @@ public class TestSpindleCluster {
     private List<Node>                               minorPartitionId;
     private BitView                                  minorView;
     private List<Weaver>                             minorWeavers;
-    private MersenneTwister                          twister = new MersenneTwister(
-                                                                                   666);
+    private MersenneTwister                          twister          = new MersenneTwister(
+                                                                                            666);
     private List<Weaver>                             weavers;
 
     @Before
@@ -682,6 +693,101 @@ public class TestSpindleCluster {
         }
 
         assertChannelMappings(channels, weavers, ring);
+
+        asymmetricallyPartition();
+
+        // major partition should be stable and active
+        assertPartitionStable(majorPartition);
+        assertPartitionActive(majorPartition);
+
+        // Filter out all the channels with a primary and secondary on the minor partition
+        List<UUID> lostChannels = filterChannels(channels, ring);
+
+        assertFailoverChannelMappings(channels, majorPartitionId, majorWeavers,
+                                      ring);
+
+        validateLostChannels(lostChannels, majorWeavers);
+
+        // Rebalance the open channels across the major partition
+        log.info("Initiating rebalance on majority partition");
+        Coordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
+        assertTrue("coordinator is not the leader",
+                   partitionLeader.isActiveLeader());
+        partitionLeader.initiateRebalance();
+
+        assertPartitionStable(majorPartition);
+
+        reformPartition();
+
+        // Entire partition should be stable
+        assertPartitionStable(coordinators);
+
+        // Only the major partition should be stable
+        assertPartitionActive(majorPartition);
+        assertPartitionInactive(minorPartition);
+
+        ring = new ConsistentHashFunction<Node>();
+        for (Node node : majorPartitionId) {
+            ring.add(node, node.capacity);
+        }
+        assertChannelMappings(channels, majorWeavers, ring);
+
+        validateLostChannels(lostChannels, majorWeavers);
+
+        log.info("Activating minor partition");
+        // Now add the minor partition back into the active set
+        ArrayList<Node> minorPartitionNodes = new ArrayList<Node>();
+        for (Coordinator c : minorPartition) {
+            minorPartitionNodes.add(c.getId());
+        }
+        partitionLeader.initiateRebalance(minorPartitionNodes.toArray(new Node[0]));
+
+        // Entire partition should be stable 
+        assertPartitionStable(coordinators);
+
+        // Entire partition should be active
+        assertPartitionActive(coordinators);
+
+        // Everything should be back to normal
+        ring = new ConsistentHashFunction<Node>();
+        for (Node node : fullPartitionId) {
+            ring.add(node, node.capacity);
+        }
+        assertChannelMappings(channels, weavers, ring);
+
+        // validate lost channels aren't mapped on the partition members
+        validateLostChannels(lostChannels, weavers);
+    }
+
+    /**
+     * Test the replication of state within the system. Create a cluster and
+     * open some channels. Create some segment data on the primaries and ensure
+     * that it has been replicated to the mirrors. Partition the system and
+     * ensure that the channel state is where it should be. Rebalance the active
+     * members and ensure that all the state has been xeroxed and is where it
+     * should be. Rebalance the group with the inactive members and ensure that
+     * all the state has been xeroxed to where it should be.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void teztReplication() throws Exception {
+
+        bootstrap();
+
+        ArrayList<UUID> channels = openChannels();
+
+        // Construct the hash ring that maps the channels to nodes
+        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+        for (Node node : fullPartitionId) {
+            ring.add(node, node.capacity);
+        }
+
+        assertChannelMappings(channels, weavers, ring);
+
+        for (UUID channel : channels) {
+            createSegments(ring, channel);
+        }
 
         asymmetricallyPartition();
 
@@ -1000,5 +1106,50 @@ public class TestSpindleCluster {
             member.cardinality = group.size();
         }
         return latch;
+    }
+
+    protected void createSegments(ConsistentHashFunction<Node> ring,
+                                  UUID channel) throws IOException {
+        Node node = ring.hash(point(channel));
+        assertNotNull(node);
+        Weaver weaver = weavers.get(node.processId - 1);
+        assertEquals(node, weaver.getId());
+        log.info(String.format("Creating segments for %s on %s", channel,
+                               weaver.getId()));
+        SocketOptions options = new SocketOptions();
+        SocketChannel outbound = SocketChannel.open();
+        options.setTimeout(1000);
+        options.configure(outbound.socket());
+        outbound.configureBlocking(true);
+        outbound.connect(weaver.getContactInformation().spindle);
+        ByteBuffer buffer = ByteBuffer.allocate(Spindle.HANDSHAKE_SIZE);
+        buffer.putInt(Spindle.MAGIC);
+        PRODUCER_NODE.serialize(buffer);
+        buffer.flip();
+        outbound.write(buffer);
+        byte[] payload = payloadFor(channel);
+        ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
+        Event event = new Event(MAGIC, payloadBuffer);
+        int batchSize = 10;
+        int batchLength = batchSize * event.totalSize();
+        int totalSize = 1024 * 16;
+        long timestamp = 0;
+        for (int i = 0; i < totalSize; i += batchLength) {
+            BatchHeader header = new BatchHeader(PRODUCER_NODE, batchLength,
+                                                 MAGIC, channel, timestamp);
+            timestamp += batchSize;
+            header.rewind();
+            header.write(outbound);
+            for (int j = 0; j < batchSize; j++) {
+                event.rewind();
+                event.write(outbound);
+            }
+        }
+        outbound.close();
+    }
+
+    private byte[] payloadFor(UUID channel) {
+        return String.format("%s Give me Slack, or give me Food, or Kill me %s",
+                             channel, channel).getBytes();
     }
 }

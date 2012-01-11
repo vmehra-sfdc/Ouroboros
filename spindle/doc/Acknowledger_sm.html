@@ -92,7 +92,7 @@ processPendingAcks();
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.writeAck()]
+[!ctxt.writeAck() && !ctxt.inError()]
   WriteAck
   {
     selectForWrite();

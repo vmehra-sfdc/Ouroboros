@@ -54,7 +54,7 @@ Entry {
 		DevNull{}
 		
 	readReady
-		[!ctxt.append()]
+		[!ctxt.append() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}
@@ -82,7 +82,7 @@ Entry {
 		ReadBatchHeader{}
 		
 	readReady
-		[!ctxt.devNull()]
+		[!ctxt.devNull() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}
@@ -105,7 +105,7 @@ Entry{
 		Append{} 
 		
 	readReady
-		[!ctxt.readBatchHeader()]
+		[!ctxt.readBatchHeader() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}

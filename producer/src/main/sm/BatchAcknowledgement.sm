@@ -48,7 +48,7 @@ Suspended {
 
 ReadAcknowledgement {
 	readReady
-		[ctxt.readAcknowledgements()]
+		[!ctxt.readAcknowledgements() && !ctxt.inError()]
 		nil {
 			selectForRead();
 		}

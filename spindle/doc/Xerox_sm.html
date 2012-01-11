@@ -228,7 +228,7 @@ sendChannelCount();
         </td>
         <td>
           <pre>
-[!ctxt.writeSegmentHeader()]
+[!ctxt.writeSegmentHeader() && !ctxt.inError()]
   WriteSegmentHeader
   {
     selectForWrite();
@@ -272,7 +272,7 @@ sendChannelCount();
         </td>
         <td>
           <pre>
-[!ctxt.copy()]
+[!ctxt.copy() && !ctxt.inError()]
   CopySegment
   {
     selectForWrite();
@@ -314,7 +314,7 @@ sendChannelCount();
         </td>
         <td>
           <pre>
-[!ctxt.readAck()]
+[!ctxt.readAck() && !ctxt.inError()]
   Finished
   {
     selectForRead();

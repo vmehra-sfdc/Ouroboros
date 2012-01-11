@@ -59,6 +59,7 @@ public class Spindle implements CommunicationsHandler {
     final Appender               appender;
 
     public Spindle(Bundle bundle) {
+        fsm.setName(Integer.toString(bundle.getId().processId));
         acknowledger = new Acknowledger();
         appender = new Appender(bundle, acknowledger);
         this.bundle = bundle;

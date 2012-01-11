@@ -107,7 +107,7 @@ Entry {
 }
 {
 	writeReady
-		[!ctxt.writeSegmentHeader()]
+		[!ctxt.writeSegmentHeader() && !ctxt.inError()]
 		nil {
 			selectForWrite();
 		}
@@ -138,7 +138,7 @@ Entry{
 		WriteSegmentHeader{}
 		
 	writeReady
-		[!ctxt.copy()]
+		[!ctxt.copy() && !ctxt.inError()]
 		nil {
 			selectForWrite();
 		}
@@ -160,7 +160,7 @@ Entry {
 		Closed{}
 		
 	readReady
-		[!ctxt.readAck()]
+		[!ctxt.readAck() && !ctxt.inError()]
 		nil {
 			selectForRead();
 		}
