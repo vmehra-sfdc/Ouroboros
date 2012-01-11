@@ -55,6 +55,7 @@ public class TestReplicator {
     @Test
     public void testInboundEstablish() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
         when(handler.getChannel()).thenReturn(socketChannel);

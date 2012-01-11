@@ -194,6 +194,7 @@ public class TestDuplicator {
         Segment inboundSegment = new Segment(inboundTmpFile);
         EventChannel inboundEventChannel = mock(EventChannel.class);
         Bundle inboundBundle = mock(Bundle.class);
+        when(inboundBundle.getId()).thenReturn(new Node(0));
         Acknowledger outboundAcknowledger = mock(Acknowledger.class);
         Acknowledger inboundAcknowledger = mock(Acknowledger.class);
 

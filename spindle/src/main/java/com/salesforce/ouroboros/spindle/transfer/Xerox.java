@@ -159,8 +159,7 @@ public class Xerox implements CommunicationsHandler {
         if (position == segmentSize) {
             try {
                 currentSegment.close();
-                inError = true;
-                return false;
+                return true;
             } catch (IOException e) {
                 log.log(Level.FINE, String.format("Error closing: %s on %s",
                                                   currentSegment, idString()),

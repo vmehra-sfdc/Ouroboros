@@ -305,7 +305,6 @@ public class Sink implements CommunicationsHandler {
                 log.info(String.format("Sink segment %s copy started on %s",
                                        current, bundle.getId()));
             }
-            error = true;
             return true;
         }
         return false;

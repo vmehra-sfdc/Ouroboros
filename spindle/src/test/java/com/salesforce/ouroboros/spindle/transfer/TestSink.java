@@ -68,6 +68,7 @@ public class TestSink {
     @Test
     public void testCopy() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         EventChannel channel = mock(EventChannel.class);
         Segment segment = mock(Segment.class);
         SocketChannel socket = mock(SocketChannel.class);
@@ -137,6 +138,7 @@ public class TestSink {
     @Test
     public void testReadHandshake() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         SocketChannel socket = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(socket);
@@ -182,6 +184,7 @@ public class TestSink {
     @Test
     public void testReadChannelCount() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         SocketChannel socket = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(socket);
@@ -212,6 +215,7 @@ public class TestSink {
     @Test
     public void testReadHeader() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         EventChannel channel = mock(EventChannel.class);
         Segment segment = mock(Segment.class);
         SocketChannel socket = mock(SocketChannel.class);
@@ -276,6 +280,7 @@ public class TestSink {
     public void testXeroxSink() throws Exception {
         SocketChannelHandler inboundHandler = mock(SocketChannelHandler.class);
         Bundle inboundBundle = mock(Bundle.class);
+        when(inboundBundle.getId()).thenReturn(new Node(0));
         UUID channelId = UUID.randomUUID();
         long prefix1 = 0x1600;
         long prefix2 = 0x1800;

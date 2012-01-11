@@ -63,6 +63,7 @@ public class TestSpindle {
     @Test
     public void testEstablish() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         Spindle spindle = new Spindle(bundle);
         assertEquals(SpindleFSM.Suspended, spindle.getState());
         SocketChannelHandler handler = mock(SocketChannelHandler.class);

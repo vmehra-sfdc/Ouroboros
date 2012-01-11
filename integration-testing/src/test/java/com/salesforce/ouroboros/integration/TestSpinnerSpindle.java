@@ -82,6 +82,7 @@ public class TestSpinnerSpindle {
         EventChannel eventChannel = mock(EventChannel.class);
         Segment segment = new Segment(segmentFile);
         final Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         Node mirror = new Node(3);
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();

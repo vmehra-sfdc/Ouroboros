@@ -68,6 +68,7 @@ public class TestAppender {
     public void testAppend() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         Acknowledger acknowledger = mock(Acknowledger.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("append", ".tst");
@@ -151,6 +152,7 @@ public class TestAppender {
     public void testDuplicate() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         Acknowledger acknowledger = mock(Acknowledger.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("duplicate", ".tst");

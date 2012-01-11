@@ -81,6 +81,7 @@ public class TestReplicatingAppender {
         payloadBuffer.clear();
         EventChannel eventChannel = mock(EventChannel.class);
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(bundle.getAcknowledger(mirror)).thenReturn(acknowledger);
         when(eventChannel.segmentFor(header.getOffset())).thenReturn(segment);
