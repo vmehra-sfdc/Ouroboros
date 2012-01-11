@@ -770,8 +770,8 @@ public class TestSpindleCluster {
      * 
      * @throws Exception
      */
-    @Test
-    public void teztReplication() throws Exception {
+    // @Test
+    public void testReplication() throws Exception {
 
         bootstrap();
 
