@@ -121,6 +121,10 @@ Closed
 Entry {
 	close();
 }
-{
+{}
+
+Default {
+	close
+		Closed{}
 }
 %%

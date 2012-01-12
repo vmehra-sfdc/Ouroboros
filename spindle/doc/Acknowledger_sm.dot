@@ -30,6 +30,9 @@ digraph Acknowledger {
         "AcknowledgerFSM::Waiting" -> "AcknowledgerFSM::WriteAck"
             [label="ack/\l"];
 
+        "AcknowledgerFSM::Waiting" -> "AcknowledgerFSM::Closed"
+            [label="close/\l"];
+
         "AcknowledgerFSM::WriteAck" -> "AcknowledgerFSM::Closed"
             [label="writeReady/\l"];
 
@@ -38,6 +41,12 @@ digraph Acknowledger {
 
         "AcknowledgerFSM::WriteAck" -> "AcknowledgerFSM::Waiting"
             [label="waiting/\l"];
+
+        "AcknowledgerFSM::WriteAck" -> "AcknowledgerFSM::Closed"
+            [label="close/\l"];
+
+        "AcknowledgerFSM::Closed" -> "AcknowledgerFSM::Closed"
+            [label="close/\l"];
 
         "%start" -> "AcknowledgerFSM::Waiting"
     }

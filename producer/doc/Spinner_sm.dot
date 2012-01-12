@@ -33,6 +33,12 @@ digraph Spinner {
         "SpinnerFSM::Suspended" -> "SpinnerFSM::Handshake"
             [label="handshake/\l"];
 
+        "SpinnerFSM::Suspended" -> "SpinnerFSM::Closed"
+            [label="close/\l"];
+
+        "SpinnerFSM::Established" -> "SpinnerFSM::Closed"
+            [label="close/\l"];
+
         "SpinnerFSM::Handshake" -> "SpinnerFSM::Closed"
             [label="writeReady/\l"];
 
@@ -41,6 +47,12 @@ digraph Spinner {
 
         "SpinnerFSM::Handshake" -> "SpinnerFSM::Established"
             [label="established/\l"];
+
+        "SpinnerFSM::Handshake" -> "SpinnerFSM::Closed"
+            [label="close/\l"];
+
+        "SpinnerFSM::Closed" -> "SpinnerFSM::Closed"
+            [label="close/\l"];
 
         "%start" -> "SpinnerFSM::Suspended"
     }

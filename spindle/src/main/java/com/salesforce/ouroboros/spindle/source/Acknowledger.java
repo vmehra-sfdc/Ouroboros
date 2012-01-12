@@ -100,7 +100,11 @@ public class Acknowledger {
             buffer.rewind();
             current.serializeOn(buffer);
             if (!writeAck()) {
-                handler.selectForWrite();
+                if (inError) {
+                    fsm.close();
+                } else {
+                    handler.selectForWrite();
+                }
                 return;
             }
             current = pending.poll();

@@ -105,5 +105,8 @@ Entry {
 Default {
 	replicate
 		nil{}
+		
+	close
+		Closed{}
 }
 %%

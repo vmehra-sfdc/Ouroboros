@@ -117,7 +117,15 @@ public final class Duplicator {
         if (writeBatch()) {
             fsm.batchWritten();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                if (inError) {
+                    fsm.close();
+                } else {
+                    handler.selectForWrite();
+                }
+            }
         }
     }
 
@@ -132,7 +140,11 @@ public final class Duplicator {
         if (writeHeader()) {
             fsm.headerWritten();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 
@@ -158,7 +170,7 @@ public final class Duplicator {
         return false;
     }
 
-    protected boolean writeHeader() { 
+    protected boolean writeHeader() {
         try {
             if (current.header.write(handler.getChannel()) < 0) {
                 inError = true;

@@ -175,7 +175,11 @@ public class Xerox implements CommunicationsHandler {
         if (copy()) {
             fsm.finished();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 
@@ -191,9 +195,9 @@ public class Xerox implements CommunicationsHandler {
         currentChannel = channels.pop();
         segments = currentChannel.getSegmentStack();
         if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Starting Xerox of %s from %s to %s, segments: %s on %s",
+            log.info(String.format("Starting Xerox of %s from %s to %s, segments: %s",
                                    currentChannel.getId(), from, to,
-                                   segments.size(), idString()));
+                                   segments.size()));
         }
         buffer.clear();
         buffer.putInt(MAGIC);
@@ -205,7 +209,11 @@ public class Xerox implements CommunicationsHandler {
         if (writeChannelHeader()) {
             fsm.finished();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 
@@ -238,7 +246,11 @@ public class Xerox implements CommunicationsHandler {
         if (writeSegmentHeader()) {
             fsm.initiateCopy();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 
@@ -271,8 +283,8 @@ public class Xerox implements CommunicationsHandler {
                 rendezvous.meet();
             } catch (BrokenBarrierException e) {
                 log.log(Level.SEVERE,
-                        String.format("Rendezvous has already been met in xeroxing %s to %s",
-                                      from, to), e);
+                        String.format("Rendezvous has been cancelled in xeroxing %s to %s",
+                                      from, to));
             }
             return true;
         }
@@ -350,7 +362,11 @@ public class Xerox implements CommunicationsHandler {
         if (writeChannelCount()) {
             fsm.finished();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 

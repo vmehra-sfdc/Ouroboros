@@ -213,7 +213,7 @@ public class TestAppender {
         server.close();
 
         assertEquals(0L, tmpFile.length());
-        verify(handler, new Times(2)).selectForRead();
+        verify(handler, new Times(3)).selectForRead();
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));

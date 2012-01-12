@@ -48,6 +48,9 @@ digraph Sink {
         "SinkFSM::Initial" -> "SinkFSM::ReadChannelCount"
             [label="accept/\l"];
 
+        "SinkFSM::Initial" -> "SinkFSM::Closed"
+            [label="close/\l"];
+
         "SinkFSM::ReadChannelCount" -> "SinkFSM::Suspended"
             [label="finished/\l"];
 
@@ -57,8 +60,14 @@ digraph Sink {
         "SinkFSM::ReadChannelCount" -> "SinkFSM::Suspended"
             [label="readReady/\l"];
 
+        "SinkFSM::ReadChannelCount" -> "SinkFSM::Closed"
+            [label="close/\l"];
+
         "SinkFSM::Suspended" -> "SinkFSM::ReadChannelHeader"
             [label="readReady/\l"];
+
+        "SinkFSM::Suspended" -> "SinkFSM::Closed"
+            [label="close/\l"];
 
         "SinkFSM::ReadChannelHeader" -> "SinkFSM::ReadSegmentHeader"
             [label="finished/\l"];
@@ -71,6 +80,9 @@ digraph Sink {
 
         "SinkFSM::ReadChannelHeader" -> "SinkFSM::ReadSegmentHeader"
             [label="readReady/\l"];
+
+        "SinkFSM::ReadChannelHeader" -> "SinkFSM::Closed"
+            [label="close/\l"];
 
         "SinkFSM::ReadSegmentHeader" -> "SinkFSM::CopySegment"
             [label="finished/\l"];
@@ -87,6 +99,9 @@ digraph Sink {
         "SinkFSM::ReadSegmentHeader" -> "SinkFSM::Suspended"
             [label="noSegments/\l"];
 
+        "SinkFSM::ReadSegmentHeader" -> "SinkFSM::Closed"
+            [label="close/\l"];
+
         "SinkFSM::CopySegment" -> "SinkFSM::ReadSegmentHeader"
             [label="finished/\l"];
 
@@ -99,6 +114,9 @@ digraph Sink {
         "SinkFSM::CopySegment" -> "SinkFSM::ReadSegmentHeader"
             [label="readReady/\l"];
 
+        "SinkFSM::CopySegment" -> "SinkFSM::Closed"
+            [label="close/\l"];
+
         "SinkFSM::Ack" -> "SinkFSM::Finished"
             [label="finished/\l"];
 
@@ -107,6 +125,15 @@ digraph Sink {
 
         "SinkFSM::Ack" -> "SinkFSM::Finished"
             [label="writeReady/\l"];
+
+        "SinkFSM::Ack" -> "SinkFSM::Closed"
+            [label="close/\l"];
+
+        "SinkFSM::Finished" -> "SinkFSM::Closed"
+            [label="close/\l"];
+
+        "SinkFSM::Closed" -> "SinkFSM::Closed"
+            [label="close/\l"];
 
         "%start" -> "SinkFSM::Initial"
     }

@@ -737,8 +737,8 @@ public class Coordinator implements Member {
         Runnable cancellationAction = new Runnable() {
             @Override
             public void run() {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Weaver rebalancing cancelled on %s",
+                if (log.isLoggable(Level.SEVERE)) {
+                    log.severe(String.format("Weaver rebalancing cancelled on %s",
                                            self));
                 }
                 for (Xerox xerox : xeroxes.values()) {

@@ -146,7 +146,11 @@ abstract public class AbstractAppender {
         if (append()) {
             fsm.appended();
         } else {
-            handler.selectForRead();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
@@ -185,6 +189,12 @@ abstract public class AbstractAppender {
         devNull = ByteBuffer.allocate(batchHeader.getBatchByteLength());
         if (devNull()) {
             fsm.ready();
+        } else {
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
@@ -213,7 +223,11 @@ abstract public class AbstractAppender {
         if (readBatchHeader()) {
             fsm.append();
         } else {
-            handler.selectForRead();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 

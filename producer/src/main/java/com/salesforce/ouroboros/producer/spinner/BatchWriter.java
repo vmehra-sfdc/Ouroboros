@@ -162,7 +162,15 @@ public class BatchWriter {
         if (writeBatchHeader()) {
             fsm.batchHeaderWritten();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                if (inError) {
+                    fsm.close();
+                } else {
+                    handler.selectForWrite();
+                }
+            }
         }
     }
 
@@ -172,7 +180,15 @@ public class BatchWriter {
         if (writeEventHeader()) {
             fsm.eventHeaderWritten();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                if (inError) {
+                    fsm.close();
+                } else {
+                    handler.selectForWrite();
+                }
+            }
         }
     }
 
@@ -184,7 +200,15 @@ public class BatchWriter {
                 fsm.payloadWritten();
             }
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                if (inError) {
+                    fsm.close();
+                } else {
+                    handler.selectForWrite();
+                }
+            }
         }
     }
 

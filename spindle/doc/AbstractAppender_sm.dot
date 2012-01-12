@@ -36,6 +36,9 @@ digraph AbstractAppender {
         "AbstractAppenderFSM::Ready" -> "AbstractAppenderFSM::ReadBatchHeader"
             [label="readReady/\l"];
 
+        "AbstractAppenderFSM::Ready" -> "AbstractAppenderFSM::Closed"
+            [label="close/\l"];
+
         "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::DevNull"
             [label="drain/\l"];
 
@@ -48,6 +51,9 @@ digraph AbstractAppender {
         "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::Ready"
             [label="appended/\l"];
 
+        "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::Closed"
+            [label="close/\l"];
+
         "AbstractAppenderFSM::DevNull" -> "AbstractAppenderFSM::ReadBatchHeader"
             [label="ready/\l"];
 
@@ -57,6 +63,9 @@ digraph AbstractAppender {
         "AbstractAppenderFSM::DevNull" -> "AbstractAppenderFSM::Ready"
             [label="readReady/\l"];
 
+        "AbstractAppenderFSM::DevNull" -> "AbstractAppenderFSM::Closed"
+            [label="close/\l"];
+
         "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Append"
             [label="append/\l"];
 
@@ -65,6 +74,12 @@ digraph AbstractAppender {
 
         "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Append"
             [label="readReady/\l"];
+
+        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Closed"
+            [label="close/\l"];
+
+        "AbstractAppenderFSM::Closed" -> "AbstractAppenderFSM::Closed"
+            [label="close/\l"];
 
         "%start" -> "AbstractAppenderFSM::Ready"
     }

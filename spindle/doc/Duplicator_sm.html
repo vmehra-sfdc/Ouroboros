@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=6>
+        <th colspan=7>
           Transition
         </th>
       </tr>
@@ -28,6 +28,9 @@
         </th>
         <th>
           batchWritten
+        </th>
+        <th>
+          close
         </th>
         <th>
           headerWritten
@@ -48,6 +51,8 @@
       <tr>
         <td>
           Waiting
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -82,6 +87,8 @@
           <pre>
 processHeader();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -144,6 +151,8 @@ processHeader();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [!ctxt.writeHeader() && !ctxt.inError()]
   WriteBatch
@@ -171,6 +180,8 @@ processHeader();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>

@@ -87,5 +87,7 @@ Entry {
 Default {
 	ack
 		nil{}
+	close
+		Closed{}
 }
 %%

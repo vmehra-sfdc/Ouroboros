@@ -121,7 +121,11 @@ public class Sink implements CommunicationsHandler {
         if (copySegment()) {
             fsm.finished();
         } else {
-            handler.selectForRead();
+            if (error) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
@@ -173,7 +177,11 @@ public class Sink implements CommunicationsHandler {
         if (readChannelHeader()) {
             fsm.finished();
         } else {
-            handler.selectForRead();
+            if (error) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
@@ -191,7 +199,11 @@ public class Sink implements CommunicationsHandler {
         if (readSegmentHeader()) {
             fsm.finished();
         } else {
-            handler.selectForRead();
+            if (error) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
@@ -214,7 +226,7 @@ public class Sink implements CommunicationsHandler {
             error = true;
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
-                        String.format("Error reading handshake on %s",
+                        String.format("Error reading channel header on %s",
                                       bundle.getId()), e);
             }
             error = true;
@@ -227,7 +239,7 @@ public class Sink implements CommunicationsHandler {
             if (MAGIC != magic) {
                 error = true;
                 if (log.isLoggable(Level.WARNING)) {
-                    log.warning(String.format("Invalid handshake magic value %s on %s",
+                    log.warning(String.format("Invalid channel header magic value %s on %s",
                                               magic, bundle.getId()));
                 }
                 error = true;
@@ -319,7 +331,11 @@ public class Sink implements CommunicationsHandler {
         if (readChannelCount()) {
             fsm.finished();
         } else {
-            handler.selectForRead();
+            if (error) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
@@ -349,7 +365,7 @@ public class Sink implements CommunicationsHandler {
         }
         if (!buffer.hasRemaining()) {
             buffer.flip();
-            long magic = buffer.getInt();
+            int magic = buffer.getInt();
             if (MAGIC != magic) {
                 error = true;
                 if (log.isLoggable(Level.WARNING)) {

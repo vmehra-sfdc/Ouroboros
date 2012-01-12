@@ -194,7 +194,11 @@ public class Spinner implements CommunicationsHandler {
         if (writeHandshake()) {
             fsm.established();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 

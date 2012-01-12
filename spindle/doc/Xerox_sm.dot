@@ -48,6 +48,9 @@ digraph Xerox {
         "XeroxFSM::Initial" -> "XeroxFSM::WriteChannelCount"
             [label="connect/\l"];
 
+        "XeroxFSM::Initial" -> "XeroxFSM::Closed"
+            [label="close/\l"];
+
         "XeroxFSM::WriteChannelCount" -> "XeroxFSM::WriteChannelHeader"
             [label="finished/\l"];
 
@@ -57,8 +60,14 @@ digraph Xerox {
         "XeroxFSM::WriteChannelCount" -> "XeroxFSM::Suspended"
             [label="writeReady/\l"];
 
+        "XeroxFSM::WriteChannelCount" -> "XeroxFSM::Closed"
+            [label="close/\l"];
+
         "XeroxFSM::Suspended" -> "XeroxFSM::WriteChannelHeader"
             [label="writeReady/\l"];
+
+        "XeroxFSM::Suspended" -> "XeroxFSM::Closed"
+            [label="close/\l"];
 
         "XeroxFSM::WriteChannelHeader" -> "XeroxFSM::WriteSegmentHeader"
             [label="finished/\l"];
@@ -72,6 +81,9 @@ digraph Xerox {
         "XeroxFSM::WriteChannelHeader" -> "XeroxFSM::Finished"
             [label="channelsEmpty/\l"];
 
+        "XeroxFSM::WriteChannelHeader" -> "XeroxFSM::Closed"
+            [label="close/\l"];
+
         "XeroxFSM::WriteSegmentHeader" -> "XeroxFSM::Error"
             [label="writeReady/\l"];
 
@@ -84,6 +96,9 @@ digraph Xerox {
         "XeroxFSM::WriteSegmentHeader" -> "XeroxFSM::WriteChannelHeader"
             [label="finished/\l"];
 
+        "XeroxFSM::WriteSegmentHeader" -> "XeroxFSM::Closed"
+            [label="close/\l"];
+
         "XeroxFSM::CopySegment" -> "XeroxFSM::WriteSegmentHeader"
             [label="finished/\l"];
 
@@ -93,6 +108,9 @@ digraph Xerox {
         "XeroxFSM::CopySegment" -> "XeroxFSM::WriteSegmentHeader"
             [label="writeReady/\l"];
 
+        "XeroxFSM::CopySegment" -> "XeroxFSM::Closed"
+            [label="close/\l"];
+
         "XeroxFSM::Finished" -> "XeroxFSM::Closed"
             [label="finished/\l"];
 
@@ -101,6 +119,15 @@ digraph Xerox {
 
         "XeroxFSM::Finished" -> "XeroxFSM::Closed"
             [label="readReady/\l"];
+
+        "XeroxFSM::Finished" -> "XeroxFSM::Closed"
+            [label="close/\l"];
+
+        "XeroxFSM::Error" -> "XeroxFSM::Closed"
+            [label="close/\l"];
+
+        "XeroxFSM::Closed" -> "XeroxFSM::Closed"
+            [label="close/\l"];
 
         "%start" -> "XeroxFSM::Initial"
     }
