@@ -86,7 +86,7 @@ public class TestXerox {
             }
         };
 
-        Answer<Integer> writeHandshake = new Answer<Integer>() {
+        Answer<Integer> writeChannelHeader = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
@@ -96,21 +96,21 @@ public class TestXerox {
                 return 24;
             }
         };
-        Answer<Integer> writeHeader1 = new Answer<Integer>() {
+        Answer<Integer> writeSegmentHeader1 = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                assertEquals(Xerox.MAGIC, buffer.getLong());
+                assertEquals(Xerox.MAGIC, buffer.getInt());
                 assertEquals(prefix1, buffer.getLong());
                 assertEquals(size1, buffer.getLong());
                 return 24;
             }
         };
-        Answer<Integer> writeHeader2 = new Answer<Integer>() {
+        Answer<Integer> writeSegmentHeader2 = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                assertEquals(Xerox.MAGIC, buffer.getLong());
+                assertEquals(Xerox.MAGIC, buffer.getInt());
                 assertEquals(prefix2, buffer.getLong());
                 assertEquals(size2, buffer.getLong());
                 return 24;
@@ -124,7 +124,7 @@ public class TestXerox {
                 return 4;
             }
         };
-        when(socket.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(writeChannelCount).thenReturn(0).thenAnswer(writeHandshake).thenReturn(0).thenAnswer(writeHeader1).thenReturn(0).thenAnswer(writeHeader2).thenReturn(0);
+        when(socket.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(writeChannelCount).thenReturn(0).thenAnswer(writeChannelHeader).thenReturn(0).thenAnswer(writeSegmentHeader1).thenReturn(0).thenAnswer(writeSegmentHeader2).thenReturn(0);
         when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readAck);
         when(segment1.transferTo(0L, 1024L, socket)).thenReturn(1024L);
         when(segment1.transferTo(1024L, 1024L, socket)).thenReturn(1024L);

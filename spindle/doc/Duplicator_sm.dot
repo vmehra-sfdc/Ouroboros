@@ -58,6 +58,9 @@ digraph Duplicator {
             [label="writeReady/\l"];
 
         "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Waiting"
+            [label="writeReady/\l"];
+
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Waiting"
             [label="batchWritten/\l"];
 
         "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Closed"

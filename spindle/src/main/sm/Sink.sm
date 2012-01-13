@@ -48,7 +48,6 @@ Entry {
 	getChannelCount();
 }
 {
-		
 	finished
 		Suspended{}
 		

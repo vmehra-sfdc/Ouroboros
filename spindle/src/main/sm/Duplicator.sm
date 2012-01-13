@@ -91,6 +91,9 @@ Entry {
 		[!ctxt.pending.isEmpty()]
 		WriteHeader{}
 		
+	writeReady
+		Waiting{}
+		
 	batchWritten
 		Waiting{}
 }

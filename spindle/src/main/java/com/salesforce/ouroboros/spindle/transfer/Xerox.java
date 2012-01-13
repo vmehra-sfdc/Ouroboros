@@ -238,7 +238,7 @@ public class Xerox implements CommunicationsHandler {
                                    currentSegment, from, to));
         }
         buffer.clear();
-        buffer.putLong(MAGIC);
+        buffer.putInt(MAGIC);
         buffer.putLong(currentSegment.getPrefix());
         buffer.putLong(segmentSize);
         buffer.flip();

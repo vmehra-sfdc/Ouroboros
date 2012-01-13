@@ -50,15 +50,19 @@ import com.salesforce.ouroboros.spindle.transfer.SinkContext.SinkState;
  * 
  */
 public class Sink implements CommunicationsHandler {
-    private final static Logger  log    = Logger.getLogger(Sink.class.getCanonicalName());
+    private final static Logger  log                       = Logger.getLogger(Sink.class.getCanonicalName());
+    public final static int      CHANNEL_COUNT_HEADER_SIZE = 8;
+    public final static int      CHANNEL_HEADER_SIZE       = 24;
+    public static final int      SEGMENT_HEADER_SIZE       = 20;
 
-    private final ByteBuffer     buffer = ByteBuffer.allocate(BUFFER_SIZE);
+    private final ByteBuffer     buffer                    = ByteBuffer.allocate(BUFFER_SIZE);
     private final Bundle         bundle;
     private long                 bytesWritten;
     private EventChannel         channel;
     private Segment              current;
     private boolean              error;
-    private final SinkContext    fsm    = new SinkContext(this);
+    private final SinkContext    fsm                       = new SinkContext(
+                                                                             this);
     private SocketChannelHandler handler;
     private int                  segmentCount;
     private long                 segmentSize;
@@ -173,6 +177,7 @@ public class Sink implements CommunicationsHandler {
     }
 
     protected void nextChannel() {
+        buffer.limit(CHANNEL_HEADER_SIZE);
         buffer.rewind();
         if (readChannelHeader()) {
             fsm.finished();
@@ -195,6 +200,7 @@ public class Sink implements CommunicationsHandler {
             return;
         }
         segmentCount--;
+        buffer.limit(SEGMENT_HEADER_SIZE);
         buffer.rewind();
         if (readSegmentHeader()) {
             fsm.finished();
@@ -290,7 +296,7 @@ public class Sink implements CommunicationsHandler {
 
         if (!buffer.hasRemaining()) {
             buffer.flip();
-            long magic = buffer.getLong();
+            long magic = buffer.getInt();
             if (MAGIC != magic) {
                 error = true;
                 if (log.isLoggable(Level.WARNING)) {
@@ -327,7 +333,7 @@ public class Sink implements CommunicationsHandler {
     }
 
     protected void getChannelCount() {
-        buffer.limit(8);
+        buffer.limit(CHANNEL_COUNT_HEADER_SIZE);
         if (readChannelCount()) {
             fsm.finished();
         } else {
