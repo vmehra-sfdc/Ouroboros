@@ -67,6 +67,12 @@ public class EventChannel {
             this.offset = offset;
             this.position = position;
         }
+
+        @Override
+        public String toString() {
+            return "AppendSegment [segment=" + segment + ", offset=" + offset
+                   + ", position=" + position + "]";
+        }
     }
 
     public enum Role {
@@ -101,6 +107,18 @@ public class EventChannel {
                                                                return name.endsWith(SEGMENT_SUFFIX);
                                                            }
                                                        };
+
+    public static void deleteDirectory(File directory) {
+        for (File n : directory.listFiles()) {
+            if (n.isDirectory()) {
+                deleteDirectory(n);
+            }
+            if (!n.delete()) {
+                log.warning(String.format("Channel cannot delete: %s",
+                                          n.getAbsolutePath()));
+            }
+        }
+    }
 
     /**
      * Answer the logical segment to which the segment belongs
@@ -160,6 +178,7 @@ public class EventChannel {
     private final long       maxSegmentSize;
     private volatile long    nextOffset;
     private final Replicator replicator;
+
     private Role             role;
 
     public EventChannel(Role role, final UUID channelId, final File root,
@@ -366,8 +385,7 @@ public class EventChannel {
             }
         }
         try {
-            return new AppendSegment(new Segment(segment),
-                                     offset, 0);
+            return new AppendSegment(new Segment(segment), offset, 0);
         } catch (FileNotFoundException e) {
             String msg = String.format("The segment file cannot be found, yet was created: %s",
                                        segment.getAbsolutePath());
@@ -382,17 +400,5 @@ public class EventChannel {
 
     public void setPrimary() {
         role = Role.PRIMARY;
-    }
-
-    private void deleteDirectory(File directory) {
-        for (File n : directory.listFiles()) {
-            if (n.isDirectory()) {
-                deleteDirectory(n);
-            }
-            if (!n.delete()) {
-                log.warning(String.format("Channel cannot delete: %s",
-                                          n.getAbsolutePath()));
-            }
-        }
     }
 }

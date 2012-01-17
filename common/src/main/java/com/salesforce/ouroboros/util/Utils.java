@@ -29,6 +29,7 @@ import java.io.File;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 import com.fasterxml.uuid.UUIDType;
 import com.fasterxml.uuid.impl.NameBasedGenerator;
@@ -39,6 +40,7 @@ import com.fasterxml.uuid.impl.NameBasedGenerator;
  * 
  */
 final public class Utils {
+    private static final Logger             log = Logger.getLogger(Utils.class.getCanonicalName());
 
     private final static NameBasedGenerator UUID_GENERATOR;
 
@@ -71,6 +73,7 @@ final public class Utils {
                 f.delete();
             }
         }
+        dir.delete();
     }
 
     public static long point(UUID id) {

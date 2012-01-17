@@ -236,28 +236,6 @@ public class Coordinator implements Member {
         }
     }
 
-    @Override
-    public void dispatch(WeaverRebalanceMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        switch (type) {
-            case PREPARE_FOR_REBALANCE:
-                rebalance((Node[]) arguments[0]);
-                break;
-            case INITIATE_REBALANCE:
-                rebalance();
-                break;
-            case TAKEOVER:
-                rebalanced();
-                break;
-            case REBALANCE_COMPLETE:
-                break;
-            default:
-                throw new IllegalStateException(
-                                                String.format("Invalid rebalance message %s",
-                                                              type));
-        }
-    }
-
     public void dispatch(ReplicatorMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
@@ -279,6 +257,28 @@ public class Coordinator implements Member {
             default:
                 throw new IllegalStateException(
                                                 String.format("Invalid replicator message: %s",
+                                                              type));
+        }
+    }
+
+    @Override
+    public void dispatch(WeaverRebalanceMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case PREPARE_FOR_REBALANCE:
+                rebalance((Node[]) arguments[0]);
+                break;
+            case INITIATE_REBALANCE:
+                rebalance();
+                break;
+            case TAKEOVER:
+                rebalanced();
+                break;
+            case REBALANCE_COMPLETE:
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Invalid rebalance message %s",
                                                               type));
         }
     }
@@ -359,6 +359,23 @@ public class Coordinator implements Member {
             }
         }
         fsm.rebalance(joiningMembers);
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    /**
+     * Answer true if the receiver is active and the leader of the active group
+     * 
+     * @return
+     */
+    public boolean isActiveLeader() {
+        if (active) {
+            return activeMembers.isEmpty() ? true
+                                          : activeMembers.last().equals(self);
+        }
+        return false;
     }
 
     /**
@@ -483,7 +500,8 @@ public class Coordinator implements Member {
      * Commit the takeover of the new primaries and secondaries.
      */
     protected void commitTakeover() {
-        switchboard.ringCast(new Message(self,
+        switchboard.ringCast(new Message(
+                                         self,
                                          WeaverRebalanceMessage.REBALANCE_COMPLETE));
     }
 
@@ -658,23 +676,6 @@ public class Coordinator implements Member {
         return !activeMembers.isEmpty();
     }
 
-    protected boolean isActive() {
-        return active;
-    }
-
-    /**
-     * Answer true if the receiver is active and the leader of the active group
-     * 
-     * @return
-     */
-    protected boolean isActiveLeader() {
-        if (active) {
-            return activeMembers.isEmpty() ? true
-                                          : activeMembers.last().equals(self);
-        }
-        return false;
-    }
-
     /**
      * Answer true if the receiver is not active and the leader of the inactive
      * group
@@ -739,7 +740,7 @@ public class Coordinator implements Member {
             public void run() {
                 if (log.isLoggable(Level.SEVERE)) {
                     log.severe(String.format("Weaver rebalancing cancelled on %s",
-                                           self));
+                                             self));
                 }
                 for (Xerox xerox : xeroxes.values()) {
                     xerox.close();
@@ -792,6 +793,13 @@ public class Coordinator implements Member {
         commitNextRing();
         active = true;
         fsm.commitTakeover();
+    }
+
+    protected void rebalancePrepared() {
+        rendezvous = null;
+        switchboard.ringCast(new Message(
+                                         self,
+                                         WeaverRebalanceMessage.INITIATE_REBALANCE));
     }
 
     /**
@@ -880,11 +888,5 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         weaver.setNextRing(ring);
-    }
-
-    protected void rebalancePrepared() {
-        rendezvous = null;
-        switchboard.ringCast(new Message(self,
-                                         WeaverRebalanceMessage.INITIATE_REBALANCE));
     }
 }

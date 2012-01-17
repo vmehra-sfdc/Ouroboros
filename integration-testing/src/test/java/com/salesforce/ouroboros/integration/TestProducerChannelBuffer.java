@@ -72,6 +72,7 @@ import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.ProducerConfiguration;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverConfigation;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * 
@@ -305,14 +306,20 @@ public class TestProducerChannelBuffer {
         }
 
         private WeaverConfigation weaverConfiguration() throws IOException {
-            File directory = File.createTempFile("prod-CB", "root");
-            directory.delete();
-            directory.mkdirs();
-            directory.deleteOnExit();
+            File directory = rootDirectory();
             WeaverConfigation weaverConfigation = new WeaverConfigation();
             weaverConfigation.setId(memberNode());
             weaverConfigation.addRoot(directory);
             return weaverConfigation;
+        }
+
+        @Bean
+        public File rootDirectory() throws IOException {
+            File directory = File.createTempFile("prod-CB", ".root");
+            directory.delete();
+            directory.mkdirs();
+            directory.deleteOnExit();
+            return directory;
         }
     }
 
@@ -358,12 +365,12 @@ public class TestProducerChannelBuffer {
             partition = new ArrayList<ControlNode>();
             ControlNode member = (ControlNode) controller.getNode(producerContext.getBean(Identity.class));
             assertNotNull("Can't find node: "
-                                          + producerContext.getBean(Identity.class),
+                                  + producerContext.getBean(Identity.class),
                           member);
             partition.add(member);
             member = (ControlNode) controller.getNode(weaverContext.getBean(Identity.class));
             assertNotNull("Can't find node: "
-                                          + weaverContext.getBean(Identity.class),
+                                  + weaverContext.getBean(Identity.class),
                           member);
             partition.add(member);
         } finally {
@@ -391,6 +398,7 @@ public class TestProducerChannelBuffer {
             }
         }
         if (weaverContext != null) {
+            Utils.deleteDirectory(weaverContext.getBean(File.class));
             try {
                 weaverContext.close();
             } catch (Throwable e) {

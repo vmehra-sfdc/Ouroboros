@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle;
+package com.salesforce.ouroboros.spindle.functional;
 
 import static com.salesforce.ouroboros.spindle.Util.waitFor;
 import static com.salesforce.ouroboros.util.Utils.point;
@@ -82,12 +82,17 @@ import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
+import com.salesforce.ouroboros.spindle.Coordinator;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
+import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Util.Condition;
+import com.salesforce.ouroboros.spindle.Weaver;
+import com.salesforce.ouroboros.spindle.WeaverConfigation;
 import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * 
@@ -312,6 +317,20 @@ public class TestSpindleCluster {
 
     static class nodeCfg extends GossipConfiguration {
 
+        private final File directory;
+
+        public nodeCfg() {
+            try {
+                directory = File.createTempFile("CoordinatorIntegration-",
+                                                ".root");
+            } catch (IOException e) {
+                throw new IllegalStateException();
+            }
+            directory.delete();
+            directory.mkdirs();
+            directory.deleteOnExit();
+        }
+
         @Bean
         public Coordinator coordinator() throws IOException {
             return new Coordinator(timer(), switchboard(), weaver());
@@ -357,11 +376,6 @@ public class TestSpindleCluster {
         }
 
         private WeaverConfigation weaverConfiguration() throws IOException {
-            File directory = File.createTempFile("CoordinatorIntegration-",
-                                                 "root");
-            directory.delete();
-            directory.mkdirs();
-            directory.deleteOnExit();
             WeaverConfigation weaverConfigation = new WeaverConfigation();
             weaverConfigation.setId(memberNode());
             weaverConfigation.addRoot(directory);
@@ -624,11 +638,13 @@ public class TestSpindleCluster {
         controllerContext = null;
         if (memberContexts != null) {
             for (AnnotationConfigApplicationContext context : memberContexts) {
+                nodeCfg cfg = context.getBean(nodeCfg.class);
                 try {
                     context.close();
                 } catch (Throwable e) {
                     e.printStackTrace();
                 }
+                Utils.delete(cfg.directory);
             }
         }
         memberContexts = null;

@@ -23,8 +23,9 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.transfer;
+package com.salesforce.ouroboros.spindle.functional;
 
+import static junit.framework.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +36,7 @@ import java.nio.channels.SocketChannel;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 
+import org.junit.After;
 import org.junit.Test;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
@@ -50,8 +52,7 @@ import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.util.Rendezvous;
-
-import static junit.framework.Assert.*;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * 
@@ -59,6 +60,9 @@ import static junit.framework.Assert.*;
  * 
  */
 public class TestTransfer {
+
+    private File primaryRoot;
+    private File mirrorRoot;
 
     @Test
     public void testReplicationTransfer() throws Exception {
@@ -73,12 +77,12 @@ public class TestTransfer {
         UUID channelId = UUID.randomUUID();
         final int maxSegmentSize = 1024 * 1024;
 
-        File primaryRoot = File.createTempFile("primary", ".channel");
+        primaryRoot = File.createTempFile("primary", ".channel");
         primaryRoot.delete();
         primaryRoot.mkdirs();
         primaryRoot.deleteOnExit();
 
-        File mirrorRoot = File.createTempFile("mirror", ".channel");
+        mirrorRoot = File.createTempFile("mirror", ".channel");
         mirrorRoot.delete();
         mirrorRoot.mkdirs();
         mirrorRoot.deleteOnExit();
@@ -173,5 +177,15 @@ public class TestTransfer {
             }
         }
         outbound.close();
+    }
+
+    @After
+    public void teardown() {
+        if (primaryRoot != null) {
+            Utils.deleteDirectory(primaryRoot);
+        }
+        if (mirrorRoot != null) {
+            Utils.deleteDirectory(mirrorRoot);
+        }
     }
 }
