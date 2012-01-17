@@ -135,13 +135,19 @@ abstract public class AbstractAppender {
         }
         AppendSegment logicalSegment = getLogicalSegment();
         segment = logicalSegment.segment;
-        offset = position = logicalSegment.offset;
+        offset = logicalSegment.offset;
+        position = logicalSegment.position;
         remaining = batchHeader.getBatchByteLength();
         if (eventChannel.isDuplicate(batchHeader)) {
             log.warning(String.format("Duplicate event batch %s received on %s",
                                       batchHeader, bundle.getId()));
             fsm.drain();
             return;
+        }
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Beginning append of %s, position=%s, remaining=%s on %s",
+                                    segment, position, remaining,
+                                    bundle.getId()));
         }
         if (append()) {
             fsm.appended();

@@ -72,7 +72,6 @@ import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.BatchHeader;
-import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Message;

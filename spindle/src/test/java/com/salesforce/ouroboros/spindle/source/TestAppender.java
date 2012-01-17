@@ -100,6 +100,7 @@ public class TestAppender {
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,
+                                                                               0,
                                                                                0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(false);
         header.rewind();
@@ -184,6 +185,7 @@ public class TestAppender {
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,
+                                                                               0,
                                                                                0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(true);
         header.rewind();

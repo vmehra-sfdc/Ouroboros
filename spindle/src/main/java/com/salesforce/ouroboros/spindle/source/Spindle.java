@@ -114,12 +114,16 @@ public class Spindle implements CommunicationsHandler {
         if (magic != MAGIC) {
             inError = true;
             log.warning(String.format("Invalid handshake magic: %s", magic));
-            handler.close();
             handshake = null;
             close();
             return;
         }
-        bundle.map(new Node(handshake), acknowledger);
+        Node producer = new Node(handshake);
+        bundle.map(producer, acknowledger);
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Established on %s for %s", bundle.getId(),
+                                   producer));
+        }
         handshake = null;
         handler.selectForRead();
     }

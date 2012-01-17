@@ -53,6 +53,7 @@ import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.Util;
 import com.salesforce.ouroboros.spindle.transfer.SinkContext.SinkFSM;
@@ -116,7 +117,8 @@ public class TestSink {
         };
 
         when(bundle.xeroxEventChannel(channelId)).thenReturn(channel);
-        when(channel.segmentFor(prefix)).thenReturn(segment);
+        when(channel.segmentFor(prefix)).thenReturn(new AppendSegment(segment,
+                                                                      0, 0));
         when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readChannelCount).thenAnswer(channelHeaderRead).thenReturn(0).thenAnswer(segmentHeaderRead).thenReturn(0);
         when(segment.transferFrom(socket, 0, bytesLeft)).thenReturn(12L);
         when(segment.transferFrom(socket, 12, bytesLeft - 12)).thenReturn(bytesLeft - 12);
@@ -261,7 +263,8 @@ public class TestSink {
             }
         };
         when(bundle.xeroxEventChannel(channelId)).thenReturn(channel);
-        when(channel.segmentFor(prefix)).thenReturn(segment);
+        when(channel.segmentFor(prefix)).thenReturn(new AppendSegment(segment,
+                                                                      0, 0));
         when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readChannelCount).thenAnswer(channelHeaderRead).thenReturn(0).thenAnswer(segmentHeaderRead).thenReturn(0);
 
         sink.accept(handler);
@@ -340,8 +343,14 @@ public class TestSink {
         when(outboundHandler.getChannel()).thenReturn(outbound);
 
         when(inboundBundle.xeroxEventChannel(channelId)).thenReturn(inboundEventChannel);
-        when(inboundEventChannel.segmentFor(prefix1)).thenReturn(inboundSegment1);
-        when(inboundEventChannel.segmentFor(prefix2)).thenReturn(inboundSegment2);
+        when(inboundEventChannel.segmentFor(prefix1)).thenReturn(new AppendSegment(
+                                                                                   inboundSegment1,
+                                                                                   0,
+                                                                                   0));
+        when(inboundEventChannel.segmentFor(prefix2)).thenReturn(new AppendSegment(
+                                                                                   inboundSegment2,
+                                                                                   0,
+                                                                                   0));
         when(outboundEventChannel.getId()).thenReturn(channelId);
         when(outboundEventChannel.getSegmentStack()).thenReturn(segments);
 

@@ -89,7 +89,8 @@ public class TestSpinnerSpindle {
         long offset = 0;
         EventChannel.AppendSegment appendSegment = new EventChannel.AppendSegment(
                                                                                   segment,
-                                                                                  offset);
+                                                                                  offset,
+                                                                                  0);
 
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.isDuplicate(isA(BatchHeader.class))).thenReturn(false);

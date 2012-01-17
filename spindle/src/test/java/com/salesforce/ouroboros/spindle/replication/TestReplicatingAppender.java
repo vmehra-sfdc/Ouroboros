@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle.replication;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -47,6 +46,7 @@ import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
@@ -84,7 +84,10 @@ public class TestReplicatingAppender {
         when(bundle.getId()).thenReturn(new Node(0));
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(bundle.getAcknowledger(mirror)).thenReturn(acknowledger);
-        when(eventChannel.segmentFor(header.getOffset())).thenReturn(segment);
+        when(eventChannel.segmentFor(header.getOffset())).thenReturn(new AppendSegment(
+                                                                                       segment,
+                                                                                       0,
+                                                                                       0));
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
         final ReplicatingAppender replicator = new ReplicatingAppender(bundle);
@@ -141,7 +144,7 @@ public class TestReplicatingAppender {
         assertEquals(event.getMagic(), replicatedEvent.getMagic());
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
-        verify(eventChannel).append(eq(header), eq(0L));
+        verify(eventChannel).append(header, 0L, segment);
         verify(acknowledger).acknowledge(channel, timestamp);
     }
 }

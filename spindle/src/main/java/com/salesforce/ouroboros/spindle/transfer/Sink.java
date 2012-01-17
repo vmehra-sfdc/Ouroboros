@@ -307,7 +307,7 @@ public class Sink implements CommunicationsHandler {
                 return false;
             }
             long offset = buffer.getLong();
-            current = channel.segmentFor(offset);
+            current = channel.segmentFor(offset).segment;
             if (current == null) {
                 error = true;
                 if (log.isLoggable(Level.WARNING)) {

@@ -76,7 +76,7 @@ public class Replicator implements CommunicationsHandler {
 
     private ReplicatingAppender     appender;
     private final Bundle            bundle;
-    private final Duplicator        duplicator     = new Duplicator();
+    private final Duplicator        duplicator;
     private final ReplicatorContext fsm            = new ReplicatorContext(this);
     private SocketChannelHandler    handler;
     private final ByteBuffer        handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
@@ -85,13 +85,14 @@ public class Replicator implements CommunicationsHandler {
     private Rendezvous              rendezvous;
 
     public Replicator(Bundle bundle) {
+        fsm.setName(Integer.toString(bundle.getId().processId));
+        duplicator = new Duplicator(bundle.getId());
         this.bundle = bundle;
     }
 
     public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
-        fsm.setName(Integer.toString(bundle.getId().processId));
+        this(bundle);
         appender = new ReplicatingAppender(bundle);
-        this.bundle = bundle;
         this.partner = partner;
         this.rendezvous = rendezvous;
     }
@@ -102,9 +103,6 @@ public class Replicator implements CommunicationsHandler {
         assert appender == null : "This replicator does not accept handshakes";
         appender = new ReplicatingAppender(bundle);
         this.handler = handler;
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Accepting handshake on %s", bundle.getId()));
-        }
         fsm.acceptHandshake();
     }
 
@@ -191,6 +189,7 @@ public class Replicator implements CommunicationsHandler {
                 return;
             }
         }
+        handler.selectForRead();
     }
 
     protected void inboundHandshake() {
@@ -249,9 +248,9 @@ public class Replicator implements CommunicationsHandler {
             return false;
         }
         partner = new Node(handshake);
-        if (log.isLoggable(Level.FINEST)) {
-            log.finest(String.format("Inbound handshake completed on %s, partner: %s",
-                                     bundle.getId(), partner));
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Inbound handshake completed on %s, partner: %s",
+                                    bundle.getId(), partner));
         }
         bundle.map(partner, this);
         return true;

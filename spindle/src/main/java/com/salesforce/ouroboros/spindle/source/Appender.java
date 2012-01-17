@@ -25,6 +25,10 @@
  */
 package com.salesforce.ouroboros.spindle.source;
 
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
@@ -36,8 +40,9 @@ import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
  * 
  */
 public class Appender extends AbstractAppender {
+    private final static Logger log = Logger.getLogger(Appender.class.getCanonicalName());
 
-    private final Acknowledger acknowledger;
+    private final Acknowledger  acknowledger;
 
     public Appender(Bundle bundle, Acknowledger acknowledger) {
         super(bundle);
@@ -46,8 +51,18 @@ public class Appender extends AbstractAppender {
 
     @Override
     protected void commit() {
-        eventChannel.append(new ReplicatedBatchHeader(batchHeader, offset),
-                            segment, acknowledger);
+        try {
+            eventChannel.append(new ReplicatedBatchHeader(batchHeader, offset),
+                                segment, acknowledger);
+        } catch (IOException e) {
+            if (log.isLoggable(Level.SEVERE)) {
+                log.log(Level.SEVERE,
+                        String.format("Unable to append segment %s for %s at offset %s on %s",
+                                      segment, eventChannel, offset,
+                                      bundle.getId()));
+            }
+            close();
+        }
     }
 
     @Override

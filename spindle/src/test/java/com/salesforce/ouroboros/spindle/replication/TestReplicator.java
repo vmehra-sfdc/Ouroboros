@@ -78,7 +78,7 @@ public class TestReplicator {
         assertEquals(ReplicatorFSM.InboundHandshake, replicator.getState());
         replicator.readReady();
         assertEquals(ReplicatorFSM.Established, replicator.getState());
-        verify(handler).selectForRead();
+        verify(handler, new Times(2)).selectForRead();
         verify(socketChannel, new Times(2)).read(isA(ByteBuffer.class));
     }
 

@@ -25,6 +25,34 @@
  */
 package com.salesforce.ouroboros.spindle.transfer;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+
+import org.junit.Test;
+
+import com.hellblazer.pinkie.CommunicationsHandler;
+import com.hellblazer.pinkie.CommunicationsHandlerFactory;
+import com.hellblazer.pinkie.ServerSocketChannelHandler;
+import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.Event;
+import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.Bundle;
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.EventChannel.Role;
+import com.salesforce.ouroboros.spindle.replication.Replicator;
+import com.salesforce.ouroboros.spindle.source.Spindle;
+import com.salesforce.ouroboros.util.Rendezvous;
+
+import static junit.framework.Assert.*;
+
 /**
  * 
  * @author hhildebrand
@@ -32,4 +60,118 @@ package com.salesforce.ouroboros.spindle.transfer;
  */
 public class TestTransfer {
 
+    @Test
+    public void testReplicationTransfer() throws Exception {
+        Node producerNode = new Node(0);
+        Node primaryNode = new Node(1);
+        Node mirrorNode = new Node(2);
+        Rendezvous rendezvous = mock(Rendezvous.class);
+        final Bundle primaryBundle = mock(Bundle.class);
+        final Bundle mirrorBundle = mock(Bundle.class);
+        when(primaryBundle.getId()).thenReturn(primaryNode);
+        when(mirrorBundle.getId()).thenReturn(mirrorNode);
+        UUID channelId = UUID.randomUUID();
+        final int maxSegmentSize = 1024 * 1024;
+
+        File primaryRoot = File.createTempFile("primary", ".channel");
+        primaryRoot.delete();
+        primaryRoot.mkdirs();
+        primaryRoot.deleteOnExit();
+
+        File mirrorRoot = File.createTempFile("mirror", ".channel");
+        mirrorRoot.delete();
+        mirrorRoot.mkdirs();
+        mirrorRoot.deleteOnExit();
+
+        final Spindle spindle = new Spindle(primaryBundle);
+
+        final Replicator primaryReplicator = new Replicator(primaryBundle,
+                                                            mirrorNode,
+                                                            rendezvous);
+        final Replicator mirrorReplicator = new Replicator(mirrorBundle);
+
+        EventChannel primaryEventChannel = new EventChannel(Role.PRIMARY,
+                                                            channelId,
+                                                            primaryRoot,
+                                                            maxSegmentSize,
+                                                            primaryReplicator);
+
+        EventChannel mirrorEventChannel = new EventChannel(Role.MIRROR,
+                                                           channelId,
+                                                           mirrorRoot,
+                                                           maxSegmentSize, null);
+        when(primaryBundle.eventChannelFor(channelId)).thenReturn(primaryEventChannel);
+        when(mirrorBundle.eventChannelFor(channelId)).thenReturn(mirrorEventChannel);
+
+        SocketOptions socketOptions = new SocketOptions();
+
+        ServerSocketChannelHandler spindleHandler = new ServerSocketChannelHandler(
+                                                                                   "spindle handler",
+                                                                                   socketOptions,
+                                                                                   new InetSocketAddress(
+                                                                                                         "127.0.0.1",
+                                                                                                         0),
+                                                                                   Executors.newFixedThreadPool(5),
+                                                                                   new CommunicationsHandlerFactory() {
+
+                                                                                       @Override
+                                                                                       public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
+                                                                                           return spindle;
+                                                                                       }
+                                                                                   });
+        ServerSocketChannelHandler replicatorHandler = new ServerSocketChannelHandler(
+                                                                                      "replicator handler",
+                                                                                      socketOptions,
+                                                                                      new InetSocketAddress(
+                                                                                                            "127.0.0.1",
+                                                                                                            0),
+                                                                                      Executors.newFixedThreadPool(5),
+                                                                                      new CommunicationsHandlerFactory() {
+
+                                                                                          @Override
+                                                                                          public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
+                                                                                              return mirrorReplicator;
+                                                                                          }
+                                                                                      });
+        spindleHandler.start();
+        replicatorHandler.start();
+
+        spindleHandler.connectTo(replicatorHandler.getLocalAddress(),
+                                 primaryReplicator);
+
+        int magic = 666;
+        SocketOptions options = new SocketOptions();
+        SocketChannel outbound = SocketChannel.open();
+        options.setTimeout(1000);
+        options.configure(outbound.socket());
+        outbound.configureBlocking(true);
+        outbound.connect(spindleHandler.getLocalAddress());
+        assertTrue(outbound.isConnected());
+        ByteBuffer buffer = ByteBuffer.allocate(Spindle.HANDSHAKE_SIZE);
+        buffer.putInt(Spindle.MAGIC);
+        producerNode.serialize(buffer);
+        buffer.flip();
+        outbound.write(buffer);
+        byte[] payload = String.format("%s Give me Slack, or give me Food, or Kill me %s",
+                                       channelId, channelId).getBytes();
+        ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
+        Event event = new Event(magic, payloadBuffer);
+        int batchSize = 100;
+        int batchLength = batchSize * event.totalSize();
+        int totalSize = 1024 * 1024 * 2;
+        long timestamp = 0;
+        for (int currentSize = 0; currentSize < totalSize; currentSize += batchLength) {
+            timestamp += batchSize;
+            System.out.println("Writing out batch: " + timestamp / batchSize);
+            BatchHeader header = new BatchHeader(producerNode, batchLength,
+                                                 magic, channelId, timestamp);
+            header.rewind();
+            header.write(outbound);
+            for (int j = 0; j < batchSize; j++) {
+                event.rewind();
+                event.write(outbound);
+            }
+        }
+        outbound.close();
+    }
 }

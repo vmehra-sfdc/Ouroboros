@@ -25,6 +25,8 @@
  */
 package com.salesforce.ouroboros.spindle.replication;
 
+import java.io.IOException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.BatchHeader;
@@ -53,7 +55,18 @@ public class ReplicatingAppender extends AbstractAppender {
      */
     @Override
     protected void commit() {
-        eventChannel.append(batchHeader, offset);
+        try {
+            eventChannel.append(batchHeader, offset, segment);
+        } catch (IOException e) {
+            if (log.isLoggable(Level.SEVERE)) {
+                log.log(Level.SEVERE,
+                        String.format("Unable to append segment %s for %s at offset %s on %s",
+                                      segment, eventChannel, offset,
+                                      bundle.getId()));
+            }
+            close();
+            return;
+        }
         Node node = batchHeader.getProducerMirror();
         Acknowledger acknowledger = bundle.getAcknowledger(node);
         if (acknowledger == null) {
@@ -72,9 +85,6 @@ public class ReplicatingAppender extends AbstractAppender {
 
     @Override
     protected AppendSegment getLogicalSegment() {
-        ReplicatedBatchHeader replicatedBatchHeader = (ReplicatedBatchHeader) batchHeader;
-        return new AppendSegment(
-                                 eventChannel.segmentFor(replicatedBatchHeader.getOffset()),
-                                 replicatedBatchHeader.getOffset());
+        return eventChannel.segmentFor(((ReplicatedBatchHeader) batchHeader).getOffset());
     }
 }

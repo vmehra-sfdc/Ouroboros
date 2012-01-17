@@ -84,6 +84,7 @@ public class TestSpindle {
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                segment,
+                                                                               0,
                                                                                0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(false);
         when(segment.transferFrom(socketChannel, 0, event.totalSize())).thenReturn(0L);

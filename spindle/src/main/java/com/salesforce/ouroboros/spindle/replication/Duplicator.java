@@ -31,6 +31,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorState;
@@ -55,6 +56,10 @@ public final class Duplicator {
     private long                    position;
     private int                     remaining;
     final Queue<EventEntry>         pending = new LockFreeQueue<EventEntry>();
+
+    public Duplicator(Node node) {
+        fsm.setName(Integer.toString(node.processId));
+    }
 
     public void connect(SocketChannelHandler handler) {
         this.handler = handler;
