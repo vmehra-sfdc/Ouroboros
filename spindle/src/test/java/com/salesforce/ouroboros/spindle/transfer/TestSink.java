@@ -131,7 +131,7 @@ public class TestSink {
         sink.readReady();
 
         verify(socket, new Times(6)).read(isA(ByteBuffer.class));
-        verify(segment, new Times(1)).transferFrom(isA(ReadableByteChannel.class),
+        verify(segment, new Times(2)).transferFrom(isA(ReadableByteChannel.class),
                                                    isA(Long.class),
                                                    isA(Long.class));
         assertEquals(SinkFSM.ReadChannelHeader, sink.getState());
