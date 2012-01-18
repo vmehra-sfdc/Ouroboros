@@ -59,10 +59,10 @@ public class EventChannel {
 
     public static class AppendSegment {
         public final long    offset;
-        public final long    position;
+        public final int     position;
         public final Segment segment;
 
-        public AppendSegment(Segment segment, long offset, long position) {
+        public AppendSegment(Segment segment, long offset, int position) {
             this.segment = segment;
             this.offset = offset;
             this.position = position;
@@ -81,10 +81,10 @@ public class EventChannel {
 
     private static class AppendSegmentName {
         public final long   offset;
-        public final long   position;
+        public final int    position;
         public final String segment;
 
-        public AppendSegmentName(String segment, long offset, long position) {
+        public AppendSegmentName(String segment, long offset, int position) {
             this.segment = segment;
             this.offset = offset;
             this.position = position;
@@ -109,15 +109,26 @@ public class EventChannel {
                                                        };
 
     public static void deleteDirectory(File directory) {
-        for (File n : directory.listFiles()) {
-            if (n.isDirectory()) {
-                deleteDirectory(n);
-            }
-            if (!n.delete()) {
-                log.warning(String.format("Channel cannot delete: %s",
-                                          n.getAbsolutePath()));
+        if (directory == null) {
+            log.warning(String.format("Attempt to delete a null directory"));
+            return;
+        }
+        File[] list = directory.listFiles();
+        if (list != null) {
+            for (File n : list) {
+                if (n.isDirectory()) {
+                    deleteDirectory(n);
+                } else if (!n.delete()) {
+                    log.warning(String.format("Channel cannot delete: %s",
+                                              n.getAbsolutePath()));
+                }
             }
         }
+        if (!directory.delete()) {
+            log.warning(String.format("Channel cannot delete: %s",
+                                      directory.getAbsolutePath()));
+        }
+
     }
 
     /**
@@ -143,8 +154,7 @@ public class EventChannel {
                                         : new AppendSegmentName(
                                                                 segmentName(homeSegment),
                                                                 offset,
-                                                                offset
-                                                                        - homeSegment);
+                                                                (int) (offset - homeSegment));
     }
 
     /**
@@ -183,20 +193,26 @@ public class EventChannel {
 
     public EventChannel(Role role, final UUID channelId, final File root,
                         final long maxSegmentSize, final Replicator replicator) {
+        assert root != null : "Root directory must not be null";
+        assert channelId != null : "Channel id must not be null";
+
         this.role = role;
         id = channelId;
         channel = new File(root, channelId.toString().replace('-', '/'));
         this.maxSegmentSize = maxSegmentSize;
 
-        channel.mkdirs();
-
         if (channel.exists() && channel.isDirectory()) {
+            log.info(String.format("Clearing channel %s, root directory: %s",
+                                   id, channel));
             deleteDirectory(channel);
         } else {
-            String msg = String.format("Unable to create channel directory for channel: %s",
-                                       channel);
-            log.severe(msg);
-            throw new IllegalStateException(msg);
+            channel.mkdirs();
+            if (!channel.exists() && channel.isDirectory()) {
+                String msg = String.format("Unable to create channel directory for channel: %s",
+                                           channel);
+                log.severe(msg);
+                throw new IllegalStateException(msg);
+            }
         }
         this.replicator = replicator;
     }
@@ -235,15 +251,12 @@ public class EventChannel {
      * Close the channel
      */
     public void close() {
+        log.info(String.format("Closing channel %s, root directory: %s", id,
+                               channel));
         deleteDirectory(channel);
-        if (!channel.delete()) {
-            log.severe(String.format("Cannot delete channel root directory: %s",
-                                     channel));
-        } else {
-            if (log.isLoggable(Level.FINE)) {
-                log.fine(String.format("Deleted channel root directory: %s",
-                                       channel));
-            }
+        if (log.isLoggable(Level.FINE)) {
+            log.fine(String.format("Deleted channel root directory: %s",
+                                   channel));
         }
     }
 
@@ -295,7 +308,7 @@ public class EventChannel {
         Arrays.sort(segmentFiles, new Comparator<File>() {
             @Override
             public int compare(File o1, File o2) {
-                return o1.getName().compareTo(o2.getName());
+                return o2.getName().compareTo(o1.getName());
             }
         });
         Deque<Segment> segments = new LinkedList<Segment>();
@@ -371,6 +384,36 @@ public class EventChannel {
      *            - the offset of the event
      * @return the segment for the event
      */
+    public AppendSegment segmentFor(long offset, int position) {
+        File segment = new File(channel, segmentName(prefixFor(offset,
+                                                               maxSegmentSize)));
+        if (!segment.exists()) {
+            try {
+                segment.createNewFile();
+            } catch (IOException e) {
+                String msg = String.format("Cannot create the new segment file: %s",
+                                           segment.getAbsolutePath());
+                log.log(Level.WARNING, msg, e);
+                throw new IllegalStateException(msg);
+            }
+        }
+        try {
+            return new AppendSegment(new Segment(segment), offset, position);
+        } catch (FileNotFoundException e) {
+            String msg = String.format("The segment file cannot be found, yet was created: %s",
+                                       segment.getAbsolutePath());
+            log.log(Level.WARNING, msg, e);
+            throw new IllegalStateException(msg);
+        }
+    }
+
+    /**
+     * Answer the segment for the event at the given offset
+     * 
+     * @param offset
+     *            - the offset of the event
+     * @return the segment for the event
+     */
     public AppendSegment segmentFor(long offset) {
         File segment = new File(channel, segmentName(prefixFor(offset,
                                                                maxSegmentSize)));
@@ -385,7 +428,7 @@ public class EventChannel {
             }
         }
         try {
-            return new AppendSegment(new Segment(segment), offset, 0);
+            return new AppendSegment(new Segment(segment), offset, -1);
         } catch (FileNotFoundException e) {
             String msg = String.format("The segment file cannot be found, yet was created: %s",
                                        segment.getAbsolutePath());

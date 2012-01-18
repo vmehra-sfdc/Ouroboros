@@ -95,12 +95,15 @@ public class Xerox implements CommunicationsHandler {
 
     @Override
     public void closing() {
-        for (Segment segment : segments) {
-            try {
-                segment.close();
-            } catch (IOException e1) {
-                log.log(Level.FINE, String.format("Error closing: %s on %s",
-                                                  segment, idString()), e1);
+        if (segments != null) {
+            for (Segment segment : segments) {
+                try {
+                    segment.close();
+                } catch (IOException e1) {
+                    log.log(Level.FINE,
+                            String.format("Error closing: %s on %s", segment,
+                                          idString()), e1);
+                }
             }
         }
     }
@@ -306,8 +309,6 @@ public class Xerox implements CommunicationsHandler {
     }
 
     protected void selectForWrite() {
-        System.out.println(String.format("Selecting for write from %s, to %s",
-                                         from, to));
         handler.selectForWrite();
     }
 

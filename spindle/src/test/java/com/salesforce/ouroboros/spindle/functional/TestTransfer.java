@@ -26,18 +26,27 @@
 package com.salesforce.ouroboros.spindle.functional;
 
 import static junit.framework.Assert.assertTrue;
+import static junit.framework.Assert.fail;
+import static org.mockito.Matchers.isA;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.After;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
@@ -50,7 +59,10 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
+import com.salesforce.ouroboros.spindle.transfer.Sink;
+import com.salesforce.ouroboros.spindle.transfer.Xerox;
 import com.salesforce.ouroboros.util.Rendezvous;
 import com.salesforce.ouroboros.util.Utils;
 
@@ -61,11 +73,94 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class TestTransfer {
 
-    private File primaryRoot;
-    private File mirrorRoot;
+    private EventChannel               mirrorEventChannel;
+    private File                       mirrorRoot;
+    private ServerSocketChannelHandler mirrorSinkHandler;
+    private File                       mirrorSinkRoot;
+    private SocketChannel              outbound;
+    private EventChannel               primaryEventChannel;
+    private File                       primaryRoot;
+    private ServerSocketChannelHandler primarySinkHandler;
+    private File                       primarySinkRoot;
+    private ServerSocketChannelHandler replicatorHandler;
+    private ServerSocketChannelHandler spindleHandler;
+    private EventChannel               primarySinkEventChannel;
+    private EventChannel               mirrorSinkEventChannel;
+    UUID                               channelId      = UUID.randomUUID();
+    int                                maxSegmentSize = 1024 * 1024;
+
+    public ServerSocketChannelHandler createHandler(String label,
+                                                    final CommunicationsHandler handler,
+                                                    SocketOptions socketOptions)
+                                                                                throws IOException {
+        return new ServerSocketChannelHandler(
+                                              label,
+                                              socketOptions,
+                                              new InetSocketAddress(
+                                                                    "127.0.0.1",
+                                                                    0),
+                                              Executors.newFixedThreadPool(5),
+                                              new CommunicationsHandlerFactory() {
+
+                                                  @Override
+                                                  public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
+                                                      return handler;
+                                                  }
+                                              });
+    }
+
+    @After
+    public void teardown() throws IOException {
+        if (spindleHandler != null) {
+            spindleHandler.terminate();
+        }
+        if (replicatorHandler != null) {
+            replicatorHandler.terminate();
+        }
+        if (primaryEventChannel != null) {
+            primaryEventChannel.close();
+        }
+        if (primarySinkHandler != null) {
+            primarySinkHandler.terminate();
+        }
+        if (mirrorSinkHandler != null) {
+            mirrorSinkHandler.terminate();
+        }
+
+        if (primaryEventChannel != null) {
+            primaryEventChannel.close();
+        }
+        if (mirrorEventChannel != null) {
+            mirrorEventChannel.close();
+        }
+
+        if (primarySinkEventChannel != null) {
+            primarySinkEventChannel.close();
+        }
+        if (mirrorSinkEventChannel != null) {
+            mirrorSinkEventChannel.close();
+        }
+
+        if (primaryRoot != null) {
+            Utils.deleteDirectory(primaryRoot);
+        }
+        if (mirrorRoot != null) {
+            Utils.deleteDirectory(mirrorRoot);
+        }
+        if (primarySinkRoot != null) {
+            Utils.deleteDirectory(primarySinkRoot);
+        }
+        if (mirrorSinkRoot != null) {
+            Utils.deleteDirectory(mirrorSinkRoot);
+        }
+
+        outbound.close();
+    }
 
     @Test
     public void testReplicationTransfer() throws Exception {
+        setupTemporaryRoots();
+
         Node producerNode = new Node(0);
         Node primaryNode = new Node(1);
         Node mirrorNode = new Node(2);
@@ -74,78 +169,164 @@ public class TestTransfer {
         final Bundle mirrorBundle = mock(Bundle.class);
         when(primaryBundle.getId()).thenReturn(primaryNode);
         when(mirrorBundle.getId()).thenReturn(mirrorNode);
-        UUID channelId = UUID.randomUUID();
-        final int maxSegmentSize = 1024 * 1024;
 
+        Spindle spindle = new Spindle(primaryBundle);
+        Replicator primaryReplicator = new Replicator(primaryBundle,
+                                                      mirrorNode, rendezvous);
+        Replicator mirrorReplicator = new Replicator(mirrorBundle);
+        primaryEventChannel = new EventChannel(Role.PRIMARY, channelId,
+                                               primaryRoot, maxSegmentSize,
+                                               primaryReplicator);
+
+        mirrorEventChannel = new EventChannel(Role.MIRROR, channelId,
+                                              mirrorRoot, maxSegmentSize, null);
+
+        when(primaryBundle.eventChannelFor(channelId)).thenReturn(primaryEventChannel);
+        when(mirrorBundle.eventChannelFor(channelId)).thenReturn(mirrorEventChannel);
+
+        startSpindleAndReplicator(spindle, mirrorReplicator);
+
+        spindleHandler.connectTo(replicatorHandler.getLocalAddress(),
+                                 primaryReplicator);
+
+        int batches = 100;
+        int batchSize = 100;
+        //final AtomicInteger acks = new AtomicInteger(-1);
+        final CountDownLatch ackLatch = new CountDownLatch(batches);
+        Acknowledger ack = mock(Acknowledger.class);
+        Answer<Void> acknowledge = new Answer<Void>() {
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                // System.out.println("Ack: " + acks.incrementAndGet());
+                ackLatch.countDown();
+                return null;
+            }
+        };
+        doAnswer(acknowledge).when(ack).acknowledge(isA(UUID.class),
+                                                    isA(Long.class));
+
+        when(primaryBundle.getAcknowledger(isA(Node.class))).thenReturn(ack);
+        when(mirrorBundle.getAcknowledger(isA(Node.class))).thenReturn(ack);
+
+        writeEventsToPrimary(producerNode, channelId, batches, batchSize);
+
+        assertTrue("Did not receive acknowledgement from all event writes and replications",
+                   ackLatch.await(10, TimeUnit.SECONDS));
+
+        // set up the xeroxes and sinks for both the primary and secondary
+        Node primarySinkNode = new Node(3);
+        Node mirrorSinkNode = new Node(4);
+        Bundle primarySinkBundle = mock(Bundle.class);
+        Bundle mirrorSinkBundle = mock(Bundle.class);
+        when(primarySinkBundle.getId()).thenReturn(primarySinkNode);
+        when(mirrorSinkBundle.getId()).thenReturn(mirrorSinkNode);
+
+        Sink primarySink = new Sink(primarySinkBundle);
+        Sink mirrorSink = new Sink(mirrorSinkBundle);
+
+        primarySinkEventChannel = new EventChannel(Role.PRIMARY, channelId,
+                                                   primarySinkRoot,
+                                                   maxSegmentSize,
+                                                   primaryReplicator);
+
+        mirrorSinkEventChannel = new EventChannel(Role.MIRROR, channelId,
+                                                  mirrorSinkRoot,
+                                                  maxSegmentSize, null);
+
+        when(primarySinkBundle.xeroxEventChannel(channelId)).thenReturn(primarySinkEventChannel);
+        when(mirrorSinkBundle.xeroxEventChannel(channelId)).thenReturn(mirrorSinkEventChannel);
+
+        final CountDownLatch xeroxLatch = new CountDownLatch(2);
+        Rendezvous xeroxRendezvous = mock(Rendezvous.class);
+        Answer<Void> meet = new Answer<Void>() {
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                xeroxLatch.countDown();
+                return null;
+            }
+        };
+        doAnswer(meet).doAnswer(meet).when(xeroxRendezvous).meet();
+        doAnswer(new Answer<Void>() {
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                fail("Rendezvous cancelled during xerox");
+                return null;
+            }
+        }).when(xeroxRendezvous).cancel();
+
+        Xerox primaryXerox = new Xerox(primaryNode, primarySinkNode);
+        primaryXerox.setRendezvous(rendezvous);
+        Xerox mirrorXerox = new Xerox(mirrorNode, mirrorSinkNode);
+        mirrorXerox.setRendezvous(rendezvous);
+
+        primaryXerox.addChannel(primaryEventChannel);
+        mirrorXerox.addChannel(mirrorEventChannel);
+
+        startSinks(primarySink, mirrorSink);
+
+        spindleHandler.connectTo(primarySinkHandler.getLocalAddress(),
+                                 primaryXerox);
+
+        spindleHandler.connectTo(mirrorSinkHandler.getLocalAddress(),
+                                 mirrorXerox);
+        Thread.sleep(20000);
+        /*assertTrue("Xerox never completed",
+                   xeroxLatch.await(60, TimeUnit.SECONDS)); */
+
+    }
+
+    private void setupTemporaryRoots() throws IOException {
         primaryRoot = File.createTempFile("primary", ".channel");
         primaryRoot.delete();
         primaryRoot.mkdirs();
         primaryRoot.deleteOnExit();
-
         mirrorRoot = File.createTempFile("mirror", ".channel");
         mirrorRoot.delete();
         mirrorRoot.mkdirs();
         mirrorRoot.deleteOnExit();
 
-        final Spindle spindle = new Spindle(primaryBundle);
+        primarySinkRoot = File.createTempFile("primary", ".channel");
+        primarySinkRoot.delete();
+        primarySinkRoot.mkdirs();
+        primarySinkRoot.deleteOnExit();
+        mirrorSinkRoot = File.createTempFile("mirror", ".channel");
+        mirrorSinkRoot.delete();
+        mirrorSinkRoot.mkdirs();
+        mirrorSinkRoot.deleteOnExit();
+    }
 
-        final Replicator primaryReplicator = new Replicator(primaryBundle,
-                                                            mirrorNode,
-                                                            rendezvous);
-        final Replicator mirrorReplicator = new Replicator(mirrorBundle);
-
-        EventChannel primaryEventChannel = new EventChannel(Role.PRIMARY,
-                                                            channelId,
-                                                            primaryRoot,
-                                                            maxSegmentSize,
-                                                            primaryReplicator);
-
-        EventChannel mirrorEventChannel = new EventChannel(Role.MIRROR,
-                                                           channelId,
-                                                           mirrorRoot,
-                                                           maxSegmentSize, null);
-        when(primaryBundle.eventChannelFor(channelId)).thenReturn(primaryEventChannel);
-        when(mirrorBundle.eventChannelFor(channelId)).thenReturn(mirrorEventChannel);
-
+    private void startSinks(final Sink primarySink, final Sink mirrorSink)
+                                                                          throws IOException {
         SocketOptions socketOptions = new SocketOptions();
 
-        ServerSocketChannelHandler spindleHandler = new ServerSocketChannelHandler(
-                                                                                   "spindle handler",
-                                                                                   socketOptions,
-                                                                                   new InetSocketAddress(
-                                                                                                         "127.0.0.1",
-                                                                                                         0),
-                                                                                   Executors.newFixedThreadPool(5),
-                                                                                   new CommunicationsHandlerFactory() {
+        primarySinkHandler = createHandler("primary Sink handler", primarySink,
+                                           socketOptions);
+        mirrorSinkHandler = createHandler("mirror Sink handler", mirrorSink,
+                                          socketOptions);
+        primarySinkHandler.start();
+        mirrorSinkHandler.start();
+    }
 
-                                                                                       @Override
-                                                                                       public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
-                                                                                           return spindle;
-                                                                                       }
-                                                                                   });
-        ServerSocketChannelHandler replicatorHandler = new ServerSocketChannelHandler(
-                                                                                      "replicator handler",
-                                                                                      socketOptions,
-                                                                                      new InetSocketAddress(
-                                                                                                            "127.0.0.1",
-                                                                                                            0),
-                                                                                      Executors.newFixedThreadPool(5),
-                                                                                      new CommunicationsHandlerFactory() {
+    private void startSpindleAndReplicator(final Spindle spindle,
+                                           final Replicator mirrorReplicator)
+                                                                             throws IOException {
+        SocketOptions socketOptions = new SocketOptions();
 
-                                                                                          @Override
-                                                                                          public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
-                                                                                              return mirrorReplicator;
-                                                                                          }
-                                                                                      });
+        spindleHandler = createHandler("spindle handler", spindle,
+                                       socketOptions);
+        replicatorHandler = createHandler("replicator handler",
+                                          mirrorReplicator, socketOptions);
         spindleHandler.start();
         replicatorHandler.start();
+    }
 
-        spindleHandler.connectTo(replicatorHandler.getLocalAddress(),
-                                 primaryReplicator);
-
+    private void writeEventsToPrimary(Node producerNode, UUID channelId,
+                                      int batches, int batchSize)
+                                                                 throws IOException {
+        // Write some events to the primary, replicate them to the mirror.
         int magic = 666;
         SocketOptions options = new SocketOptions();
-        SocketChannel outbound = SocketChannel.open();
+        outbound = SocketChannel.open();
         options.setTimeout(1000);
         options.configure(outbound.socket());
         outbound.configureBlocking(true);
@@ -160,32 +341,18 @@ public class TestTransfer {
                                        channelId, channelId).getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
-        int batchSize = 100;
         int batchLength = batchSize * event.totalSize();
-        int totalSize = 1024 * 1024 * 2;
         long timestamp = 0;
-        for (int currentSize = 0; currentSize < totalSize; currentSize += batchLength) {
-            timestamp += batchSize;
-            System.out.println("Writing out batch: " + timestamp / batchSize);
+        for (int batch = 0; batch < batches; batch++) {
+            // System.out.println("Writing batch: " + batch);
             BatchHeader header = new BatchHeader(producerNode, batchLength,
-                                                 magic, channelId, timestamp);
+                                                 magic, channelId, timestamp++);
             header.rewind();
             header.write(outbound);
             for (int j = 0; j < batchSize; j++) {
                 event.rewind();
                 event.write(outbound);
             }
-        }
-        outbound.close();
-    }
-
-    @After
-    public void teardown() {
-        if (primaryRoot != null) {
-            Utils.deleteDirectory(primaryRoot);
-        }
-        if (mirrorRoot != null) {
-            Utils.deleteDirectory(mirrorRoot);
         }
     }
 }

@@ -77,7 +77,8 @@ public class TestReplicatingAppender {
                                                                  event.totalSize(),
                                                                  magic,
                                                                  channel,
-                                                                 timestamp, 0);
+                                                                 timestamp, 0,
+                                                                 0);
         payloadBuffer.clear();
         EventChannel eventChannel = mock(EventChannel.class);
         Bundle bundle = mock(Bundle.class);

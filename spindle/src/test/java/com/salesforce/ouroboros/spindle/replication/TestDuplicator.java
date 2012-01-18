@@ -165,7 +165,7 @@ public class TestDuplicator {
         replicator.replicate(new ReplicatedBatchHeader(mirror,
                                                        event.totalSize(),
                                                        magic, channel,
-                                                       timestamp, 0),
+                                                       timestamp, 0, 0),
                              eventChannel, segment, acknowledger);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
@@ -220,7 +220,7 @@ public class TestDuplicator {
                                                                       magic,
                                                                       channel,
                                                                       timestamp,
-                                                                      0);
+                                                                      0, 0);
 
         event.rewind();
         event.write(outboundSegment);
@@ -229,7 +229,10 @@ public class TestDuplicator {
 
         when(inboundBundle.eventChannelFor(channel)).thenReturn(inboundEventChannel);
         when(inboundBundle.getAcknowledger(mirror)).thenReturn(inboundAcknowledger);
-        when(inboundEventChannel.segmentFor(offset)).thenReturn(new AppendSegment(inboundSegment, 0, 0));
+        when(inboundEventChannel.segmentFor(offset)).thenReturn(new AppendSegment(
+                                                                                  inboundSegment,
+                                                                                  0,
+                                                                                  0));
 
         final Duplicator outboundDuplicator = new Duplicator(new Node(0));
         assertEquals(DuplicatorFSM.Waiting, outboundDuplicator.getState());
@@ -275,7 +278,8 @@ public class TestDuplicator {
         SocketChannelHandler outboundHandler = mock(SocketChannelHandler.class);
         when(outboundHandler.getChannel()).thenReturn(outbound);
         outboundDuplicator.connect(outboundHandler);
-        outboundDuplicator.replicate(new ReplicatedBatchHeader(batchHeader, 0),
+        outboundDuplicator.replicate(new ReplicatedBatchHeader(batchHeader, 0,
+                                                               0),
                                      eventChannel, outboundSegment,
                                      outboundAcknowledger);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {

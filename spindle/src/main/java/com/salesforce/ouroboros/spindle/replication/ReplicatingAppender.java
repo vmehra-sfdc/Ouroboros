@@ -60,9 +60,8 @@ public class ReplicatingAppender extends AbstractAppender {
         } catch (IOException e) {
             if (log.isLoggable(Level.SEVERE)) {
                 log.log(Level.SEVERE,
-                        String.format("Unable to append segment %s for %s at offset %s on %s",
-                                      segment, eventChannel, offset,
-                                      bundle.getId()));
+                        String.format("Unable to append %s to segment on %s",
+                                      batchHeader, segment, bundle.getId()));
             }
             close();
             return;
@@ -73,6 +72,10 @@ public class ReplicatingAppender extends AbstractAppender {
             log.warning(String.format("Could not find an acknowledger for %s",
                                       node));
             return;
+        }
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Acknowledging replication of %s on %s",
+                                    batchHeader, bundle.getId()));
         }
         acknowledger.acknowledge(batchHeader.getChannel(),
                                  batchHeader.getTimestamp());
@@ -85,6 +88,8 @@ public class ReplicatingAppender extends AbstractAppender {
 
     @Override
     protected AppendSegment getLogicalSegment() {
-        return eventChannel.segmentFor(((ReplicatedBatchHeader) batchHeader).getOffset());
+        ReplicatedBatchHeader replicated = (ReplicatedBatchHeader) batchHeader;
+        return eventChannel.segmentFor(replicated.getOffset(),
+                                       replicated.getPosition());
     }
 }

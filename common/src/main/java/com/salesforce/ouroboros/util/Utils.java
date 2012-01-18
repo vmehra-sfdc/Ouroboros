@@ -63,11 +63,14 @@ final public class Utils {
     }
 
     public static void deleteDirectory(File dir) {
-        for (File f : dir.listFiles()) {
-            if (f.isDirectory()) {
-                deleteDirectory(f);
-            } else {
-                f.delete();
+        File[] listing = dir.listFiles();
+        if (listing != null) {
+            for (File f : listing) {
+                if (f.isDirectory()) {
+                    deleteDirectory(f);
+                } else {
+                    f.delete();
+                }
             }
         }
         dir.delete();

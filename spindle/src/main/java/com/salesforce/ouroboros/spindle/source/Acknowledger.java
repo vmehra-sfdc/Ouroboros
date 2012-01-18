@@ -63,9 +63,7 @@ public class Acknowledger {
      */
     public void acknowledge(UUID channel, long timestamp) {
         pending.add(new BatchIdentity(channel, timestamp));
-        if (!fsm.isInTransition()) {
-            fsm.ack();
-        }
+        fsm.ack();
     }
 
     public void close() {

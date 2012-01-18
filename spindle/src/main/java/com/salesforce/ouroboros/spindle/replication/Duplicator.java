@@ -56,9 +56,11 @@ public final class Duplicator {
     private long                    position;
     private int                     remaining;
     final Queue<EventEntry>         pending = new LockFreeQueue<EventEntry>();
+    final Node                      thisNode;
 
     public Duplicator(Node node) {
         fsm.setName(Integer.toString(node.processId));
+        thisNode = node;
     }
 
     public void connect(SocketChannelHandler handler) {
@@ -79,9 +81,7 @@ public final class Duplicator {
                           EventChannel eventChannel, Segment segment,
                           Acknowledger acknowledger) {
         pending.add(new EventEntry(header, eventChannel, segment, acknowledger));
-        if (!fsm.isInTransition()) {
-            fsm.replicate();
-        }
+        fsm.replicate();
     }
 
     public void writeReady() {
@@ -94,6 +94,11 @@ public final class Duplicator {
                                                        handler.getChannel());
         remaining = remaining - written;
         position = p + written;
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Writing batch %s, position=%s, written=%s, to %s on %s",
+                                    current.header, position, written,
+                                    current.segment, thisNode));
+        }
         if (remaining == 0) {
             return true;
         }
@@ -137,10 +142,19 @@ public final class Duplicator {
     protected void processHeader() {
         current = pending.poll();
         if (current == null) {
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("No more events to replicate on %s",
+                                        thisNode));
+            }
             fsm.pendingEmpty();
+            return;
+        }
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Processing %s on %s", current.header,
+                                    thisNode));
         }
         remaining = current.header.getBatchByteLength();
-        position = current.header.getOffset();
+        position = current.header.getPosition();
         current.header.rewind();
         if (writeHeader()) {
             fsm.headerWritten();
@@ -161,6 +175,10 @@ public final class Duplicator {
         try {
             if (transferTo()) {
                 current.eventChannel.commit(current.header.getOffset());
+                if (log.isLoggable(Level.FINER)) {
+                    log.finer(String.format("Acknowledging replication of %s, on %s",
+                                            current.header, thisNode));
+                }
                 current.acknowledger.acknowledge(current.header.getChannel(),
                                                  current.header.getTimestamp());
                 return true;
@@ -168,9 +186,8 @@ public final class Duplicator {
         } catch (IOException e) {
             inError = true;
             log.log(Level.WARNING,
-                    String.format("Unable to replicate payload for event: %s from: %s",
-                                  current.header.getOffset(), current.segment),
-                    e);
+                    String.format("Unable to replicate payload for %s from: %s",
+                                  current.header, current.segment), e);
         }
         return false;
     }
@@ -186,7 +203,15 @@ public final class Duplicator {
                     String.format("Unable to write batch header: %s",
                                   current.header), e);
             inError = true;
+            return false;
         }
-        return !current.header.hasRemaining();
+        boolean written = !current.header.hasRemaining();
+        if (written) {
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("written header %s on %s",
+                                        current.header, thisNode));
+            }
+        }
+        return written;
     }
 }

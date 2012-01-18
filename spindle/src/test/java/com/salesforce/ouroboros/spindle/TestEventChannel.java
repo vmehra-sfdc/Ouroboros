@@ -70,13 +70,6 @@ public class TestEventChannel {
     }
 
     @Test
-    public void testDeleteOnClose() throws Exception {
-        EventChannel eventChannel = new EventChannel(Role.PRIMARY,
-                                                     UUID.randomUUID(), root,
-                                                     100, null);
-    }
-
-    @Test
     public void testSegmentGeneration() throws Exception {
         long maxSegmentSize = 16 * 1024;
         int eventSize = 256;

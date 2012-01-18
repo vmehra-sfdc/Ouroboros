@@ -59,7 +59,7 @@ abstract public class AbstractAppender {
     protected SocketChannelHandler          handler;
     protected boolean                       inError  = false;
     protected long                          offset   = -1L;
-    protected long                          position = -1L;
+    protected int                          position = -1;
     protected long                          remaining;
     protected Segment                       segment;
 
@@ -101,8 +101,8 @@ abstract public class AbstractAppender {
         position += written;
         remaining -= written;
         if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Appending, position=%s, remaining=%s, written=%s on %s",
-                                    position, remaining, written,
+            log.finer(String.format("Appending, offset=%s, position=%s, remaining=%s, written=%s on %s",
+                                    offset, position, remaining, written,
                                     bundle.getId()));
         }
         if (remaining == 0) {
@@ -136,7 +136,8 @@ abstract public class AbstractAppender {
         AppendSegment logicalSegment = getLogicalSegment();
         segment = logicalSegment.segment;
         offset = logicalSegment.offset;
-        position = logicalSegment.position;
+        setStartPosition(logicalSegment);
+        markPosition();
         remaining = batchHeader.getBatchByteLength();
         if (eventChannel.isDuplicate(batchHeader)) {
             log.warning(String.format("Duplicate event batch %s received on %s",
@@ -145,8 +146,8 @@ abstract public class AbstractAppender {
             return;
         }
         if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Beginning append of %s, position=%s, remaining=%s on %s",
-                                    segment, position, remaining,
+            log.finer(String.format("Beginning append of %s, offset=%s, position=%s, remaining=%s on %s",
+                                    segment, offset, position, remaining,
                                     bundle.getId()));
         }
         if (append()) {
@@ -158,6 +159,14 @@ abstract public class AbstractAppender {
                 handler.selectForRead();
             }
         }
+    }
+
+    public void setStartPosition(AppendSegment logicalSegment) {
+        position = logicalSegment.position;
+    }
+
+    protected void markPosition() {
+        // default is to do nothing
     }
 
     abstract protected void commit();
@@ -240,7 +249,7 @@ abstract public class AbstractAppender {
     protected boolean readBatchHeader() {
         try {
             if (batchHeader.read(handler.getChannel()) < 0) {
-                inError = true;
+                return false;
             }
         } catch (IOException e) {
             log.log(Level.SEVERE,
