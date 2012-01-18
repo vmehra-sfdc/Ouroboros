@@ -402,6 +402,10 @@ public class Sink implements CommunicationsHandler {
     }
 
     protected void sendAck() {
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Copy complete, sending ack from %s",
+                                   bundle.getId()));
+        }
         buffer.clear();
         buffer.limit(ACK_HEADER_SIZE);
         buffer.putInt(MAGIC);

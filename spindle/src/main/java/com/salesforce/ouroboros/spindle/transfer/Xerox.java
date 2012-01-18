@@ -289,6 +289,9 @@ public class Xerox implements CommunicationsHandler {
                 inError = true;
                 return false;
             }
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Ack received from %s on %s", to, from));
+            }
             try {
                 rendezvous.meet();
             } catch (BrokenBarrierException e) {
@@ -302,6 +305,10 @@ public class Xerox implements CommunicationsHandler {
     }
 
     protected void receiveAck() {
+        if (log.isLoggable(Level.FINER)) {
+            log.fine(String.format("Complete, waiting for ack on %s from %s",
+                                   from, to));
+        }
         buffer.clear();
         buffer.limit(Sink.ACK_HEADER_SIZE);
         if (readAck()) {

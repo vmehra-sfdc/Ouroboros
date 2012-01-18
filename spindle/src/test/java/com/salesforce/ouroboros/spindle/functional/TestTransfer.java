@@ -240,7 +240,6 @@ public class TestTransfer {
         Answer<Void> meet = new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
-                System.out.println("Countdown!");
                 xeroxLatch.countDown();
                 return null;
             }
@@ -255,9 +254,9 @@ public class TestTransfer {
         }).when(xeroxRendezvous).cancel();
 
         Xerox primaryXerox = new Xerox(primaryNode, primarySinkNode);
-        primaryXerox.setRendezvous(rendezvous);
+        primaryXerox.setRendezvous(xeroxRendezvous);
         Xerox mirrorXerox = new Xerox(mirrorNode, mirrorSinkNode);
-        mirrorXerox.setRendezvous(rendezvous);
+        mirrorXerox.setRendezvous(xeroxRendezvous);
 
         primaryXerox.addChannel(primaryEventChannel);
         mirrorXerox.addChannel(mirrorEventChannel);

@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -249,8 +250,12 @@ abstract public class AbstractAppender {
     protected boolean readBatchHeader() {
         try {
             if (batchHeader.read(handler.getChannel()) < 0) {
+                error();
                 return false;
             }
+        } catch (ClosedChannelException e) {
+            error();
+            return false;
         } catch (IOException e) {
             log.log(Level.SEVERE,
                     String.format("Exception during batch header read on %s",
