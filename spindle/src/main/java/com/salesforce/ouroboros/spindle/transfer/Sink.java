@@ -51,6 +51,7 @@ import com.salesforce.ouroboros.spindle.transfer.SinkContext.SinkState;
  */
 public class Sink implements CommunicationsHandler {
     private final static Logger  log                       = Logger.getLogger(Sink.class.getCanonicalName());
+    public static final int      ACK_HEADER_SIZE           = 4;
     public final static int      CHANNEL_COUNT_HEADER_SIZE = 8;
     public final static int      CHANNEL_HEADER_SIZE       = 24;
     public static final int      SEGMENT_HEADER_SIZE       = 20;
@@ -122,6 +123,8 @@ public class Sink implements CommunicationsHandler {
     }
 
     protected void copy() {
+        buffer.clear();
+        buffer.limit(BUFFER_SIZE);
         if (copySegment()) {
             fsm.finished();
         } else {
@@ -134,10 +137,10 @@ public class Sink implements CommunicationsHandler {
     }
 
     protected boolean copySegment() {
+        long written;
         try {
-            bytesWritten += current.transferFrom(handler.getChannel(),
-                                                 bytesWritten, segmentSize
-                                                               - bytesWritten);
+            written = current.transferFrom(handler.getChannel(), bytesWritten,
+                                           segmentSize - bytesWritten);
         } catch (IOException e) {
             error = true;
             if (log.isLoggable(Level.WARNING)) {
@@ -146,6 +149,13 @@ public class Sink implements CommunicationsHandler {
                                       current, bundle.getId()), e);
             }
             return false;
+        }
+        bytesWritten += written;
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("copying segment %s, written %s, remaining: %s on %s",
+                                    current, written, segmentSize
+                                                      - bytesWritten,
+                                    bundle.getId()));
         }
         if (bytesWritten == segmentSize) {
             try {
@@ -159,6 +169,7 @@ public class Sink implements CommunicationsHandler {
                 }
                 return false;
             }
+            segmentCount--;
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Sink segment %s copy finished on %s",
                                        current, bundle.getId()));
@@ -177,8 +188,8 @@ public class Sink implements CommunicationsHandler {
     }
 
     protected void nextChannel() {
+        buffer.clear();
         buffer.limit(CHANNEL_HEADER_SIZE);
-        buffer.rewind();
         if (readChannelHeader()) {
             fsm.finished();
         } else {
@@ -199,9 +210,9 @@ public class Sink implements CommunicationsHandler {
             }
             return;
         }
-        segmentCount--;
+        bytesWritten = 0;
+        buffer.clear();
         buffer.limit(SEGMENT_HEADER_SIZE);
-        buffer.rewind();
         if (readSegmentHeader()) {
             fsm.finished();
         } else {
@@ -265,8 +276,8 @@ public class Sink implements CommunicationsHandler {
                 return false;
             }
             if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Sink started for channel %s on %s",
-                                       channelId, bundle.getId()));
+                log.info(String.format("Sink started for channel %s, segment count %s on %s",
+                                       channelId, segmentCount, bundle.getId()));
             }
             channelCount--;
             return true;
@@ -296,7 +307,7 @@ public class Sink implements CommunicationsHandler {
 
         if (!buffer.hasRemaining()) {
             buffer.flip();
-            long magic = buffer.getInt();
+            int magic = buffer.getInt();
             if (MAGIC != magic) {
                 error = true;
                 if (log.isLoggable(Level.WARNING)) {
@@ -318,10 +329,9 @@ public class Sink implements CommunicationsHandler {
                 return false;
             }
             segmentSize = buffer.getLong();
-            bytesWritten = 0;
             if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Sink segment %s copy started on %s",
-                                       current, bundle.getId()));
+                log.info(String.format("Sink segment %s copy, total size %s, started on %s",
+                                       current, segmentSize, bundle.getId()));
             }
             return true;
         }
@@ -333,6 +343,7 @@ public class Sink implements CommunicationsHandler {
     }
 
     protected void getChannelCount() {
+        buffer.clear();
         buffer.limit(CHANNEL_COUNT_HEADER_SIZE);
         if (readChannelCount()) {
             fsm.finished();
@@ -385,8 +396,6 @@ public class Sink implements CommunicationsHandler {
                 log.info(String.format("Expecting %s channels on %s",
                                        channelCount, bundle.getId()));
             }
-            buffer.limit(BUFFER_SIZE);
-            buffer.clear();
             return true;
         }
         return false;
@@ -394,12 +403,17 @@ public class Sink implements CommunicationsHandler {
 
     protected void sendAck() {
         buffer.clear();
+        buffer.limit(ACK_HEADER_SIZE);
         buffer.putInt(MAGIC);
         buffer.flip();
         if (writeAck()) {
             fsm.finished();
         } else {
-            handler.selectForWrite();
+            if (error) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 

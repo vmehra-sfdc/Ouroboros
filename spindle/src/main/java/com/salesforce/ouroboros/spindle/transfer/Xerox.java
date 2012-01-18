@@ -159,6 +159,10 @@ public class Xerox implements CommunicationsHandler {
             return false;
         }
         position += written;
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Copying %s, written=%s, position=%s on %s to %s",
+                                    currentSegment, written, position, from, to));
+        }
         if (position == segmentSize) {
             try {
                 currentSegment.close();
@@ -175,6 +179,7 @@ public class Xerox implements CommunicationsHandler {
     }
 
     protected void copySegment() {
+        buffer.clear();
         if (copy()) {
             fsm.finished();
         } else {
@@ -203,6 +208,7 @@ public class Xerox implements CommunicationsHandler {
                                    segments.size()));
         }
         buffer.clear();
+        buffer.limit(Sink.CHANNEL_HEADER_SIZE);
         buffer.putInt(MAGIC);
         buffer.putInt(segments.size());
         buffer.putLong(currentChannel.getId().getMostSignificantBits());
@@ -237,10 +243,11 @@ public class Xerox implements CommunicationsHandler {
             return;
         }
         if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Starting Xerox of segment %s from %s to %s",
-                                   currentSegment, from, to));
+            log.info(String.format("Starting Xerox of segment %s, total size= %s, from %s to %s",
+                                   currentSegment, segmentSize, from, to));
         }
         buffer.clear();
+        buffer.limit(Sink.SEGMENT_HEADER_SIZE);
         buffer.putInt(MAGIC);
         buffer.putLong(currentSegment.getPrefix());
         buffer.putLong(segmentSize);
@@ -296,7 +303,7 @@ public class Xerox implements CommunicationsHandler {
 
     protected void receiveAck() {
         buffer.clear();
-        buffer.limit(4);
+        buffer.limit(Sink.ACK_HEADER_SIZE);
         if (readAck()) {
             fsm.finished();
         } else {
@@ -357,6 +364,8 @@ public class Xerox implements CommunicationsHandler {
     }
 
     protected void sendChannelCount() {
+        buffer.clear();
+        buffer.limit(Sink.CHANNEL_COUNT_HEADER_SIZE);
         buffer.putInt(MAGIC);
         buffer.putInt(channels.size());
         buffer.flip();

@@ -41,7 +41,6 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.After;
 import org.junit.Test;
@@ -241,11 +240,12 @@ public class TestTransfer {
         Answer<Void> meet = new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
+                System.out.println("Countdown!");
                 xeroxLatch.countDown();
                 return null;
             }
         };
-        doAnswer(meet).doAnswer(meet).when(xeroxRendezvous).meet();
+        doAnswer(meet).when(xeroxRendezvous).meet();
         doAnswer(new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
@@ -269,9 +269,9 @@ public class TestTransfer {
 
         spindleHandler.connectTo(mirrorSinkHandler.getLocalAddress(),
                                  mirrorXerox);
-        Thread.sleep(20000);
-        /*assertTrue("Xerox never completed",
-                   xeroxLatch.await(60, TimeUnit.SECONDS)); */
+
+        assertTrue("Xerox never completed",
+                   xeroxLatch.await(60, TimeUnit.SECONDS));
 
     }
 
