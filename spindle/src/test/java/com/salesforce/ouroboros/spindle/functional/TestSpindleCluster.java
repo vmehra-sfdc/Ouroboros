@@ -786,7 +786,7 @@ public class TestSpindleCluster {
      * 
      * @throws Exception
      */
-    // @Test
+    @Test
     public void testReplication() throws Exception {
 
         bootstrap();
