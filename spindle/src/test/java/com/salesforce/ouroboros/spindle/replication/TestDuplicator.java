@@ -229,10 +229,10 @@ public class TestDuplicator {
 
         when(inboundBundle.eventChannelFor(channel)).thenReturn(inboundEventChannel);
         when(inboundBundle.getAcknowledger(mirror)).thenReturn(inboundAcknowledger);
-        when(inboundEventChannel.segmentFor(offset)).thenReturn(new AppendSegment(
-                                                                                  inboundSegment,
-                                                                                  0,
-                                                                                  0));
+        when(inboundEventChannel.segmentFor(offset, 0)).thenReturn(new AppendSegment(
+                                                                                     inboundSegment,
+                                                                                     0,
+                                                                                     0));
 
         final Duplicator outboundDuplicator = new Duplicator(new Node(0));
         assertEquals(DuplicatorFSM.Waiting, outboundDuplicator.getState());

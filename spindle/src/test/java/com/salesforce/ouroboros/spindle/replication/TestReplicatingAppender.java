@@ -85,10 +85,10 @@ public class TestReplicatingAppender {
         when(bundle.getId()).thenReturn(new Node(0));
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(bundle.getAcknowledger(mirror)).thenReturn(acknowledger);
-        when(eventChannel.segmentFor(header.getOffset())).thenReturn(new AppendSegment(
-                                                                                       segment,
-                                                                                       0,
-                                                                                       0));
+        when(eventChannel.segmentFor(header.getOffset(), header.getPosition())).thenReturn(new AppendSegment(
+                                                                                                             segment,
+                                                                                                             0,
+                                                                                                             0));
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
         final ReplicatingAppender replicator = new ReplicatingAppender(bundle);
