@@ -89,7 +89,7 @@ public class TestAppender {
         assertEquals(AbstractAppenderFSM.Ready, appender.getState());
 
         Node mirror = new Node(0x1638);
-        int magic = 666;
+        int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
@@ -141,7 +141,7 @@ public class TestAppender {
             assertEquals(b, writtenPayload.get());
         }
 
-        verify(handler, new Times(3)).selectForRead();
+        verify(handler, new Times(2)).selectForRead();
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).append(isA(ReplicatedBatchHeader.class),
                                     eq(writeSegment), isA(Acknowledger.class),
@@ -175,7 +175,7 @@ public class TestAppender {
         assertEquals(AbstractAppenderFSM.Ready, appender.getState());
 
         Node mirror = new Node(0x1638);
-        int magic = 666;
+        int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();

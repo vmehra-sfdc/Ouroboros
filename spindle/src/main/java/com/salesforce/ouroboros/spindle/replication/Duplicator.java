@@ -240,7 +240,6 @@ public final class Duplicator {
                     String.format("Unable to replicate payload for %s from: %s",
                                   current.header, current.segment), e);
         }
-        System.out.println("Batch not written");
         return false;
     }
 

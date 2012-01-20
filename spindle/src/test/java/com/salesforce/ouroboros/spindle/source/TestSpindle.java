@@ -73,7 +73,7 @@ public class TestSpindle {
 
         EventChannel eventChannel = mock(EventChannel.class);
         Node mirror = new Node(0x1638);
-        int magic = 666;
+        int magic = BatchHeader.MAGIC;
         final UUID channel = UUID.randomUUID();
         final long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();

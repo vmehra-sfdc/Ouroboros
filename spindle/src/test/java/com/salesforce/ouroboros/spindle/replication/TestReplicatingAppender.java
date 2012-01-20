@@ -42,6 +42,7 @@ import org.junit.Test;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
@@ -65,7 +66,7 @@ public class TestReplicatingAppender {
         Segment segment = new Segment(tmpFile);
         Acknowledger acknowledger = mock(Acknowledger.class);
 
-        int magic = 666;
+        int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();

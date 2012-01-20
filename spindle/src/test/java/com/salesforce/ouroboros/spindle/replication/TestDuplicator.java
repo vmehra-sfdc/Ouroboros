@@ -43,6 +43,7 @@ import org.junit.Test;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
@@ -212,7 +213,7 @@ public class TestDuplicator {
         tmpOutboundFile.deleteOnExit();
         Segment outboundSegment = new Segment(tmpOutboundFile);
 
-        int magic = 666;
+        int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
