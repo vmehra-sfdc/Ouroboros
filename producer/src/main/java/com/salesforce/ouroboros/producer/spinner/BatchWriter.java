@@ -52,8 +52,6 @@ import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterS
 public class BatchWriter {
 
     private static final Logger        log         = Logger.getLogger(BatchWriter.class.getCanonicalName());
-    private static final int           MAGIC       = 0x1638;
-
     private final BatchHeader          batchHeader = new BatchHeader();
     private final BatchWriterContext   fsm         = new BatchWriterContext(
                                                                             this);
@@ -123,7 +121,7 @@ public class BatchWriter {
             totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
             batch.add(event);
         }
-        batchHeader.initialize(entry.mirror, totalSize, MAGIC, entry.channel,
+        batchHeader.initialize(entry.mirror, totalSize, BatchHeader.MAGIC, entry.channel,
                                entry.timestamp);
         batchHeader.rewind();
         handler.selectForWrite();
@@ -156,7 +154,7 @@ public class BatchWriter {
             totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
             batch.add(event);
         }
-        batchHeader.initialize(entry.mirror, totalSize, MAGIC, entry.channel,
+        batchHeader.initialize(entry.mirror, totalSize, BatchHeader.MAGIC, entry.channel,
                                entry.timestamp);
         batchHeader.rewind();
         if (writeBatchHeader()) {
@@ -175,7 +173,7 @@ public class BatchWriter {
     }
 
     protected void nextEventHeader() {
-        header.initialize(MAGIC, batch.peekFirst());
+        header.initialize(BatchHeader.MAGIC, batch.peekFirst());
         header.rewind();
         if (writeEventHeader()) {
             fsm.eventHeaderWritten();
@@ -226,8 +224,9 @@ public class BatchWriter {
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
-                        String.format("Unable to write batch header %s on %s",
-                                      batchHeader, handler.getChannel()), e);
+                                    String.format("Unable to write batch header %s on %s",
+                                                  batchHeader,
+                                                  handler.getChannel()), e);
             }
             inError = true;
             return false;
@@ -241,8 +240,9 @@ public class BatchWriter {
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
-                        String.format("Unable to write header %s on %s",
-                                      header, handler.getChannel()), e);
+                                    String.format("Unable to write header %s on %s",
+                                                  header, handler.getChannel()),
+                                    e);
             }
             inError = true;
             return false;
@@ -262,8 +262,8 @@ public class BatchWriter {
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
-                        String.format("Unable to write event batch payload %s",
-                                      handler.getChannel()), e);
+                                    String.format("Unable to write event batch payload %s",
+                                                  handler.getChannel()), e);
             }
             inError = true;
             return false;

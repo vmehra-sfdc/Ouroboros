@@ -96,18 +96,18 @@ public class ReplicatedBatchHeader extends BatchHeader {
         return getBytes().getInt(BATCH_POSITION_OFFSET);
     }
 
+    @Override
+    public String toString() {
+        return String.format("ReplicatedBatchHeader[magic=%s, timestamp=%s, length=%s, channel=%s offset=%s position=%s]",
+                             getMagic(), getTimestamp(), getBatchByteLength(),
+                             getChannel(), getOffset(), getPosition());
+    }
+
     /* (non-Javadoc)
      * @see com.salesforce.ouroboros.BatchHeader#getHeaderSize()
      */
     @Override
     protected int getHeaderSize() {
         return HEADER_SIZE;
-    }
-
-    @Override
-    public String toString() {
-        return String.format("ReplicatedBatchHeader[magic=%s, timestamp=%s, length=%s, channel=%s offset=%s position=%s]",
-                             getMagic(), getTimestamp(), getBatchByteLength(),
-                             getChannel(), getOffset(), getPosition());
     }
 }

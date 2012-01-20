@@ -115,6 +115,10 @@ public class EventHeader implements Cloneable {
                && header.getCrc32() == getCrc32();
     }
 
+    public ByteBuffer getBytes() {
+        return bytes;
+    }
+
     /**
      * @return the CRC32 value of the payload
      */

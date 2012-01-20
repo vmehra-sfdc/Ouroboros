@@ -39,7 +39,11 @@
 %start DuplicatorFSM::Waiting
 %map DuplicatorFSM
 %% 
-Waiting{
+Waiting
+Entry {
+	next();
+}
+{
 	replicate
 		WriteHeader{}
 	
@@ -67,9 +71,6 @@ Entry {
 		
 	headerWritten
 		WriteBatch{}
-		
-	pendingEmpty
-		Waiting{}
 }
 
 WriteBatch
@@ -88,11 +89,15 @@ Entry {
 		Closed{}
 		
 	writeReady
-		[!ctxt.pending.isEmpty()]
+		[ctxt.hasNext()]
 		WriteHeader{}
 		
 	writeReady
 		Waiting{}
+		
+	batchWritten
+		[ctxt.hasNext()]
+		WriteHeader{}
 		
 	batchWritten
 		Waiting{}

@@ -37,7 +37,9 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
@@ -242,9 +244,11 @@ public class EventChannel {
      * @throws IOException
      */
     public void append(ReplicatedBatchHeader batchHeader, Segment segment,
-                       Acknowledger acknowledger) throws IOException {
+                       Acknowledger acknowledger, SocketChannelHandler handler)
+                                                                               throws IOException {
         append(batchHeader, batchHeader.getOffset(), segment);
-        replicator.replicate(batchHeader, this, segment, acknowledger);
+        replicator.replicate(new EventEntry(batchHeader, this, segment,
+                                            acknowledger, handler));
     }
 
     /**
@@ -355,26 +359,21 @@ public class EventChannel {
                                                             batchHeader.getBatchByteLength(),
                                                             maxSegmentSize);
         File segmentFile = new File(channel, logicalSegment.segment);
-        if (!segmentFile.exists()) {
-            try {
-                segmentFile.createNewFile();
-            } catch (IOException e) {
-                String msg = String.format("Cannot create the new segment file: %s",
-                                           segmentFile.getAbsolutePath());
-                log.log(Level.WARNING, msg, e);
-                throw new IllegalStateException(msg);
-            }
-        }
-        try {
-            return new AppendSegment(new Segment(segmentFile),
-                                     logicalSegment.offset,
-                                     logicalSegment.position);
-        } catch (FileNotFoundException e) {
-            String msg = String.format("The segment file cannot be found, yet was created: %s",
-                                       segmentFile.getAbsolutePath());
-            log.log(Level.WARNING, msg, e);
-            throw new IllegalStateException(msg);
-        }
+        return getSegment(logicalSegment.offset, logicalSegment.position,
+                          segmentFile);
+    }
+
+    /**
+     * Answer the segment for the event at the given offset
+     * 
+     * @param offset
+     *            - the offset of the event
+     * @return the segment for the event
+     */
+    public AppendSegment segmentFor(long offset) {
+        File segment = new File(channel, segmentName(prefixFor(offset,
+                                                               maxSegmentSize)));
+        return getSegment(offset, -1, segment);
     }
 
     /**
@@ -387,6 +386,18 @@ public class EventChannel {
     public AppendSegment segmentFor(long offset, int position) {
         File segment = new File(channel, segmentName(prefixFor(offset,
                                                                maxSegmentSize)));
+        return getSegment(offset, position, segment);
+    }
+
+    public void setMirror() {
+        role = Role.MIRROR;
+    }
+
+    public void setPrimary() {
+        role = Role.PRIMARY;
+    }
+
+    private AppendSegment getSegment(long offset, int position, File segment) {
         if (!segment.exists()) {
             try {
                 segment.createNewFile();
@@ -405,43 +416,5 @@ public class EventChannel {
             log.log(Level.WARNING, msg, e);
             throw new IllegalStateException(msg);
         }
-    }
-
-    /**
-     * Answer the segment for the event at the given offset
-     * 
-     * @param offset
-     *            - the offset of the event
-     * @return the segment for the event
-     */
-    public AppendSegment segmentFor(long offset) {
-        File segment = new File(channel, segmentName(prefixFor(offset,
-                                                               maxSegmentSize)));
-        if (!segment.exists()) {
-            try {
-                segment.createNewFile();
-            } catch (IOException e) {
-                String msg = String.format("Cannot create the new segment file: %s",
-                                           segment.getAbsolutePath());
-                log.log(Level.WARNING, msg, e);
-                throw new IllegalStateException(msg);
-            }
-        }
-        try {
-            return new AppendSegment(new Segment(segment), offset, -1);
-        } catch (FileNotFoundException e) {
-            String msg = String.format("The segment file cannot be found, yet was created: %s",
-                                       segment.getAbsolutePath());
-            log.log(Level.WARNING, msg, e);
-            throw new IllegalStateException(msg);
-        }
-    }
-
-    public void setMirror() {
-        role = Role.MIRROR;
-    }
-
-    public void setPrimary() {
-        role = Role.PRIMARY;
     }
 }

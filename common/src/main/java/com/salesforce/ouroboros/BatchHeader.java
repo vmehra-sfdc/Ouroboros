@@ -49,6 +49,7 @@ import java.util.UUID;
  * 
  */
 public class BatchHeader {
+    public static final int    MAGIC                    = 0x1638;
     protected static final int BATCH_BYTE_LENGTH_OFFSET = 0;
     protected static final int MAGIC_OFFSET             = BATCH_BYTE_LENGTH_OFFSET + 4;
     protected static final int PRODUCER_MIRROR_OFFSET   = MAGIC_OFFSET + 4;

@@ -40,6 +40,9 @@
 %map AbstractAppenderFSM
 %% 
 Ready
+Entry {
+	ready();
+}
 {
 	readReady
 		ReadBatchHeader{}
@@ -63,14 +66,10 @@ Entry {
 		Closed{}
 
 	readReady
-		Ready{
-			selectForRead();
-		}
+		Ready{}
 
 	appended
-		Ready{
-			selectForRead();
-		}
+		Ready{}
 }
 
 DevNull

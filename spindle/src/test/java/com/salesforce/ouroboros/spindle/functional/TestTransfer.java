@@ -41,6 +41,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.After;
 import org.junit.Test;
@@ -50,6 +51,7 @@ import org.mockito.stubbing.Answer;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
+import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
@@ -76,7 +78,6 @@ public class TestTransfer {
     private File                       mirrorRoot;
     private ServerSocketChannelHandler mirrorSinkHandler;
     private File                       mirrorSinkRoot;
-    private SocketChannel              outbound;
     private EventChannel               primaryEventChannel;
     private File                       primaryRoot;
     private ServerSocketChannelHandler primarySinkHandler;
@@ -152,11 +153,9 @@ public class TestTransfer {
         if (mirrorSinkRoot != null) {
             Utils.deleteDirectory(mirrorSinkRoot);
         }
-
-        outbound.close();
     }
 
-    @Test
+    // @Test
     public void testReplicationTransfer() throws Exception {
         setupTemporaryRoots();
 
@@ -188,15 +187,13 @@ public class TestTransfer {
         spindleHandler.connectTo(replicatorHandler.getLocalAddress(),
                                  primaryReplicator);
 
-        int batches = 100;
+        int batches = 3000;
         int batchSize = 100;
-        //final AtomicInteger acks = new AtomicInteger(-1);
         final CountDownLatch ackLatch = new CountDownLatch(batches);
         Acknowledger ack = mock(Acknowledger.class);
         Answer<Void> acknowledge = new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
-                // System.out.println("Ack: " + acks.incrementAndGet());
                 ackLatch.countDown();
                 return null;
             }
@@ -207,10 +204,15 @@ public class TestTransfer {
         when(primaryBundle.getAcknowledger(isA(Node.class))).thenReturn(ack);
         when(mirrorBundle.getAcknowledger(isA(Node.class))).thenReturn(ack);
 
-        writeEventsToPrimary(producerNode, channelId, batches, batchSize);
-
+        CountDownLatch producerLatch = new CountDownLatch(1);
+        Producer producer = new Producer(producerLatch, batches, batchSize,
+                                         producerNode, BatchHeader.MAGIC);
+        spindleHandler.connectTo(spindleHandler.getLocalAddress(), producer);
+        assertTrue("Did not publish all events in given time",
+                   producerLatch.await(60, TimeUnit.SECONDS));
+        System.out.println("Events published");
         assertTrue("Did not receive acknowledgement from all event writes and replications",
-                   ackLatch.await(10, TimeUnit.SECONDS));
+                   ackLatch.await(60, TimeUnit.SECONDS));
 
         // set up the xeroxes and sinks for both the primary and secondary
         Node primarySinkNode = new Node(3);
@@ -319,39 +321,122 @@ public class TestTransfer {
         replicatorHandler.start();
     }
 
-    private void writeEventsToPrimary(Node producerNode, UUID channelId,
-                                      int batches, int batchSize)
-                                                                 throws IOException {
-        // Write some events to the primary, replicate them to the mirror.
-        int magic = 666;
-        SocketOptions options = new SocketOptions();
-        outbound = SocketChannel.open();
-        options.setTimeout(1000);
-        options.configure(outbound.socket());
-        outbound.configureBlocking(true);
-        outbound.connect(spindleHandler.getLocalAddress());
-        assertTrue(outbound.isConnected());
-        ByteBuffer buffer = ByteBuffer.allocate(Spindle.HANDSHAKE_SIZE);
-        buffer.putInt(Spindle.MAGIC);
-        producerNode.serialize(buffer);
-        buffer.flip();
-        outbound.write(buffer);
-        byte[] payload = String.format("%s Give me Slack, or give me Food, or Kill me %s",
-                                       channelId, channelId).getBytes();
-        ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        Event event = new Event(magic, payloadBuffer);
-        int batchLength = batchSize * event.totalSize();
-        long timestamp = 0;
-        for (int batch = 0; batch < batches; batch++) {
-            // System.out.println("Writing batch: " + batch);
-            BatchHeader header = new BatchHeader(producerNode, batchLength,
-                                                 magic, channelId, timestamp++);
-            header.rewind();
-            header.write(outbound);
-            for (int j = 0; j < batchSize; j++) {
+    private class Producer implements CommunicationsHandler {
+        private final int            numberOfBatches;
+        private SocketChannelHandler handler;
+        private final AtomicInteger  batches   = new AtomicInteger();
+        private final ByteBuffer     batch;
+        private final AtomicInteger  timestamp = new AtomicInteger(0);
+        private BatchHeader          currentHeader;
+        private final Node           node;
+        private final int            magic;
+        private final int            batchLength;
+        private final CountDownLatch latch;
+
+        private Producer(CountDownLatch latch, int batches, int batchSize,
+                         Node node, int magic) {
+            this.latch = latch;
+            this.node = node;
+            this.magic = magic;
+            this.numberOfBatches = batches;
+            Event event = event();
+            batchLength = batchSize * event.totalSize();
+            batch = ByteBuffer.allocate(batchLength);
+            for (int i = 0; i < batchSize; i++) {
                 event.rewind();
-                event.write(outbound);
+                batch.put(event.getBytes());
             }
         }
+
+        private void nextBatch() {
+            int batchNumber = batches.get();
+            if (batchNumber == numberOfBatches) {
+                System.out.println();
+                latch.countDown();
+                return;
+            }
+            if (batchNumber % 100 == 0) {
+                System.out.println();
+                System.out.print(Integer.toString(batchNumber));
+            }
+            if (batchNumber % 10 == 0) {
+                System.out.print('.');
+            }
+            batches.incrementAndGet();
+            currentHeader = new BatchHeader(node, batchLength, magic,
+                                            channelId,
+                                            timestamp.incrementAndGet());
+            batch.rewind();
+            handler.selectForWrite();
+        }
+
+        private Event event() {
+            byte[] payload = String.format("%s Give me Slack, or give me Food, or Kill me %s",
+                                           channelId, channelId).getBytes();
+            ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
+            return new Event(666, payloadBuffer);
+        }
+
+        @Override
+        public void closing() {
+        }
+
+        @Override
+        public void accept(SocketChannelHandler handler) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void connect(SocketChannelHandler handler) {
+            this.handler = handler;
+            ByteBuffer buffer = ByteBuffer.allocate(Spindle.HANDSHAKE_SIZE);
+            buffer.putInt(Spindle.MAGIC);
+            node.serialize(buffer);
+            buffer.flip();
+            try {
+                while (buffer.hasRemaining()) {
+                    handler.getChannel().write(buffer);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+            nextBatch();
+        }
+
+        @Override
+        public void readReady() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void writeReady() {
+            if (currentHeader.hasRemaining()) {
+                try {
+                    if (currentHeader.write(handler.getChannel()) < 0) {
+                        handler.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return;
+                }
+                if (currentHeader.hasRemaining()) {
+                    handler.selectForWrite();
+                    return;
+                }
+            }
+            try {
+                handler.getChannel().write(batch);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+            if (batch.hasRemaining()) {
+                handler.selectForWrite();
+            } else {
+                nextBatch();
+            }
+        }
+
     }
 }

@@ -57,6 +57,7 @@ public class ReplicatingAppender extends AbstractAppender {
     protected void commit() {
         try {
             eventChannel.append(batchHeader, offset, segment);
+            segment.close();
         } catch (IOException e) {
             if (log.isLoggable(Level.SEVERE)) {
                 log.log(Level.SEVERE,
@@ -87,9 +88,22 @@ public class ReplicatingAppender extends AbstractAppender {
     }
 
     @Override
+    protected Logger getLogger() {
+        return log;
+    }
+
+    @Override
     protected AppendSegment getLogicalSegment() {
         ReplicatedBatchHeader replicated = (ReplicatedBatchHeader) batchHeader;
+        System.out.println(String.format("# position %s remaining %s",
+                                         replicated.getPosition(),
+                                         replicated.getBatchByteLength()));
         return eventChannel.segmentFor(replicated.getOffset(),
                                        replicated.getPosition());
+    }
+
+    @Override
+    protected void ready() {
+        handler.selectForRead();
     }
 }

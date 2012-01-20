@@ -26,17 +26,17 @@
 package com.salesforce.ouroboros.spindle.replication;
 
 import java.io.IOException;
-import java.util.Queue;
+import java.lang.Thread.UncaughtExceptionHandler;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.EventChannel;
-import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorState;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
-import com.salesforce.ouroboros.util.lockfree.LockFreeQueue;
 
 /**
  * A duplicator of event streams. The duplicator provides outbound replication
@@ -47,24 +47,42 @@ import com.salesforce.ouroboros.util.lockfree.LockFreeQueue;
  */
 public final class Duplicator {
 
-    static final Logger             log     = Logger.getLogger(Duplicator.class.getCanonicalName());
+    static final Logger                     log          = Logger.getLogger(Duplicator.class.getCanonicalName());
 
-    private EventEntry              current;
-    private final DuplicatorContext fsm     = new DuplicatorContext(this);
-    private SocketChannelHandler    handler;
-    private boolean                 inError;
-    private long                    position;
-    private int                     remaining;
-    final Queue<EventEntry>         pending = new LockFreeQueue<EventEntry>();
-    final Node                      thisNode;
+    private final Thread                    consumer;
+    private final Semaphore                 consumerGate = new Semaphore(0);
+    private volatile EventEntry                      current;
+    private final DuplicatorContext         fsm          = new DuplicatorContext(
+                                                                                 this);
+    private SocketChannelHandler            handler;
+    private boolean                         inError;
+    private final BlockingQueue<EventEntry> pending      = new LinkedBlockingQueue<EventEntry>();
+    private long                            position;
+    private int                             remaining;
+    private final AtomicBoolean             running      = new AtomicBoolean(
+                                                                             true);
+    private final Node                      thisNode;
 
     public Duplicator(Node node) {
         fsm.setName(Integer.toString(node.processId));
         thisNode = node;
+        consumer = new Thread(consumer(),
+                              String.format("Duplicator consumer for %s",
+                                            thisNode));
+        consumer.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                log.log(Level.SEVERE,
+                        String.format("Exception in %s on %s", t, thisNode), e);
+            }
+        });
+        consumer.setDaemon(true);
+        consumer.start();
     }
 
     public void connect(SocketChannelHandler handler) {
         this.handler = handler;
+        next();
     }
 
     /**
@@ -77,35 +95,65 @@ public final class Duplicator {
     /**
      * Replicate the event to the mirror
      */
-    public void replicate(ReplicatedBatchHeader header,
-                          EventChannel eventChannel, Segment segment,
-                          Acknowledger acknowledger) {
-        pending.add(new EventEntry(header, eventChannel, segment, acknowledger));
-        fsm.replicate();
+    public void replicate(EventEntry event) {
+        if (log.isLoggable(Level.FINE)) {
+            log.fine(String.format("Replicating event %s on %s", event,
+                                   thisNode));
+        }
+        pending.add(event);
     }
 
     public void writeReady() {
         fsm.writeReady();
     }
 
+    private Runnable consumer() {
+        return new Runnable() {
+            @Override
+            public void run() {
+                while (running.get()) {
+                    try {
+                        if (log.isLoggable(Level.FINEST)) {
+                            log.finest(String.format("waiting for event on %s",
+                                                     thisNode));
+                        }
+                        consumerGate.acquire();
+                        if (!running.get()) {
+                            return;
+                        }
+                        if (log.isLoggable(Level.FINEST)) {
+                            log.finest(String.format("acquired event on %s",
+                                                     thisNode));
+                        }
+                        assert current == null : "Concurrent events are being processed";
+                        current = pending.take();
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                    fsm.replicate();
+                }
+            }
+        };
+    }
+
     private boolean transferTo() throws IOException {
-        long p = position;
-        int written = (int) current.segment.transferTo(p, remaining,
+        int written = (int) current.segment.transferTo(position, remaining,
                                                        handler.getChannel());
-        remaining = remaining - written;
-        position = p + written;
+        remaining -= written;
+        position += written;
         if (log.isLoggable(Level.FINER)) {
             log.finer(String.format("Writing batch %s, position=%s, written=%s, to %s on %s",
                                     current.header, position, written,
                                     current.segment, thisNode));
         }
-        if (remaining == 0) {
-            return true;
-        }
-        return false;
+        return remaining == 0;
     }
 
     protected void close() {
+        handler.close();
+    }
+
+    public void closing() {
         if (current != null) {
             try {
                 current.segment.close();
@@ -115,12 +163,21 @@ public final class Duplicator {
             }
         }
         current = null;
+        for (EventEntry entry : pending) {
+            entry.handler.selectForRead();
+        }
         pending.clear();
-        handler.close();
     }
 
     protected boolean inError() {
         return inError;
+    }
+
+    protected void next() {
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Triggering consumer gate on %s", thisNode));
+        }
+        consumerGate.release();
     }
 
     protected void processBatch() {
@@ -140,19 +197,11 @@ public final class Duplicator {
     }
 
     protected void processHeader() {
-        current = pending.poll();
-        if (current == null) {
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("No more events to replicate on %s",
-                                        thisNode));
-            }
-            fsm.pendingEmpty();
-            return;
-        }
         if (log.isLoggable(Level.FINER)) {
             log.finer(String.format("Processing %s on %s", current.header,
                                     thisNode));
         }
+        current.handler.selectForRead();
         remaining = current.header.getBatchByteLength();
         position = current.header.getPosition();
         current.header.rewind();
@@ -181,6 +230,8 @@ public final class Duplicator {
                 }
                 current.acknowledger.acknowledge(current.header.getChannel(),
                                                  current.header.getTimestamp());
+                current.segment.close();
+                current = null;
                 return true;
             }
         } catch (IOException e) {
@@ -189,6 +240,7 @@ public final class Duplicator {
                     String.format("Unable to replicate payload for %s from: %s",
                                   current.header, current.segment), e);
         }
+        System.out.println("Batch not written");
         return false;
     }
 
@@ -207,11 +259,17 @@ public final class Duplicator {
         }
         boolean written = !current.header.hasRemaining();
         if (written) {
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("written header %s on %s",
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("written header %s on %s",
                                         current.header, thisNode));
             }
         }
         return written;
+    }
+
+    protected boolean hasNext() {
+        assert current == null : "Concurrent events are being processed";
+        current = pending.poll();
+        return current != null;
     }
 }

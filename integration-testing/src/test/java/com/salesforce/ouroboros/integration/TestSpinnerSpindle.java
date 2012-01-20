@@ -52,6 +52,7 @@ import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
+import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
@@ -102,7 +103,8 @@ public class TestSpinnerSpindle {
                 return null;
             }
         }).when(eventChannel).append(isA(ReplicatedBatchHeader.class),
-                                     eq(segment), isA(Acknowledger.class));
+                                     eq(segment), isA(Acknowledger.class),
+                                     isA(SocketChannelHandler.class));
 
         final ArrayList<Spindle> spindles = new ArrayList<Spindle>();
 

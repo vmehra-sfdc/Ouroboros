@@ -51,13 +51,18 @@ public class Appender extends AbstractAppender {
     }
 
     @Override
+    protected Logger getLogger() {
+        return log;
+    }
+
+    @Override
     protected void commit() {
         try {
             ReplicatedBatchHeader batchHeader2 = new ReplicatedBatchHeader(
                                                                            batchHeader,
                                                                            offset,
                                                                            startPosition);
-            eventChannel.append(batchHeader2, segment, acknowledger);
+            eventChannel.append(batchHeader2, segment, acknowledger, handler);
         } catch (IOException e) {
             if (log.isLoggable(Level.SEVERE)) {
                 log.log(Level.SEVERE,
