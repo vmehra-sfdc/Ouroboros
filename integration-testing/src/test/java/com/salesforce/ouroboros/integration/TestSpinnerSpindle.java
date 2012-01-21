@@ -52,13 +52,14 @@ import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
+import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.producer.Batch;
 import com.salesforce.ouroboros.producer.Producer;
-import com.salesforce.ouroboros.producer.Spinner;
+import com.salesforce.ouroboros.producer.spinner.Batch;
+import com.salesforce.ouroboros.producer.spinner.Spinner;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
@@ -82,13 +83,15 @@ public class TestSpinnerSpindle {
         EventChannel eventChannel = mock(EventChannel.class);
         Segment segment = new Segment(segmentFile);
         final Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         Node mirror = new Node(3);
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         long offset = 0;
         EventChannel.AppendSegment appendSegment = new EventChannel.AppendSegment(
                                                                                   segment,
-                                                                                  offset);
+                                                                                  offset,
+                                                                                  0);
 
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.isDuplicate(isA(BatchHeader.class))).thenReturn(false);
@@ -100,7 +103,8 @@ public class TestSpinnerSpindle {
                 return null;
             }
         }).when(eventChannel).append(isA(ReplicatedBatchHeader.class),
-                                     eq(segment), isA(Acknowledger.class));
+                                     eq(segment), isA(Acknowledger.class),
+                                     isA(SocketChannelHandler.class));
 
         final ArrayList<Spindle> spindles = new ArrayList<Spindle>();
 
@@ -137,7 +141,7 @@ public class TestSpinnerSpindle {
         Node coordNode = new Node(2);
         Producer producer = mock(Producer.class);
         when(producer.getId()).thenReturn(coordNode);
-        final Spinner spinner = new Spinner(producer);
+        final Spinner spinner = new Spinner(producer, 10);
 
         spindleHandler.connectTo(spindleAddress, spinner);
 

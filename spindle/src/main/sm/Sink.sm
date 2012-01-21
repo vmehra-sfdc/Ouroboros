@@ -48,12 +48,11 @@ Entry {
 	getChannelCount();
 }
 {
-		
 	finished
 		Suspended{}
 		
 	readReady
-		[!ctxt.readChannelCount()]
+		[!ctxt.readChannelCount() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}
@@ -87,7 +86,7 @@ Entry {
 		Suspended{}
 		
 	readReady
-		[!ctxt.readChannelHeader()]
+		[!ctxt.readChannelHeader() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}
@@ -109,7 +108,7 @@ Entry {
 		CopySegment{}
 		
 	readReady
-		[!ctxt.readSegmentHeader()]
+		[!ctxt.readSegmentHeader() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}
@@ -137,11 +136,11 @@ Entry {
 		ReadSegmentHeader{}
 
 	readReady
-		[ctxt.isLastSegment()]
+		[ctxt.isLastSegment() && !ctxt.inError()]
 		Suspended{}
 		
 	readReady
-		[!ctxt.copySegment()]
+		[!ctxt.copySegment() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}
@@ -163,7 +162,7 @@ Entry {
 		Finished {}
 		
 	writeReady
-		[!ctxt.writeAck()]
+		[!ctxt.writeAck() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}
@@ -186,5 +185,9 @@ Entry {
 	close();
 }
 {}
- 
+
+Default {
+	close
+		Closed{}
+}
 %%

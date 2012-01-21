@@ -36,6 +36,7 @@
 %package com.salesforce.ouroboros.partition
 %access public
 %import org.smartfrog.services.anubis.partition.views.View
+%import java.util.UUID
 
 %start SwitchboardFSM::Unstable
 %map SwitchboardFSM
@@ -45,6 +46,12 @@ Entry{
 	destabilizePartition();
 } 
 {
+	stabilized(view: View, leader: int)
+		[ctxt.isLeader()]
+		ConductElection {
+			stabilize(view, leader);
+		}
+		
 	stabilized(view: View, leader: int)
 		ElectView {
 			stabilize(view, leader);
@@ -61,26 +68,20 @@ Entry{
 {
 }
 
-ElectView
-Entry{
-	vote();
-}
-{
-	voteReceived
-		[ctxt.votingComplete()]
-		EstablishViewId{}
-
-	voteReceived
-		nil{}
-}
-
-EstablishViewId
-Entry{
-	electView();
-}
-{
-	established
+ElectView {
+	viewEstablished
 		Advertising{}
+}
+
+ConductElection
+Entry {
+	initiateVoting();
+}
+{
+	votingComplete(votes: UUID[])
+		ElectView{
+			establishView(votes);
+		}
 }
 
 Advertising

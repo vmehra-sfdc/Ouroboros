@@ -38,11 +38,8 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
-import com.salesforce.ouroboros.spindle.EventChannel;
-import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorState;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**
@@ -76,7 +73,7 @@ public class Replicator implements CommunicationsHandler {
 
     private ReplicatingAppender     appender;
     private final Bundle            bundle;
-    private final Duplicator        duplicator     = new Duplicator();
+    private final Duplicator        duplicator;
     private final ReplicatorContext fsm            = new ReplicatorContext(this);
     private SocketChannelHandler    handler;
     private final ByteBuffer        handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
@@ -85,12 +82,14 @@ public class Replicator implements CommunicationsHandler {
     private Rendezvous              rendezvous;
 
     public Replicator(Bundle bundle) {
+        fsm.setName(Integer.toString(bundle.getId().processId));
+        duplicator = new Duplicator(bundle.getId());
         this.bundle = bundle;
     }
 
     public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
+        this(bundle);
         appender = new ReplicatingAppender(bundle);
-        this.bundle = bundle;
         this.partner = partner;
         this.rendezvous = rendezvous;
     }
@@ -101,9 +100,6 @@ public class Replicator implements CommunicationsHandler {
         assert appender == null : "This replicator does not accept handshakes";
         appender = new ReplicatingAppender(bundle);
         this.handler = handler;
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Accepting handshake on %s", bundle.getId()));
-        }
         fsm.acceptHandshake();
     }
 
@@ -113,6 +109,7 @@ public class Replicator implements CommunicationsHandler {
 
     @Override
     public void closing() {
+        duplicator.closing();
         if (partner != null) {
             bundle.closeReplicator(partner);
         }
@@ -162,9 +159,8 @@ public class Replicator implements CommunicationsHandler {
         }
     }
 
-    public void replicate(ReplicatedBatchHeader header, EventChannel channel,
-                          Segment segment, Acknowledger acknowledger) {
-        duplicator.replicate(header, channel, segment, acknowledger);
+    public void replicate(EventEntry event) {
+        duplicator.replicate(event);
     }
 
     @Override
@@ -190,6 +186,7 @@ public class Replicator implements CommunicationsHandler {
                 return;
             }
         }
+        handler.selectForRead();
     }
 
     protected void inboundHandshake() {
@@ -212,7 +209,11 @@ public class Replicator implements CommunicationsHandler {
         if (writeHandshake()) {
             fsm.established();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 
@@ -244,9 +245,9 @@ public class Replicator implements CommunicationsHandler {
             return false;
         }
         partner = new Node(handshake);
-        if (log.isLoggable(Level.FINEST)) {
-            log.finest(String.format("Inbound handshake completed on %s, partner: %s",
-                                     bundle.getId(), partner));
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Inbound handshake completed on %s, partner: %s",
+                                    bundle.getId(), partner));
         }
         bundle.map(partner, this);
         return true;

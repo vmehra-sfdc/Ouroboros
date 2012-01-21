@@ -60,7 +60,7 @@ Entry {
 }
 {
 	writeReady
-		[!ctxt.inError() && !ctxt.writeAck()]
+		[!ctxt.writeAck() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}
@@ -87,5 +87,7 @@ Entry {
 Default {
 	ack
 		nil{}
+	close
+		Closed{}
 }
 %%

@@ -74,6 +74,7 @@ public class Xerox implements CommunicationsHandler {
     }
 
     public Xerox(Node from, Node toNode, int transferSize) {
+        fsm.setName(String.format("%s->%s", from.processId, toNode.processId));
         this.from = from;
         to = toNode;
         this.transferSize = transferSize;
@@ -94,12 +95,15 @@ public class Xerox implements CommunicationsHandler {
 
     @Override
     public void closing() {
-        for (Segment segment : segments) {
-            try {
-                segment.close();
-            } catch (IOException e1) {
-                log.log(Level.FINE,
-                        String.format("Error closing: %s", segment), e1);
+        if (segments != null) {
+            for (Segment segment : segments) {
+                try {
+                    segment.close();
+                } catch (IOException e1) {
+                    log.log(Level.FINE,
+                            String.format("Error closing: %s on %s", segment,
+                                          idString()), e1);
+                }
             }
         }
     }
@@ -149,31 +153,41 @@ public class Xerox implements CommunicationsHandler {
             written = currentSegment.transferTo(position, transferSize,
                                                 handler.getChannel());
         } catch (IOException e) {
-            inError = true;
             log.log(Level.WARNING, String.format("Error transfering %s on %s",
-                                                 currentSegment,
-                                                 handler.getChannel()), e);
+                                                 currentSegment, idString()), e);
             inError = true;
             return false;
         }
         position += written;
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Copying %s, written=%s, position=%s on %s to %s",
+                                    currentSegment, written, position, from, to));
+        }
         if (position == segmentSize) {
             try {
                 currentSegment.close();
+                return true;
             } catch (IOException e) {
-                log.log(Level.FINE,
-                        String.format("Error closing: %s", currentSegment), e);
+                log.log(Level.FINE, String.format("Error closing: %s on %s",
+                                                  currentSegment, idString()),
+                        e);
+                inError = true;
+                return false;
             }
-            return true;
         }
         return false;
     }
 
     protected void copySegment() {
+        buffer.clear();
         if (copy()) {
             fsm.finished();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 
@@ -194,6 +208,7 @@ public class Xerox implements CommunicationsHandler {
                                    segments.size()));
         }
         buffer.clear();
+        buffer.limit(Sink.CHANNEL_HEADER_SIZE);
         buffer.putInt(MAGIC);
         buffer.putInt(segments.size());
         buffer.putLong(currentChannel.getId().getMostSignificantBits());
@@ -203,7 +218,11 @@ public class Xerox implements CommunicationsHandler {
         if (writeChannelHeader()) {
             fsm.finished();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 
@@ -218,17 +237,18 @@ public class Xerox implements CommunicationsHandler {
             segmentSize = currentSegment.size();
         } catch (IOException e) {
             log.log(Level.WARNING,
-                    String.format("Error retrieving size of %s", currentSegment),
-                    e);
+                    String.format("Error retrieving size of %s on %s",
+                                  currentSegment, idString()), e);
             inError = true;
             return;
         }
         if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Starting Xerox of segment %s from %s to %s",
-                                   currentSegment, from, to));
+            log.info(String.format("Starting Xerox of segment %s, total size= %s, from %s to %s",
+                                   currentSegment, segmentSize, from, to));
         }
         buffer.clear();
-        buffer.putLong(MAGIC);
+        buffer.limit(Sink.SEGMENT_HEADER_SIZE);
+        buffer.putInt(MAGIC);
         buffer.putLong(currentSegment.getPrefix());
         buffer.putLong(segmentSize);
         buffer.flip();
@@ -236,7 +256,11 @@ public class Xerox implements CommunicationsHandler {
         if (writeSegmentHeader()) {
             fsm.initiateCopy();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 
@@ -244,7 +268,7 @@ public class Xerox implements CommunicationsHandler {
         try {
             if (handler.getChannel().read(buffer) < 0) {
                 if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                    log.fine(String.format("Closing channel on %s", idString()));
                 }
                 inError = true;
                 return false;
@@ -252,7 +276,7 @@ public class Xerox implements CommunicationsHandler {
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Error reading acknowledgement on %s",
-                                  handler.getChannel()), e);
+                                  idString()), e);
             inError = true;
             return false;
         }
@@ -265,12 +289,15 @@ public class Xerox implements CommunicationsHandler {
                 inError = true;
                 return false;
             }
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Ack received from %s on %s", to, from));
+            }
             try {
                 rendezvous.meet();
             } catch (BrokenBarrierException e) {
                 log.log(Level.SEVERE,
-                        String.format("Rendezvous has already been met in xeroxing %s to %s",
-                                      from, to), e);
+                        String.format("Rendezvous has been cancelled in xeroxing %s to %s",
+                                      from, to));
             }
             return true;
         }
@@ -278,8 +305,12 @@ public class Xerox implements CommunicationsHandler {
     }
 
     protected void receiveAck() {
+        if (log.isLoggable(Level.FINER)) {
+            log.fine(String.format("Complete, waiting for ack on %s from %s",
+                                   from, to));
+        }
         buffer.clear();
-        buffer.limit(4); 
+        buffer.limit(Sink.ACK_HEADER_SIZE);
         if (readAck()) {
             fsm.finished();
         } else {
@@ -299,16 +330,17 @@ public class Xerox implements CommunicationsHandler {
         try {
             if (handler.getChannel().write(buffer) < 0) {
                 if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                    log.fine(String.format("Closing channel from %s to %s",
+                                           from, to));
                 }
                 inError = true;
                 return false;
             }
         } catch (IOException e) {
             log.log(Level.WARNING,
-                    String.format("Error writing handshake for %s on %s",
-                                  currentChannel.getId(), handler.getChannel()),
-                    e);
+                    String.format("Error writing channel header %s for %s on %s",
+                                  currentChannel, currentChannel.getId(),
+                                  idString()), e);
             inError = true;
             return false;
         }
@@ -322,7 +354,8 @@ public class Xerox implements CommunicationsHandler {
         try {
             if (handler.getChannel().write(buffer) < 0) {
                 if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                    log.fine(String.format("Closing channel from %s to %s",
+                                           from, to));
                 }
                 inError = true;
                 return false;
@@ -330,7 +363,7 @@ public class Xerox implements CommunicationsHandler {
         } catch (IOException e) {
             log.log(Level.WARNING,
                     String.format("Error writing header for %s on %s",
-                                  currentSegment, handler.getChannel()), e);
+                                  currentSegment, idString()), e);
             inError = true;
             return false;
         }
@@ -338,13 +371,19 @@ public class Xerox implements CommunicationsHandler {
     }
 
     protected void sendChannelCount() {
+        buffer.clear();
+        buffer.limit(Sink.CHANNEL_COUNT_HEADER_SIZE);
         buffer.putInt(MAGIC);
         buffer.putInt(channels.size());
         buffer.flip();
         if (writeChannelCount()) {
             fsm.finished();
         } else {
-            handler.selectForWrite();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
+            }
         }
     }
 
@@ -352,18 +391,23 @@ public class Xerox implements CommunicationsHandler {
         try {
             if (handler.getChannel().write(buffer) < 0) {
                 if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                    log.fine(String.format("Closing channel from %s to %s",
+                                           from, to));
                 }
                 inError = true;
                 return false;
             }
         } catch (IOException e) {
             log.log(Level.WARNING,
-                    String.format("Error writing header for %s on %s",
-                                  currentSegment, handler.getChannel()), e);
+                    String.format("Error writing segment header for %s to %s on %s",
+                                  currentSegment, idString(), idString()), e);
             inError = true;
             return false;
         }
         return !buffer.hasRemaining();
+    }
+
+    String idString() {
+        return String.format("%s to %s", from, to);
     }
 }

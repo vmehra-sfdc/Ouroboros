@@ -64,7 +64,7 @@ Entry{
 }
 {
     readReady
-        [!ctxt.inError() && !ctxt.readHandshake()]
+        [!ctxt.readHandshake() && !ctxt.inError()]
         nil{
             selectForRead();
         }
@@ -86,7 +86,7 @@ Entry{
 }
 {
 	writeReady
-		[!ctxt.inError() && !ctxt.writeHandshake()]
+		[!ctxt.writeHandshake() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}
@@ -111,5 +111,8 @@ Entry {
 Default {
 	bind()
 		nil{}
+		
+	close
+		Closed{}
 }
 %%

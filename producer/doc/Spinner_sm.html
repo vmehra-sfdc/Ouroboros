@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=5>
+        <th colspan=6>
           Transition
         </th>
       </tr>
@@ -28,6 +28,9 @@
         </th>
         <th>
           bind
+        </th>
+        <th>
+          close
         </th>
         <th>
           established
@@ -45,6 +48,8 @@
       <tr>
         <td>
           Suspended
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -83,6 +88,8 @@
         </td>
         <td>
         </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -98,6 +105,8 @@ processHandshake();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Established
   {}
@@ -107,7 +116,7 @@ processHandshake();
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.writeHandshake()]
+[!ctxt.writeHandshake() && !ctxt.inError()]
   Handshake
   {
     selectForWrite();
@@ -132,6 +141,8 @@ processHandshake();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>

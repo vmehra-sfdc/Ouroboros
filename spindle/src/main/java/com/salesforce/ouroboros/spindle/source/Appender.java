@@ -25,6 +25,10 @@
  */
 package com.salesforce.ouroboros.spindle.source;
 
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
@@ -36,8 +40,10 @@ import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
  * 
  */
 public class Appender extends AbstractAppender {
+    private final static Logger log = Logger.getLogger(Appender.class.getCanonicalName());
 
-    private final Acknowledger acknowledger;
+    private final Acknowledger  acknowledger;
+    private volatile int        startPosition;
 
     public Appender(Bundle bundle, Acknowledger acknowledger) {
         super(bundle);
@@ -45,9 +51,31 @@ public class Appender extends AbstractAppender {
     }
 
     @Override
+    protected Logger getLogger() {
+        return log;
+    }
+
+    @Override
     protected void commit() {
-        eventChannel.append(new ReplicatedBatchHeader(batchHeader, offset),
-                            segment, acknowledger);
+        try {
+            ReplicatedBatchHeader batchHeader2 = new ReplicatedBatchHeader(
+                                                                           batchHeader,
+                                                                           offset,
+                                                                           startPosition);
+            eventChannel.append(batchHeader2, segment, acknowledger, handler);
+        } catch (IOException e) {
+            if (log.isLoggable(Level.SEVERE)) {
+                log.log(Level.SEVERE,
+                        String.format("Unable to append to %s for %s at %s on %s",
+                                      segment, batchHeader, offset,
+                                      bundle.getId()));
+            }
+            close();
+        }
+        if (log.isLoggable(Level.FINER)) {
+            log.fine(String.format("Committed %s on %s ", batchHeader,
+                                   bundle.getId()));
+        }
     }
 
     @Override
@@ -58,5 +86,10 @@ public class Appender extends AbstractAppender {
     @Override
     protected AppendSegment getLogicalSegment() {
         return eventChannel.segmentFor(batchHeader);
+    }
+
+    @Override
+    protected void markPosition() {
+        startPosition = (int) position;
     }
 }

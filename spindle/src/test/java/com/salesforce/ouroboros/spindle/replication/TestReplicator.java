@@ -55,6 +55,7 @@ public class TestReplicator {
     @Test
     public void testInboundEstablish() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
         when(handler.getChannel()).thenReturn(socketChannel);
@@ -77,7 +78,7 @@ public class TestReplicator {
         assertEquals(ReplicatorFSM.InboundHandshake, replicator.getState());
         replicator.readReady();
         assertEquals(ReplicatorFSM.Established, replicator.getState());
-        verify(handler).selectForRead();
+        verify(handler, new Times(2)).selectForRead();
         verify(socketChannel, new Times(2)).read(isA(ByteBuffer.class));
     }
 

@@ -63,6 +63,7 @@ public class TestSpindle {
     @Test
     public void testEstablish() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         Spindle spindle = new Spindle(bundle);
         assertEquals(SpindleFSM.Suspended, spindle.getState());
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
@@ -72,7 +73,7 @@ public class TestSpindle {
 
         EventChannel eventChannel = mock(EventChannel.class);
         Node mirror = new Node(0x1638);
-        int magic = 666;
+        int magic = BatchHeader.MAGIC;
         final UUID channel = UUID.randomUUID();
         final long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
@@ -83,6 +84,7 @@ public class TestSpindle {
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                segment,
+                                                                               0,
                                                                                0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(false);
         when(segment.transferFrom(socketChannel, 0, event.totalSize())).thenReturn(0L);

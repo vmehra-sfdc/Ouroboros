@@ -48,6 +48,7 @@ public enum RebalancedMessage implements MemberDispatch {
         if (!(switchboard.getMember() instanceof Coordinator)) {
             log.warning(String.format("RebalancedMessage %s must be targeted at weaver coordinator, not %s",
                                       this, switchboard.getMember()));
+            return;
         }
         Coordinator coordinator = (Coordinator) switchboard.getMember();
         coordinator.dispatch(this, sender, arguments, time);

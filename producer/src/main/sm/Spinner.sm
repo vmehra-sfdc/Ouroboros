@@ -33,7 +33,7 @@
 // The FSM of the Spinner handshake protocol
 
 %class Spinner
-%package com.salesforce.ouroboros.producer
+%package com.salesforce.ouroboros.producer.spinner
 
 %access public
 
@@ -53,7 +53,7 @@ Entry{
 }
 {
 	writeReady
-		[!ctxt.inError() && !ctxt.writeHandshake()]
+		[!ctxt.writeHandshake() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}
@@ -78,5 +78,8 @@ Entry {
 Default {
 	bind()
 		nil{}
+	
+	close
+		Closed{}
 }
 %%

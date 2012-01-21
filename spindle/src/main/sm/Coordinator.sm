@@ -194,6 +194,11 @@ Entry {
 		
 	memberRebalanced
 		nil{}
+		
+	rebalanceCancelled
+        pop() {
+            destabilizePartition();
+        }
 }
 
 CoordinateTakeover

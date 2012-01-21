@@ -39,7 +39,6 @@ import com.fasterxml.uuid.impl.NameBasedGenerator;
  * 
  */
 final public class Utils {
-
     private final static NameBasedGenerator UUID_GENERATOR;
 
     static {
@@ -64,13 +63,17 @@ final public class Utils {
     }
 
     public static void deleteDirectory(File dir) {
-        for (File f : dir.listFiles()) {
-            if (f.isDirectory()) {
-                deleteDirectory(f);
-            } else {
-                f.delete();
+        File[] listing = dir.listFiles();
+        if (listing != null) {
+            for (File f : listing) {
+                if (f.isDirectory()) {
+                    deleteDirectory(f);
+                } else {
+                    f.delete();
+                }
             }
         }
+        dir.delete();
     }
 
     public static long point(UUID id) {

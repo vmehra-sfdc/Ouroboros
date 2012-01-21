@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.spindle.replication;
 
+import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
@@ -40,13 +41,16 @@ public class EventEntry {
     public final EventChannel          eventChannel;
     public final ReplicatedBatchHeader header;
     public final Segment               segment;
+    public final SocketChannelHandler  handler;
 
     public EventEntry(ReplicatedBatchHeader header, EventChannel eventChannel,
-                      Segment segment, Acknowledger acknowledger) {
+                      Segment segment, Acknowledger acknowledger,
+                      SocketChannelHandler handler) {
         this.header = header;
         this.eventChannel = eventChannel;
         this.segment = segment;
         this.acknowledger = acknowledger;
+        this.handler = handler;
     }
 
 }

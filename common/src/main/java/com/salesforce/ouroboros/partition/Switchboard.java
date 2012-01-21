@@ -31,21 +31,22 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 
 import org.smartfrog.services.anubis.partition.Partition;
 import org.smartfrog.services.anubis.partition.PartitionNotification;
@@ -54,6 +55,7 @@ import org.smartfrog.services.anubis.partition.util.NodeIdSet;
 import org.smartfrog.services.anubis.partition.views.View;
 
 import statemap.StateUndefinedException;
+import statemap.TransitionUndefinedException;
 
 import com.fasterxml.uuid.NoArgGenerator;
 import com.salesforce.ouroboros.Node;
@@ -62,8 +64,8 @@ import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
 import com.salesforce.ouroboros.partition.messages.ViewElectionMessage;
+import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.util.Gate;
 
 /**
@@ -106,7 +108,7 @@ public class Switchboard {
         void dispatch(FailoverMessage type, Node sender,
                       Serializable[] arguments, long time);
 
-        void dispatch(RebalanceMessage type, Node sender,
+        void dispatch(WeaverRebalanceMessage type, Node sender,
                       Serializable[] arguments, long time);
 
         /**
@@ -146,7 +148,16 @@ public class Switchboard {
                     messageProcessor.execute(new Runnable() {
                         @Override
                         public void run() {
-                            processMessage((Message) obj, sender, time);
+                            try {
+                                processMessage((Message) obj, sender, time);
+                            } catch (TransitionUndefinedException e) {
+                                if (log.isLoggable(Level.WARNING)) {
+                                    log.log(Level.WARNING,
+                                            String.format("Transition error processing message: %s from: %s on %s",
+                                                          obj, sender,
+                                                          self.processId), e);
+                                }
+                            }
                         }
                     });
                 } catch (RejectedExecutionException e) {
@@ -164,26 +175,26 @@ public class Switchboard {
         }
     }
 
-    static final Logger                              log             = Logger.getLogger(Switchboard.class.getCanonicalName());
-    private final ArrayList<Node>                    deadMembers     = new ArrayList<Node>();
-    private final SwitchboardContext                 fsm             = new SwitchboardContext(
-                                                                                              this);
-    private final Gate                               inboundGate     = new Gate();
-    private final NoArgGenerator                     viewIdGenerator;
-    private boolean                                  leader          = false;
-    private Member                                   member;
-    private SortedSet<Node>                          members         = new ConcurrentSkipListSet<Node>();
-    private final Executor                           messageProcessor;
-    private final PartitionNotification              notification    = new Notification();
-    private final Partition                          partition;
-    private ArrayList<Node>                          previousMembers = new ArrayList<Node>();
-    private NodeIdSet                                previousView;
-    private final Node                               self;
-    private final AtomicBoolean                      stable          = new AtomicBoolean(
-                                                                                         false);
-    private NodeIdSet                                view;
-    private UUID                                     viewId;
-    private final ConcurrentMap<UUID, AtomicInteger> votes           = new ConcurrentHashMap<UUID, AtomicInteger>();
+    private static final Logger         log             = Logger.getLogger(Switchboard.class.getCanonicalName());
+
+    private final ArrayList<Node>       deadMembers     = new ArrayList<Node>();
+    private final SwitchboardContext    fsm             = new SwitchboardContext(
+                                                                                 this);
+    private final Gate                  inboundGate     = new Gate();
+    private final NoArgGenerator        viewIdGenerator;
+    private volatile boolean            leader          = false;
+    private Member                      member;
+    private SortedSet<Node>             members         = new ConcurrentSkipListSet<Node>();
+    private final Executor              messageProcessor;
+    private final PartitionNotification notification    = new Notification();
+    private final Partition             partition;
+    private ArrayList<Node>             previousMembers = new ArrayList<Node>();
+    private NodeIdSet                   previousView;
+    private final Node                  self;
+    private final AtomicBoolean         stable          = new AtomicBoolean(
+                                                                            false);
+    private NodeIdSet                   view;
+    private UUID                        viewId;
 
     public Switchboard(Node node, Partition p, NoArgGenerator viewIdGenerator) {
         inboundGate.close();
@@ -261,6 +272,13 @@ public class Switchboard {
                 }
                 fsm.discoveryComplete();
                 break;
+            case ADVERTISE_NOOP:
+                if (log.isLoggable(Level.FINER)) {
+                    log.finer(String.format("Discovery of noop node %s = %s",
+                                            self, type));
+                }
+                discover(sender);
+                break;
             default:
                 if (log.isLoggable(Level.FINER)) {
                     log.finer(String.format("Discovery of node %s = %s", self,
@@ -276,19 +294,25 @@ public class Switchboard {
                          Serializable[] arguments, long time) {
         switch (type) {
             case VOTE:
-                assert arguments.length == 1 : "No view id in vote";
-                AtomicInteger initialTally = new AtomicInteger(1);
-                AtomicInteger tally = votes.putIfAbsent((UUID) arguments[0],
-                                                        initialTally);
-                if (tally != null) {
-                    tally.incrementAndGet();
+                assert arguments.length > 0 : "No view ids in vote";
+                if (isLeader()) {
+                    fsm.votingComplete((UUID[]) arguments);
+                } else {
+                    Serializable[] votes = Arrays.copyOf(arguments,
+                                                         arguments.length + 1);
+                    votes[arguments.length] = viewId;
+                    forwardToNextInRing(new Message(sender,
+                                                    ViewElectionMessage.VOTE,
+                                                    votes));
                 }
-                fsm.voteReceived();
                 break;
             case NEW_VIEW_ID:
-                assert arguments.length == 1 : "No view id in new view message";
-                viewId = (UUID) arguments[0];
-                fsm.established();
+                assert arguments.length == 2 : "Incorrect number of ids in new view message";
+                if (!((UUID) arguments[0]).equals(viewId)) {
+                    member.becomeInactive();
+                }
+                viewId = (UUID) arguments[1];
+                fsm.viewEstablished();
                 break;
             default:
                 throw new IllegalStateException(
@@ -312,7 +336,7 @@ public class Switchboard {
         member.dispatch(type, sender, arguments, time);
     }
 
-    public void dispatchToMember(RebalanceMessage type, Node sender,
+    public void dispatchToMember(WeaverRebalanceMessage type, Node sender,
                                  Serializable[] arguments, long time) {
         member.dispatch(type, sender, arguments, time);
     }
@@ -456,10 +480,12 @@ public class Switchboard {
         member = m;
     }
 
+    @PostConstruct
     public void start() {
         partition.register(notification);
     }
 
+    @PreDestroy
     public void terminate() {
         partition.deregister(notification);
     }
@@ -500,7 +526,20 @@ public class Switchboard {
                 log.finest(String.format("Sending %s to self", msg));
             }
             try {
-                processMessage(msg, self.processId, System.currentTimeMillis());
+                try {
+                    messageProcessor.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            processMessage(msg, self.processId,
+                                           System.currentTimeMillis());
+                        }
+                    });
+                } catch (RejectedExecutionException e) {
+                    if (log.isLoggable(Level.FINEST)) {
+                        log.finest(String.format("rejecting message %s due to shutdown on %s",
+                                                 msg, self));
+                    }
+                }
             } catch (RejectedExecutionException e) {
                 if (log.isLoggable(Level.FINEST)) {
                     log.finest(String.format("rejecting message %s due to shutdown on %s",
@@ -531,48 +570,23 @@ public class Switchboard {
      * Destabilize the partition
      */
     protected void destabilizePartition() {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Destabilizing partition on: %s", self));
-        }
-        votes.clear();
         inboundGate.close();
         stable.set(false);
         previousMembers.addAll(members);
         deadMembers.clear();
         members.clear();
         member.destabilize();
+
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Destabilizing partition on: %s", self));
+        }
     }
 
     /**
-     * Distributed election of the correct view. After the election, if this
-     * node's previous view is the elected view, this node remains an active
-     * member. Otherwise, if this node's previous view is not the elected view,
-     * this node becomes inactivated.
+     * @return true if this node is the leader
      */
-    protected void electView() {
-        int i = 0;
-        Result[] results = new Result[votes.size()];
-        for (Entry<UUID, AtomicInteger> entry : votes.entrySet()) {
-            results[i++] = new Result(entry.getValue().get(), entry.getKey());
-        }
-        votes.clear();
-
-        Arrays.sort(results);
-        Result result = results[results.length - 1];
-
-        if (log.isLoggable(Level.FINE)) {
-            log.fine(String.format("View elected: %s on %s", result.vote, self));
-        }
-        UUID previousViewId = viewId;
-        if (!result.vote.equals(previousViewId)) {
-            member.becomeInactive();
-        }
-        if (leader) {
-            ringCast(new Message(
-                                 self,
-                                 ViewElectionMessage.NEW_VIEW_ID,
-                                 new Serializable[] { viewIdGenerator.generate() }));
-        }
+    protected boolean isLeader() {
+        return leader;
     }
 
     /**
@@ -611,26 +625,6 @@ public class Switchboard {
                                      self));
         }
         member.stabilized();
-    }
-
-    /**
-     * Establish the cannonical view for this partition. The partition members
-     * hold an election to establish which previous view is the "correct" view.
-     */
-    protected void vote() {
-        ringCast(new Message(self, ViewElectionMessage.VOTE,
-                             new Serializable[] { viewId }));
-    }
-
-    /**
-     * @return true if all the members have voted on the majority view.
-     */
-    protected boolean votingComplete() {
-        int totalVotes = 0;
-        for (AtomicInteger tally : votes.values()) {
-            totalVotes += tally.get();
-        }
-        return totalVotes == view.cardinality();
     }
 
     // test access
@@ -680,5 +674,43 @@ public class Switchboard {
         } else {
             fsm.destabilize();
         }
+    }
+
+    /**
+     * Establish the cannonical view for this partition. The partition members
+     * hold an election to establish which previous view is the "correct" view.
+     */
+    protected void initiateVoting() {
+        ringCast(new Message(self, ViewElectionMessage.VOTE,
+                             (Serializable[]) new UUID[] { viewId }));
+    }
+
+    protected void establishView(UUID[] votes) {
+        HashMap<UUID, Integer> tally = new HashMap<UUID, Integer>();
+        for (UUID vote : votes) {
+            Integer count = tally.get(vote);
+            if (count == null) {
+                tally.put(vote, 1);
+            } else {
+                tally.put(vote, count + 1);
+            }
+        }
+        int i = 0;
+        Result[] results = new Result[tally.size()];
+        for (Entry<UUID, Integer> entry : tally.entrySet()) {
+            results[i++] = new Result(entry.getValue(), entry.getKey());
+        }
+        Arrays.sort(results);
+        Result result = results[results.length - 1];
+
+        UUID newViewId = viewIdGenerator.generate();
+
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("View elected: %s on %s new view: %s",
+                                   result.vote, self, newViewId));
+        }
+
+        ringCast(new Message(self, ViewElectionMessage.NEW_VIEW_ID,
+                             new Serializable[] { result.vote, newViewId }));
     }
 }

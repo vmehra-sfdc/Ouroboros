@@ -58,7 +58,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.uuid.Generators;
-import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.SocketOptions;
@@ -69,7 +68,7 @@ import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
+import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 
 /**
  * 
@@ -169,7 +168,7 @@ public class SwitchboardFunctionalTest {
         }
 
         @Override
-        public void dispatch(RebalanceMessage type, Node sender,
+        public void dispatch(WeaverRebalanceMessage type, Node sender,
                              Serializable[] arguments, long time) {
 
         }
@@ -189,12 +188,6 @@ public class SwitchboardFunctionalTest {
 
     @Configuration
     static class MyControllerConfig extends ControllerGossipConfiguration {
-
-        @Override
-        @Bean
-        public DeployedPostProcessor deployedPostProcessor() {
-            return new DeployedPostProcessor();
-        }
 
         @Override
         public int magic() {
@@ -427,7 +420,7 @@ public class SwitchboardFunctionalTest {
             return new Node(node(), node(), node());
         }
 
-        @Bean(initMethod = "start", destroyMethod = "terminate")
+        @Bean
         public Switchboard switchboard() {
             Switchboard switchboard = new Switchboard(
                                                       memberNode(),
@@ -457,10 +450,10 @@ public class SwitchboardFunctionalTest {
 
     static {
         String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
-                                         "24010");
+                                         "24110");
         testPort1 = Integer.parseInt(port);
         port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
-                                  "24020");
+                                  "24220");
         testPort2 = Integer.parseInt(port);
     }
 
@@ -473,6 +466,8 @@ public class SwitchboardFunctionalTest {
 
     @Before
     public void setUp() throws Exception {
+        testPort1++;
+        testPort2++;
         log.info("Setting up initial partition");
         initialLatch = new CountDownLatch(configs.length);
         controllerContext = new AnnotationConfigApplicationContext(

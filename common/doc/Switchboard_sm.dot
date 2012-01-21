@@ -20,8 +20,8 @@ digraph Switchboard {
         "SwitchboardFSM::ElectView"
             [label="{ElectView}"];
 
-        "SwitchboardFSM::EstablishViewId"
-            [label="{EstablishViewId}"];
+        "SwitchboardFSM::ConductElection"
+            [label="{ConductElection}"];
 
         "SwitchboardFSM::Advertising"
             [label="{Advertising}"];
@@ -36,22 +36,25 @@ digraph Switchboard {
         // Transitions (Edges)
         //
 
+        "SwitchboardFSM::Unstable" -> "SwitchboardFSM::ConductElection"
+            [label="stabilized/\l"];
+
         "SwitchboardFSM::Unstable" -> "SwitchboardFSM::ElectView"
             [label="stabilized/\l"];
 
         "SwitchboardFSM::Stable" -> "SwitchboardFSM::Unstable"
             [label="destabilize/\l"];
 
-        "SwitchboardFSM::ElectView" -> "SwitchboardFSM::EstablishViewId"
-            [label="voteReceived/\l"];
+        "SwitchboardFSM::ElectView" -> "SwitchboardFSM::Advertising"
+            [label="viewEstablished/\l"];
 
         "SwitchboardFSM::ElectView" -> "SwitchboardFSM::Unstable"
             [label="destabilize/\l"];
 
-        "SwitchboardFSM::EstablishViewId" -> "SwitchboardFSM::Advertising"
-            [label="established/\l"];
+        "SwitchboardFSM::ConductElection" -> "SwitchboardFSM::ElectView"
+            [label="votingComplete/\l"];
 
-        "SwitchboardFSM::EstablishViewId" -> "SwitchboardFSM::Unstable"
+        "SwitchboardFSM::ConductElection" -> "SwitchboardFSM::Unstable"
             [label="destabilize/\l"];
 
         "SwitchboardFSM::Advertising" -> "SwitchboardFSM::Stable"

@@ -39,7 +39,11 @@
 %start DuplicatorFSM::Waiting
 %map DuplicatorFSM
 %% 
-Waiting{
+Waiting
+Entry {
+	next();
+}
+{
 	replicate
 		WriteHeader{}
 	
@@ -53,7 +57,7 @@ Entry {
 }
 {
 	writeReady
-		[!ctxt.inError() && !ctxt.writeHeader()]
+		[!ctxt.writeHeader() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}
@@ -67,9 +71,6 @@ Entry {
 		
 	headerWritten
 		WriteBatch{}
-		
-	pendingEmpty
-		Waiting{}
 }
 
 WriteBatch
@@ -78,7 +79,7 @@ Entry {
 }
 {
 	writeReady
-		[!ctxt.inError() && !ctxt.writeHeader()]
+		[!ctxt.writeHeader() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}
@@ -88,7 +89,14 @@ Entry {
 		Closed{}
 		
 	writeReady
-		[!ctxt.pending.isEmpty()]
+		[ctxt.hasNext()]
+		WriteHeader{}
+		
+	writeReady
+		Waiting{}
+		
+	batchWritten
+		[ctxt.hasNext()]
 		WriteHeader{}
 		
 	batchWritten
@@ -105,5 +113,8 @@ Entry {
 Default {
 	replicate
 		nil{}
+		
+	close
+		Closed{}
 }
 %%

@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=7>
+        <th colspan=11>
           Transition
         </th>
       </tr>
@@ -30,6 +30,9 @@
           bootstrapped
         </th>
         <th>
+          commitTakeover
+        </th>
+        <th>
           destabilize
         </th>
         <th>
@@ -42,6 +45,17 @@
         </th>
         <th>
           rebalance
+        </th>
+        <th>
+          rebalance
+          <br>
+          (Node[])
+        </th>
+        <th>
+          rebalanceCancelled
+        </th>
+        <th>
+          rebalanced
         </th>
         <th>
           stabilize
@@ -64,10 +78,18 @@ cleanUp();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Unstable
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -81,11 +103,15 @@ cleanUp();
   AwaitingFailover
   {}
 
-[ctxt.isLeader()]
+[!ctxt.hasActiveMembers() && ctxt.isInactiveLeader()]
   Bootstrapping/push(CoordinatorFSM::Unstable)
   {}
 
+[!ctxt.hasActiveMembers()]
   Bootstrapping
+  {}
+
+  Stable
   {}
           </pre>
         </td>
@@ -95,6 +121,8 @@ cleanUp();
       <tr>
         <td>
           AwaitingFailover
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -118,10 +146,18 @@ cleanUp();
         </td>
         <td>
         </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
           Stable
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -148,6 +184,19 @@ cleanUp();
           </pre>
         </td>
         <td>
+          <pre>
+[ctxt.isActiveLeader()]
+  AwaitingTakeover/push(CoordinatorFSM::Stable)
+  {
+    beginRebalance(joiningMembers);
+  }
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -165,6 +214,14 @@ cleanUp();
   Stable
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -201,6 +258,59 @@ cleanUp();
         </td>
         <td>
         </td>
+        <td>
+          <pre>
+  Rebalance
+  {
+    destabilizePartition();
+  }
+          </pre>
+        </td>
+        <td>
+          <pre>
+  AwaitingTakeover
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          AwaitingTakeover
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Stable
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
       </tr>
     </table>
     <p>
@@ -215,7 +325,7 @@ cleanUp();
         <th colspan=2>
           Actions
         </th>
-        <th colspan=4>
+        <th colspan=8>
           Transition
         </th>
       </tr>
@@ -235,7 +345,19 @@ cleanUp();
           bootstrapped
         </th>
         <th>
+          commitTakeover
+        </th>
+        <th>
           destabilize
+        </th>
+        <th>
+          memberRebalanced
+        </th>
+        <th>
+          rebalance
+        </th>
+        <th>
+          rebalanced
         </th>
         <th>
           <b>Default</b>
@@ -253,9 +375,17 @@ cleanUp();
           <pre>
   CoordinateBootstrap
   {
-    setJoiningMembers(joiningMembers);
+    setJoiningProducers(joiningMembers);
   }
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -282,6 +412,118 @@ cleanUp();
   pop(bootstrapped)
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          CoordinateRebalance
+        </td>
+        <td>
+          <pre>
+    coordinateRebalance();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Rebalance
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Rebalance
+        </td>
+        <td>
+          <pre>
+    rebalancePrepared();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[ctxt.tallyComplete()]
+  CoordinateTakeover
+  {}
+
+  Rebalance
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Rebalance
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          CoordinateTakeover
+        </td>
+        <td>
+          <pre>
+    coordinateTakeover();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  pop(commitTakeover)
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>

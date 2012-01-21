@@ -30,10 +30,10 @@
           batchWritten
         </th>
         <th>
-          headerWritten
+          close
         </th>
         <th>
-          pendingEmpty
+          headerWritten
         </th>
         <th>
           replicate
@@ -50,6 +50,9 @@
           Waiting
         </td>
         <td>
+          <pre>
+next();
+          </pre>
         </td>
         <td>
         </td>
@@ -88,22 +91,18 @@ processHeader();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   WriteBatch
   {}
           </pre>
         </td>
         <td>
-          <pre>
-  Waiting
-  {}
-          </pre>
-        </td>
-        <td>
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.writeHeader()]
+[!ctxt.writeHeader() && !ctxt.inError()]
   WriteHeader
   {
     selectForWrite();
@@ -133,6 +132,10 @@ processHeader();
         </td>
         <td>
           <pre>
+[ctxt.hasNext()]
+  WriteHeader
+  {}
+
   Waiting
   {}
           </pre>
@@ -145,7 +148,7 @@ processHeader();
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.writeHeader()]
+[!ctxt.writeHeader() && !ctxt.inError()]
   WriteBatch
   {
     selectForWrite();
@@ -155,8 +158,11 @@ processHeader();
   Closed
   {}
 
-[!ctxt.pending.isEmpty()]
+[ctxt.hasNext()]
   WriteHeader
+  {}
+
+  Waiting
   {}
           </pre>
         </td>

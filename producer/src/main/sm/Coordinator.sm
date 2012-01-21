@@ -51,11 +51,15 @@ Entry {
 		AwaitingFailover{}
         
     stabilize
-    	[ctxt.isLeader()]
+    	[!ctxt.hasActiveMembers() && ctxt.isInactiveLeader()]
     	Bootstrapping/push(ControllerFSM::Bootstrap){}
         
     stabilize
+    	[!ctxt.hasActiveMembers()]
     	Bootstrapping{}
+    	
+  	stabilize
+  		Stable{}
 		
 	destabilize
 		nil{}
@@ -67,12 +71,20 @@ AwaitingFailover{
 }
 
 Stable{
-	rebalance
-		Rebalance{}
+		
+    rebalance(joiningMembers: Node[])
+        [ctxt.isActiveLeader()]
+        AwaitingTakeover/push(ControllerFSM::CoordinateRebalance) {
+        	beginRebalance(joiningMembers);
+        }
+		
 	open(channel:UUID)
 		nil {
 			openChannel(channel);
 		}
+    
+    rebalance
+        Rebalance{}
 }
 
 Bootstrapping{
@@ -80,7 +92,20 @@ Bootstrapping{
 		Stable{}
 }
 
-Rebalance{}
+Rebalance{
+	rebalanced
+		AwaitingTakeover{}
+		
+	rebalanceCancelled
+        nil {
+            destabilizePartition();
+        }
+}
+
+AwaitingTakeover {
+	commitTakeover
+		Stable{}
+}
 
 Default {
 	destabilize
@@ -92,7 +117,7 @@ Default {
 Bootstrap {
 	bootstrapSystem(joiningMembers: Node[])
 		CoordinateBootstrap{
-			setJoiningMembers(joiningMembers);
+			setJoiningProducers(joiningMembers);
 		}
 }
 
@@ -103,6 +128,41 @@ Entry{
 {
 	bootstrapped
 		pop(bootstrapped){}
+}
+
+CoordinateRebalance
+Entry{
+	coordinateRebalance();
+}
+{
+	rebalance
+		Rebalance{}
+		
+}
+
+Rebalance
+Entry {
+	rebalancePrepared();
+}
+{
+	rebalanced
+		nil{}
+		
+	memberRebalanced
+		[ctxt.tallyComplete()]
+		CoordinateTakeover{}
+		
+	memberRebalanced
+		nil{}
+}
+
+CoordinateTakeover
+Entry{
+	coordinateTakeover();
+}
+{
+	commitTakeover
+		pop(commitTakeover) {}
 }
 
 Default{

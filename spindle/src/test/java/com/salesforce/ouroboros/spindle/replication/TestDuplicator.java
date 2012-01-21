@@ -43,11 +43,13 @@ import org.junit.Test;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.Util;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorFSM;
@@ -127,7 +129,7 @@ public class TestDuplicator {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
-        final Duplicator replicator = new Duplicator();
+        final Duplicator replicator = new Duplicator(new Node(0));
         assertEquals(DuplicatorFSM.Waiting, replicator.getState());
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);
@@ -161,11 +163,16 @@ public class TestDuplicator {
         }, 1000L, 100L);
         Node mirror = new Node(0x1638);
         long timestamp = System.currentTimeMillis();
-        replicator.replicate(new ReplicatedBatchHeader(mirror,
-                                                       event.totalSize(),
-                                                       magic, channel,
-                                                       timestamp, 0),
-                             eventChannel, segment, acknowledger);
+        replicator.replicate(new EventEntry(
+                                            new ReplicatedBatchHeader(
+                                                                      mirror,
+                                                                      event.totalSize(),
+                                                                      magic,
+                                                                      channel,
+                                                                      timestamp,
+                                                                      0, 0),
+                                            eventChannel, segment,
+                                            acknowledger, handler));
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
             public boolean value() {
@@ -194,6 +201,7 @@ public class TestDuplicator {
         Segment inboundSegment = new Segment(inboundTmpFile);
         EventChannel inboundEventChannel = mock(EventChannel.class);
         Bundle inboundBundle = mock(Bundle.class);
+        when(inboundBundle.getId()).thenReturn(new Node(0));
         Acknowledger outboundAcknowledger = mock(Acknowledger.class);
         Acknowledger inboundAcknowledger = mock(Acknowledger.class);
 
@@ -205,7 +213,7 @@ public class TestDuplicator {
         tmpOutboundFile.deleteOnExit();
         Segment outboundSegment = new Segment(tmpOutboundFile);
 
-        int magic = 666;
+        int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
@@ -218,7 +226,7 @@ public class TestDuplicator {
                                                                       magic,
                                                                       channel,
                                                                       timestamp,
-                                                                      0);
+                                                                      0, 0);
 
         event.rewind();
         event.write(outboundSegment);
@@ -227,9 +235,12 @@ public class TestDuplicator {
 
         when(inboundBundle.eventChannelFor(channel)).thenReturn(inboundEventChannel);
         when(inboundBundle.getAcknowledger(mirror)).thenReturn(inboundAcknowledger);
-        when(inboundEventChannel.segmentFor(offset)).thenReturn(inboundSegment);
+        when(inboundEventChannel.segmentFor(offset, 0)).thenReturn(new AppendSegment(
+                                                                                     inboundSegment,
+                                                                                     0,
+                                                                                     0));
 
-        final Duplicator outboundDuplicator = new Duplicator();
+        final Duplicator outboundDuplicator = new Duplicator(new Node(0));
         assertEquals(DuplicatorFSM.Waiting, outboundDuplicator.getState());
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);
@@ -273,9 +284,15 @@ public class TestDuplicator {
         SocketChannelHandler outboundHandler = mock(SocketChannelHandler.class);
         when(outboundHandler.getChannel()).thenReturn(outbound);
         outboundDuplicator.connect(outboundHandler);
-        outboundDuplicator.replicate(new ReplicatedBatchHeader(batchHeader, 0),
-                                     eventChannel, outboundSegment,
-                                     outboundAcknowledger);
+        outboundDuplicator.replicate(new EventEntry(
+                                                    new ReplicatedBatchHeader(
+                                                                              batchHeader,
+                                                                              0,
+                                                                              0),
+                                                    eventChannel,
+                                                    outboundSegment,
+                                                    outboundAcknowledger,
+                                                    outboundHandler));
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
             public boolean value() {

@@ -33,6 +33,9 @@ digraph Duplicator {
         "DuplicatorFSM::Waiting" -> "DuplicatorFSM::WriteHeader"
             [label="replicate/\l"];
 
+        "DuplicatorFSM::Waiting" -> "DuplicatorFSM::Closed"
+            [label="close/\l"];
+
         "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::Closed"
             [label="writeReady/\l"];
 
@@ -42,8 +45,8 @@ digraph Duplicator {
         "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::WriteBatch"
             [label="headerWritten/\l"];
 
-        "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::Waiting"
-            [label="pendingEmpty/\l"];
+        "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::Closed"
+            [label="close/\l"];
 
         "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Closed"
             [label="writeReady/\l"];
@@ -52,7 +55,19 @@ digraph Duplicator {
             [label="writeReady/\l"];
 
         "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Waiting"
+            [label="writeReady/\l"];
+
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::WriteHeader"
             [label="batchWritten/\l"];
+
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Waiting"
+            [label="batchWritten/\l"];
+
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Closed"
+            [label="close/\l"];
+
+        "DuplicatorFSM::Closed" -> "DuplicatorFSM::Closed"
+            [label="close/\l"];
 
         "%start" -> "DuplicatorFSM::Waiting"
     }

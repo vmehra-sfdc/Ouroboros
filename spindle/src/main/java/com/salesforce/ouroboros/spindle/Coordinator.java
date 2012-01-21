@@ -53,7 +53,7 @@ import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.RebalanceMessage;
+import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorState;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
@@ -139,18 +139,12 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case BOOTSTAP_PRODUCERS:
-                switchboard.forwardToNextInRing(new Message(sender, type,
-                                                            arguments));
                 break;
             case BOOTSTRAP_SPINDLES:
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Bootstrapping spindles on %s", self));
                 }
                 bootstrap((Node[]) arguments[0]);
-                if (!isInactiveLeader()) {
-                    switchboard.forwardToNextInRing(new Message(sender, type,
-                                                                arguments));
-                }
                 fsm.bootstrapped();
                 break;
             default:
@@ -242,28 +236,6 @@ public class Coordinator implements Member {
         }
     }
 
-    @Override
-    public void dispatch(RebalanceMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        switch (type) {
-            case PREPARE_FOR_REBALANCE:
-                rebalance((Node[]) arguments[0]);
-                break;
-            case INITIATE_REBALANCE:
-                rebalance();
-                break;
-            case TAKEOVER:
-                rebalanced();
-                break;
-            case REBALANCE_COMPLETE:
-                break;
-            default:
-                throw new IllegalStateException(
-                                                String.format("Invalid rebalance message %s",
-                                                              type));
-        }
-    }
-
     public void dispatch(ReplicatorMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
@@ -285,6 +257,28 @@ public class Coordinator implements Member {
             default:
                 throw new IllegalStateException(
                                                 String.format("Invalid replicator message: %s",
+                                                              type));
+        }
+    }
+
+    @Override
+    public void dispatch(WeaverRebalanceMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case PREPARE_FOR_REBALANCE:
+                rebalance((Node[]) arguments[0]);
+                break;
+            case INITIATE_REBALANCE:
+                rebalance();
+                break;
+            case TAKEOVER:
+                rebalanced();
+                break;
+            case REBALANCE_COMPLETE:
+                break;
+            default:
+                throw new IllegalStateException(
+                                                String.format("Invalid rebalance message %s",
                                                               type));
         }
     }
@@ -367,6 +361,23 @@ public class Coordinator implements Member {
         fsm.rebalance(joiningMembers);
     }
 
+    public boolean isActive() {
+        return active;
+    }
+
+    /**
+     * Answer true if the receiver is active and the leader of the active group
+     * 
+     * @return
+     */
+    public boolean isActiveLeader() {
+        if (active) {
+            return activeMembers.isEmpty() ? true
+                                          : activeMembers.last().equals(self);
+        }
+        return false;
+    }
+
     /**
      * Open the new channel if this node is a primary or mirror of the new
      * channel.
@@ -434,7 +445,8 @@ public class Coordinator implements Member {
     protected void beginRebalance(Node[] joiningMembers) {
         setJoiningMembers(joiningMembers);
         switchboard.ringCast(new Message(self,
-                                         ReplicatorMessage.BEGIN_REBALANCE));
+                                         ReplicatorMessage.BEGIN_REBALANCE),
+                             nextMembership);
     }
 
     protected void bootstrap(Node[] bootsrappingMembers) {
@@ -488,8 +500,9 @@ public class Coordinator implements Member {
      * Commit the takeover of the new primaries and secondaries.
      */
     protected void commitTakeover() {
-        switchboard.ringCast(new Message(self,
-                                         RebalanceMessage.REBALANCE_COMPLETE));
+        switchboard.ringCast(new Message(
+                                         self,
+                                         WeaverRebalanceMessage.REBALANCE_COMPLETE));
     }
 
     protected void coordinateBootstrap() {
@@ -521,7 +534,7 @@ public class Coordinator implements Member {
         tally.set(nextMembership.size());
         switchboard.ringCast(new Message(
                                          self,
-                                         RebalanceMessage.PREPARE_FOR_REBALANCE,
+                                         WeaverRebalanceMessage.PREPARE_FOR_REBALANCE,
                                          (Serializable) joiningMembers));
     }
 
@@ -545,7 +558,7 @@ public class Coordinator implements Member {
      * Coordinate the takeover of the completion of the rebalancing
      */
     protected void coordinateTakeover() {
-        switchboard.ringCast(new Message(self, RebalanceMessage.TAKEOVER));
+        switchboard.ringCast(new Message(self, WeaverRebalanceMessage.TAKEOVER));
     }
 
     /**
@@ -663,23 +676,6 @@ public class Coordinator implements Member {
         return !activeMembers.isEmpty();
     }
 
-    protected boolean isActive() {
-        return active;
-    }
-
-    /**
-     * Answer true if the receiver is active and the leader of the active group
-     * 
-     * @return
-     */
-    protected boolean isActiveLeader() {
-        if (active) {
-            return activeMembers.size() == 0 ? true
-                                            : activeMembers.last().equals(self);
-        }
-        return false;
-    }
-
     /**
      * Answer true if the receiver is not active and the leader of the inactive
      * group
@@ -688,8 +684,8 @@ public class Coordinator implements Member {
      */
     protected boolean isInactiveLeader() {
         if (!active) {
-            return inactiveMembers.size() == 0 ? true
-                                              : inactiveMembers.last().equals(self);
+            return inactiveMembers.isEmpty() ? true
+                                            : inactiveMembers.last().equals(self);
         }
         return false;
     }
@@ -742,9 +738,9 @@ public class Coordinator implements Member {
         Runnable cancellationAction = new Runnable() {
             @Override
             public void run() {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Weaver rebalancing cancelled on %s",
-                                           self));
+                if (log.isLoggable(Level.SEVERE)) {
+                    log.severe(String.format("Weaver rebalancing cancelled on %s",
+                                             self));
                 }
                 for (Xerox xerox : xeroxes.values()) {
                     xerox.close();
@@ -797,6 +793,13 @@ public class Coordinator implements Member {
         commitNextRing();
         active = true;
         fsm.commitTakeover();
+    }
+
+    protected void rebalancePrepared() {
+        rendezvous = null;
+        switchboard.ringCast(new Message(
+                                         self,
+                                         WeaverRebalanceMessage.INITIATE_REBALANCE));
     }
 
     /**
@@ -885,11 +888,5 @@ public class Coordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         weaver.setNextRing(ring);
-    }
-
-    protected void rebalancePrepared() {
-        rendezvous = null;
-        switchboard.ringCast(new Message(self,
-                                         RebalanceMessage.INITIATE_REBALANCE));
     }
 }

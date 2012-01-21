@@ -40,6 +40,9 @@
 %map AbstractAppenderFSM
 %% 
 Ready
+Entry {
+	ready();
+}
 {
 	readReady
 		ReadBatchHeader{}
@@ -54,7 +57,7 @@ Entry {
 		DevNull{}
 		
 	readReady
-		[!ctxt.append()]
+		[!ctxt.append() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}
@@ -63,14 +66,10 @@ Entry {
 		Closed{}
 
 	readReady
-		Ready{
-			selectForRead();
-		}
+		Ready{}
 
 	appended
-		Ready{
-			selectForRead();
-		}
+		Ready{}
 }
 
 DevNull
@@ -82,7 +81,7 @@ Entry {
 		ReadBatchHeader{}
 		
 	readReady
-		[!ctxt.devNull()]
+		[!ctxt.devNull() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}
@@ -105,7 +104,7 @@ Entry{
 		Append{} 
 		
 	readReady
-		[!ctxt.readBatchHeader()]
+		[!ctxt.readBatchHeader() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}
@@ -121,6 +120,10 @@ Closed
 Entry {
 	close();
 }
-{
+{}
+
+Default {
+	close
+		Closed{}
 }
 %%

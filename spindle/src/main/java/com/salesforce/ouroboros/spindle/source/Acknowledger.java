@@ -29,13 +29,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.spindle.source.AcknowledgerContext.AcknowledgerState;
-import com.salesforce.ouroboros.util.lockfree.LockFreeQueue;
 
 /**
  * 
@@ -51,7 +51,7 @@ public class Acknowledger {
     private final AcknowledgerContext fsm     = new AcknowledgerContext(this);
     private SocketChannelHandler      handler;
     private boolean                   inError;
-    final Queue<BatchIdentity>        pending = new LockFreeQueue<BatchIdentity>();
+    final Queue<BatchIdentity>        pending = new LinkedBlockingQueue<BatchIdentity>();
 
     /**
      * Replicate the event to the mirror
@@ -63,9 +63,7 @@ public class Acknowledger {
      */
     public void acknowledge(UUID channel, long timestamp) {
         pending.add(new BatchIdentity(channel, timestamp));
-        if (!fsm.isInTransition()) {
-            fsm.ack();
-        }
+        fsm.ack();
     }
 
     public void close() {
@@ -100,7 +98,11 @@ public class Acknowledger {
             buffer.rewind();
             current.serializeOn(buffer);
             if (!writeAck()) {
-                handler.selectForWrite();
+                if (inError) {
+                    fsm.close();
+                } else {
+                    handler.selectForWrite();
+                }
                 return;
             }
             current = pending.poll();

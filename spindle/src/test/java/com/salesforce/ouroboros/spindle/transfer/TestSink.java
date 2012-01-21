@@ -53,6 +53,7 @@ import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.Util;
 import com.salesforce.ouroboros.spindle.transfer.SinkContext.SinkFSM;
@@ -68,6 +69,7 @@ public class TestSink {
     @Test
     public void testCopy() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         EventChannel channel = mock(EventChannel.class);
         Segment segment = mock(Segment.class);
         SocketChannel socket = mock(SocketChannel.class);
@@ -87,11 +89,11 @@ public class TestSink {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 buffer.putInt(Xerox.MAGIC);
                 buffer.putInt(666);
-                return 4;
+                return Sink.CHANNEL_COUNT_HEADER_SIZE;
             }
         };
 
-        Answer<Integer> handshakeRead = new Answer<Integer>() {
+        Answer<Integer> channelHeaderRead = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
@@ -99,24 +101,25 @@ public class TestSink {
                 buffer.putInt(1);
                 buffer.putLong(channelId.getMostSignificantBits());
                 buffer.putLong(channelId.getLeastSignificantBits());
-                return Xerox.BUFFER_SIZE;
+                return Sink.CHANNEL_HEADER_SIZE;
             }
         };
 
-        Answer<Integer> headerRead = new Answer<Integer>() {
+        Answer<Integer> segmentHeaderRead = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                buffer.putLong(Xerox.MAGIC);
+                buffer.putInt(Xerox.MAGIC);
                 buffer.putLong(prefix);
                 buffer.putLong(bytesLeft);
-                return Xerox.BUFFER_SIZE;
+                return Sink.SEGMENT_HEADER_SIZE;
             }
         };
 
         when(bundle.xeroxEventChannel(channelId)).thenReturn(channel);
-        when(channel.segmentFor(prefix)).thenReturn(segment);
-        when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readChannelCount).thenAnswer(handshakeRead).thenReturn(0).thenAnswer(headerRead).thenReturn(0);
+        when(channel.segmentFor(prefix)).thenReturn(new AppendSegment(segment,
+                                                                      0, 0));
+        when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readChannelCount).thenAnswer(channelHeaderRead).thenReturn(0).thenAnswer(segmentHeaderRead).thenReturn(0);
         when(segment.transferFrom(socket, 0, bytesLeft)).thenReturn(12L);
         when(segment.transferFrom(socket, 12, bytesLeft - 12)).thenReturn(bytesLeft - 12);
 
@@ -128,15 +131,16 @@ public class TestSink {
         sink.readReady();
 
         verify(socket, new Times(6)).read(isA(ByteBuffer.class));
-        verify(segment, new Times(1)).transferFrom(isA(ReadableByteChannel.class),
+        verify(segment, new Times(2)).transferFrom(isA(ReadableByteChannel.class),
                                                    isA(Long.class),
                                                    isA(Long.class));
         assertEquals(SinkFSM.ReadChannelHeader, sink.getState());
     }
 
     @Test
-    public void testReadHandshake() throws Exception {
+    public void testReadChannelHeader() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         SocketChannel socket = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(socket);
@@ -151,11 +155,11 @@ public class TestSink {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 buffer.putInt(Xerox.MAGIC);
                 buffer.putInt(666);
-                return 4;
+                return Sink.CHANNEL_COUNT_HEADER_SIZE;
             }
         };
 
-        Answer<Integer> readHandshake = new Answer<Integer>() {
+        Answer<Integer> readChannelHeader = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
@@ -163,11 +167,11 @@ public class TestSink {
                 buffer.putInt(1);
                 buffer.putLong(channelId.getMostSignificantBits());
                 buffer.putLong(channelId.getLeastSignificantBits());
-                return Xerox.BUFFER_SIZE;
+                return Sink.CHANNEL_HEADER_SIZE;
             }
         };
 
-        when(socket.read(isA(ByteBuffer.class))).thenAnswer(readChannelCount).thenReturn(0).thenAnswer(readHandshake).thenReturn(0);
+        when(socket.read(isA(ByteBuffer.class))).thenAnswer(readChannelCount).thenReturn(0).thenAnswer(readChannelHeader).thenReturn(0);
 
         sink.accept(handler);
         sink.readReady();
@@ -182,6 +186,7 @@ public class TestSink {
     @Test
     public void testReadChannelCount() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         SocketChannel socket = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(socket);
@@ -210,8 +215,9 @@ public class TestSink {
     }
 
     @Test
-    public void testReadHeader() throws Exception {
+    public void testReadSegmentHeader() throws Exception {
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         EventChannel channel = mock(EventChannel.class);
         Segment segment = mock(Segment.class);
         SocketChannel socket = mock(SocketChannel.class);
@@ -230,11 +236,11 @@ public class TestSink {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 buffer.putInt(Xerox.MAGIC);
                 buffer.putInt(666);
-                return 4;
+                return Sink.CHANNEL_COUNT_HEADER_SIZE;
             }
         };
 
-        Answer<Integer> handshakeRead = new Answer<Integer>() {
+        Answer<Integer> channelHeaderRead = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
@@ -242,23 +248,24 @@ public class TestSink {
                 buffer.putInt(1);
                 buffer.putLong(channelId.getMostSignificantBits());
                 buffer.putLong(channelId.getLeastSignificantBits());
-                return Xerox.BUFFER_SIZE;
+                return Sink.CHANNEL_HEADER_SIZE;
             }
         };
 
-        Answer<Integer> headerRead = new Answer<Integer>() {
+        Answer<Integer> segmentHeaderRead = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                buffer.putLong(Xerox.MAGIC);
+                buffer.putInt(Xerox.MAGIC);
                 buffer.putLong(prefix);
                 buffer.putLong(bytesLeft);
-                return Xerox.BUFFER_SIZE;
+                return Sink.SEGMENT_HEADER_SIZE;
             }
         };
         when(bundle.xeroxEventChannel(channelId)).thenReturn(channel);
-        when(channel.segmentFor(prefix)).thenReturn(segment);
-        when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readChannelCount).thenAnswer(handshakeRead).thenReturn(0).thenAnswer(headerRead).thenReturn(0);
+        when(channel.segmentFor(prefix)).thenReturn(new AppendSegment(segment,
+                                                                      0, 0));
+        when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readChannelCount).thenAnswer(channelHeaderRead).thenReturn(0).thenAnswer(segmentHeaderRead).thenReturn(0);
 
         sink.accept(handler);
         sink.readReady();
@@ -276,6 +283,7 @@ public class TestSink {
     public void testXeroxSink() throws Exception {
         SocketChannelHandler inboundHandler = mock(SocketChannelHandler.class);
         Bundle inboundBundle = mock(Bundle.class);
+        when(inboundBundle.getId()).thenReturn(new Node(0));
         UUID channelId = UUID.randomUUID();
         long prefix1 = 0x1600;
         long prefix2 = 0x1800;
@@ -335,8 +343,14 @@ public class TestSink {
         when(outboundHandler.getChannel()).thenReturn(outbound);
 
         when(inboundBundle.xeroxEventChannel(channelId)).thenReturn(inboundEventChannel);
-        when(inboundEventChannel.segmentFor(prefix1)).thenReturn(inboundSegment1);
-        when(inboundEventChannel.segmentFor(prefix2)).thenReturn(inboundSegment2);
+        when(inboundEventChannel.segmentFor(prefix1)).thenReturn(new AppendSegment(
+                                                                                   inboundSegment1,
+                                                                                   0,
+                                                                                   0));
+        when(inboundEventChannel.segmentFor(prefix2)).thenReturn(new AppendSegment(
+                                                                                   inboundSegment2,
+                                                                                   0,
+                                                                                   0));
         when(outboundEventChannel.getId()).thenReturn(channelId);
         when(outboundEventChannel.getSegmentStack()).thenReturn(segments);
 
@@ -402,7 +416,7 @@ public class TestSink {
                 return false;
             }
         }, 2000L, 100L);
-        
+
         verify(rendezvous).meet();
 
         assertTrue("first segment empty", inboundTmpFile1.length() != 0);

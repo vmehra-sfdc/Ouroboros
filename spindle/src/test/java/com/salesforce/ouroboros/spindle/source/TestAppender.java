@@ -68,6 +68,7 @@ public class TestAppender {
     public void testAppend() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         Acknowledger acknowledger = mock(Acknowledger.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("append", ".tst");
@@ -88,7 +89,7 @@ public class TestAppender {
         assertEquals(AbstractAppenderFSM.Ready, appender.getState());
 
         Node mirror = new Node(0x1638);
-        int magic = 666;
+        int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
@@ -99,6 +100,7 @@ public class TestAppender {
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,
+                                                                               0,
                                                                                0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(false);
         header.rewind();
@@ -139,10 +141,11 @@ public class TestAppender {
             assertEquals(b, writtenPayload.get());
         }
 
-        verify(handler, new Times(3)).selectForRead();
+        verify(handler, new Times(2)).selectForRead();
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).append(isA(ReplicatedBatchHeader.class),
-                                    eq(writeSegment), isA(Acknowledger.class));
+                                    eq(writeSegment), isA(Acknowledger.class),
+                                    isA(SocketChannelHandler.class));
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
     }
@@ -151,6 +154,7 @@ public class TestAppender {
     public void testDuplicate() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         Acknowledger acknowledger = mock(Acknowledger.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("duplicate", ".tst");
@@ -171,7 +175,7 @@ public class TestAppender {
         assertEquals(AbstractAppenderFSM.Ready, appender.getState());
 
         Node mirror = new Node(0x1638);
-        int magic = 666;
+        int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
@@ -182,6 +186,7 @@ public class TestAppender {
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,
+                                                                               0,
                                                                                0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(true);
         header.rewind();
@@ -211,7 +216,7 @@ public class TestAppender {
         server.close();
 
         assertEquals(0L, tmpFile.length());
-        verify(handler, new Times(2)).selectForRead();
+        verify(handler, new Times(3)).selectForRead();
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));

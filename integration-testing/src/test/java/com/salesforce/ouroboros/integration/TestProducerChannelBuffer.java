@@ -61,7 +61,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.uuid.Generators;
-import com.hellblazer.jackal.annotations.DeployedPostProcessor;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.SocketOptions;
@@ -73,6 +72,7 @@ import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.ProducerConfiguration;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverConfigation;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * 
@@ -146,12 +146,6 @@ public class TestProducerChannelBuffer {
     static class MyControllerConfig extends ControllerGossipConfiguration {
 
         @Override
-        @Bean
-        public DeployedPostProcessor deployedPostProcessor() {
-            return new DeployedPostProcessor();
-        }
-
-        @Override
         public int magic() {
             try {
                 return Identity.getMagicFromLocalIpAddress();
@@ -205,7 +199,7 @@ public class TestProducerChannelBuffer {
             return new Node(node(), node(), node());
         }
 
-        @Bean(initMethod = "start", destroyMethod = "terminate")
+        @Bean
         public Switchboard switchboard() {
             Switchboard switchboard = new Switchboard(
                                                       memberNode(),
@@ -300,7 +294,7 @@ public class TestProducerChannelBuffer {
             return Executors.newSingleThreadScheduledExecutor();
         }
 
-        @Bean(initMethod = "start", destroyMethod = "terminate")
+        @Bean
         public Weaver weaver() throws IOException {
             return new Weaver(weaverConfiguration());
         }
@@ -312,14 +306,20 @@ public class TestProducerChannelBuffer {
         }
 
         private WeaverConfigation weaverConfiguration() throws IOException {
-            File directory = File.createTempFile("prod-CB", "root");
-            directory.delete();
-            directory.mkdirs();
-            directory.deleteOnExit();
+            File directory = rootDirectory();
             WeaverConfigation weaverConfigation = new WeaverConfigation();
             weaverConfigation.setId(memberNode());
             weaverConfigation.addRoot(directory);
             return weaverConfigation;
+        }
+
+        @Bean
+        public File rootDirectory() throws IOException {
+            File directory = File.createTempFile("prod-CB", ".root");
+            directory.delete();
+            directory.mkdirs();
+            directory.deleteOnExit();
+            return directory;
         }
     }
 
@@ -328,10 +328,10 @@ public class TestProducerChannelBuffer {
     private static final Logger        log = Logger.getLogger(TestProducerChannelBuffer.class.getCanonicalName());
     static {
         String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
-                                         "24010");
+                                         "24020");
         testPort1 = Integer.parseInt(port);
         port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
-                                  "24020");
+                                  "24040");
         testPort2 = Integer.parseInt(port);
     }
 
@@ -344,6 +344,8 @@ public class TestProducerChannelBuffer {
 
     @Before
     public void starUp() throws Exception {
+        testPort1++;
+        testPort2++;
         log.info("Setting up initial partition");
         initialLatch = new CountDownLatch(2);
         controllerContext = new AnnotationConfigApplicationContext(
@@ -363,12 +365,12 @@ public class TestProducerChannelBuffer {
             partition = new ArrayList<ControlNode>();
             ControlNode member = (ControlNode) controller.getNode(producerContext.getBean(Identity.class));
             assertNotNull("Can't find node: "
-                                          + producerContext.getBean(Identity.class),
+                                  + producerContext.getBean(Identity.class),
                           member);
             partition.add(member);
             member = (ControlNode) controller.getNode(weaverContext.getBean(Identity.class));
             assertNotNull("Can't find node: "
-                                          + weaverContext.getBean(Identity.class),
+                                  + weaverContext.getBean(Identity.class),
                           member);
             partition.add(member);
         } finally {
@@ -396,6 +398,7 @@ public class TestProducerChannelBuffer {
             }
         }
         if (weaverContext != null) {
+            Utils.deleteDirectory(weaverContext.getBean(File.class));
             try {
                 weaverContext.close();
             } catch (Throwable e) {

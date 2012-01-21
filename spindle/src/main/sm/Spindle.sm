@@ -82,5 +82,8 @@ Entry {
 Default {
 	bind()
 		nil{}
+		
+	close
+		Closed{}
 }
 %%

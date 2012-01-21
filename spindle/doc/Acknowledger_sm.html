@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=4>
+        <th colspan=5>
           Transition
         </th>
       </tr>
@@ -28,6 +28,9 @@
         </th>
         <th>
           ack
+        </th>
+        <th>
+          close
         </th>
         <th>
           waiting
@@ -55,6 +58,8 @@ processPendingAcks();
   WriteAck
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
           <pre>
@@ -85,6 +90,8 @@ processPendingAcks();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Waiting
   {}
@@ -92,7 +99,7 @@ processPendingAcks();
         </td>
         <td>
           <pre>
-[!ctxt.inError() && !ctxt.writeAck()]
+[!ctxt.writeAck() && !ctxt.inError()]
   WriteAck
   {
     selectForWrite();
@@ -118,6 +125,8 @@ processPendingAcks();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>

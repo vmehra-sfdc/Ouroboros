@@ -25,6 +25,8 @@
  */
 package com.salesforce.ouroboros.spindle.replication;
 
+import java.io.IOException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.BatchHeader;
@@ -53,13 +55,28 @@ public class ReplicatingAppender extends AbstractAppender {
      */
     @Override
     protected void commit() {
-        eventChannel.append(batchHeader, offset);
+        try {
+            eventChannel.append(batchHeader, offset, segment);
+            segment.close();
+        } catch (IOException e) {
+            if (log.isLoggable(Level.SEVERE)) {
+                log.log(Level.SEVERE,
+                        String.format("Unable to append %s to segment on %s",
+                                      batchHeader, segment, bundle.getId()));
+            }
+            close();
+            return;
+        }
         Node node = batchHeader.getProducerMirror();
         Acknowledger acknowledger = bundle.getAcknowledger(node);
         if (acknowledger == null) {
             log.warning(String.format("Could not find an acknowledger for %s",
                                       node));
             return;
+        }
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Acknowledging replication of %s on %s",
+                                    batchHeader, bundle.getId()));
         }
         acknowledger.acknowledge(batchHeader.getChannel(),
                                  batchHeader.getTimestamp());
@@ -71,10 +88,22 @@ public class ReplicatingAppender extends AbstractAppender {
     }
 
     @Override
+    protected Logger getLogger() {
+        return log;
+    }
+
+    @Override
     protected AppendSegment getLogicalSegment() {
-        ReplicatedBatchHeader replicatedBatchHeader = (ReplicatedBatchHeader) batchHeader;
-        return new AppendSegment(
-                                 eventChannel.segmentFor(replicatedBatchHeader.getOffset()),
-                                 replicatedBatchHeader.getOffset());
+        ReplicatedBatchHeader replicated = (ReplicatedBatchHeader) batchHeader;
+        System.out.println(String.format("# position %s remaining %s",
+                                         replicated.getPosition(),
+                                         replicated.getBatchByteLength()));
+        return eventChannel.segmentFor(replicated.getOffset(),
+                                       replicated.getPosition());
+    }
+
+    @Override
+    protected void ready() {
+        handler.selectForRead();
     }
 }

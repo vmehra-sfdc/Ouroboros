@@ -33,6 +33,12 @@ digraph Spindle {
         "SpindleFSM::Suspended" -> "SpindleFSM::Handshake"
             [label="handshake/\l"];
 
+        "SpindleFSM::Suspended" -> "SpindleFSM::Closed"
+            [label="close/\l"];
+
+        "SpindleFSM::Established" -> "SpindleFSM::Closed"
+            [label="close/\l"];
+
         "SpindleFSM::Handshake" -> "SpindleFSM::Closed"
             [label="readReady/\l"];
 
@@ -41,6 +47,12 @@ digraph Spindle {
 
         "SpindleFSM::Handshake" -> "SpindleFSM::Established"
             [label="established/\l"];
+
+        "SpindleFSM::Handshake" -> "SpindleFSM::Closed"
+            [label="close/\l"];
+
+        "SpindleFSM::Closed" -> "SpindleFSM::Closed"
+            [label="close/\l"];
 
         "%start" -> "SpindleFSM::Suspended"
     }

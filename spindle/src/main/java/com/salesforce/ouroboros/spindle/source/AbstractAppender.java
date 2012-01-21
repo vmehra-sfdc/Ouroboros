@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -47,9 +48,6 @@ import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractA
  * 
  */
 abstract public class AbstractAppender {
-
-    private static final Logger             log      = Logger.getLogger(AbstractAppender.class.getCanonicalName());
-
     protected final BatchHeader             batchHeader;
     protected final Bundle                  bundle;
     protected ByteBuffer                    devNull;
@@ -59,12 +57,13 @@ abstract public class AbstractAppender {
     protected SocketChannelHandler          handler;
     protected boolean                       inError  = false;
     protected long                          offset   = -1L;
-    protected long                          position = -1L;
+    protected int                           position = -1;
     protected long                          remaining;
     protected Segment                       segment;
 
     public AbstractAppender(Bundle bundle) {
         super();
+        fsm.setName(Integer.toString(bundle.getId().processId));
         this.bundle = bundle;
         batchHeader = createBatchHeader();
     }
@@ -91,23 +90,27 @@ abstract public class AbstractAppender {
             written = segment.transferFrom(handler.getChannel(), position,
                                            remaining);
         } catch (IOException e) {
-            log.log(Level.SEVERE, "Exception during append", e);
+            getLogger().log(Level.SEVERE,
+                            String.format("Exception during append on %s",
+                                          bundle.getId()), e);
             error();
             return false;
         }
         position += written;
         remaining -= written;
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Appending, position=%s, remaining=%s, written=%s",
-                                    position, remaining, written));
+        if (getLogger().isLoggable(Level.FINER)) {
+            getLogger().finer(String.format("Appending, offset=%s, position=%s, remaining=%s, written=%s on %s",
+                                            offset, position, remaining,
+                                            written, bundle.getId()));
         }
         if (remaining == 0) {
             try {
                 segment.position(position);
             } catch (IOException e) {
-                log.log(Level.SEVERE,
-                        String.format("Cannot determine position in segment: %s",
-                                      segment), e);
+                getLogger().log(Level.SEVERE,
+                                String.format("Cannot determine position on channel %s segment: %s on %s",
+                                              eventChannel, segment,
+                                              bundle.getId()), e);
                 error();
                 return false;
             }
@@ -124,24 +127,45 @@ abstract public class AbstractAppender {
 
     protected void beginAppend() {
         if (eventChannel == null) {
-            log.warning(String.format("No existing event channel for: %s",
-                                      batchHeader));
-            fsm.drain();
+            getLogger().warning(String.format("No existing event channel for: %s on %s",
+                                              batchHeader, bundle.getId()));
+            fsm.close();
             return;
         }
         AppendSegment logicalSegment = getLogicalSegment();
         segment = logicalSegment.segment;
-        offset = position = logicalSegment.offset;
+        offset = logicalSegment.offset;
+        position = logicalSegment.position;
+        markPosition();
         remaining = batchHeader.getBatchByteLength();
         if (eventChannel.isDuplicate(batchHeader)) {
-            log.warning(String.format("Duplicate event batch %s", batchHeader));
+            getLogger().warning(String.format("Duplicate event batch %s received on %s",
+                                              batchHeader, bundle.getId()));
+            try {
+                segment.close();
+            } catch (IOException e) {
+                if (getLogger().isLoggable(Level.WARNING)) {
+                    getLogger().log(Level.WARNING,
+                                    String.format("Unable to close segment %s on %s",
+                                                  segment, bundle.getId()), e);
+                }
+            }
             fsm.drain();
             return;
+        }
+        if (getLogger().isLoggable(Level.FINER)) {
+            getLogger().finer(String.format("Beginning append of %s, offset=%s, position=%s, remaining=%s on %s",
+                                            segment, offset, position,
+                                            remaining, bundle.getId()));
         }
         if (append()) {
             fsm.appended();
         } else {
-            handler.selectForRead();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
@@ -153,14 +177,16 @@ abstract public class AbstractAppender {
         long read;
         try {
             if ((read = handler.getChannel().read(devNull)) < 0) {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                if (getLogger().isLoggable(Level.FINE)) {
+                    getLogger().fine("Closing channel");
                 }
                 inError = true;
                 return false;
             }
         } catch (IOException e) {
-            log.log(Level.SEVERE, "Exception during append", e);
+            getLogger().log(Level.SEVERE,
+                            String.format("Exception during append on %s",
+                                          bundle.getId()), e);
             error();
             return false;
         }
@@ -175,18 +201,26 @@ abstract public class AbstractAppender {
 
     protected void drain() {
         segment = null;
-        devNull = ByteBuffer.allocate(batchHeader.getBatchByteLength());
+        devNull = ByteBuffer.allocate(32 * 1024);
         if (devNull()) {
             fsm.ready();
+        } else {
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
     protected void error() {
+        inError = true;
         if (segment != null) {
             try {
                 segment.close();
             } catch (IOException e) {
-                log.finest(String.format("Error closing segment %s", segment));
+                getLogger().finest(String.format("Error closing segment %s on %s",
+                                                 segment, bundle.getId()));
             }
         }
         segment = null;
@@ -194,10 +228,16 @@ abstract public class AbstractAppender {
         devNull = null;
     }
 
+    abstract protected Logger getLogger();
+
     abstract protected AppendSegment getLogicalSegment();
 
     protected boolean inError() {
         return inError;
+    }
+
+    protected void markPosition() {
+        // default is to do nothing
     }
 
     protected void nextBatchHeader() {
@@ -205,30 +245,51 @@ abstract public class AbstractAppender {
         if (readBatchHeader()) {
             fsm.append();
         } else {
-            handler.selectForRead();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
     protected boolean readBatchHeader() {
         try {
             if (batchHeader.read(handler.getChannel()) < 0) {
-                inError = true;
+                error();
+                return false;
             }
+        } catch (ClosedChannelException e) {
+            error();
+            return false;
         } catch (IOException e) {
-            log.log(Level.SEVERE, "Exception during batch header read", e);
+            getLogger().log(Level.SEVERE,
+                            String.format("Exception during batch header read on %s",
+                                          bundle.getId()), e);
             error();
             return false;
         }
         if (!batchHeader.hasRemaining()) {
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Batch header read, header=%s",
-                                        batchHeader));
+            if (getLogger().isLoggable(Level.FINER)) {
+                getLogger().finer(String.format("Batch header read, header=%s on %s",
+                                                batchHeader, bundle.getId()));
+            }
+            if (batchHeader.getMagic() != BatchHeader.MAGIC) {
+                getLogger().severe(String.format("Received invalid magic %s in header %s on %s",
+                                                 batchHeader.getMagic(),
+                                                 batchHeader, bundle.getId()));
+                error();
+                return false;
             }
             eventChannel = bundle.eventChannelFor(batchHeader.getChannel());
             return true;
         } else {
             return false;
         }
+    }
+
+    protected void ready() {
+        // default is to do nothing
     }
 
     protected void selectForRead() {

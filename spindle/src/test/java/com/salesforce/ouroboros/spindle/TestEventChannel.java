@@ -26,8 +26,21 @@
 package com.salesforce.ouroboros.spindle;
 
 import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertTrue;
 
+import java.io.File;
+import java.util.UUID;
+
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
+
+import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
+import com.salesforce.ouroboros.spindle.EventChannel.Role;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * 
@@ -35,6 +48,8 @@ import org.junit.Test;
  * 
  */
 public class TestEventChannel {
+
+    private File root;
 
     @Test
     public void testPrefix() {
@@ -45,5 +60,99 @@ public class TestEventChannel {
         assertEquals(1024 * 11, EventChannel.prefixFor(1024 * 11, 1024L));
         assertEquals(1024 * 10, EventChannel.prefixFor(1024 * 11 - 1, 1024L));
         assertEquals(1024 * 11, EventChannel.prefixFor(1024 * 11 + 15, 1024L));
+    }
+
+    @Before
+    public void setUp() throws Exception {
+        root = File.createTempFile("TestEventChannel", ".root");
+        root.delete();
+        root.mkdirs();
+    }
+
+    @Test
+    public void testSegmentGeneration() throws Exception {
+        long maxSegmentSize = 16 * 1024;
+        int eventSize = 256;
+        Node node = new Node(0);
+        UUID channel = UUID.randomUUID();
+        int timestamp = 0;
+        EventChannel eventChannel = new EventChannel(Role.PRIMARY, channel,
+                                                     root, maxSegmentSize, null);
+        long offset = 0;
+        BatchHeader batchHeader;
+        AppendSegment logicalSegment;
+
+        // For the first segment, offset and position should track
+        for (; offset + eventSize < maxSegmentSize; offset += eventSize) {
+            batchHeader = new BatchHeader(node, eventSize, 666, channel,
+                                          timestamp++);
+            logicalSegment = eventChannel.segmentFor(batchHeader);
+            assertNotNull(logicalSegment);
+            assertEquals(offset, logicalSegment.offset);
+            assertEquals(offset, logicalSegment.position);
+            assertEquals(0L, logicalSegment.segment.getPrefix());
+            eventChannel.append(batchHeader, offset, logicalSegment.segment);
+        }
+
+        // the next event should trigger a segment rollover
+        batchHeader = new BatchHeader(node, eventSize, 666, channel,
+                                      timestamp++);
+        logicalSegment = eventChannel.segmentFor(batchHeader);
+        assertNotNull(logicalSegment);
+        assertTrue(offset < logicalSegment.offset);
+        assertEquals(0, logicalSegment.position);
+        assertEquals(maxSegmentSize, logicalSegment.segment.getPrefix());
+        eventChannel.append(batchHeader, logicalSegment.offset,
+                            logicalSegment.segment);
+
+        long position = logicalSegment.position + eventSize;
+        offset = logicalSegment.offset + eventSize;
+
+        // Now track the second rollover segment.
+        for (; offset + eventSize < 2 * maxSegmentSize; offset += eventSize) {
+            batchHeader = new BatchHeader(node, eventSize, 666, channel,
+                                          timestamp++);
+            logicalSegment = eventChannel.segmentFor(batchHeader);
+            assertNotNull(logicalSegment);
+            assertEquals(offset, logicalSegment.offset);
+            assertEquals(position, logicalSegment.position);
+            assertEquals(maxSegmentSize, logicalSegment.segment.getPrefix());
+            eventChannel.append(batchHeader, offset, logicalSegment.segment);
+            position += eventSize;
+        }
+
+        // the next event should trigger another segment rollover
+        batchHeader = new BatchHeader(node, eventSize, 666, channel,
+                                      timestamp++);
+        logicalSegment = eventChannel.segmentFor(batchHeader);
+        assertNotNull(logicalSegment);
+        assertTrue(offset < logicalSegment.offset);
+        assertEquals(0, logicalSegment.position);
+        assertEquals(maxSegmentSize * 2, logicalSegment.segment.getPrefix());
+        eventChannel.append(batchHeader, logicalSegment.offset,
+                            logicalSegment.segment);
+
+        position = logicalSegment.position + eventSize;
+        offset = logicalSegment.offset + eventSize;
+
+        // Now track the second rollover segment.
+        for (; offset + eventSize < 3 * maxSegmentSize; offset += eventSize) {
+            batchHeader = new BatchHeader(node, eventSize, 666, channel,
+                                          timestamp++);
+            logicalSegment = eventChannel.segmentFor(batchHeader);
+            assertNotNull(logicalSegment);
+            assertEquals(offset, logicalSegment.offset);
+            assertEquals(position, logicalSegment.position);
+            assertEquals(maxSegmentSize * 2, logicalSegment.segment.getPrefix());
+            eventChannel.append(batchHeader, offset, logicalSegment.segment);
+            position += eventSize;
+        }
+    }
+
+    @After
+    public void teardown() {
+        if (root != null) {
+            Utils.deleteDirectory(root);
+        }
     }
 }

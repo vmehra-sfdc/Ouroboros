@@ -37,15 +37,17 @@ import com.salesforce.ouroboros.Node;
  * 
  */
 public class ReplicatedBatchHeader extends BatchHeader {
-    private static final int BATCH_OFFSET_OFFSET = BatchHeader.HEADER_BYTE_SIZE;
-    public static final int  HEADER_SIZE         = BATCH_OFFSET_OFFSET + 8;
+    private static final int BATCH_OFFSET_OFFSET   = BatchHeader.HEADER_BYTE_SIZE;
+    public static final int  BATCH_POSITION_OFFSET = BATCH_OFFSET_OFFSET + 8;
+    public static final int  HEADER_SIZE           = BATCH_POSITION_OFFSET + 4;
 
     private static ByteBuffer fromBatchHeader(ByteBuffer headerBytes,
-                                              long offset) {
+                                              long offset, int position) {
         headerBytes.rewind();
         ByteBuffer replicatedHeader = ByteBuffer.allocate(HEADER_SIZE);
         replicatedHeader.put(headerBytes);
         replicatedHeader.putLong(BATCH_OFFSET_OFFSET, offset);
+        replicatedHeader.putInt(BATCH_POSITION_OFFSET, position);
         replicatedHeader.rewind();
         return replicatedHeader;
     }
@@ -54,8 +56,8 @@ public class ReplicatedBatchHeader extends BatchHeader {
         super();
     }
 
-    public ReplicatedBatchHeader(BatchHeader header, long offset) {
-        this(fromBatchHeader(header.getBytes(), offset));
+    public ReplicatedBatchHeader(BatchHeader header, long offset, int position) {
+        this(fromBatchHeader(header.getBytes(), offset, position));
     }
 
     public ReplicatedBatchHeader(ByteBuffer b) {
@@ -63,9 +65,11 @@ public class ReplicatedBatchHeader extends BatchHeader {
     }
 
     public ReplicatedBatchHeader(Node mirror, int batchByteLength, int magic,
-                                 UUID channel, long timestamp, long batchOffset) {
+                                 UUID channel, long timestamp,
+                                 long batchOffset, int batchPosition) {
         super(mirror, batchByteLength, magic, channel, timestamp);
         getBytes().putLong(BATCH_OFFSET_OFFSET, batchOffset);
+        getBytes().putInt(BATCH_OFFSET_OFFSET, batchPosition);
     }
 
     /* (non-Javadoc)
@@ -86,6 +90,17 @@ public class ReplicatedBatchHeader extends BatchHeader {
 
     public long getOffset() {
         return getBytes().getLong(BATCH_OFFSET_OFFSET);
+    }
+
+    public int getPosition() {
+        return getBytes().getInt(BATCH_POSITION_OFFSET);
+    }
+
+    @Override
+    public String toString() {
+        return String.format("ReplicatedBatchHeader[magic=%s, timestamp=%s, length=%s, channel=%s offset=%s position=%s]",
+                             getMagic(), getTimestamp(), getBatchByteLength(),
+                             getChannel(), getOffset(), getPosition());
     }
 
     /* (non-Javadoc)

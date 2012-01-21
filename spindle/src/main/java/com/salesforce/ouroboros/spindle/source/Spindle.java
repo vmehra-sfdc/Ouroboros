@@ -59,6 +59,7 @@ public class Spindle implements CommunicationsHandler {
     final Appender               appender;
 
     public Spindle(Bundle bundle) {
+        fsm.setName(Integer.toString(bundle.getId().processId));
         acknowledger = new Acknowledger();
         appender = new Appender(bundle, acknowledger);
         this.bundle = bundle;
@@ -113,12 +114,16 @@ public class Spindle implements CommunicationsHandler {
         if (magic != MAGIC) {
             inError = true;
             log.warning(String.format("Invalid handshake magic: %s", magic));
-            handler.close();
             handshake = null;
             close();
             return;
         }
-        bundle.map(new Node(handshake), acknowledger);
+        Node producer = new Node(handshake);
+        bundle.map(producer, acknowledger);
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Established on %s for %s", bundle.getId(),
+                                   producer));
+        }
         handshake = null;
         handler.selectForRead();
     }
@@ -131,13 +136,17 @@ public class Spindle implements CommunicationsHandler {
         if (readHandshake()) {
             fsm.established();
         } else {
-            handler.selectForRead();
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
     protected boolean readHandshake() {
         try {
-            if (handler.getChannel().read(handshake) < 0) { 
+            if (handler.getChannel().read(handshake) < 0) {
                 if (log.isLoggable(Level.FINE)) {
                     log.fine("Closing channel");
                 }

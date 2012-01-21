@@ -164,6 +164,9 @@ digraph Coordinator {
         "ControllerFSM::CoordinateTakeover"
             [label="{CoordinateTakeover}"];
 
+        "ControllerFSM::pop()"
+            [label="" width=1]
+
         "ControllerFSM::pop(destabilize)"
             [label="" width=1]
 
@@ -213,6 +216,9 @@ digraph Coordinator {
         "ControllerFSM::Rebalance" -> "ControllerFSM::CoordinateTakeover"
             [label="memberRebalanced/\l"];
 
+        "ControllerFSM::Rebalance" -> "ControllerFSM::pop()"
+            [label="rebalanceCancelled/\l"];
+
         "ControllerFSM::Rebalance" -> "ControllerFSM::pop(destabilize)"
             [label="destabilize/\l"];
 
@@ -221,6 +227,9 @@ digraph Coordinator {
 
         "ControllerFSM::CoordinateTakeover" -> "ControllerFSM::pop(destabilize)"
             [label="destabilize/\l"];
+
+        "ControllerFSM::pop()" -> "ControllerFSM::%end"
+            [label="pop();\l"];
 
         "ControllerFSM::pop(destabilize)" -> "ControllerFSM::%end"
             [label="pop(destabilize);\l"];
