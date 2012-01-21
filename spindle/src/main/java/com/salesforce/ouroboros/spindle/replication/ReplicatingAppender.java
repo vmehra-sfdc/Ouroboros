@@ -95,9 +95,6 @@ public class ReplicatingAppender extends AbstractAppender {
     @Override
     protected AppendSegment getLogicalSegment() {
         ReplicatedBatchHeader replicated = (ReplicatedBatchHeader) batchHeader;
-        System.out.println(String.format("# position %s remaining %s",
-                                         replicated.getPosition(),
-                                         replicated.getBatchByteLength()));
         return eventChannel.segmentFor(replicated.getOffset(),
                                        replicated.getPosition());
     }

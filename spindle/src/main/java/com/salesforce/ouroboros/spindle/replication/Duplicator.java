@@ -258,8 +258,8 @@ public final class Duplicator {
         }
         boolean written = !current.header.hasRemaining();
         if (written) {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("written header %s on %s",
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("written header %s on %s",
                                         current.header, thisNode));
             }
         }

@@ -79,7 +79,7 @@ Entry {
 }
 {
 	writeReady
-		[!ctxt.writeHeader() && !ctxt.inError()]
+		[!ctxt.writeBatch() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}

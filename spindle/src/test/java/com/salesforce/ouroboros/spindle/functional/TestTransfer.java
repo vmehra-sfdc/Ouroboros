@@ -155,7 +155,7 @@ public class TestTransfer {
         }
     }
 
-    // @Test
+    @Test
     public void testReplicationTransfer() throws Exception {
         setupTemporaryRoots();
 

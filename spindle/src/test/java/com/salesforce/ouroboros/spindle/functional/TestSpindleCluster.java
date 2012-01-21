@@ -786,7 +786,7 @@ public class TestSpindleCluster {
      * 
      * @throws Exception
      */
-    // @Test
+    @Test
     public void testReplication() throws Exception {
 
         bootstrap();
@@ -1148,11 +1148,12 @@ public class TestSpindleCluster {
         Event event = new Event(MAGIC, payloadBuffer);
         int batchSize = 10;
         int batchLength = batchSize * event.totalSize();
-        int totalSize = 1024 * 1024 * 4;
+        int totalSize = 1024 * 16;
         long timestamp = 0;
         for (int i = 0; i < totalSize; i += batchLength) {
             BatchHeader header = new BatchHeader(PRODUCER_NODE, batchLength,
-                                                 MAGIC, channel, timestamp);
+                                                 BatchHeader.MAGIC, channel,
+                                                 timestamp);
             timestamp += batchSize;
             header.rewind();
             header.write(outbound);
