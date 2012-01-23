@@ -209,7 +209,7 @@ public class TestTransfer {
                                          producerNode);
         spindleHandler.connectTo(spindleHandler.getLocalAddress(), producer);
         assertTrue("Did not publish all events in given time",
-                   producerLatch.await(60, TimeUnit.SECONDS));
+                   producerLatch.await(120, TimeUnit.SECONDS));
         System.out.println("Events published");
         assertTrue("Did not receive acknowledgement from all event writes and replications",
                    ackLatch.await(60, TimeUnit.SECONDS));
