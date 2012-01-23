@@ -229,7 +229,6 @@ public class EventChannel {
      */
     public void append(BatchHeader batchHeader, long offset, Segment segment)
                                                                              throws IOException {
-        segment.force(false);
         nextOffset = offset + batchHeader.getBatchByteLength();
         lastTimestamp = batchHeader.getTimestamp();
     }

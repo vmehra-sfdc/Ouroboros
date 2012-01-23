@@ -206,7 +206,7 @@ public class TestTransfer {
 
         CountDownLatch producerLatch = new CountDownLatch(1);
         Producer producer = new Producer(producerLatch, batches, batchSize,
-                                         producerNode, BatchHeader.MAGIC);
+                                         producerNode);
         spindleHandler.connectTo(spindleHandler.getLocalAddress(), producer);
         assertTrue("Did not publish all events in given time",
                    producerLatch.await(60, TimeUnit.SECONDS));
@@ -329,15 +329,13 @@ public class TestTransfer {
         private final AtomicInteger  timestamp = new AtomicInteger(0);
         private BatchHeader          currentHeader;
         private final Node           node;
-        private final int            magic;
         private final int            batchLength;
         private final CountDownLatch latch;
 
         private Producer(CountDownLatch latch, int batches, int batchSize,
-                         Node node, int magic) {
+                         Node node) {
             this.latch = latch;
             this.node = node;
-            this.magic = magic;
             this.numberOfBatches = batches;
             Event event = event();
             batchLength = batchSize * event.totalSize();
@@ -363,8 +361,8 @@ public class TestTransfer {
                 System.out.print('.');
             }
             batches.incrementAndGet();
-            currentHeader = new BatchHeader(node, batchLength, magic,
-                                            channelId,
+            currentHeader = new BatchHeader(node, batchLength,
+                                            BatchHeader.MAGIC, channelId,
                                             timestamp.incrementAndGet());
             batch.rewind();
             handler.selectForWrite();

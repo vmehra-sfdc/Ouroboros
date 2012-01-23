@@ -39,10 +39,11 @@ import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Timer;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -50,6 +51,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import org.junit.After;
@@ -70,6 +72,9 @@ import org.springframework.context.annotation.Configuration;
 import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
 import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
+import com.hellblazer.pinkie.ChannelHandler;
+import com.hellblazer.pinkie.CommunicationsHandler;
+import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
@@ -100,9 +105,6 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class TestSpindleCluster {
-    private static final int  MAGIC         = 666;
-    private static final Node PRODUCER_NODE = new Node(666);
-
     public static class ControlNode extends NodeData {
         int            cardinality;
         CountDownLatch latch;
@@ -215,6 +217,123 @@ public class TestSpindleCluster {
 
         @Override
         public void stabilized() {
+        }
+
+    }
+
+    private class Producer implements CommunicationsHandler {
+        private final int            numberOfBatches;
+        private SocketChannelHandler handler;
+        private final AtomicInteger  batches        = new AtomicInteger();
+        private volatile ByteBuffer  batch;
+        private final AtomicInteger  timestamp      = new AtomicInteger(0);
+        private volatile BatchHeader currentHeader;
+        private final CountDownLatch latch;
+        private final List<UUID>     channelIds;
+        private final AtomicInteger  currentChannel = new AtomicInteger();
+        private final int            batchSize;
+
+        private Producer(List<UUID> channelIds, CountDownLatch latch,
+                         int batches, int batchSize) {
+            this.channelIds = channelIds;
+            this.latch = latch;
+            this.numberOfBatches = batches;
+            this.batchSize = batchSize;
+        }
+
+        @Override
+        public void accept(SocketChannelHandler handler) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void closing() {
+        }
+
+        @Override
+        public void connect(SocketChannelHandler handler) {
+            this.handler = handler;
+            ByteBuffer buffer = ByteBuffer.allocate(Spindle.HANDSHAKE_SIZE);
+            buffer.putInt(Spindle.MAGIC);
+            PRODUCER_NODE.serialize(buffer);
+            buffer.flip();
+            try {
+                while (buffer.hasRemaining()) {
+                    handler.getChannel().write(buffer);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+            nextBatch();
+        }
+
+        @Override
+        public void readReady() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void writeReady() {
+            if (currentHeader.hasRemaining()) {
+                try {
+                    if (currentHeader.write(handler.getChannel()) < 0) {
+                        handler.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return;
+                }
+                if (currentHeader.hasRemaining()) {
+                    handler.selectForWrite();
+                    return;
+                }
+            }
+            try {
+                handler.getChannel().write(batch);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+            if (batch.hasRemaining()) {
+                handler.selectForWrite();
+            } else {
+                nextBatch();
+            }
+        }
+
+        private Event event(UUID channelId) {
+            byte[] payload = String.format("%s Give me Slack, or give me Food, or Kill me %s",
+                                           channelId, channelId).getBytes();
+            ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
+            return new Event(666, payloadBuffer);
+        }
+
+        private void nextBatch() {
+            int batchNumber = batches.get();
+            if (batchNumber == numberOfBatches) {
+                System.out.println("Events published");
+                latch.countDown();
+                return;
+            }
+            int channel = currentChannel.get();
+            if (currentChannel.incrementAndGet() == channelIds.size()) {
+                currentChannel.set(0);
+                batches.incrementAndGet();
+            }
+            UUID channelId = channelIds.get(channel);
+            Event event = event(channelId);
+            int batchLength = batchSize * event.totalSize();
+            batch = ByteBuffer.allocate(batchLength);
+            for (int i = 0; i < batchSize; i++) {
+                event.rewind();
+                batch.put(event.getBytes());
+            }
+            currentHeader = new BatchHeader(PRODUCER_NODE, batchLength,
+                                            BatchHeader.MAGIC, channelId,
+                                            timestamp.incrementAndGet());
+            batch.rewind();
+            handler.selectForWrite();
         }
 
     }
@@ -490,6 +609,9 @@ public class TestSpindleCluster {
         }
     }
 
+    private static final Node                        PRODUCER_NODE    = new Node(
+                                                                                 666);
+
     private static final Logger                      log              = Logger.getLogger(TestSpindleCluster.class.getCanonicalName());
     private static final int                         MAX_SEGMENT_SIZE = 1024 * 1024;
     private static int                               testPort1;
@@ -529,6 +651,8 @@ public class TestSpindleCluster {
     private MersenneTwister                          twister          = new MersenneTwister(
                                                                                             666);
     private List<Weaver>                             weavers;
+
+    private ChannelHandler                           producerHandler;
 
     @Before
     public void startUp() throws Exception {
@@ -628,6 +752,9 @@ public class TestSpindleCluster {
 
     @After
     public void tearDown() throws Exception {
+        if (producerHandler != null) {
+            producerHandler.terminate();
+        }
         if (controllerContext != null) {
             try {
                 controllerContext.close();
@@ -788,7 +915,13 @@ public class TestSpindleCluster {
      */
     @Test
     public void testReplication() throws Exception {
-
+        producerHandler = new ChannelHandler(
+                                             "Producer handler",
+                                             new SocketOptions(),
+                                             Executors.newFixedThreadPool(majorPartitionId.size()));
+        producerHandler.start();
+        int batches = 10000;
+        int batchSize = 10;
         bootstrap();
 
         ArrayList<UUID> channels = openChannels();
@@ -801,9 +934,25 @@ public class TestSpindleCluster {
 
         assertChannelMappings(channels, weavers, ring);
 
+        CountDownLatch producerLatch = new CountDownLatch(
+                                                          fullPartitionId.size());
+        Map<Node, List<UUID>> channelMap = new HashMap<Node, List<UUID>>();
         for (UUID channel : channels) {
-            createSegments(ring, channel);
+            Node node = ring.hash(point(channel));
+            assertNotNull(node);
+            List<UUID> list = channelMap.get(node);
+            if (list == null) {
+                list = new ArrayList<UUID>();
+                channelMap.put(node, list);
+            }
+            list.add(channel);
         }
+        for (Map.Entry<Node, List<UUID>> entry : channelMap.entrySet()) {
+            createSegments(producerLatch, ring, entry.getKey(),
+                           entry.getValue(), batches, batchSize);
+        }
+        assertTrue("Events not published",
+                   producerLatch.await(240, TimeUnit.SECONDS));
 
         asymmetricallyPartition();
 
@@ -1115,6 +1264,20 @@ public class TestSpindleCluster {
         }
     }
 
+    protected void createSegments(CountDownLatch latch,
+                                  ConsistentHashFunction<Node> ring,
+                                  Node target, List<UUID> channels,
+                                  int batches, int batchSize)
+                                                             throws IOException,
+                                                             InterruptedException {
+        Producer producer = new Producer(channels, latch, batches, batchSize);
+        Weaver weaver = weavers.get(target.processId - 1);
+        assertEquals(target, weaver.getId());
+        log.info(String.format("Creating producer for %s", weaver.getId()));
+        producerHandler.connectTo(weaver.getContactInformation().spindle,
+                                  producer);
+    }
+
     protected CountDownLatch latch(List<ControlNode> group) {
         CountDownLatch latch = new CountDownLatch(group.size());
         for (ControlNode member : group) {
@@ -1122,53 +1285,5 @@ public class TestSpindleCluster {
             member.cardinality = group.size();
         }
         return latch;
-    }
-
-    protected void createSegments(ConsistentHashFunction<Node> ring,
-                                  UUID channel) throws IOException {
-        Node node = ring.hash(point(channel));
-        assertNotNull(node);
-        Weaver weaver = weavers.get(node.processId - 1);
-        assertEquals(node, weaver.getId());
-        log.info(String.format("Creating segments for %s on %s", channel,
-                               weaver.getId()));
-        SocketOptions options = new SocketOptions();
-        SocketChannel outbound = SocketChannel.open();
-        options.setTimeout(1000);
-        options.configure(outbound.socket());
-        outbound.configureBlocking(true);
-        outbound.connect(weaver.getContactInformation().spindle);
-        ByteBuffer buffer = ByteBuffer.allocate(Spindle.HANDSHAKE_SIZE);
-        buffer.putInt(Spindle.MAGIC);
-        PRODUCER_NODE.serialize(buffer);
-        buffer.flip();
-        outbound.write(buffer);
-        byte[] payload = payloadFor(channel);
-        ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        Event event = new Event(MAGIC, payloadBuffer);
-        int batchSize = 10;
-        int batchLength = batchSize * event.totalSize();
-        int totalSize = 1024 * 16;
-        long timestamp = 0;
-        for (int i = 0; i < totalSize; i += batchLength) {
-            BatchHeader header = new BatchHeader(PRODUCER_NODE, batchLength,
-                                                 BatchHeader.MAGIC, channel,
-                                                 timestamp);
-            timestamp += batchSize;
-            header.rewind();
-            header.write(outbound);
-            for (int j = 0; j < batchSize; j++) {
-                event.rewind();
-                event.write(outbound);
-            }
-        }
-        // ByteBuffer ackBuffer = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
-        // outbound.read(ackBuffer);
-        // outbound.close();
-    }
-
-    private byte[] payloadFor(UUID channel) {
-        return String.format("%s Give me Slack, or give me Food, or Kill me %s",
-                             channel, channel).getBytes();
     }
 }
