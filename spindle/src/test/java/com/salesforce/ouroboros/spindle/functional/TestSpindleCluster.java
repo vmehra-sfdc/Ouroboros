@@ -25,13 +25,13 @@
  */
 package com.salesforce.ouroboros.spindle.functional;
 
-import static com.salesforce.ouroboros.spindle.Util.waitFor;
 import static com.salesforce.ouroboros.util.Utils.point;
 import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
+import static com.salesforce.ouroboros.testUtils.Util.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -91,10 +91,10 @@ import com.salesforce.ouroboros.spindle.Coordinator;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.spindle.EventChannel;
-import com.salesforce.ouroboros.spindle.Util.Condition;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverConfigation;
 import com.salesforce.ouroboros.spindle.source.Spindle;
+import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
 import com.salesforce.ouroboros.util.Utils;

@@ -72,6 +72,7 @@ import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.ProducerConfiguration;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverConfigation;
+import com.salesforce.ouroboros.testUtils.Util;
 import com.salesforce.ouroboros.util.Utils;
 
 /**

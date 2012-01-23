@@ -24,7 +24,28 @@
 		</dependency>
 		<dependency>
 			<groupId>com.salesforce.ouroboros</groupId>
+			<artifactId>common</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.salesforce.ouroboros</groupId>
 			<artifactId>producer</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+			<type>jar</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.salesforce.ouroboros</groupId>
+			<artifactId>producer</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.salesforce.ouroboros</groupId>
+			<artifactId>spindle</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 			<type>jar</type>
 			<scope>test</scope>
@@ -33,7 +54,7 @@
 			<groupId>com.salesforce.ouroboros</groupId>
 			<artifactId>spindle</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
-			<type>jar</type>
+			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

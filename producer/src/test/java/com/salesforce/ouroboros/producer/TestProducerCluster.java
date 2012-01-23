@@ -25,7 +25,7 @@
  */
 package com.salesforce.ouroboros.producer;
 
-import static com.salesforce.ouroboros.producer.Util.waitFor;
+import static com.salesforce.ouroboros.testUtils.Util.waitFor;
 import static com.salesforce.ouroboros.util.Utils.point;
 import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertFalse;
@@ -84,7 +84,7 @@ import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.producer.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM;
-import com.salesforce.ouroboros.producer.Util.Condition;
+import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
 

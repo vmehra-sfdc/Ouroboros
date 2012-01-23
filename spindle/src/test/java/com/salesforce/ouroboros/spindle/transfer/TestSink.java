@@ -55,9 +55,9 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
-import com.salesforce.ouroboros.spindle.Util;
 import com.salesforce.ouroboros.spindle.transfer.SinkContext.SinkFSM;
 import com.salesforce.ouroboros.spindle.transfer.XeroxContext.XeroxFSM;
+import com.salesforce.ouroboros.testUtils.Util;
 import com.salesforce.ouroboros.util.Rendezvous;
 
 /**

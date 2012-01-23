@@ -66,6 +66,7 @@ import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
+import com.salesforce.ouroboros.testUtils.Util;
 
 /**
  * 

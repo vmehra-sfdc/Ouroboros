@@ -63,12 +63,13 @@ import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
-import com.salesforce.ouroboros.partition.Util.Condition;
 import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
+import com.salesforce.ouroboros.testUtils.Util;
+import com.salesforce.ouroboros.testUtils.Util.Condition;
 
 /**
  * 

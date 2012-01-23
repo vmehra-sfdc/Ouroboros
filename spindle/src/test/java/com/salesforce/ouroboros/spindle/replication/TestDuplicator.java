@@ -51,10 +51,10 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
-import com.salesforce.ouroboros.spindle.Util;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorFSM;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
+import com.salesforce.ouroboros.testUtils.Util;
 
 /**
  * 
