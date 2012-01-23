@@ -920,7 +920,7 @@ public class TestSpindleCluster {
                                              new SocketOptions(),
                                              Executors.newFixedThreadPool(majorPartitionId.size()));
         producerHandler.start();
-        int batches = 10000;
+        int batches = 5000;
         int batchSize = 10;
         bootstrap();
 
