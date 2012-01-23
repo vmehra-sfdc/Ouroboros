@@ -35,13 +35,11 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.After;
 import org.junit.Test;
@@ -51,14 +49,12 @@ import org.mockito.stubbing.Answer;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
-import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
-import com.salesforce.ouroboros.BatchHeader;
-import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
+import com.salesforce.ouroboros.spindle.functional.util.Producer;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
@@ -205,8 +201,8 @@ public class TestTransfer {
         when(mirrorBundle.getAcknowledger(isA(Node.class))).thenReturn(ack);
 
         CountDownLatch producerLatch = new CountDownLatch(1);
-        Producer producer = new Producer(producerLatch, batches, batchSize,
-                                         producerNode);
+        Producer producer = new Producer(channelId, producerLatch, batches,
+                                         batchSize, producerNode);
         spindleHandler.connectTo(spindleHandler.getLocalAddress(), producer);
         assertTrue("Did not publish all events in given time",
                    producerLatch.await(120, TimeUnit.SECONDS));
@@ -319,122 +315,5 @@ public class TestTransfer {
                                           mirrorReplicator, socketOptions);
         spindleHandler.start();
         replicatorHandler.start();
-    }
-
-    private class Producer implements CommunicationsHandler {
-        private final int            numberOfBatches;
-        private SocketChannelHandler handler;
-        private final AtomicInteger  batches   = new AtomicInteger();
-        private final ByteBuffer     batch;
-        private final AtomicInteger  timestamp = new AtomicInteger(0);
-        private BatchHeader          currentHeader;
-        private final Node           node;
-        private final int            batchLength;
-        private final CountDownLatch latch;
-
-        private Producer(CountDownLatch latch, int batches, int batchSize,
-                         Node node) {
-            this.latch = latch;
-            this.node = node;
-            this.numberOfBatches = batches;
-            Event event = event();
-            batchLength = batchSize * event.totalSize();
-            batch = ByteBuffer.allocate(batchLength);
-            for (int i = 0; i < batchSize; i++) {
-                event.rewind();
-                batch.put(event.getBytes());
-            }
-        }
-
-        private void nextBatch() {
-            int batchNumber = batches.get();
-            if (batchNumber == numberOfBatches) {
-                System.out.println();
-                latch.countDown();
-                return;
-            }
-            if (batchNumber % 100 == 0) {
-                System.out.println();
-                System.out.print(Integer.toString(batchNumber));
-            }
-            if (batchNumber % 10 == 0) {
-                System.out.print('.');
-            }
-            batches.incrementAndGet();
-            currentHeader = new BatchHeader(node, batchLength,
-                                            BatchHeader.MAGIC, channelId,
-                                            timestamp.incrementAndGet());
-            batch.rewind();
-            handler.selectForWrite();
-        }
-
-        private Event event() {
-            byte[] payload = String.format("%s Give me Slack, or give me Food, or Kill me %s",
-                                           channelId, channelId).getBytes();
-            ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-            return new Event(666, payloadBuffer);
-        }
-
-        @Override
-        public void closing() {
-        }
-
-        @Override
-        public void accept(SocketChannelHandler handler) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void connect(SocketChannelHandler handler) {
-            this.handler = handler;
-            ByteBuffer buffer = ByteBuffer.allocate(Spindle.HANDSHAKE_SIZE);
-            buffer.putInt(Spindle.MAGIC);
-            node.serialize(buffer);
-            buffer.flip();
-            try {
-                while (buffer.hasRemaining()) {
-                    handler.getChannel().write(buffer);
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                return;
-            }
-            nextBatch();
-        }
-
-        @Override
-        public void readReady() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void writeReady() {
-            if (currentHeader.hasRemaining()) {
-                try {
-                    if (currentHeader.write(handler.getChannel()) < 0) {
-                        handler.close();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    return;
-                }
-                if (currentHeader.hasRemaining()) {
-                    handler.selectForWrite();
-                    return;
-                }
-            }
-            try {
-                handler.getChannel().write(batch);
-            } catch (IOException e) {
-                e.printStackTrace();
-                return;
-            }
-            if (batch.hasRemaining()) {
-                handler.selectForWrite();
-            } else {
-                nextBatch();
-            }
-        }
-
     }
 }

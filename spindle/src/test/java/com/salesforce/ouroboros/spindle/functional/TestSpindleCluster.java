@@ -25,75 +25,56 @@
  */
 package com.salesforce.ouroboros.spindle.functional;
 
+import static com.salesforce.ouroboros.testUtils.Util.waitFor;
 import static com.salesforce.ouroboros.util.Utils.point;
-import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
-import static com.salesforce.ouroboros.testUtils.Util.*;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Timer;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.smartfrog.services.anubis.locator.AnubisLocator;
-import org.smartfrog.services.anubis.partition.test.controller.Controller;
-import org.smartfrog.services.anubis.partition.test.controller.NodeData;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.BitView;
-import org.smartfrog.services.anubis.partition.views.View;
-import org.smartfrog.services.anubis.partition.wire.msg.Heartbeat;
-import org.smartfrog.services.anubis.partition.wire.security.WireSecurity;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
-import com.fasterxml.uuid.Generators;
-import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
-import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.hellblazer.pinkie.ChannelHandler;
-import com.hellblazer.pinkie.CommunicationsHandler;
-import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
-import com.salesforce.ouroboros.BatchHeader;
-import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.Message;
-import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.partition.Switchboard.Member;
-import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
-import com.salesforce.ouroboros.partition.messages.ChannelMessage;
-import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
-import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.spindle.Coordinator;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Weaver;
-import com.salesforce.ouroboros.spindle.WeaverConfigation;
-import com.salesforce.ouroboros.spindle.source.Spindle;
+import com.salesforce.ouroboros.spindle.functional.util.ClusterMaster;
+import com.salesforce.ouroboros.spindle.functional.util.ClusterMasterCfg;
+import com.salesforce.ouroboros.spindle.functional.util.ControlNode;
+import com.salesforce.ouroboros.spindle.functional.util.MyController;
+import com.salesforce.ouroboros.spindle.functional.util.MyControllerConfig;
+import com.salesforce.ouroboros.spindle.functional.util.Producer;
+import com.salesforce.ouroboros.spindle.functional.util.nodeCfg;
+import com.salesforce.ouroboros.spindle.functional.util.w1;
+import com.salesforce.ouroboros.spindle.functional.util.w10;
+import com.salesforce.ouroboros.spindle.functional.util.w2;
+import com.salesforce.ouroboros.spindle.functional.util.w3;
+import com.salesforce.ouroboros.spindle.functional.util.w4;
+import com.salesforce.ouroboros.spindle.functional.util.w5;
+import com.salesforce.ouroboros.spindle.functional.util.w6;
+import com.salesforce.ouroboros.spindle.functional.util.w7;
+import com.salesforce.ouroboros.spindle.functional.util.w8;
+import com.salesforce.ouroboros.spindle.functional.util.w9;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
@@ -105,532 +86,16 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class TestSpindleCluster {
-    public static class ControlNode extends NodeData {
-        int            cardinality;
-        CountDownLatch latch;
+    private static final Node                        PRODUCER_NODE = new Node(
+                                                                              666);
 
-        public ControlNode(Heartbeat hb, Controller controller) {
-            super(hb, controller);
-        }
-
-        @Override
-        protected void partitionNotification(View partition, int leader) {
-            log.finest("Partition notification: " + partition);
-            super.partitionNotification(partition, leader);
-            if (partition.isStable() && partition.cardinality() == cardinality) {
-                latch.countDown();
-            }
-        }
-    }
-
-    public static class MyController extends Controller {
-        int            cardinality;
-        CountDownLatch latch;
-
-        public MyController(Timer timer, long checkPeriod, long expirePeriod,
-                            Identity partitionIdentity, long heartbeatTimeout,
-                            long heartbeatInterval,
-                            SocketOptions socketOptions,
-                            Executor dispatchExecutor, WireSecurity wireSecurity)
-                                                                                 throws IOException {
-            super(timer, checkPeriod, expirePeriod, partitionIdentity,
-                  heartbeatTimeout, heartbeatInterval, socketOptions,
-                  dispatchExecutor, wireSecurity);
-        }
-
-        @Override
-        protected NodeData createNode(Heartbeat hb) {
-            ControlNode node = new ControlNode(hb, this);
-            node.cardinality = cardinality;
-            node.latch = latch;
-            return node;
-        }
-
-    }
-
-    private static class ClusterMaster implements Member {
-        CountDownLatch    openLatch;
-        final Switchboard switchboard;
-
-        public ClusterMaster(Switchboard switchboard) {
-            this.switchboard = switchboard;
-            switchboard.setMember(this);
-        }
-
-        @Override
-        public void advertise() {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             DiscoveryMessage.ADVERTISE_NOOP));
-        }
-
-        @Override
-        public void becomeInactive() {
-        }
-
-        @Override
-        public void destabilize() {
-        }
-
-        @Override
-        public void dispatch(BootstrapMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void dispatch(ChannelMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-            if (openLatch == null) {
-                return;
-            }
-            switch (type) {
-                case PRIMARY_OPENED:
-                case MIRROR_OPENED:
-                    openLatch.countDown();
-                    break;
-                default:
-            }
-        }
-
-        @Override
-        public void dispatch(DiscoveryMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void dispatch(FailoverMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void dispatch(WeaverRebalanceMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        public boolean open(UUID channel, long timeout, TimeUnit unit)
-                                                                      throws InterruptedException {
-            openLatch = new CountDownLatch(2);
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             ChannelMessage.OPEN,
-                                             new Serializable[] { channel }));
-            return openLatch.await(timeout, unit);
-        }
-
-        @Override
-        public void stabilized() {
-        }
-
-    }
-
-    private class Producer implements CommunicationsHandler {
-        private final int            numberOfBatches;
-        private SocketChannelHandler handler;
-        private final AtomicInteger  batches        = new AtomicInteger();
-        private volatile ByteBuffer  batch;
-        private final AtomicInteger  timestamp      = new AtomicInteger(0);
-        private volatile BatchHeader currentHeader;
-        private final CountDownLatch latch;
-        private final List<UUID>     channelIds;
-        private final AtomicInteger  currentChannel = new AtomicInteger();
-        private final int            batchSize;
-
-        private Producer(List<UUID> channelIds, CountDownLatch latch,
-                         int batches, int batchSize) {
-            this.channelIds = channelIds;
-            this.latch = latch;
-            this.numberOfBatches = batches;
-            this.batchSize = batchSize;
-        }
-
-        @Override
-        public void accept(SocketChannelHandler handler) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void closing() {
-        }
-
-        @Override
-        public void connect(SocketChannelHandler handler) {
-            this.handler = handler;
-            ByteBuffer buffer = ByteBuffer.allocate(Spindle.HANDSHAKE_SIZE);
-            buffer.putInt(Spindle.MAGIC);
-            PRODUCER_NODE.serialize(buffer);
-            buffer.flip();
-            try {
-                while (buffer.hasRemaining()) {
-                    handler.getChannel().write(buffer);
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                return;
-            }
-            nextBatch();
-        }
-
-        @Override
-        public void readReady() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void writeReady() {
-            if (currentHeader.hasRemaining()) {
-                try {
-                    if (currentHeader.write(handler.getChannel()) < 0) {
-                        handler.close();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    return;
-                }
-                if (currentHeader.hasRemaining()) {
-                    handler.selectForWrite();
-                    return;
-                }
-            }
-            try {
-                handler.getChannel().write(batch);
-            } catch (IOException e) {
-                e.printStackTrace();
-                return;
-            }
-            if (batch.hasRemaining()) {
-                handler.selectForWrite();
-            } else {
-                nextBatch();
-            }
-        }
-
-        private Event event(UUID channelId) {
-            byte[] payload = String.format("%s Give me Slack, or give me Food, or Kill me %s",
-                                           channelId, channelId).getBytes();
-            ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-            return new Event(666, payloadBuffer);
-        }
-
-        private void nextBatch() {
-            int batchNumber = batches.get();
-            if (batchNumber == numberOfBatches) {
-                System.out.println("Events published");
-                latch.countDown();
-                return;
-            }
-            int channel = currentChannel.get();
-            if (currentChannel.incrementAndGet() == channelIds.size()) {
-                currentChannel.set(0);
-                batches.incrementAndGet();
-            }
-            UUID channelId = channelIds.get(channel);
-            Event event = event(channelId);
-            int batchLength = batchSize * event.totalSize();
-            batch = ByteBuffer.allocate(batchLength);
-            for (int i = 0; i < batchSize; i++) {
-                event.rewind();
-                batch.put(event.getBytes());
-            }
-            currentHeader = new BatchHeader(PRODUCER_NODE, batchLength,
-                                            BatchHeader.MAGIC, channelId,
-                                            timestamp.incrementAndGet());
-            batch.rewind();
-            handler.selectForWrite();
-        }
-
-    }
-
-    @Configuration
-    static class ClusterMasterCfg extends GossipConfiguration {
-        @Bean
-        public ClusterMaster clusterMaster() {
-            return new ClusterMaster(switchboard());
-        }
-
-        @Override
-        public int getMagic() {
-            try {
-                return Identity.getMagicFromLocalIpAddress();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        @Override
-        @Bean
-        public AnubisLocator locator() {
-            return null;
-        }
-
-        @Bean
-        public Node memberNode() {
-            return new Node(node(), node(), node());
-        }
-
-        @Override
-        public int node() {
-            return 0;
-        }
-
-        @Bean
-        public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(
-                                                      memberNode(),
-                                                      partition(),
-                                                      Generators.timeBasedGenerator());
-            return switchboard;
-        }
-
-        @Bean
-        public ScheduledExecutorService timer() {
-            return Executors.newSingleThreadScheduledExecutor();
-        }
-
-        @Override
-        protected Collection<InetSocketAddress> seedHosts()
-                                                           throws UnknownHostException {
-            return asList(seedContact1(), seedContact2());
-        }
-
-        InetSocketAddress seedContact1() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort1);
-        }
-
-        InetSocketAddress seedContact2() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort2);
-        }
-    }
-
-    @Configuration
-    static class MyControllerConfig extends ControllerGossipConfiguration {
-
-        @Override
-        public int magic() {
-            try {
-                return Identity.getMagicFromLocalIpAddress();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        @Override
-        protected Controller constructController() throws IOException {
-            return new MyController(timer(), 1000, 300000, partitionIdentity(),
-                                    heartbeatTimeout(), heartbeatInterval(),
-                                    socketOptions(), dispatchExecutor(),
-                                    wireSecurity());
-        }
-
-        @Override
-        protected Collection<InetSocketAddress> seedHosts()
-                                                           throws UnknownHostException {
-            return asList(seedContact1(), seedContact2());
-        }
-
-        InetSocketAddress seedContact1() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort1);
-        }
-
-        InetSocketAddress seedContact2() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort2);
-        }
-    }
-
-    static class nodeCfg extends GossipConfiguration {
-
-        private final File directory;
-
-        public nodeCfg() {
-            try {
-                directory = File.createTempFile("CoordinatorIntegration-",
-                                                ".root");
-            } catch (IOException e) {
-                throw new IllegalStateException();
-            }
-            directory.delete();
-            directory.mkdirs();
-            directory.deleteOnExit();
-        }
-
-        @Bean
-        public Coordinator coordinator() throws IOException {
-            return new Coordinator(timer(), switchboard(), weaver());
-        }
-
-        @Override
-        public int getMagic() {
-            try {
-                return Identity.getMagicFromLocalIpAddress();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        @Override
-        @Bean
-        public AnubisLocator locator() {
-            return null;
-        }
-
-        @Bean
-        public Node memberNode() {
-            return new Node(node(), node(), node());
-        }
-
-        @Bean
-        public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(
-                                                      memberNode(),
-                                                      partition(),
-                                                      Generators.timeBasedGenerator());
-            return switchboard;
-        }
-
-        @Bean
-        public ScheduledExecutorService timer() {
-            return Executors.newSingleThreadScheduledExecutor();
-        }
-
-        @Bean
-        public Weaver weaver() throws IOException {
-            return new Weaver(weaverConfiguration());
-        }
-
-        private WeaverConfigation weaverConfiguration() throws IOException {
-            WeaverConfigation weaverConfigation = new WeaverConfigation();
-            weaverConfigation.setId(memberNode());
-            weaverConfigation.addRoot(directory);
-            weaverConfigation.setMaxSegmentSize(MAX_SEGMENT_SIZE);
-            return weaverConfigation;
-        }
-
-        @Override
-        protected Collection<InetSocketAddress> seedHosts()
-                                                           throws UnknownHostException {
-            return asList(seedContact1(), seedContact2());
-        }
-
-        InetSocketAddress seedContact1() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort1);
-        }
-
-        InetSocketAddress seedContact2() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort2);
-        }
-    }
-
-    @Configuration
-    static class w1 extends nodeCfg {
-        @Override
-        public int node() {
-            return 1;
-        }
-
-        @Override
-        protected InetSocketAddress gossipEndpoint()
-                                                    throws UnknownHostException {
-            return seedContact1();
-        }
-    }
-
-    @Configuration
-    static class w10 extends nodeCfg {
-        @Override
-        public int node() {
-            return 10;
-        }
-
-        @Override
-        protected InetSocketAddress gossipEndpoint()
-                                                    throws UnknownHostException {
-            return seedContact2();
-        }
-    }
-
-    @Configuration
-    static class w2 extends nodeCfg {
-        @Override
-        public int node() {
-            return 2;
-        }
-    }
-
-    @Configuration
-    static class w3 extends nodeCfg {
-        @Override
-        public int node() {
-            return 3;
-        }
-    }
-
-    @Configuration
-    static class w4 extends nodeCfg {
-        @Override
-        public int node() {
-            return 4;
-        }
-    }
-
-    @Configuration
-    static class w5 extends nodeCfg {
-        @Override
-        public int node() {
-            return 5;
-        }
-    }
-
-    @Configuration
-    static class w6 extends nodeCfg {
-        @Override
-        public int node() {
-            return 6;
-        }
-    }
-
-    @Configuration
-    static class w7 extends nodeCfg {
-        @Override
-        public int node() {
-            return 7;
-        }
-    }
-
-    @Configuration
-    static class w8 extends nodeCfg {
-        @Override
-        public int node() {
-            return 8;
-        }
-    }
-
-    @Configuration
-    static class w9 extends nodeCfg {
-        @Override
-        public int node() {
-            return 9;
-        }
-    }
-
-    private static final Node                        PRODUCER_NODE    = new Node(
-                                                                                 666);
-
-    private static final Logger                      log              = Logger.getLogger(TestSpindleCluster.class.getCanonicalName());
-    private static final int                         MAX_SEGMENT_SIZE = 1024 * 1024;
-    private static int                               testPort1;
-    private static int                               testPort2;
-
-    static {
-        String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
-                                         "24506");
-        testPort1 = Integer.parseInt(port);
-        port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
-                                  "24320");
-        testPort2 = Integer.parseInt(port);
-    }
+    static final Logger                              log           = Logger.getLogger(TestSpindleCluster.class.getCanonicalName());
 
     private ClusterMaster                            clusterMaster;
     private AnnotationConfigApplicationContext       clusterMasterContext;
-    private final Class<?>[]                         configs          = new Class[] {
+    private final Class<?>[]                         configs       = new Class[] {
             w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
-            w7.class, w8.class, w9.class, w10.class                  };
+            w7.class, w8.class, w9.class, w10.class               };
     private MyController                             controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<Coordinator>                        coordinators;
@@ -648,16 +113,16 @@ public class TestSpindleCluster {
     private List<Node>                               minorPartitionId;
     private BitView                                  minorView;
     private List<Weaver>                             minorWeavers;
-    private MersenneTwister                          twister          = new MersenneTwister(
-                                                                                            666);
+    private MersenneTwister                          twister       = new MersenneTwister(
+                                                                                         666);
     private List<Weaver>                             weavers;
 
     private ChannelHandler                           producerHandler;
 
     @Before
     public void startUp() throws Exception {
-        testPort1++;
-        testPort2++;
+        nodeCfg.testPort1++;
+        nodeCfg.testPort2++;
         log.info("Setting up initial partition");
         CountDownLatch initialLatch = new CountDownLatch(configs.length + 1);
         controllerContext = new AnnotationConfigApplicationContext(
@@ -1270,7 +735,8 @@ public class TestSpindleCluster {
                                   int batches, int batchSize)
                                                              throws IOException,
                                                              InterruptedException {
-        Producer producer = new Producer(channels, latch, batches, batchSize);
+        Producer producer = new Producer(channels, latch, batches, batchSize,
+                                         PRODUCER_NODE);
         Weaver weaver = weavers.get(target.processId - 1);
         assertEquals(target, weaver.getId());
         log.info(String.format("Creating producer for %s", weaver.getId()));
