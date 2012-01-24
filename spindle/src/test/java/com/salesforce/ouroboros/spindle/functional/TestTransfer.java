@@ -95,7 +95,7 @@ public class TestTransfer {
                                               new InetSocketAddress(
                                                                     "127.0.0.1",
                                                                     0),
-                                              Executors.newCachedThreadPool(),
+                                              Executors.newFixedThreadPool(10),
                                               new CommunicationsHandlerFactory() {
                                                   @Override
                                                   public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
