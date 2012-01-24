@@ -380,10 +380,9 @@ public class TestSpindleCluster {
      */
     @Test
     public void testReplication() throws Exception {
-        producerHandler = new ChannelHandler(
-                                             "Producer handler",
+        producerHandler = new ChannelHandler("Producer handler",
                                              new SocketOptions(),
-                                             Executors.newFixedThreadPool(majorPartitionId.size()));
+                                             Executors.newCachedThreadPool());
         producerHandler.start();
         int batches = 2500;
         int batchSize = 10;

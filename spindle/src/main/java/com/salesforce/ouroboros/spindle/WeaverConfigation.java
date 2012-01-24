@@ -29,7 +29,7 @@ import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -73,24 +73,21 @@ public class WeaverConfigation {
                                                                                              0);
     private int                       replicationQueueSize           = DEFAULT_REPLICATION_QUEUE_SIZE;
     private final SocketOptions       replicationSocketOptions       = new SocketOptions();
-    private Executor                  replicators                    = Executors.newFixedThreadPool(10,
-                                                                                                    new LabeledThreadFactory(
-                                                                                                                             REPLICATOR));
+    private ExecutorService           replicators                    = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                              REPLICATOR));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
     private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
-    private Executor                  spindles                       = Executors.newFixedThreadPool(3,
-                                                                                                    new LabeledThreadFactory(
-                                                                                                                             SPINDLE));
+    private ExecutorService           spindles                       = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                              SPINDLE));
     private final SocketOptions       spindleSocketOptions           = new SocketOptions();
     private String                    stateName                      = DEFAULT_STATE_NAME;
     private InetSocketAddress         xeroxAddress                   = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
-    private Executor                  xeroxes                        = Executors.newFixedThreadPool(3,
-                                                                                                    new LabeledThreadFactory(
-                                                                                                                             XEROX));
+    private ExecutorService           xeroxes                        = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                              XEROX));
     private final SocketOptions       xeroxSocketOptions             = new SocketOptions();
 
     public void addRoot(File directory) {
@@ -153,7 +150,7 @@ public class WeaverConfigation {
     /**
      * @return the replicators
      */
-    public Executor getReplicators() {
+    public ExecutorService getReplicators() {
         return replicators;
     }
 
@@ -174,7 +171,7 @@ public class WeaverConfigation {
     /**
      * @return the spindles
      */
-    public Executor getSpindles() {
+    public ExecutorService getSpindles() {
         return spindles;
     }
 
@@ -202,7 +199,7 @@ public class WeaverConfigation {
     /**
      * @return the xeroxes
      */
-    public Executor getXeroxes() {
+    public ExecutorService getXeroxes() {
         return xeroxes;
     }
 
@@ -265,7 +262,7 @@ public class WeaverConfigation {
      * @param replicators
      *            the replicators to set
      */
-    public void setReplicators(Executor replicators) {
+    public void setReplicators(ExecutorService replicators) {
         this.replicators = replicators;
     }
 
@@ -281,7 +278,7 @@ public class WeaverConfigation {
      * @param spindles
      *            the spindles to set
      */
-    public void setSpindles(Executor spindles) {
+    public void setSpindles(ExecutorService spindles) {
         this.spindles = spindles;
     }
 
@@ -305,7 +302,7 @@ public class WeaverConfigation {
      * @param xeroxes
      *            the xeroxes to set
      */
-    public void setXeroxes(Executor xeroxes) {
+    public void setXeroxes(ExecutorService xeroxes) {
         this.xeroxes = xeroxes;
     }
 

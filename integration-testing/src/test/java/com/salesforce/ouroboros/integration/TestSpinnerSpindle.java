@@ -40,7 +40,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.UUID;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -118,7 +118,7 @@ public class TestSpinnerSpindle {
                 return spindle;
             }
         };
-        Executor spindleExec = Executors.newSingleThreadExecutor();
+        ExecutorService spindleExec = Executors.newSingleThreadExecutor();
         SocketOptions spindleSocketOptions = new SocketOptions();
         ServerSocketChannelHandler spindleHandler = new ServerSocketChannelHandler(
                                                                                    "Spindle Handler",
@@ -131,7 +131,7 @@ public class TestSpinnerSpindle {
         spindleHandler.start();
         InetSocketAddress spindleAddress = spindleHandler.getLocalAddress();
 
-        Executor spinnerExec = Executors.newSingleThreadExecutor();
+        ExecutorService spinnerExec = Executors.newSingleThreadExecutor();
         SocketOptions spinnerSocketOptions = new SocketOptions();
         ChannelHandler spinnerHandler = new ChannelHandler(
                                                            "Spinner Handler",

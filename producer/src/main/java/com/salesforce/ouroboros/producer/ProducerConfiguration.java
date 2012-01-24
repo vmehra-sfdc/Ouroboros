@@ -25,7 +25,7 @@
  */
 package com.salesforce.ouroboros.producer;
 
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.hellblazer.pinkie.SocketOptions;
@@ -44,8 +44,8 @@ public class ProducerConfiguration {
     private int                 retryLimit                   = 10;
     private int                 sampleFrequency              = 10;
     private int                 sampleWindowSize             = 1000;
-    private Executor            spinners                     = Executors.newSingleThreadExecutor(new LabeledThreadFactory(
-                                                                                                                          "Spinner"));
+    private ExecutorService     spinners                     = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                      "Spinner"));
     private final SocketOptions spinnerSocketOptions         = new SocketOptions();
     private double              targetEventRate              = 1000.0;
     private int                 tokenLimit                   = 1000;
@@ -96,7 +96,7 @@ public class ProducerConfiguration {
     /**
      * @return the spinners
      */
-    public Executor getSpinners() {
+    public ExecutorService getSpinners() {
         return spinners;
     }
 
@@ -173,7 +173,7 @@ public class ProducerConfiguration {
      * @param spinners
      *            the spinners to set
      */
-    public void setSpinners(Executor spinners) {
+    public void setSpinners(ExecutorService spinners) {
         this.spinners = spinners;
     }
 

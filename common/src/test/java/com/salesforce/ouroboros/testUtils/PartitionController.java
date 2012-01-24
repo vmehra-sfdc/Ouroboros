@@ -3,7 +3,7 @@ package com.salesforce.ouroboros.testUtils;
 import java.io.IOException;
 import java.util.Timer;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 
 import org.smartfrog.services.anubis.partition.test.controller.Controller;
 import org.smartfrog.services.anubis.partition.test.controller.NodeData;
@@ -17,11 +17,12 @@ public class PartitionController extends Controller {
     public int            cardinality;
     public CountDownLatch latch;
 
-    public PartitionController(Timer timer, long checkPeriod, long expirePeriod,
-                        Identity partitionIdentity, long heartbeatTimeout,
-                        long heartbeatInterval, SocketOptions socketOptions,
-                        Executor dispatchExecutor, WireSecurity wireSecurity)
-                                                                             throws IOException {
+    public PartitionController(Timer timer, long checkPeriod,
+                               long expirePeriod, Identity partitionIdentity,
+                               long heartbeatTimeout, long heartbeatInterval,
+                               SocketOptions socketOptions,
+                               ExecutorService dispatchExecutor,
+                               WireSecurity wireSecurity) throws IOException {
         super(timer, checkPeriod, expirePeriod, partitionIdentity,
               heartbeatTimeout, heartbeatInterval, socketOptions,
               dispatchExecutor, wireSecurity);
