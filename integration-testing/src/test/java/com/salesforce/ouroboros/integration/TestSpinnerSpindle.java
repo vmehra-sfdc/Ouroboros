@@ -118,7 +118,7 @@ public class TestSpinnerSpindle {
                 return spindle;
             }
         };
-        ExecutorService spindleExec = Executors.newSingleThreadExecutor();
+        ExecutorService spindleExec = Executors.newCachedThreadPool();
         SocketOptions spindleSocketOptions = new SocketOptions();
         ServerSocketChannelHandler spindleHandler = new ServerSocketChannelHandler(
                                                                                    "Spindle Handler",
@@ -131,7 +131,7 @@ public class TestSpinnerSpindle {
         spindleHandler.start();
         InetSocketAddress spindleAddress = spindleHandler.getLocalAddress();
 
-        ExecutorService spinnerExec = Executors.newSingleThreadExecutor();
+        ExecutorService spinnerExec = Executors.newCachedThreadPool();
         SocketOptions spinnerSocketOptions = new SocketOptions();
         ChannelHandler spinnerHandler = new ChannelHandler(
                                                            "Spinner Handler",
