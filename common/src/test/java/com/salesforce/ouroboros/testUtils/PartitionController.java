@@ -1,4 +1,4 @@
-package com.salesforce.ouroboros.spindle.functional.util;
+package com.salesforce.ouroboros.testUtils;
 
 import java.io.IOException;
 import java.util.Timer;
@@ -13,11 +13,11 @@ import org.smartfrog.services.anubis.partition.wire.security.WireSecurity;
 
 import com.hellblazer.pinkie.SocketOptions;
 
-public class MyController extends Controller {
+public class PartitionController extends Controller {
     public int            cardinality;
     public CountDownLatch latch;
 
-    public MyController(Timer timer, long checkPeriod, long expirePeriod,
+    public PartitionController(Timer timer, long checkPeriod, long expirePeriod,
                         Identity partitionIdentity, long heartbeatTimeout,
                         long heartbeatInterval, SocketOptions socketOptions,
                         Executor dispatchExecutor, WireSecurity wireSecurity)

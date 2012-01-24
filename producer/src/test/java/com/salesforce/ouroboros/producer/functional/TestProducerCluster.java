@@ -23,67 +23,52 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer;
+package com.salesforce.ouroboros.producer.functional;
 
 import static com.salesforce.ouroboros.testUtils.Util.waitFor;
 import static com.salesforce.ouroboros.util.Utils.point;
-import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
-import java.io.IOException;
-import java.io.Serializable;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.Timer;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.smartfrog.services.anubis.locator.AnubisLocator;
-import org.smartfrog.services.anubis.partition.test.controller.Controller;
-import org.smartfrog.services.anubis.partition.test.controller.NodeData;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.BitView;
-import org.smartfrog.services.anubis.partition.views.View;
-import org.smartfrog.services.anubis.partition.wire.msg.Heartbeat;
-import org.smartfrog.services.anubis.partition.wire.security.WireSecurity;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
-import com.fasterxml.uuid.Generators;
-import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
-import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
-import com.hellblazer.pinkie.SocketOptions;
-import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.api.producer.EventSource;
-import com.salesforce.ouroboros.partition.Message;
-import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.partition.Switchboard.Member;
-import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
-import com.salesforce.ouroboros.partition.messages.ChannelMessage;
-import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
-import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
+import com.salesforce.ouroboros.producer.Coordinator;
 import com.salesforce.ouroboros.producer.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM;
+import com.salesforce.ouroboros.producer.Producer;
+import com.salesforce.ouroboros.producer.functional.util.ClusterMaster;
+import com.salesforce.ouroboros.producer.functional.util.ClusterMasterCfg;
+import com.salesforce.ouroboros.producer.functional.util.MyControllerConfig;
+import com.salesforce.ouroboros.producer.functional.util.f1;
+import com.salesforce.ouroboros.producer.functional.util.f2;
+import com.salesforce.ouroboros.producer.functional.util.nodeCfg;
+import com.salesforce.ouroboros.producer.functional.util.w10;
+import com.salesforce.ouroboros.producer.functional.util.w11;
+import com.salesforce.ouroboros.producer.functional.util.w12;
+import com.salesforce.ouroboros.producer.functional.util.w3;
+import com.salesforce.ouroboros.producer.functional.util.w4;
+import com.salesforce.ouroboros.producer.functional.util.w5;
+import com.salesforce.ouroboros.producer.functional.util.w6;
+import com.salesforce.ouroboros.producer.functional.util.w7;
+import com.salesforce.ouroboros.producer.functional.util.w8;
+import com.salesforce.ouroboros.producer.functional.util.w9;
+import com.salesforce.ouroboros.testUtils.ControlNode;
+import com.salesforce.ouroboros.testUtils.PartitionController;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
@@ -95,600 +80,14 @@ import com.salesforce.ouroboros.util.MersenneTwister;
  */
 public class TestProducerCluster {
 
-    public static class ControlNode extends NodeData {
-        int            cardinality;
-        CountDownLatch latch;
-
-        public ControlNode(Heartbeat hb, Controller controller) {
-            super(hb, controller);
-        }
-
-        @Override
-        protected void partitionNotification(View partition, int leader) {
-            log.finest("Partition notification: " + partition);
-            super.partitionNotification(partition, leader);
-            if (partition.isStable() && partition.cardinality() == cardinality) {
-                latch.countDown();
-            }
-        }
-    }
-
-    public static class MyController extends Controller {
-        int            cardinality;
-        CountDownLatch latch;
-
-        public MyController(Timer timer, long checkPeriod, long expirePeriod,
-                            Identity partitionIdentity, long heartbeatTimeout,
-                            long heartbeatInterval,
-                            SocketOptions socketOptions,
-                            Executor dispatchExecutor, WireSecurity wireSecurity)
-                                                                                 throws IOException {
-            super(timer, checkPeriod, expirePeriod, partitionIdentity,
-                  heartbeatTimeout, heartbeatInterval, socketOptions,
-                  dispatchExecutor, wireSecurity);
-        }
-
-        @Override
-        protected NodeData createNode(Heartbeat hb) {
-            ControlNode node = new ControlNode(hb, this);
-            node.cardinality = cardinality;
-            node.latch = latch;
-            return node;
-        }
-
-    }
-
-    public static class Source implements EventSource {
-
-        @Override
-        public void assumePrimary(Map<UUID, Long> newPrimaries) {
-        }
-
-        @Override
-        public void closed(UUID channel) {
-        }
-
-        @Override
-        public void opened(UUID channel) {
-        }
-
-    }
-
-    private static class ClusterMaster implements Member {
-        Semaphore                      semaphore = new Semaphore(0);
-        final Switchboard              switchboard;
-        final ScheduledExecutorService timer     = Executors.newSingleThreadScheduledExecutor();
-
-        public ClusterMaster(Switchboard switchboard) {
-            this.switchboard = switchboard;
-            switchboard.setMember(this);
-        }
-
-        @Override
-        public void advertise() {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             DiscoveryMessage.ADVERTISE_NOOP));
-        }
-
-        @Override
-        public void becomeInactive() {
-        }
-
-        @Override
-        public void destabilize() {
-        }
-
-        @Override
-        public void dispatch(BootstrapMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-            switch (type) {
-                case BOOTSTRAP_SPINDLES:
-                    semaphore.release();
-                    break;
-                default:
-                    break;
-
-            }
-        }
-
-        @Override
-        public void dispatch(ChannelMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-            semaphore.release();
-        }
-
-        @Override
-        public void dispatch(DiscoveryMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void dispatch(FailoverMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void dispatch(WeaverRebalanceMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        public void failover() {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             FailoverMessage.FAILOVER));
-        }
-
-        public boolean mirrorOpened(UUID channel, long timeout, TimeUnit unit)
-                                                                              throws InterruptedException {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             ChannelMessage.MIRROR_OPENED,
-                                             new Serializable[] { channel }));
-            return acquire(timeout, unit).get();
-        }
-
-        public boolean open(UUID channel, long timeout, TimeUnit unit)
-                                                                      throws InterruptedException {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             ChannelMessage.OPEN,
-                                             new Serializable[] { channel }));
-            return acquire(timeout, unit).get();
-        }
-
-        public void prepare() {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             FailoverMessage.PREPARE));
-        }
-
-        public boolean primaryOpened(UUID channel, long timeout, TimeUnit unit)
-                                                                               throws InterruptedException {
-            switchboard.ringCast(new Message(switchboard.getId(),
-                                             ChannelMessage.PRIMARY_OPENED,
-                                             new Serializable[] { channel }));
-            return acquire(timeout, unit).get();
-        }
-
-        public boolean bootstrapSpindles(Node[] spindles, long timeout,
-                                         TimeUnit unit)
-                                                       throws InterruptedException {
-            switchboard.ringCast(new Message(
-                                             switchboard.getId(),
-                                             BootstrapMessage.BOOTSTRAP_SPINDLES,
-                                             (Serializable) spindles));
-            return acquire(timeout, unit).get();
-        }
-
-        @Override
-        public void stabilized() {
-        }
-
-        private AtomicBoolean acquire(long timeout, TimeUnit unit)
-                                                                  throws InterruptedException {
-            final AtomicBoolean acquired = new AtomicBoolean(true);
-            timer.schedule(new Runnable() {
-                @Override
-                public void run() {
-                    acquired.set(false);
-                    semaphore.release();
-                }
-            }, timeout, unit);
-            semaphore.acquire();
-            return acquired;
-        }
-
-    }
-
-    private static class FakeSpindle implements Member {
-        int               PORT = 55555;
-        final Switchboard switchboard;
-
-        public FakeSpindle(Switchboard switchboard) {
-            this.switchboard = switchboard;
-            switchboard.setMember(this);
-        }
-
-        @Override
-        public void advertise() {
-            ContactInformation info = new ContactInformation(
-                                                             new InetSocketAddress(
-                                                                                   "127.0.0.1",
-                                                                                   PORT++),
-                                                             null, null);
-            switchboard.ringCast(new Message(
-                                             switchboard.getId(),
-                                             DiscoveryMessage.ADVERTISE_CHANNEL_BUFFER,
-                                             info, true));
-        }
-
-        @Override
-        public void becomeInactive() {
-        }
-
-        @Override
-        public void destabilize() {
-        }
-
-        @Override
-        public void dispatch(BootstrapMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void dispatch(ChannelMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void dispatch(DiscoveryMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void dispatch(FailoverMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void dispatch(WeaverRebalanceMessage type, Node sender,
-                             Serializable[] arguments, long time) {
-        }
-
-        @Override
-        public void stabilized() {
-        }
-
-    }
-
-    @Configuration
-    static class ClusterMasterCfg extends GossipConfiguration {
-        @Bean
-        public ClusterMaster clusterMaster() {
-            return new ClusterMaster(switchboard());
-        }
-
-        @Override
-        public int getMagic() {
-            try {
-                return Identity.getMagicFromLocalIpAddress();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        @Override
-        @Bean
-        public AnubisLocator locator() {
-            return null;
-        }
-
-        @Bean
-        public Node memberNode() {
-            return new Node(node(), node(), node());
-        }
-
-        @Override
-        public int node() {
-            return 0;
-        }
-
-        @Bean
-        public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(
-                                                      memberNode(),
-                                                      partition(),
-                                                      Generators.timeBasedGenerator());
-            return switchboard;
-        }
-
-        @Bean
-        public ScheduledExecutorService timer() {
-            return Executors.newSingleThreadScheduledExecutor();
-        }
-
-        @Override
-        protected Collection<InetSocketAddress> seedHosts()
-                                                           throws UnknownHostException {
-            return asList(seedContact1(), seedContact2());
-        }
-
-        InetSocketAddress seedContact1() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort1);
-        }
-
-        InetSocketAddress seedContact2() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort2);
-        }
-    }
-
-    @Configuration
-    static class f1 extends FakeSpindleCfg {
-        @Override
-        public int node() {
-            return 1;
-        }
-    }
-
-    @Configuration
-    static class f2 extends FakeSpindleCfg {
-        @Override
-        public int node() {
-            return 2;
-        }
-    }
-
-    static class FakeSpindleCfg extends GossipConfiguration {
-        @Bean
-        public FakeSpindle fakeSpindle() {
-            return new FakeSpindle(switchboard());
-        }
-
-        @Override
-        public int getMagic() {
-            try {
-                return Identity.getMagicFromLocalIpAddress();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        @Override
-        @Bean
-        public AnubisLocator locator() {
-            return null;
-        }
-
-        @Bean
-        public Node memberNode() {
-            return new Node(node(), node(), node());
-        }
-
-        @Override
-        public int node() {
-            return 0;
-        }
-
-        @Bean
-        public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(
-                                                      memberNode(),
-                                                      partition(),
-                                                      Generators.timeBasedGenerator());
-            return switchboard;
-        }
-
-        @Bean
-        public ScheduledExecutorService timer() {
-            return Executors.newSingleThreadScheduledExecutor();
-        }
-
-        @Override
-        protected Collection<InetSocketAddress> seedHosts()
-                                                           throws UnknownHostException {
-            return asList(seedContact1(), seedContact2());
-        }
-
-        InetSocketAddress seedContact1() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort1);
-        }
-
-        InetSocketAddress seedContact2() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort2);
-        }
-    }
-
-    @Configuration
-    static class MyControllerConfig extends ControllerGossipConfiguration {
-
-        @Override
-        public int magic() {
-            try {
-                return Identity.getMagicFromLocalIpAddress();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        @Override
-        protected Controller constructController() throws IOException {
-            return new MyController(timer(), 1000, 300000, partitionIdentity(),
-                                    heartbeatTimeout(), heartbeatInterval(),
-                                    socketOptions(), dispatchExecutor(),
-                                    wireSecurity());
-        }
-
-        @Override
-        protected Collection<InetSocketAddress> seedHosts()
-                                                           throws UnknownHostException {
-            return asList(seedContact1(), seedContact2());
-        }
-
-        InetSocketAddress seedContact1() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort1);
-        }
-
-        InetSocketAddress seedContact2() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort2);
-        }
-    }
-
-    static class nodeCfg extends GossipConfiguration {
-        @Bean
-        public Coordinator coordinator() throws IOException {
-            return new Coordinator(switchboard(), producer());
-        }
-
-        @Override
-        public int getMagic() {
-            try {
-                return Identity.getMagicFromLocalIpAddress();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        @Override
-        @Bean
-        public AnubisLocator locator() {
-            return null;
-        }
-
-        @Bean
-        public Node memberNode() {
-            return new Node(node(), node(), node());
-        }
-
-        @Bean
-        public Producer producer() throws IOException {
-            return new Producer(memberNode(), source(), configuration());
-        }
-
-        @Bean
-        public EventSource source() {
-            return new Source();
-        }
-
-        @Bean
-        public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(
-                                                      memberNode(),
-                                                      partition(),
-                                                      Generators.timeBasedGenerator());
-            return switchboard;
-        }
-
-        @Bean
-        public ScheduledExecutorService timer() {
-            return Executors.newSingleThreadScheduledExecutor();
-        }
-
-        protected ProducerConfiguration configuration() {
-            return new ProducerConfiguration();
-        }
-
-        @Override
-        protected Collection<InetSocketAddress> seedHosts()
-                                                           throws UnknownHostException {
-            return asList(seedContact1(), seedContact2());
-        }
-
-        InetSocketAddress seedContact1() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort1);
-        }
-
-        InetSocketAddress seedContact2() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort2);
-        }
-    }
-
-    @Configuration
-    static class w10 extends nodeCfg {
-        @Override
-        public int node() {
-            return 10;
-        }
-    }
-
-    @Configuration
-    static class w11 extends nodeCfg {
-        @Override
-        public int node() {
-            return 11;
-        }
-    }
-
-    @Configuration
-    static class w12 extends nodeCfg {
-        @Override
-        public int node() {
-            return 12;
-        }
-
-        @Override
-        protected InetSocketAddress gossipEndpoint()
-                                                    throws UnknownHostException {
-            return seedContact2();
-        }
-    }
-
-    @Configuration
-    static class w3 extends nodeCfg {
-        @Override
-        public int node() {
-            return 3;
-        }
-
-        @Override
-        protected InetSocketAddress gossipEndpoint()
-                                                    throws UnknownHostException {
-            return seedContact1();
-        }
-    }
-
-    @Configuration
-    static class w4 extends nodeCfg {
-        @Override
-        public int node() {
-            return 4;
-        }
-    }
-
-    @Configuration
-    static class w5 extends nodeCfg {
-        @Override
-        public int node() {
-            return 5;
-        }
-    }
-
-    @Configuration
-    static class w6 extends nodeCfg {
-        @Override
-        public int node() {
-            return 6;
-        }
-    }
-
-    @Configuration
-    static class w7 extends nodeCfg {
-        @Override
-        public int node() {
-            return 7;
-        }
-    }
-
-    @Configuration
-    static class w8 extends nodeCfg {
-        @Override
-        public int node() {
-            return 8;
-        }
-    }
-
-    @Configuration
-    static class w9 extends nodeCfg {
-        @Override
-        public int node() {
-            return 9;
-        }
-    }
-
-    private static final Logger                      log     = Logger.getLogger(TestProducerCluster.class.getCanonicalName());
-    private static int                               testPort1;
-    private static int                               testPort2;
-
-    static {
-        String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
-                                         "25230");
-        testPort1 = Integer.parseInt(port);
-        port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
-                                  "25370");
-        testPort2 = Integer.parseInt(port);
-    }
+    static final Logger                              log     = Logger.getLogger(TestProducerCluster.class.getCanonicalName());
 
     private ClusterMaster                            clusterMaster;
     private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs = new Class[] {
             w3.class, w4.class, w5.class, w6.class, w7.class, w8.class,
             w9.class, w10.class, w11.class, w12.class       };
-    private MyController                             controller;
+    private PartitionController                       controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<Coordinator>                        coordinators;
     private List<AnnotationConfigApplicationContext> fakeSpindleContexts;
@@ -713,13 +112,13 @@ public class TestProducerCluster {
 
     @Before
     public void startUp() throws Exception {
-        testPort1++;
-        testPort2++;
+        nodeCfg.testPort1++;
+        nodeCfg.testPort2++;
         log.info("Setting up initial partition");
         CountDownLatch initialLatch = new CountDownLatch(configs.length + 3);
         controllerContext = new AnnotationConfigApplicationContext(
                                                                    MyControllerConfig.class);
-        controller = controllerContext.getBean(MyController.class);
+        controller = controllerContext.getBean(PartitionController.class);
         controller.cardinality = configs.length + 3;
         controller.latch = initialLatch;
         clusterMasterContext = new AnnotationConfigApplicationContext(

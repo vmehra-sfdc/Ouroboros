@@ -1,4 +1,4 @@
-package com.salesforce.ouroboros.spindle.functional.util;
+package com.salesforce.ouroboros.partition.functional.util;
 
 import static java.util.Arrays.asList;
 

@@ -60,8 +60,6 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.functional.util.ClusterMaster;
 import com.salesforce.ouroboros.spindle.functional.util.ClusterMasterCfg;
-import com.salesforce.ouroboros.spindle.functional.util.ControlNode;
-import com.salesforce.ouroboros.spindle.functional.util.MyController;
 import com.salesforce.ouroboros.spindle.functional.util.MyControllerConfig;
 import com.salesforce.ouroboros.spindle.functional.util.Producer;
 import com.salesforce.ouroboros.spindle.functional.util.nodeCfg;
@@ -75,6 +73,8 @@ import com.salesforce.ouroboros.spindle.functional.util.w6;
 import com.salesforce.ouroboros.spindle.functional.util.w7;
 import com.salesforce.ouroboros.spindle.functional.util.w8;
 import com.salesforce.ouroboros.spindle.functional.util.w9;
+import com.salesforce.ouroboros.testUtils.ControlNode;
+import com.salesforce.ouroboros.testUtils.PartitionController;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
@@ -96,7 +96,7 @@ public class TestSpindleCluster {
     private final Class<?>[]                         configs       = new Class[] {
             w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
             w7.class, w8.class, w9.class, w10.class               };
-    private MyController                             controller;
+    private PartitionController                      controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<Coordinator>                        coordinators;
     private List<ControlNode>                        fullPartition;
@@ -127,7 +127,7 @@ public class TestSpindleCluster {
         CountDownLatch initialLatch = new CountDownLatch(configs.length + 1);
         controllerContext = new AnnotationConfigApplicationContext(
                                                                    MyControllerConfig.class);
-        controller = controllerContext.getBean(MyController.class);
+        controller = controllerContext.getBean(PartitionController.class);
         controller.cardinality = configs.length + 1;
         controller.latch = initialLatch;
         clusterMasterContext = new AnnotationConfigApplicationContext(
@@ -385,7 +385,7 @@ public class TestSpindleCluster {
                                              new SocketOptions(),
                                              Executors.newFixedThreadPool(majorPartitionId.size()));
         producerHandler.start();
-        int batches = 5000;
+        int batches = 2500;
         int batchSize = 10;
         bootstrap();
 

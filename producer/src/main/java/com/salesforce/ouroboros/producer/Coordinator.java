@@ -32,9 +32,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.SortedSet;
 import java.util.UUID;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -415,6 +415,23 @@ public class Coordinator implements Member {
         fsm.rebalance(joiningMembers);
     }
 
+    public boolean isActive() {
+        return active;
+    }
+
+    /**
+     * Answer true if the receiver is active and the leader of the active group
+     * 
+     * @return
+     */
+    public boolean isActiveLeader() {
+        if (active) {
+            return activeProducers.isEmpty() ? true
+                                            : activeProducers.last().equals(self);
+        }
+        return false;
+    }
+
     @Override
     public void stabilized() {
         filterSystemMembership();
@@ -523,29 +540,16 @@ public class Coordinator implements Member {
         nextProducerMembership.addAll(activeProducers);
     }
 
+    protected SortedSet<Node> getActiveProducers() {
+        return activeProducers;
+    }
+
     protected SortedSet<Node> getNextProducerMembership() {
         return nextProducerMembership;
     }
 
     protected boolean hasActiveMembers() {
         return !activeProducers.isEmpty();
-    }
-
-    protected boolean isActive() {
-        return active;
-    }
-
-    /**
-     * Answer true if the receiver is active and the leader of the active group
-     * 
-     * @return
-     */
-    protected boolean isActiveLeader() {
-        if (active) {
-            return activeProducers.isEmpty() ? true
-                                            : activeProducers.last().equals(self);
-        }
-        return false;
     }
 
     /**
@@ -670,9 +674,5 @@ public class Coordinator implements Member {
      */
     protected boolean tallyComplete() {
         return tally.get() == 0;
-    }
-
-    protected SortedSet<Node> getActiveProducers() {
-        return activeProducers;
     }
 }

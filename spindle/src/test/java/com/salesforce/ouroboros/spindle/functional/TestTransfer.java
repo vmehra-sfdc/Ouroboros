@@ -183,7 +183,7 @@ public class TestTransfer {
         spindleHandler.connectTo(replicatorHandler.getLocalAddress(),
                                  primaryReplicator);
 
-        int batches = 3000;
+        int batches = 2500;
         int batchSize = 100;
         final CountDownLatch ackLatch = new CountDownLatch(batches);
         Acknowledger ack = mock(Acknowledger.class);
