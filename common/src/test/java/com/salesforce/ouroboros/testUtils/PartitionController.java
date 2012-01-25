@@ -17,7 +17,7 @@ public class PartitionController extends Controller {
     public CountDownLatch latch;
 
     public PartitionController(Identity partitionIdentity,
-                               long heartbeatTimeout, long heartbeatInterval,
+                               int heartbeatTimeout, int heartbeatInterval,
                                SocketOptions socketOptions,
                                ExecutorService dispatchExecutor,
                                WireSecurity wireSecurity) throws IOException {

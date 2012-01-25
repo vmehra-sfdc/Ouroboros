@@ -37,7 +37,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Timer;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -106,10 +105,8 @@ public class TestProducerChannelBuffer {
         int            cardinality;
         CountDownLatch latch;
 
-        public MyController(Timer timer, long checkPeriod, long expirePeriod,
-                            Identity partitionIdentity, long heartbeatTimeout,
-                            long heartbeatInterval,
-                            SocketOptions socketOptions,
+        public MyController(Identity partitionIdentity, int heartbeatTimeout,
+                            int heartbeatInterval, SocketOptions socketOptions,
                             ExecutorService dispatchExecutor,
                             WireSecurity wireSecurity) throws IOException {
             super(partitionIdentity, heartbeatTimeout, heartbeatInterval,
@@ -156,10 +153,9 @@ public class TestProducerChannelBuffer {
 
         @Override
         protected Controller constructController() throws IOException {
-            return new MyController(timer(), 1000, 300000, partitionIdentity(),
-                                    heartbeatTimeout(), heartbeatInterval(),
-                                    socketOptions(), dispatchExecutor(),
-                                    wireSecurity());
+            return new MyController(partitionIdentity(), heartbeatTimeout(),
+                                    heartbeatInterval(), socketOptions(),
+                                    dispatchExecutor(), wireSecurity());
         }
 
         @Override
