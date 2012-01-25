@@ -88,6 +88,7 @@ public class Producer implements CommunicationsHandler {
     @Override
     public void connect(SocketChannelHandler handler) {
         this.handler = handler;
+        System.out.println(String.format("Handshake started %s", targetNode));
         ByteBuffer buffer = ByteBuffer.allocate(Spindle.HANDSHAKE_SIZE);
         buffer.putInt(Spindle.MAGIC);
         producerNode.serialize(buffer);
@@ -95,11 +96,17 @@ public class Producer implements CommunicationsHandler {
         try {
             while (buffer.hasRemaining()) {
                 handler.getChannel().write(buffer);
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                    return;
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
             return;
         }
+        System.out.println(String.format("Handshake completed %s", targetNode));
         nextBatch();
     }
 

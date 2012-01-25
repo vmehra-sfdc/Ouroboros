@@ -382,7 +382,7 @@ public class TestSpindleCluster {
     public void testReplication() throws Exception {
         producerHandler = new ChannelHandler("Producer handler",
                                              new SocketOptions(),
-                                             Executors.newFixedThreadPool(30));
+                                             Executors.newCachedThreadPool());
         producerHandler.start();
         int batches = 2500;
         int batchSize = 10;
