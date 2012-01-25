@@ -112,9 +112,8 @@ public class TestProducerChannelBuffer {
                             SocketOptions socketOptions,
                             ExecutorService dispatchExecutor,
                             WireSecurity wireSecurity) throws IOException {
-            super(timer, checkPeriod, expirePeriod, partitionIdentity,
-                  heartbeatTimeout, heartbeatInterval, socketOptions,
-                  dispatchExecutor, wireSecurity);
+            super(partitionIdentity, heartbeatTimeout, heartbeatInterval,
+                  socketOptions, dispatchExecutor, wireSecurity);
         }
 
         @Override
@@ -256,11 +255,6 @@ public class TestProducerChannelBuffer {
         @Bean
         public Source source() {
             return new Source();
-        }
-
-        @Bean
-        public ScheduledExecutorService timer() {
-            return Executors.newSingleThreadScheduledExecutor();
         }
 
         @Override

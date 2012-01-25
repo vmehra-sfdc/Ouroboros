@@ -6,8 +6,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Collection;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 
 import org.smartfrog.services.anubis.locator.AnubisLocator;
 import org.smartfrog.services.anubis.partition.util.Identity;
@@ -56,11 +54,6 @@ public class FakeSpindleCfg extends GossipConfiguration {
                                                   partition(),
                                                   Generators.timeBasedGenerator());
         return switchboard;
-    }
-
-    @Bean
-    public ScheduledExecutorService timer() {
-        return Executors.newSingleThreadScheduledExecutor();
     }
 
     @Override

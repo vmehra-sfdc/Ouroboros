@@ -1,7 +1,6 @@
 package com.salesforce.ouroboros.testUtils;
 
 import java.io.IOException;
-import java.util.Timer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 
@@ -17,15 +16,13 @@ public class PartitionController extends Controller {
     public int            cardinality;
     public CountDownLatch latch;
 
-    public PartitionController(Timer timer, long checkPeriod,
-                               long expirePeriod, Identity partitionIdentity,
+    public PartitionController(Identity partitionIdentity,
                                long heartbeatTimeout, long heartbeatInterval,
                                SocketOptions socketOptions,
                                ExecutorService dispatchExecutor,
                                WireSecurity wireSecurity) throws IOException {
-        super(timer, checkPeriod, expirePeriod, partitionIdentity,
-              heartbeatTimeout, heartbeatInterval, socketOptions,
-              dispatchExecutor, wireSecurity);
+        super(partitionIdentity, heartbeatTimeout, heartbeatInterval,
+              socketOptions, dispatchExecutor, wireSecurity);
     }
 
     @Override

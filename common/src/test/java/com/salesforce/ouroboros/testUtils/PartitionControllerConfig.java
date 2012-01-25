@@ -22,9 +22,8 @@ public class PartitionControllerConfig extends ControllerGossipConfiguration {
 
     @Override
     protected Controller constructController() throws IOException {
-        return new PartitionController(timer(), 1000, 300000, partitionIdentity(),
-                                heartbeatTimeout(), heartbeatInterval(),
-                                socketOptions(), dispatchExecutor(),
-                                wireSecurity());
+        return new PartitionController(partitionIdentity(), heartbeatTimeout(),
+                                       heartbeatInterval(), socketOptions(),
+                                       dispatchExecutor(), wireSecurity());
     }
 }
