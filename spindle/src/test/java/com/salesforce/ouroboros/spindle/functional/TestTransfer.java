@@ -201,7 +201,7 @@ public class TestTransfer {
 
         CountDownLatch producerLatch = new CountDownLatch(1);
         Producer producer = new Producer(channelId, producerLatch, batches,
-                                         batchSize, producerNode);
+                                         batchSize, producerNode, primaryNode);
         spindleHandler.connectTo(spindleHandler.getLocalAddress(), producer);
         assertTrue("Did not publish all events in given time",
                    producerLatch.await(120, TimeUnit.SECONDS));

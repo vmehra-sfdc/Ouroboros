@@ -735,7 +735,7 @@ public class TestSpindleCluster {
                                                              throws IOException,
                                                              InterruptedException {
         Producer producer = new Producer(channels, latch, batches, batchSize,
-                                         PRODUCER_NODE);
+                                         PRODUCER_NODE, target);
         Weaver weaver = weavers.get(target.processId - 1);
         assertEquals(target, weaver.getId());
         log.info(String.format("Creating producer for %s", weaver.getId()));

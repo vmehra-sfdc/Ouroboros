@@ -58,20 +58,22 @@ public class Producer implements CommunicationsHandler {
     private final AtomicInteger  currentChannel = new AtomicInteger();
     private final int            batchSize;
     private final Node           producerNode;
+    private final Node           targetNode;
 
     public Producer(List<UUID> channelIds, CountDownLatch latch, int batches,
-                    int batchSize, Node producerNode) {
+                    int batchSize, Node producerNode, Node targetNode) {
         this.channelIds = channelIds;
         this.latch = latch;
         this.numberOfBatches = batches;
         this.batchSize = batchSize;
         this.producerNode = producerNode;
+        this.targetNode = targetNode;
     }
 
     public Producer(UUID channelId, CountDownLatch producerLatch, int batches,
-                    int batchSize, Node producerNode) {
+                    int batchSize, Node producerNode, Node targetNode) {
         this(Arrays.asList(new UUID[] { channelId }), producerLatch, batches,
-             batchSize, producerNode);
+             batchSize, producerNode, targetNode);
     }
 
     @Override
@@ -145,7 +147,8 @@ public class Producer implements CommunicationsHandler {
     private void nextBatch() {
         int batchNumber = batches.get();
         if (batchNumber == numberOfBatches) {
-            System.out.println("Events published");
+            System.out.println(String.format("All Events published to: %s",
+                                             targetNode));
             latch.countDown();
             return;
         }
