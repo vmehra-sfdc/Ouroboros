@@ -89,7 +89,6 @@ public class TestSpindleCluster {
     private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs       = new Class[] {
             spindle1.class, spindle.class, spindle.class, spindle.class,
-            spindle.class, spindle.class, spindle.class, spindle.class,
             spindle.class, spindle2.class                         };
     private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
@@ -529,7 +528,7 @@ public class TestSpindleCluster {
     private ArrayList<UUID> openChannels() throws InterruptedException {
         log.info("Creating some channels");
 
-        int numOfChannels = 100;
+        int numOfChannels = 60;
         ArrayList<UUID> channels = new ArrayList<UUID>();
         for (int i = 0; i < numOfChannels; i++) {
             UUID channel = new UUID(twister.nextLong(), twister.nextLong());

@@ -10,6 +10,6 @@ import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode2Cfg;
 public class spindle2 extends GossipDiscoveryNode2Cfg {
     @Override
     public int node() {
-        return 10;
+        return 6;
     }
 }
