@@ -39,12 +39,13 @@
 %start DuplicatorFSM::Waiting
 %map DuplicatorFSM
 %% 
-Waiting {
+Waiting
+Entry {
+	waitCheck();
+}
+{
 	replicate
 		WriteHeader{}
-	
-	writeReady
-		nil {}
 }
 
 WriteHeader

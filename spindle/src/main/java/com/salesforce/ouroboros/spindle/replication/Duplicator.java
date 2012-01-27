@@ -222,4 +222,10 @@ public final class Duplicator {
         assert current == null : "Concurrent events are being processed";
         return pending.peek() != null;
     }
+
+    protected void waitCheck() {
+        if (hasNext()) {
+            fsm.replicate();
+        }
+    }
 }
