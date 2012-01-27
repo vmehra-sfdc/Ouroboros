@@ -46,6 +46,9 @@ Entry {
 {
 	replicate
 		WriteHeader{}
+		
+	writeReady
+		nil{}
 }
 
 WriteHeader
