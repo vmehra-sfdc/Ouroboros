@@ -41,7 +41,7 @@
 %% 
 Waiting
 Entry {
-	waitCheck();
+	next();
 }
 {
 	replicate
