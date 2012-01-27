@@ -25,21 +25,16 @@
  */
 package com.salesforce.ouroboros.integration;
 
-import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -48,21 +43,20 @@ import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.smartfrog.services.anubis.locator.AnubisLocator;
-import org.smartfrog.services.anubis.partition.test.controller.Controller;
-import org.smartfrog.services.anubis.partition.test.controller.NodeData;
+import org.smartfrog.services.anubis.partition.Partition;
 import org.smartfrog.services.anubis.partition.util.Identity;
-import org.smartfrog.services.anubis.partition.views.View;
-import org.smartfrog.services.anubis.partition.wire.msg.Heartbeat;
-import org.smartfrog.services.anubis.partition.wire.security.WireSecurity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.uuid.Generators;
-import com.hellblazer.jackal.gossip.configuration.ControllerGossipConfiguration;
-import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
-import com.hellblazer.pinkie.SocketOptions;
+import com.hellblazer.jackal.testUtil.TestController;
+import com.hellblazer.jackal.testUtil.TestNode;
+import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
+import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode1Cfg;
+import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode2Cfg;
+import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -81,48 +75,6 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class TestProducerChannelBuffer {
 
-    public static class ControlNode extends NodeData {
-        static final Logger log = Logger.getLogger(ControlNode.class.getCanonicalName());
-
-        int                 cardinality;
-        CountDownLatch      latch;
-
-        public ControlNode(Heartbeat hb, Controller controller) {
-            super(hb, controller);
-        }
-
-        @Override
-        protected void partitionNotification(View partition, int leader) {
-            log.finest("Partition notification: " + partition);
-            super.partitionNotification(partition, leader);
-            if (partition.isStable() && partition.cardinality() == cardinality) {
-                latch.countDown();
-            }
-        }
-    }
-
-    public static class MyController extends Controller {
-        int            cardinality;
-        CountDownLatch latch;
-
-        public MyController(Identity partitionIdentity, int heartbeatTimeout,
-                            int heartbeatInterval, SocketOptions socketOptions,
-                            ExecutorService dispatchExecutor,
-                            WireSecurity wireSecurity) throws IOException {
-            super(partitionIdentity, heartbeatTimeout, heartbeatInterval,
-                  socketOptions, dispatchExecutor, wireSecurity);
-        }
-
-        @Override
-        protected NodeData createNode(Heartbeat hb) {
-            ControlNode node = new ControlNode(hb, this);
-            node.cardinality = cardinality;
-            node.latch = latch;
-            return node;
-        }
-
-    }
-
     public static class Source implements EventSource {
 
         @Override
@@ -140,87 +92,10 @@ public class TestProducerChannelBuffer {
     }
 
     @Configuration
-    static class MyControllerConfig extends ControllerGossipConfiguration {
+    static class ProducerCfg extends GossipDiscoveryNode1Cfg {
 
-        @Override
-        public int magic() {
-            try {
-                return Identity.getMagicFromLocalIpAddress();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        @Override
-        protected Controller constructController() throws IOException {
-            return new MyController(partitionIdentity(), heartbeatTimeout(),
-                                    heartbeatInterval(), socketOptions(),
-                                    dispatchExecutor(), wireSecurity());
-        }
-
-        @Override
-        protected Collection<InetSocketAddress> seedHosts()
-                                                           throws UnknownHostException {
-            return asList(seedContact1(), seedContact2());
-        }
-
-        InetSocketAddress seedContact1() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort1);
-        }
-
-        InetSocketAddress seedContact2() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort2);
-        }
-
-    }
-
-    static class nodeCfg extends GossipConfiguration {
-        @Override
-        public int getMagic() {
-            try {
-                return Identity.getMagicFromLocalIpAddress();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        @Override
-        @Bean
-        public AnubisLocator locator() {
-            return null;
-        }
-
-        @Bean
-        public Node memberNode() {
-            return new Node(node(), node(), node());
-        }
-
-        @Bean
-        public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(
-                                                      memberNode(),
-                                                      partition(),
-                                                      Generators.timeBasedGenerator());
-            return switchboard;
-        }
-
-        @Override
-        protected Collection<InetSocketAddress> seedHosts()
-                                                           throws UnknownHostException {
-            return asList(seedContact1(), seedContact2());
-        }
-
-        InetSocketAddress seedContact1() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort1);
-        }
-
-        InetSocketAddress seedContact2() throws UnknownHostException {
-            return new InetSocketAddress("127.0.0.1", testPort2);
-        }
-    }
-
-    @Configuration
-    static class ProducerCfg extends nodeCfg {
+        @Autowired
+        private Partition partitionManager;
 
         @Bean
         public ProducerConfiguration configuration() {
@@ -233,6 +108,20 @@ public class TestProducerChannelBuffer {
             return new com.salesforce.ouroboros.producer.Coordinator(
                                                                      switchboard(),
                                                                      producer());
+        }
+
+        @Bean
+        public Switchboard switchboard() {
+            Switchboard switchboard = new Switchboard(
+                                                      memberNode(),
+                                                      partitionManager,
+                                                      Generators.timeBasedGenerator());
+            return switchboard;
+        }
+
+        @Bean
+        public Node memberNode() {
+            return new Node(node(), node(), node());
         }
 
         /* (non-Javadoc)
@@ -252,16 +141,12 @@ public class TestProducerChannelBuffer {
         public Source source() {
             return new Source();
         }
-
-        @Override
-        protected InetSocketAddress gossipEndpoint()
-                                                    throws UnknownHostException {
-            return seedContact1();
-        }
     }
 
     @Configuration
-    static class WeaverCfg extends nodeCfg {
+    static class WeaverCfg extends GossipDiscoveryNode2Cfg {
+        @Autowired
+        private Partition partitionManager;
 
         @Bean
         public com.salesforce.ouroboros.spindle.Coordinator coordinator()
@@ -270,6 +155,20 @@ public class TestProducerChannelBuffer {
                                                                     timer(),
                                                                     switchboard(),
                                                                     weaver());
+        }
+
+        @Bean
+        public Switchboard switchboard() {
+            Switchboard switchboard = new Switchboard(
+                                                      memberNode(),
+                                                      partitionManager,
+                                                      Generators.timeBasedGenerator());
+            return switchboard;
+        }
+
+        @Bean
+        public Node memberNode() {
+            return new Node(node(), node(), node());
         }
 
         /* (non-Javadoc)
@@ -290,12 +189,6 @@ public class TestProducerChannelBuffer {
             return new Weaver(weaverConfiguration());
         }
 
-        @Override
-        protected InetSocketAddress gossipEndpoint()
-                                                    throws UnknownHostException {
-            return seedContact2();
-        }
-
         private WeaverConfigation weaverConfiguration() throws IOException {
             File directory = rootDirectory();
             WeaverConfigation weaverConfigation = new WeaverConfigation();
@@ -314,34 +207,26 @@ public class TestProducerChannelBuffer {
         }
     }
 
-    static int                         testPort1;
-    static int                         testPort2;
     private static final Logger        log = Logger.getLogger(TestProducerChannelBuffer.class.getCanonicalName());
     static {
-        String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
-                                         "24020");
-        testPort1 = Integer.parseInt(port);
-        port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
-                                  "24040");
-        testPort2 = Integer.parseInt(port);
+        GossipTestCfg.setTestPorts(24020, 24040);
     }
 
-    MyController                       controller;
+    TestController                     controller;
     AnnotationConfigApplicationContext controllerContext;
     CountDownLatch                     initialLatch;
-    List<ControlNode>                  partition;
+    List<TestNode>                     partition;
     AnnotationConfigApplicationContext producerContext;
     AnnotationConfigApplicationContext weaverContext;
 
     @Before
     public void starUp() throws Exception {
-        testPort1++;
-        testPort2++;
+        GossipTestCfg.incrementPorts();
         log.info("Setting up initial partition");
         initialLatch = new CountDownLatch(2);
         controllerContext = new AnnotationConfigApplicationContext(
-                                                                   MyControllerConfig.class);
-        controller = controllerContext.getBean(MyController.class);
+                                                                   GossipControllerCfg.class);
+        controller = controllerContext.getBean(TestController.class);
         controller.cardinality = 2;
         controller.latch = initialLatch;
         producerContext = new AnnotationConfigApplicationContext(
@@ -353,13 +238,13 @@ public class TestProducerChannelBuffer {
             success = initialLatch.await(120, TimeUnit.SECONDS);
             assertTrue("Initial partition did not acheive stability", success);
             log.info("Initial partition stable");
-            partition = new ArrayList<ControlNode>();
-            ControlNode member = (ControlNode) controller.getNode(producerContext.getBean(Identity.class));
+            partition = new ArrayList<TestNode>();
+            TestNode member = (TestNode) controller.getNode(producerContext.getBean(Identity.class));
             assertNotNull("Can't find node: "
                                   + producerContext.getBean(Identity.class),
                           member);
             partition.add(member);
-            member = (ControlNode) controller.getNode(weaverContext.getBean(Identity.class));
+            member = (TestNode) controller.getNode(weaverContext.getBean(Identity.class));
             assertNotNull("Can't find node: "
                                   + weaverContext.getBean(Identity.class),
                           member);

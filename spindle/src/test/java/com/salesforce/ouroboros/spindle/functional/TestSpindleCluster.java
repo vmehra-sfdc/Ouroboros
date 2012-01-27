@@ -50,6 +50,10 @@ import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.BitView;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
+import com.hellblazer.jackal.testUtil.TestController;
+import com.hellblazer.jackal.testUtil.TestNode;
+import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
+import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
 import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Node;
@@ -60,21 +64,11 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.functional.util.ClusterMaster;
 import com.salesforce.ouroboros.spindle.functional.util.ClusterMasterCfg;
-import com.salesforce.ouroboros.spindle.functional.util.MyControllerConfig;
 import com.salesforce.ouroboros.spindle.functional.util.Producer;
 import com.salesforce.ouroboros.spindle.functional.util.nodeCfg;
-import com.salesforce.ouroboros.spindle.functional.util.w1;
-import com.salesforce.ouroboros.spindle.functional.util.w10;
-import com.salesforce.ouroboros.spindle.functional.util.w2;
-import com.salesforce.ouroboros.spindle.functional.util.w3;
-import com.salesforce.ouroboros.spindle.functional.util.w4;
-import com.salesforce.ouroboros.spindle.functional.util.w5;
-import com.salesforce.ouroboros.spindle.functional.util.w6;
-import com.salesforce.ouroboros.spindle.functional.util.w7;
-import com.salesforce.ouroboros.spindle.functional.util.w8;
-import com.salesforce.ouroboros.spindle.functional.util.w9;
-import com.salesforce.ouroboros.testUtils.ControlNode;
-import com.salesforce.ouroboros.testUtils.PartitionController;
+import com.salesforce.ouroboros.spindle.functional.util.spindle;
+import com.salesforce.ouroboros.spindle.functional.util.spindle1;
+import com.salesforce.ouroboros.spindle.functional.util.spindle2;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
@@ -94,21 +88,22 @@ public class TestSpindleCluster {
     private ClusterMaster                            clusterMaster;
     private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs       = new Class[] {
-            w1.class, w2.class, w3.class, w4.class, w5.class, w6.class,
-            w7.class, w8.class, w9.class, w10.class               };
-    private PartitionController                      controller;
+            spindle1.class, spindle.class, spindle.class, spindle.class,
+            spindle.class, spindle.class, spindle.class, spindle.class,
+            spindle.class, spindle2.class                         };
+    private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<Coordinator>                        coordinators;
-    private List<ControlNode>                        fullPartition;
+    private List<TestNode>                           fullPartition;
     private List<Node>                               fullPartitionId;
     private BitView                                  fullView;
-    private List<ControlNode>                        majorGroup;
+    private List<TestNode>                           majorGroup;
     private List<Coordinator>                        majorPartition;
     private List<Node>                               majorPartitionId;
     private BitView                                  majorView;
     private List<Weaver>                             majorWeavers;
     private List<AnnotationConfigApplicationContext> memberContexts;
-    private List<ControlNode>                        minorGroup;
+    private List<TestNode>                           minorGroup;
     private List<Coordinator>                        minorPartition;
     private List<Node>                               minorPartitionId;
     private BitView                                  minorView;
@@ -116,25 +111,28 @@ public class TestSpindleCluster {
     private MersenneTwister                          twister       = new MersenneTwister(
                                                                                          666);
     private List<Weaver>                             weavers;
-
     private ChannelHandler                           producerHandler;
+
+    static {
+        GossipTestCfg.setTestPorts(24506, 24320);
+    }
 
     @Before
     public void startUp() throws Exception {
-        nodeCfg.testPort1++;
-        nodeCfg.testPort2++;
+        GossipTestCfg.incrementPorts();
+        spindle.reset();
         log.info("Setting up initial partition");
         CountDownLatch initialLatch = new CountDownLatch(configs.length + 1);
         controllerContext = new AnnotationConfigApplicationContext(
-                                                                   MyControllerConfig.class);
-        controller = controllerContext.getBean(PartitionController.class);
+                                                                   GossipControllerCfg.class);
+        controller = controllerContext.getBean(TestController.class);
         controller.cardinality = configs.length + 1;
         controller.latch = initialLatch;
         clusterMasterContext = new AnnotationConfigApplicationContext(
                                                                       ClusterMasterCfg.class);
         clusterMaster = clusterMasterContext.getBean(ClusterMaster.class);
         memberContexts = createMembers();
-        fullPartition = new ArrayList<ControlNode>();
+        fullPartition = new ArrayList<TestNode>();
         coordinators = new ArrayList<Coordinator>();
         weavers = new ArrayList<Weaver>();
         log.info("Awaiting initial partition stability");
@@ -145,7 +143,7 @@ public class TestSpindleCluster {
             log.info("Initial partition stable");
             fullPartitionId = new ArrayList<Node>();
             for (AnnotationConfigApplicationContext context : memberContexts) {
-                ControlNode node = (ControlNode) controller.getNode(context.getBean(Identity.class));
+                TestNode node = (TestNode) controller.getNode(context.getBean(Identity.class));
                 assertNotNull("Can't find node: "
                                       + context.getBean(Identity.class), node);
                 fullPartition.add(node);
@@ -161,7 +159,7 @@ public class TestSpindleCluster {
                 tearDown();
             }
         }
-        ControlNode clusterMasterNode = (ControlNode) controller.getNode(clusterMasterContext.getBean(Identity.class));
+        TestNode clusterMasterNode = (TestNode) controller.getNode(clusterMasterContext.getBean(Identity.class));
         fullPartition.add(clusterMasterNode);
 
         assertPartitionBootstrapping(coordinators);
@@ -173,8 +171,8 @@ public class TestSpindleCluster {
         majorPartition = new ArrayList<Coordinator>();
         minorPartition = new ArrayList<Coordinator>();
 
-        majorGroup = new ArrayList<ControlNode>();
-        minorGroup = new ArrayList<ControlNode>();
+        majorGroup = new ArrayList<TestNode>();
+        minorGroup = new ArrayList<TestNode>();
 
         majorPartitionId = new ArrayList<Node>();
         minorPartitionId = new ArrayList<Node>();
@@ -186,7 +184,7 @@ public class TestSpindleCluster {
 
         // Form the major partition
         for (int i = 0; i < majorPartitionSize; i++) {
-            ControlNode member = fullPartition.get(i);
+            TestNode member = fullPartition.get(i);
             Coordinator coordinator = coordinators.get(i);
             majorPartitionId.add(fullPartitionId.get(i));
             majorPartition.add(coordinator);
@@ -201,7 +199,7 @@ public class TestSpindleCluster {
 
         // Form the minor partition
         for (int i = majorPartitionSize; i < coordinators.size(); i++) {
-            ControlNode member = fullPartition.get(i);
+            TestNode member = fullPartition.get(i);
             Coordinator coordinator = coordinators.get(i);
             minorPartitionId.add(coordinator.getId());
             minorPartition.add(coordinator);
@@ -495,7 +493,7 @@ public class TestSpindleCluster {
         log.info("Major partition has stabilized");
 
         // Check to see everything is as expected.
-        for (ControlNode member : majorGroup) {
+        for (TestNode member : majorGroup) {
             assertEquals(majorView, member.getPartition());
         }
     }
@@ -547,7 +545,7 @@ public class TestSpindleCluster {
     private void reformPartition() throws InterruptedException {
         // reform
         CountDownLatch latch = new CountDownLatch(fullPartition.size());
-        for (ControlNode node : fullPartition) {
+        for (TestNode node : fullPartition) {
             node.latch = latch;
             node.cardinality = fullPartition.size();
         }
@@ -563,7 +561,7 @@ public class TestSpindleCluster {
         log.info("Full partition has stabilized");
 
         // Check to see everything is kosher
-        for (ControlNode member : fullPartition) {
+        for (TestNode member : fullPartition) {
             assertEquals(fullView, member.getPartition());
         }
     }
@@ -743,9 +741,9 @@ public class TestSpindleCluster {
                                   producer);
     }
 
-    protected CountDownLatch latch(List<ControlNode> group) {
+    protected CountDownLatch latch(List<TestNode> group) {
         CountDownLatch latch = new CountDownLatch(group.size());
-        for (ControlNode member : group) {
+        for (TestNode member : group) {
             member.latch = latch;
             member.cardinality = group.size();
         }

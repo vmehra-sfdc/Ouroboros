@@ -1,41 +1,26 @@
 package com.salesforce.ouroboros.producer.functional.util;
 
-import static java.util.Arrays.asList;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.util.Collection;
-
-import org.smartfrog.services.anubis.locator.AnubisLocator;
-import org.smartfrog.services.anubis.partition.util.Identity;
+import org.smartfrog.services.anubis.partition.Partition;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 
 import com.fasterxml.uuid.Generators;
-import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
+import com.hellblazer.jackal.testUtil.gossip.GossipNodeCfg;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
 
-public class FakeSpindleCfg extends GossipConfiguration {
-    @Bean
-    public FakeSpindle fakeSpindle() {
-        return new FakeSpindle(switchboard());
+public class FakeSpindleCfg extends GossipNodeCfg {
+    private static final AtomicInteger id   = new AtomicInteger(0);
+    
+    public static void reset() {
+        id.set(0);
     }
 
-    @Override
-    public int getMagic() {
-        try {
-            return Identity.getMagicFromLocalIpAddress();
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    @Override
-    @Bean
-    public AnubisLocator locator() {
-        return null;
-    }
+    @Autowired
+    private Partition                  partitionManager;
+    private int                        node = -1;
 
     @Bean
     public Node memberNode() {
@@ -43,30 +28,21 @@ public class FakeSpindleCfg extends GossipConfiguration {
     }
 
     @Override
+    @Bean
     public int node() {
-        return 0;
+        if (node == -1) {
+            node = id.incrementAndGet();
+        }
+        return node;
     }
 
     @Bean
     public Switchboard switchboard() {
         Switchboard switchboard = new Switchboard(
                                                   memberNode(),
-                                                  partition(),
+                                                  partitionManager,
                                                   Generators.timeBasedGenerator());
+        new FakeSpindle(switchboard);
         return switchboard;
-    }
-
-    @Override
-    protected Collection<InetSocketAddress> seedHosts()
-                                                       throws UnknownHostException {
-        return asList(seedContact1(), seedContact2());
-    }
-
-    InetSocketAddress seedContact1() throws UnknownHostException {
-        return new InetSocketAddress("127.0.0.1", nodeCfg.testPort1);
-    }
-
-    InetSocketAddress seedContact2() throws UnknownHostException {
-        return new InetSocketAddress("127.0.0.1", nodeCfg.testPort2);
     }
 }

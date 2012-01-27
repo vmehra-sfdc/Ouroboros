@@ -46,6 +46,10 @@ import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.BitView;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
+import com.hellblazer.jackal.testUtil.TestController;
+import com.hellblazer.jackal.testUtil.TestNode;
+import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
+import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.producer.Coordinator;
 import com.salesforce.ouroboros.producer.CoordinatorContext.ControllerFSM;
@@ -53,22 +57,10 @@ import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.functional.util.ClusterMaster;
 import com.salesforce.ouroboros.producer.functional.util.ClusterMasterCfg;
-import com.salesforce.ouroboros.producer.functional.util.MyControllerConfig;
-import com.salesforce.ouroboros.producer.functional.util.f1;
-import com.salesforce.ouroboros.producer.functional.util.f2;
-import com.salesforce.ouroboros.producer.functional.util.nodeCfg;
-import com.salesforce.ouroboros.producer.functional.util.w10;
-import com.salesforce.ouroboros.producer.functional.util.w11;
-import com.salesforce.ouroboros.producer.functional.util.w12;
-import com.salesforce.ouroboros.producer.functional.util.w3;
-import com.salesforce.ouroboros.producer.functional.util.w4;
-import com.salesforce.ouroboros.producer.functional.util.w5;
-import com.salesforce.ouroboros.producer.functional.util.w6;
-import com.salesforce.ouroboros.producer.functional.util.w7;
-import com.salesforce.ouroboros.producer.functional.util.w8;
-import com.salesforce.ouroboros.producer.functional.util.w9;
-import com.salesforce.ouroboros.testUtils.ControlNode;
-import com.salesforce.ouroboros.testUtils.PartitionController;
+import com.salesforce.ouroboros.producer.functional.util.FakeSpindleCfg;
+import com.salesforce.ouroboros.producer.functional.util.weaver;
+import com.salesforce.ouroboros.producer.functional.util.weaver0;
+import com.salesforce.ouroboros.producer.functional.util.weaver2;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
@@ -85,23 +77,24 @@ public class TestProducerCluster {
     private ClusterMaster                            clusterMaster;
     private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs = new Class[] {
-            w3.class, w4.class, w5.class, w6.class, w7.class, w8.class,
-            w9.class, w10.class, w11.class, w12.class       };
-    private PartitionController                       controller;
+            weaver0.class, weaver.class, weaver.class, weaver.class,
+            weaver.class, weaver.class, weaver.class, weaver.class,
+            weaver.class, weaver2.class                     };
+    private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<Coordinator>                        coordinators;
     private List<AnnotationConfigApplicationContext> fakeSpindleContexts;
     private Node[]                                   fakeSpindleNodes;
-    private List<ControlNode>                        fullPartition;
+    private List<TestNode>                           fullPartition;
     private List<Node>                               fullPartitionId;
     private BitView                                  fullView;
-    private List<ControlNode>                        majorGroup;
+    private List<TestNode>                           majorGroup;
     private List<Coordinator>                        majorPartition;
     private List<Node>                               majorPartitionId;
     private List<Producer>                           majorProducers;
     private BitView                                  majorView;
     private List<AnnotationConfigApplicationContext> memberContexts;
-    private List<ControlNode>                        minorGroup;
+    private List<TestNode>                           minorGroup;
     private List<Coordinator>                        minorPartition;
     private List<Node>                               minorPartitionId;
     private List<Producer>                           minorProducers;
@@ -110,23 +103,30 @@ public class TestProducerCluster {
     private MersenneTwister                          twister = new MersenneTwister(
                                                                                    666);
 
+    static {
+        GossipTestCfg.setTestPorts(25230, 23546);
+    }
+
     @Before
     public void startUp() throws Exception {
-        nodeCfg.testPort1++;
-        nodeCfg.testPort2++;
+        GossipTestCfg.incrementPorts();
+        FakeSpindleCfg.reset();
+        weaver.reset();
         log.info("Setting up initial partition");
         CountDownLatch initialLatch = new CountDownLatch(configs.length + 3);
         controllerContext = new AnnotationConfigApplicationContext(
-                                                                   MyControllerConfig.class);
-        controller = controllerContext.getBean(PartitionController.class);
+                                                                   GossipControllerCfg.class);
+        controller = controllerContext.getBean(TestController.class);
         controller.cardinality = configs.length + 3;
         controller.latch = initialLatch;
         clusterMasterContext = new AnnotationConfigApplicationContext(
                                                                       ClusterMasterCfg.class);
         clusterMaster = clusterMasterContext.getBean(ClusterMaster.class);
         fakeSpindleContexts = new ArrayList<AnnotationConfigApplicationContext>();
-        fakeSpindleContexts.add(new AnnotationConfigApplicationContext(f1.class));
-        fakeSpindleContexts.add(new AnnotationConfigApplicationContext(f2.class));
+        fakeSpindleContexts.add(new AnnotationConfigApplicationContext(
+                                                                       FakeSpindleCfg.class));
+        fakeSpindleContexts.add(new AnnotationConfigApplicationContext(
+                                                                       FakeSpindleCfg.class));
         memberContexts = createMembers();
         log.info("Awaiting initial partition stability");
         boolean success = false;
@@ -134,12 +134,12 @@ public class TestProducerCluster {
             success = initialLatch.await(120, TimeUnit.SECONDS);
             assertTrue("Initial partition did not acheive stability", success);
             log.info("Initial partition stable");
-            fullPartition = new ArrayList<ControlNode>();
+            fullPartition = new ArrayList<TestNode>();
             coordinators = new ArrayList<Coordinator>();
             producers = new ArrayList<Producer>();
             fullPartitionId = new ArrayList<Node>();
             for (AnnotationConfigApplicationContext context : memberContexts) {
-                ControlNode node = (ControlNode) controller.getNode(context.getBean(Identity.class));
+                TestNode node = (TestNode) controller.getNode(context.getBean(Identity.class));
                 assertNotNull("Can't find node: "
                                       + context.getBean(Identity.class), node);
                 fullPartition.add(node);
@@ -156,7 +156,7 @@ public class TestProducerCluster {
             }
         }
 
-        ControlNode clusterMasterNode = (ControlNode) controller.getNode(clusterMasterContext.getBean(Identity.class));
+        TestNode clusterMasterNode = (TestNode) controller.getNode(clusterMasterContext.getBean(Identity.class));
         fullPartition.add(clusterMasterNode);
 
         assertPartitionBootstrapping(coordinators);
@@ -168,7 +168,7 @@ public class TestProducerCluster {
         ArrayList<Node> nodes = new ArrayList<Node>();
         for (AnnotationConfigApplicationContext ctxt : fakeSpindleContexts) {
             Identity id = ctxt.getBean(Identity.class);
-            fullPartition.add((ControlNode) controller.getNode(id));
+            fullPartition.add((TestNode) controller.getNode(id));
             fullView.add(id);
             majorView.add(id);
             nodes.add(ctxt.getBean(Node.class));
@@ -178,8 +178,8 @@ public class TestProducerCluster {
         majorPartition = new ArrayList<Coordinator>();
         minorPartition = new ArrayList<Coordinator>();
 
-        majorGroup = new ArrayList<ControlNode>();
-        minorGroup = new ArrayList<ControlNode>();
+        majorGroup = new ArrayList<TestNode>();
+        minorGroup = new ArrayList<TestNode>();
 
         majorPartitionId = new ArrayList<Node>();
         minorPartitionId = new ArrayList<Node>();
@@ -191,7 +191,7 @@ public class TestProducerCluster {
 
         // Form the major partition
         for (int i = 0; i < majorPartitionSize; i++) {
-            ControlNode member = fullPartition.get(i);
+            TestNode member = fullPartition.get(i);
             Coordinator coordinator = coordinators.get(i);
             majorPartitionId.add(fullPartitionId.get(i));
             majorPartition.add(coordinator);
@@ -206,12 +206,12 @@ public class TestProducerCluster {
         majorView.add(clusterMasterNode.getIdentity());
         for (AnnotationConfigApplicationContext ctxt : fakeSpindleContexts) {
             Identity id = ctxt.getBean(Identity.class);
-            majorGroup.add((ControlNode) controller.getNode(id));
+            majorGroup.add((TestNode) controller.getNode(id));
         }
 
         // Form the minor partition
         for (int i = majorPartitionSize; i < coordinators.size(); i++) {
-            ControlNode member = fullPartition.get(i);
+            TestNode member = fullPartition.get(i);
             Coordinator coordinator = coordinators.get(i);
             minorPartitionId.add(coordinator.getId());
             minorPartition.add(coordinator);
@@ -323,7 +323,7 @@ public class TestProducerCluster {
         reformPartition();
 
         // Check to see everything is kosher
-        for (ControlNode member : fullPartition) {
+        for (TestNode member : fullPartition) {
             assertEquals(fullView, member.getPartition());
         }
 
@@ -405,7 +405,7 @@ public class TestProducerCluster {
         reformPartition();
 
         // Check to see everything is kosher
-        for (ControlNode member : fullPartition) {
+        for (TestNode member : fullPartition) {
             assertEquals(fullView, member.getPartition());
         }
 
@@ -437,7 +437,7 @@ public class TestProducerCluster {
         log.info("Major partition has stabilized");
 
         // Check to see everything is as expected.
-        for (ControlNode member : majorGroup) {
+        for (TestNode member : majorGroup) {
             assertEquals(majorView, member.getPartition());
         }
     }
@@ -472,7 +472,7 @@ public class TestProducerCluster {
 
         // reform
         CountDownLatch latch = new CountDownLatch(fullPartition.size());
-        for (ControlNode node : fullPartition) {
+        for (TestNode node : fullPartition) {
             node.latch = latch;
             node.cardinality = fullPartition.size();
         }
@@ -558,9 +558,9 @@ public class TestProducerCluster {
         }
     }
 
-    protected CountDownLatch latch(List<ControlNode> group) {
+    protected CountDownLatch latch(List<TestNode> group) {
         CountDownLatch latch = new CountDownLatch(group.size());
-        for (ControlNode member : group) {
+        for (TestNode member : group) {
             member.latch = latch;
             member.cardinality = group.size();
         }

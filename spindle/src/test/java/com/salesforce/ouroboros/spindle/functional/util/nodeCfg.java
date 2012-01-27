@@ -1,43 +1,32 @@
 package com.salesforce.ouroboros.spindle.functional.util;
 
-import static java.util.Arrays.asList;
-
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.util.Collection;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
-import org.smartfrog.services.anubis.locator.AnubisLocator;
+import org.smartfrog.services.anubis.partition.Partition;
 import org.smartfrog.services.anubis.partition.util.Identity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.uuid.Generators;
-import com.hellblazer.jackal.gossip.configuration.GossipConfiguration;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.spindle.Coordinator;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverConfigation;
 
-public class nodeCfg extends GossipConfiguration {
+@Configuration
+public class nodeCfg {
     public static final int MAX_SEGMENT_SIZE = 1024 * 1024;
 
-    public static int       testPort1;
-    public static int       testPort2;
-
-    static {
-        String port = System.getProperty("com.hellblazer.jackal.gossip.test.port.1",
-                                         "24506");
-        testPort1 = Integer.parseInt(port);
-        port = System.getProperty("com.hellblazer.jackal.gossip.test.port.2",
-                                  "24320");
-        testPort2 = Integer.parseInt(port);
-    }
-
     public final File       directory;
+    @Autowired
+    private Partition       partitionManager;
+    @Autowired
+    private Identity        partitionIdentity;
 
     public nodeCfg() {
         try {
@@ -55,31 +44,17 @@ public class nodeCfg extends GossipConfiguration {
         return new Coordinator(timer(), switchboard(), weaver());
     }
 
-    @Override
-    public int getMagic() {
-        try {
-            return Identity.getMagicFromLocalIpAddress();
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    @Override
-    @Bean
-    public AnubisLocator locator() {
-        return null;
-    }
-
     @Bean
     public Node memberNode() {
-        return new Node(node(), node(), node());
+        return new Node(partitionIdentity.id, partitionIdentity.id,
+                        partitionIdentity.id);
     }
 
     @Bean
     public Switchboard switchboard() {
         Switchboard switchboard = new Switchboard(
                                                   memberNode(),
-                                                  partition(),
+                                                  partitionManager,
                                                   Generators.timeBasedGenerator());
         return switchboard;
     }
@@ -104,19 +79,5 @@ public class nodeCfg extends GossipConfiguration {
 
     protected long maxSegmentSize() {
         return MAX_SEGMENT_SIZE;
-    }
-
-    @Override
-    protected Collection<InetSocketAddress> seedHosts()
-                                                       throws UnknownHostException {
-        return asList(seedContact1(), seedContact2());
-    }
-
-    InetSocketAddress seedContact1() throws UnknownHostException {
-        return new InetSocketAddress("127.0.0.1", testPort1);
-    }
-
-    InetSocketAddress seedContact2() throws UnknownHostException {
-        return new InetSocketAddress("127.0.0.1", testPort2);
     }
 }

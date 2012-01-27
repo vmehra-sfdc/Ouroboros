@@ -38,35 +38,18 @@ import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.smartfrog.services.anubis.partition.test.controller.Controller;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
+import com.hellblazer.jackal.testUtil.TestController;
+import com.hellblazer.jackal.testUtil.TestNode;
+import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
+import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
+import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.functional.util.M;
-import com.salesforce.ouroboros.partition.functional.util.MyControllerConfig;
-import com.salesforce.ouroboros.partition.functional.util.node0;
-import com.salesforce.ouroboros.partition.functional.util.node1;
-import com.salesforce.ouroboros.partition.functional.util.node10;
-import com.salesforce.ouroboros.partition.functional.util.node11;
-import com.salesforce.ouroboros.partition.functional.util.node12;
-import com.salesforce.ouroboros.partition.functional.util.node13;
-import com.salesforce.ouroboros.partition.functional.util.node14;
-import com.salesforce.ouroboros.partition.functional.util.node15;
-import com.salesforce.ouroboros.partition.functional.util.node16;
-import com.salesforce.ouroboros.partition.functional.util.node17;
-import com.salesforce.ouroboros.partition.functional.util.node18;
-import com.salesforce.ouroboros.partition.functional.util.node19;
-import com.salesforce.ouroboros.partition.functional.util.node2;
-import com.salesforce.ouroboros.partition.functional.util.node3;
-import com.salesforce.ouroboros.partition.functional.util.node4;
-import com.salesforce.ouroboros.partition.functional.util.node5;
-import com.salesforce.ouroboros.partition.functional.util.node6;
-import com.salesforce.ouroboros.partition.functional.util.node7;
-import com.salesforce.ouroboros.partition.functional.util.node8;
-import com.salesforce.ouroboros.partition.functional.util.node9;
-import com.salesforce.ouroboros.partition.functional.util.nodeCfg;
-import com.salesforce.ouroboros.testUtils.ControlNode;
-import com.salesforce.ouroboros.testUtils.PartitionController;
+import com.salesforce.ouroboros.partition.functional.util.member;
+import com.salesforce.ouroboros.partition.functional.util.wkMember1;
+import com.salesforce.ouroboros.partition.functional.util.wkMember2;
 import com.salesforce.ouroboros.testUtils.Util;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 
@@ -79,21 +62,24 @@ public class SwitchboardFunctionalTest {
     private static final Logger              log     = Logger.getLogger(SwitchboardFunctionalTest.class.getCanonicalName());
 
     final Class<?>[]                         configs = getConfigs();
-    PartitionController                      controller;
+    TestController                           controller;
     AnnotationConfigApplicationContext       controllerContext;
     CountDownLatch                           initialLatch;
     List<AnnotationConfigApplicationContext> memberContexts;
-    List<ControlNode>                        partition;
+    List<TestNode>                           partition;
+
+    static {
+        GossipTestCfg.setTestPorts(24110, 24220);
+    }
 
     @Before
     public void setUp() throws Exception {
-        nodeCfg.testPort1++;
-        nodeCfg.testPort2++;
+        GossipTestCfg.incrementPorts();
         log.info("Setting up initial partition");
         initialLatch = new CountDownLatch(configs.length);
         controllerContext = new AnnotationConfigApplicationContext(
                                                                    getControllerConfig());
-        controller = (PartitionController) controllerContext.getBean(Controller.class);
+        controller = controllerContext.getBean(TestController.class);
         controller.cardinality = configs.length;
         controller.latch = initialLatch;
         memberContexts = createMembers();
@@ -103,9 +89,9 @@ public class SwitchboardFunctionalTest {
             success = initialLatch.await(120, TimeUnit.SECONDS);
             assertTrue("Initial partition did not acheive stability", success);
             log.info("Initial partition stable");
-            partition = new ArrayList<ControlNode>();
+            partition = new ArrayList<TestNode>();
             for (AnnotationConfigApplicationContext context : memberContexts) {
-                ControlNode member = (ControlNode) controller.getNode(context.getBean(Identity.class));
+                TestNode member = (TestNode) controller.getNode(context.getBean(Identity.class));
                 assertNotNull("Can't find node: "
                                       + context.getBean(Identity.class), member);
                 partition.add(member);
@@ -146,7 +132,7 @@ public class SwitchboardFunctionalTest {
     public void testDiscovery() throws Exception {
         List<M> vnodes = new ArrayList<M>();
         for (AnnotationConfigApplicationContext context : memberContexts) {
-            vnodes.add(context.getBean(M.class));
+            vnodes.add((M) context.getBean(Switchboard.class).getMember());
         }
         assertEquals(memberContexts.size(), vnodes.size());
         for (M m : vnodes) {
@@ -162,22 +148,24 @@ public class SwitchboardFunctionalTest {
     }
 
     protected Class<?>[] getConfigs() {
-        return new Class[] { node0.class, node1.class, node2.class,
-                node3.class, node4.class, node5.class, node6.class,
-                node7.class, node8.class, node9.class, node10.class,
-                node11.class, node12.class, node13.class, node14.class,
-                node15.class, node16.class, node17.class, node18.class,
-                node19.class };
+        return new Class[] { wkMember1.class, wkMember2.class, member.class,
+                member.class, member.class, member.class, member.class,
+                member.class, member.class, member.class, member.class,
+                member.class, member.class, member.class, member.class,
+                member.class, member.class, member.class, member.class,
+                member.class };
     }
 
     protected Class<?> getControllerConfig() {
-        return MyControllerConfig.class;
+        return GossipControllerCfg.class;
     }
 
     private List<AnnotationConfigApplicationContext> createMembers() {
         ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
         for (Class<?> config : configs) {
-            contexts.add(new AnnotationConfigApplicationContext(config));
+            AnnotationConfigApplicationContext ctxt = new AnnotationConfigApplicationContext(
+                                                                                             config);
+            contexts.add(ctxt);
         }
         return contexts;
     }
