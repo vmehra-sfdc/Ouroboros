@@ -407,7 +407,7 @@ public class TestSpindleCluster {
                            entry.getValue(), batches, batchSize);
         }
         assertTrue("Events not published",
-                   producerLatch.await(240, TimeUnit.SECONDS));
+                   producerLatch.await(60, TimeUnit.SECONDS));
 
         asymmetricallyPartition();
 
