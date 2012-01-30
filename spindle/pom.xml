@@ -24,6 +24,13 @@
 			<groupId>com.salesforce.ouroboros</groupId>
 			<artifactId>common</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
+			<type>jar</type>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.salesforce.ouroboros</groupId>
+			<artifactId>common</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
@@ -47,17 +54,17 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>com.salesforce.ouroboros</groupId>
-			<artifactId>common</artifactId>
+			<groupId>com.hellblazer.anubis</groupId>
+			<artifactId>anubis</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
-			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.hellblazer.anubis</groupId>
 			<artifactId>anubis</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
-			<scope>compile</scope>
+			<type>test-jar</type>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>

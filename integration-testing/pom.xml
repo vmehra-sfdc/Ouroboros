@@ -38,13 +38,6 @@
 		</dependency>
 		<dependency>
 			<groupId>com.salesforce.ouroboros</groupId>
-			<artifactId>producer</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.salesforce.ouroboros</groupId>
 			<artifactId>spindle</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 			<type>jar</type>
@@ -68,6 +61,13 @@
 			<artifactId>cglib-nodep</artifactId>
 			<version>2.2.2</version>
 			<type>jar</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.hellblazer.anubis</groupId>
+			<artifactId>anubis</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
