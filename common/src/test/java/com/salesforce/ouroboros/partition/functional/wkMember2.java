@@ -1,11 +1,11 @@
 /**
  */
-package com.salesforce.ouroboros.partition.functional.util;
+package com.salesforce.ouroboros.partition.functional;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
-import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode1Cfg;
+import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode2Cfg;
 
 /**
  * @author hhildebrand
@@ -13,11 +13,10 @@ import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode1Cfg;
  */
 @Configuration
 @Import({ nodeCfg.class })
-public class wkMember1 extends GossipDiscoveryNode1Cfg {
-
+public class wkMember2 extends GossipDiscoveryNode2Cfg {
     @Override
     protected int node() {
-        return 0;
+        return member.id.incrementAndGet();
     }
 
 }

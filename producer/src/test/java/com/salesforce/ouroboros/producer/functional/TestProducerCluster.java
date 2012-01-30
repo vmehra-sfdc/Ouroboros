@@ -55,12 +55,6 @@ import com.salesforce.ouroboros.producer.Coordinator;
 import com.salesforce.ouroboros.producer.CoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.producer.Producer;
-import com.salesforce.ouroboros.producer.functional.util.ClusterMaster;
-import com.salesforce.ouroboros.producer.functional.util.ClusterMasterCfg;
-import com.salesforce.ouroboros.producer.functional.util.FakeSpindleCfg;
-import com.salesforce.ouroboros.producer.functional.util.weaver;
-import com.salesforce.ouroboros.producer.functional.util.weaver0;
-import com.salesforce.ouroboros.producer.functional.util.weaver2;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
@@ -110,7 +104,6 @@ public class TestProducerCluster {
     @Before
     public void startUp() throws Exception {
         GossipTestCfg.incrementPorts();
-        FakeSpindleCfg.reset();
         weaver.reset();
         log.info("Setting up initial partition");
         CountDownLatch initialLatch = new CountDownLatch(configs.length + 3);

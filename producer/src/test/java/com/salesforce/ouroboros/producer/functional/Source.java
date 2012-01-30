@@ -1,4 +1,4 @@
-package com.salesforce.ouroboros.producer.functional.util;
+package com.salesforce.ouroboros.producer.functional;
 
 import java.util.Map;
 import java.util.UUID;

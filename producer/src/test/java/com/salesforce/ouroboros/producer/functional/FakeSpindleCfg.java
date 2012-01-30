@@ -1,36 +1,19 @@
-package com.salesforce.ouroboros.producer.functional.util;
-
-import java.io.IOException;
+package com.salesforce.ouroboros.producer.functional;
 
 import org.smartfrog.services.anubis.partition.Partition;
-import org.smartfrog.services.anubis.partition.util.Identity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.testUtil.gossip.GossipNodeCfg;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
 
-@Configuration
-public class ClusterMasterCfg extends GossipNodeCfg {
+public class FakeSpindleCfg extends GossipNodeCfg { 
+
     @Autowired
-    private Partition partitionManager;
-
-    @Bean
-    public ClusterMaster clusterMaster() {
-        return new ClusterMaster(switchboard());
-    }
-
-    @Override
-    public int getMagic() {
-        try {
-            return Identity.getMagicFromLocalIpAddress();
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
-    }
+    private Partition                  partitionManager;
+    private int                        node = -1;
 
     @Bean
     public Node memberNode() {
@@ -38,8 +21,12 @@ public class ClusterMasterCfg extends GossipNodeCfg {
     }
 
     @Override
+    @Bean
     public int node() {
-        return 0;
+        if (node == -1) {
+            node = weaver.id.incrementAndGet();
+        }
+        return node;
     }
 
     @Bean
@@ -48,6 +35,7 @@ public class ClusterMasterCfg extends GossipNodeCfg {
                                                   memberNode(),
                                                   partitionManager,
                                                   Generators.timeBasedGenerator());
+        new FakeSpindle(switchboard);
         return switchboard;
     }
 }

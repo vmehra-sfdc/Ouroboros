@@ -62,13 +62,6 @@ import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
 import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Weaver;
-import com.salesforce.ouroboros.spindle.functional.util.ClusterMaster;
-import com.salesforce.ouroboros.spindle.functional.util.ClusterMasterCfg;
-import com.salesforce.ouroboros.spindle.functional.util.Producer;
-import com.salesforce.ouroboros.spindle.functional.util.nodeCfg;
-import com.salesforce.ouroboros.spindle.functional.util.spindle;
-import com.salesforce.ouroboros.spindle.functional.util.spindle1;
-import com.salesforce.ouroboros.spindle.functional.util.spindle2;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
@@ -89,6 +82,7 @@ public class TestSpindleCluster {
     private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs       = new Class[] {
             spindle1.class, spindle.class, spindle.class, spindle.class,
+            spindle.class, spindle.class, spindle.class, spindle.class,
             spindle.class, spindle2.class                         };
     private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
@@ -528,7 +522,7 @@ public class TestSpindleCluster {
     private ArrayList<UUID> openChannels() throws InterruptedException {
         log.info("Creating some channels");
 
-        int numOfChannels = 60;
+        int numOfChannels = 100;
         ArrayList<UUID> channels = new ArrayList<UUID>();
         for (int i = 0; i < numOfChannels; i++) {
             UUID channel = new UUID(twister.nextLong(), twister.nextLong());

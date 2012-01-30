@@ -1,4 +1,4 @@
-package com.salesforce.ouroboros.producer.functional.util;
+package com.salesforce.ouroboros.partition.functional;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -10,11 +10,11 @@ import com.hellblazer.jackal.testUtil.gossip.GossipNodeCfg;
 
 @Configuration
 @Import({ nodeCfg.class })
-public class weaver extends GossipNodeCfg {
-    private static final AtomicInteger id = new AtomicInteger(3);
-    
-    public static void reset() {
-        id.set(3);
+public class member extends GossipNodeCfg {
+    final static AtomicInteger id = new AtomicInteger(-1);
+
+    static void reset() {
+        id.set(-1);
     }
 
     @Override

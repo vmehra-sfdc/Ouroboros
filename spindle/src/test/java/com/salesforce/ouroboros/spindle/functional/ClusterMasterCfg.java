@@ -1,4 +1,4 @@
-package com.salesforce.ouroboros.spindle.functional.util;
+package com.salesforce.ouroboros.spindle.functional;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -17,6 +17,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
 public class ClusterMasterCfg extends GossipNodeCfg {
     @Autowired
     private Partition partitionManager;
+    private int                node = -1;
 
     @Bean
     public ClusterMaster clusterMaster() {
@@ -30,7 +31,10 @@ public class ClusterMasterCfg extends GossipNodeCfg {
 
     @Override
     public int node() {
-        return 0;
+        if (node == -1) {
+            node = spindle.id.incrementAndGet();
+        }
+        return node;
     }
 
     @Bean

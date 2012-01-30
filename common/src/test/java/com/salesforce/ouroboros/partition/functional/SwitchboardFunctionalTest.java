@@ -46,10 +46,6 @@ import com.hellblazer.jackal.testUtil.TestNode;
 import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.partition.functional.util.M;
-import com.salesforce.ouroboros.partition.functional.util.member;
-import com.salesforce.ouroboros.partition.functional.util.wkMember1;
-import com.salesforce.ouroboros.partition.functional.util.wkMember2;
 import com.salesforce.ouroboros.testUtils.Util;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 
@@ -75,6 +71,7 @@ public class SwitchboardFunctionalTest {
     @Before
     public void setUp() throws Exception {
         GossipTestCfg.incrementPorts();
+        member.reset();
         log.info("Setting up initial partition");
         initialLatch = new CountDownLatch(configs.length);
         controllerContext = new AnnotationConfigApplicationContext(

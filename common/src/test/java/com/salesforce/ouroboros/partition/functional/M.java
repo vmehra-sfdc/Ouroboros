@@ -1,9 +1,7 @@
-package com.salesforce.ouroboros.producer.functional.util;
+package com.salesforce.ouroboros.partition.functional;
 
 import java.io.Serializable;
-import java.net.InetSocketAddress;
 
-import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -14,34 +12,26 @@ import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 
-public class FakeSpindle implements Member {
-    int               PORT = 55555;
-    final Switchboard switchboard;
+public class M implements Member {
+    public final Node        node;
+    public volatile boolean  stabilized = false;
+    public final Switchboard switchboard;
 
-    public FakeSpindle(Switchboard switchboard) {
-        this.switchboard = switchboard;
+    M(Node n, Switchboard s) {
+        node = n;
+        switchboard = s;
         switchboard.setMember(this);
     }
 
     @Override
     public void advertise() {
-        ContactInformation info = new ContactInformation(
-                                                         new InetSocketAddress(
-                                                                               "127.0.0.1",
-                                                                               PORT++),
-                                                         null, null);
-        switchboard.ringCast(new Message(
-                                         switchboard.getId(),
-                                         DiscoveryMessage.ADVERTISE_CHANNEL_BUFFER,
-                                         info, true));
-    }
-
-    @Override
-    public void becomeInactive() {
+        switchboard.ringCast(new Message(node,
+                                         DiscoveryMessage.ADVERTISE_CONSUMER));
     }
 
     @Override
     public void destabilize() {
+        stabilized = false;
     }
 
     @Override
@@ -52,11 +42,14 @@ public class FakeSpindle implements Member {
     @Override
     public void dispatch(ChannelMessage type, Node sender,
                          Serializable[] arguments, long time) {
+
     }
 
     @Override
-    public void dispatch(DiscoveryMessage type, Node sender,
+    public void dispatch(DiscoveryMessage type,
+                         com.salesforce.ouroboros.Node sender,
                          Serializable[] arguments, long time) {
+
     }
 
     @Override
@@ -67,10 +60,18 @@ public class FakeSpindle implements Member {
     @Override
     public void dispatch(WeaverRebalanceMessage type, Node sender,
                          Serializable[] arguments, long time) {
+
     }
 
     @Override
     public void stabilized() {
+        stabilized = true;
+    }
+
+    @Override
+    public void becomeInactive() {
+        // TODO Auto-generated method stub
+
     }
 
 }

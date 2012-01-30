@@ -1,4 +1,4 @@
-package com.salesforce.ouroboros.spindle.functional.util;
+package com.salesforce.ouroboros.spindle.functional;
 
 import java.io.File;
 import java.io.IOException;
