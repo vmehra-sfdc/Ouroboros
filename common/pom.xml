@@ -24,15 +24,8 @@
 			<groupId>com.hellblazer.anubis</groupId>
 			<artifactId>anubis</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
-			<type>jar</type>
-			<scope>compile</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.hellblazer.anubis</groupId>
-			<artifactId>anubis</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
 			<type>test-jar</type>
-			<scope>compile</scope>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.uuid</groupId>
