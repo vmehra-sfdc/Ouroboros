@@ -26,11 +26,8 @@
 package com.salesforce.ouroboros.spindle.replication;
 
 import java.io.IOException;
-import java.lang.Thread.UncaughtExceptionHandler;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -47,42 +44,24 @@ import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.Duplicator
  */
 public final class Duplicator {
 
-    static final Logger                     log          = Logger.getLogger(Duplicator.class.getCanonicalName());
+    static final Logger             log     = Logger.getLogger(Duplicator.class.getCanonicalName());
 
-    private final Thread                    consumer;
-    private final Semaphore                 consumerGate = new Semaphore(0);
-    private volatile EventEntry                      current;
-    private final DuplicatorContext         fsm          = new DuplicatorContext(
-                                                                                 this);
-    private SocketChannelHandler            handler;
-    private boolean                         inError;
-    private final BlockingQueue<EventEntry> pending      = new LinkedBlockingQueue<EventEntry>();
-    private long                            position;
-    private int                             remaining;
-    private final AtomicBoolean             running      = new AtomicBoolean(
-                                                                             true);
-    private final Node                      thisNode;
+    private EventEntry              current;
+    private final DuplicatorContext fsm     = new DuplicatorContext(this);
+    private SocketChannelHandler    handler;
+    private boolean                 inError;
+    private final Queue<EventEntry> pending = new LinkedList<EventEntry>();
+    private long                    position;
+    private int                     remaining;
+    private final Node              thisNode;
 
     public Duplicator(Node node) {
         fsm.setName(Integer.toString(node.processId));
         thisNode = node;
-        consumer = new Thread(consumer(),
-                              String.format("Duplicator consumer for %s",
-                                            thisNode));
-        consumer.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
-            @Override
-            public void uncaughtException(Thread t, Throwable e) {
-                log.log(Level.SEVERE,
-                        String.format("Exception in %s on %s", t, thisNode), e);
-            }
-        });
-        consumer.setDaemon(true);
-        consumer.start();
     }
 
     public void connect(SocketChannelHandler handler) {
         this.handler = handler;
-        next();
     }
 
     /**
@@ -100,40 +79,11 @@ public final class Duplicator {
             log.fine(String.format("Replicating event %s on %s", event,
                                    thisNode));
         }
-        pending.add(event);
+        fsm.replicate(event);
     }
 
     public void writeReady() {
         fsm.writeReady();
-    }
-
-    private Runnable consumer() {
-        return new Runnable() {
-            @Override
-            public void run() {
-                while (running.get()) {
-                    try {
-                        if (log.isLoggable(Level.FINEST)) {
-                            log.finest(String.format("waiting for event on %s",
-                                                     thisNode));
-                        }
-                        consumerGate.acquire();
-                        if (!running.get()) {
-                            return;
-                        }
-                        if (log.isLoggable(Level.FINEST)) {
-                            log.finest(String.format("acquired event on %s",
-                                                     thisNode));
-                        }
-                        assert current == null : "Concurrent events are being processed";
-                        current = pending.take();
-                    } catch (InterruptedException e) {
-                        return;
-                    }
-                    fsm.replicate();
-                }
-            }
-        };
     }
 
     private boolean transferTo() throws IOException {
@@ -173,13 +123,6 @@ public final class Duplicator {
         return inError;
     }
 
-    protected void next() {
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Triggering consumer gate on %s", thisNode));
-        }
-        consumerGate.release();
-    }
-
     protected void processBatch() {
         if (writeBatch()) {
             fsm.batchWritten();
@@ -197,6 +140,7 @@ public final class Duplicator {
     }
 
     protected void processHeader() {
+        current = pending.remove();
         if (log.isLoggable(Level.FINER)) {
             log.finer(String.format("Processing %s on %s", current.header,
                                     thisNode));
@@ -268,7 +212,13 @@ public final class Duplicator {
 
     protected boolean hasNext() {
         assert current == null : "Concurrent events are being processed";
-        current = pending.poll();
-        return current != null;
+        return pending.peek() != null;
+    }
+
+    /**
+     * @param event
+     */
+    protected void enqueue(EventEntry event) {
+        pending.add(event);
     }
 }

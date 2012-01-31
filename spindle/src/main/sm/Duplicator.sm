@@ -39,14 +39,11 @@
 %start DuplicatorFSM::Waiting
 %map DuplicatorFSM
 %% 
-Waiting
-Entry {
-	next();
-}
-{
-	replicate
-		WriteHeader{}
-		
+Waiting {
+	replicate(event: EventEntry)
+		WriteHeader{
+			enqueue(event);
+		}
 	writeReady
 		nil{}
 }
@@ -111,8 +108,10 @@ Entry {
 }
 
 Default {
-	replicate
-		nil{}
+	replicate(event: EventEntry)
+		nil{
+			enqueue(event);
+		}
 		
 	close
 		Closed{}

@@ -37,6 +37,8 @@
         </th>
         <th>
           replicate
+          <br>
+          (EventEntry)
         </th>
         <th>
           writeReady
@@ -50,9 +52,6 @@
           Waiting
         </td>
         <td>
-          <pre>
-next();
-          </pre>
         </td>
         <td>
         </td>
@@ -65,7 +64,9 @@ next();
         <td>
           <pre>
   WriteHeader
-  {}
+  {
+    enqueue(event);
+  }
           </pre>
         </td>
         <td>
@@ -83,7 +84,7 @@ next();
         </td>
         <td>
           <pre>
-processHeader();
+    processHeader();
           </pre>
         </td>
         <td>
