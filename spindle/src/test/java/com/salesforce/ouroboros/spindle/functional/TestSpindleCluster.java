@@ -374,7 +374,7 @@ public class TestSpindleCluster {
                                              new SocketOptions(),
                                              Executors.newCachedThreadPool());
         producerHandler.start();
-        int batches = 2500;
+        int batches = 1250;
         int batchSize = 10;
         bootstrap();
 
@@ -521,7 +521,7 @@ public class TestSpindleCluster {
     private ArrayList<UUID> openChannels() throws InterruptedException {
         log.info("Creating some channels");
 
-        int numOfChannels = 100;
+        int numOfChannels = 50;
         ArrayList<UUID> channels = new ArrayList<UUID>();
         for (int i = 0; i < numOfChannels; i++) {
             UUID channel = new UUID(twister.nextLong(), twister.nextLong());
