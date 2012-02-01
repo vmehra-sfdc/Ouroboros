@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 import com.fasterxml.uuid.Generators;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.spindle.Coordinator;
+import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverConfigation;
 
@@ -40,8 +40,8 @@ public class nodeCfg {
     }
 
     @Bean
-    public Coordinator coordinator() throws IOException {
-        return new Coordinator(timer(), switchboard(), weaver());
+    public WeaverCoordinator coordinator() throws IOException {
+        return new WeaverCoordinator(timer(), switchboard(), weaver());
     }
 
     @Bean

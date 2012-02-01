@@ -62,7 +62,7 @@ public class TestCoordinator {
         when(producer.getId()).thenReturn(self);
         Switchboard switchboard = mock(Switchboard.class);
 
-        Coordinator coordinator = new Coordinator(switchboard, producer);
+        ProducerCoordinator coordinator = new ProducerCoordinator(switchboard, producer);
         coordinator.advertise();
         verify(switchboard).ringCast(messageCaptor.capture());
         assertEquals(DiscoveryMessage.ADVERTISE_PRODUCER,

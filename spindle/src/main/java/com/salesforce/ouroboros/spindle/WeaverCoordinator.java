@@ -54,7 +54,7 @@ import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
-import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorState;
+import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext.WeaverCoordinatorState;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
@@ -67,16 +67,16 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * @author hhildebrand
  * 
  */
-public class Coordinator implements Member {
+public class WeaverCoordinator implements Member {
 
-    private final static Logger                 log             = Logger.getLogger(Coordinator.class.getCanonicalName());
+    private final static Logger                 log             = Logger.getLogger(WeaverCoordinator.class.getCanonicalName());
     static final int                            DEFAULT_TIMEOUT = 5;
     static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
 
     private boolean                             active          = false;
     private final SortedSet<Node>               activeMembers   = new ConcurrentSkipListSet<Node>();
-    private final CoordinatorContext            fsm             = new CoordinatorContext(
-                                                                                         this);
+    private final WeaverCoordinatorContext      fsm             = new WeaverCoordinatorContext(
+                                                                                               this);
     private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
     private Node[]                              joiningMembers  = new Node[0];
     private final SortedSet<Node>               nextMembership  = new ConcurrentSkipListSet<Node>();
@@ -88,8 +88,9 @@ public class Coordinator implements Member {
     private final Weaver                        weaver;
     private final Map<Node, ContactInformation> yellowPages     = new ConcurrentHashMap<Node, ContactInformation>();
 
-    public Coordinator(ScheduledExecutorService timer, Switchboard switchboard,
-                       Weaver weaver) throws IOException {
+    public WeaverCoordinator(ScheduledExecutorService timer,
+                             Switchboard switchboard, Weaver weaver)
+                                                                    throws IOException {
         this.timer = timer;
         this.switchboard = switchboard;
         this.weaver = weaver;
@@ -138,7 +139,7 @@ public class Coordinator implements Member {
     public void dispatch(BootstrapMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
-            case BOOTSTAP_PRODUCERS:
+            case BOOTSTRAP_PRODUCERS:
                 break;
             case BOOTSTRAP_SPINDLES:
                 if (log.isLoggable(Level.INFO)) {
@@ -291,7 +292,7 @@ public class Coordinator implements Member {
      * @return the state of the reciver. return null if the state is undefined,
      *         such as when the coordinator is transititioning between states
      */
-    public CoordinatorState getState() {
+    public WeaverCoordinatorState getState() {
         try {
             return fsm.getState();
         } catch (StateUndefinedException e) {
@@ -838,7 +839,7 @@ public class Coordinator implements Member {
      * 
      * @return the FSM for the receiver
      */
-    CoordinatorContext getFsm() {
+    WeaverCoordinatorContext getFsm() {
         return fsm;
     }
 

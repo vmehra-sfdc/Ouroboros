@@ -23,27 +23,25 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.partition.messages;
+package com.salesforce.ouroboros.integration;
 
-import java.io.Serializable;
+import java.util.Map;
+import java.util.UUID;
 
-import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.MemberDispatch;
-import com.salesforce.ouroboros.partition.Message;
-import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.api.producer.EventSource;
 
-/**
- * 
- * @author hhildebrand
- * 
- */
-public enum BootstrapMessage implements MemberDispatch {
-    BOOTSTRAP_SPINDLES, BOOTSTRAP_PRODUCERS;
+public class Source implements EventSource {
 
     @Override
-    public void dispatch(Switchboard switchboard, Node sender,
-                         Serializable[] arguments, long time) {
-        switchboard.dispatchToMember(this, sender, arguments, time);
-        switchboard.forwardToNextInRing(new Message(sender, this, arguments));
+    public void assumePrimary(Map<UUID, Long> newPrimaries) {
     }
+
+    @Override
+    public void closed(UUID channel) {
+    }
+
+    @Override
+    public void opened(UUID channel) {
+    }
+
 }

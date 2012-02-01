@@ -51,10 +51,10 @@ import com.hellblazer.jackal.testUtil.TestNode;
 import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.producer.Coordinator;
-import com.salesforce.ouroboros.producer.CoordinatorContext.ControllerFSM;
-import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.producer.Producer;
+import com.salesforce.ouroboros.producer.ProducerCoordinator;
+import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.ControllerFSM;
+import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
@@ -76,20 +76,20 @@ public class TestProducerCluster {
             weaver.class, weaver2.class                     };
     private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
-    private List<Coordinator>                        coordinators;
+    private List<ProducerCoordinator>                        coordinators;
     private List<AnnotationConfigApplicationContext> fakeSpindleContexts;
     private Node[]                                   fakeSpindleNodes;
     private List<TestNode>                           fullPartition;
     private List<Node>                               fullPartitionId;
     private BitView                                  fullView;
     private List<TestNode>                           majorGroup;
-    private List<Coordinator>                        majorPartition;
+    private List<ProducerCoordinator>                        majorPartition;
     private List<Node>                               majorPartitionId;
     private List<Producer>                           majorProducers;
     private BitView                                  majorView;
     private List<AnnotationConfigApplicationContext> memberContexts;
     private List<TestNode>                           minorGroup;
-    private List<Coordinator>                        minorPartition;
+    private List<ProducerCoordinator>                        minorPartition;
     private List<Node>                               minorPartitionId;
     private List<Producer>                           minorProducers;
     private BitView                                  minorView;
@@ -128,7 +128,7 @@ public class TestProducerCluster {
             assertTrue("Initial partition did not acheive stability", success);
             log.info("Initial partition stable");
             fullPartition = new ArrayList<TestNode>();
-            coordinators = new ArrayList<Coordinator>();
+            coordinators = new ArrayList<ProducerCoordinator>();
             producers = new ArrayList<Producer>();
             fullPartitionId = new ArrayList<Node>();
             for (AnnotationConfigApplicationContext context : memberContexts) {
@@ -136,7 +136,7 @@ public class TestProducerCluster {
                 assertNotNull("Can't find node: "
                                       + context.getBean(Identity.class), node);
                 fullPartition.add(node);
-                Coordinator coordinator = context.getBean(Coordinator.class);
+                ProducerCoordinator coordinator = context.getBean(ProducerCoordinator.class);
                 fullPartitionId.add(coordinator.getId());
                 assertNotNull("Can't find coordinator in context: " + context,
                               coordinator);
@@ -168,8 +168,8 @@ public class TestProducerCluster {
         }
         fakeSpindleNodes = nodes.toArray(new Node[nodes.size()]);
 
-        majorPartition = new ArrayList<Coordinator>();
-        minorPartition = new ArrayList<Coordinator>();
+        majorPartition = new ArrayList<ProducerCoordinator>();
+        minorPartition = new ArrayList<ProducerCoordinator>();
 
         majorGroup = new ArrayList<TestNode>();
         minorGroup = new ArrayList<TestNode>();
@@ -185,7 +185,7 @@ public class TestProducerCluster {
         // Form the major partition
         for (int i = 0; i < majorPartitionSize; i++) {
             TestNode member = fullPartition.get(i);
-            Coordinator coordinator = coordinators.get(i);
+            ProducerCoordinator coordinator = coordinators.get(i);
             majorPartitionId.add(fullPartitionId.get(i));
             majorPartition.add(coordinator);
             fullView.add(member.getIdentity());
@@ -205,7 +205,7 @@ public class TestProducerCluster {
         // Form the minor partition
         for (int i = majorPartitionSize; i < coordinators.size(); i++) {
             TestNode member = fullPartition.get(i);
-            Coordinator coordinator = coordinators.get(i);
+            ProducerCoordinator coordinator = coordinators.get(i);
             minorPartitionId.add(coordinator.getId());
             minorPartition.add(coordinator);
             fullView.add(member.getIdentity());
@@ -306,7 +306,7 @@ public class TestProducerCluster {
 
         // Rebalance the open channels across the major partition
         log.info("Initiating rebalance on majority partition");
-        Coordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
+        ProducerCoordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
         assertTrue("coordinator is not the leader",
                    partitionLeader.isActiveLeader());
         partitionLeader.initiateRebalance();
@@ -346,7 +346,7 @@ public class TestProducerCluster {
         log.info("Activating minor partition");
         // Now add the minor partition back into the active set
         ArrayList<Node> minorPartitionNodes = new ArrayList<Node>();
-        for (Coordinator c : minorPartition) {
+        for (ProducerCoordinator c : minorPartition) {
             minorPartitionNodes.add(c.getId());
         }
         partitionLeader.initiateRebalance(minorPartitionNodes.toArray(new Node[0]));
@@ -480,10 +480,10 @@ public class TestProducerCluster {
         log.info("Full partition has stabilized");
     }
 
-    protected void assertPartitionActive(List<Coordinator> partition)
+    protected void assertPartitionActive(List<ProducerCoordinator> partition)
                                                                      throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
+        for (ProducerCoordinator coordinator : partition) {
+            final ProducerCoordinator c = coordinator;
             waitFor("Coordinator never entered the active state: "
                     + coordinator, new Condition() {
                 @Override
@@ -494,10 +494,10 @@ public class TestProducerCluster {
         }
     }
 
-    protected void assertPartitionAwaitingFailover(List<Coordinator> partition)
+    protected void assertPartitionAwaitingFailover(List<ProducerCoordinator> partition)
                                                                                throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
+        for (ProducerCoordinator coordinator : partition) {
+            final ProducerCoordinator c = coordinator;
             waitFor("Coordinator never entered the awaiting failover state: "
                     + coordinator, new Condition() {
                 @Override
@@ -508,10 +508,10 @@ public class TestProducerCluster {
         }
     }
 
-    protected void assertPartitionBootstrapping(List<Coordinator> partition)
+    protected void assertPartitionBootstrapping(List<ProducerCoordinator> partition)
                                                                             throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
+        for (ProducerCoordinator coordinator : partition) {
+            final ProducerCoordinator c = coordinator;
             waitFor("Coordinator never entered the bootstrapping state: "
                     + coordinator, new Condition() {
                 @Override
@@ -523,10 +523,10 @@ public class TestProducerCluster {
         }
     }
 
-    protected void assertPartitionInactive(List<Coordinator> partition)
+    protected void assertPartitionInactive(List<ProducerCoordinator> partition)
                                                                        throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
+        for (ProducerCoordinator coordinator : partition) {
+            final ProducerCoordinator c = coordinator;
             waitFor("Coordinator never entered the inactive state: "
                     + coordinator, new Condition() {
                 @Override
@@ -537,10 +537,10 @@ public class TestProducerCluster {
         }
     }
 
-    protected void assertPartitionStable(List<Coordinator> partition)
+    protected void assertPartitionStable(List<ProducerCoordinator> partition)
                                                                      throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
+        for (ProducerCoordinator coordinator : partition) {
+            final ProducerCoordinator c = coordinator;
             waitFor("Coordinator never entered the stable state: "
                     + coordinator, new Condition() {
                 @Override

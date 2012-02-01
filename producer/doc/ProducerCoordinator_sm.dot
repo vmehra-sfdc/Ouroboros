@@ -1,4 +1,4 @@
-digraph Coordinator {
+digraph ProducerCoordinator {
 
     node
         [shape=Mrecord width=1.5];

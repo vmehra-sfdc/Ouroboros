@@ -45,11 +45,11 @@ public enum UpdateMessage implements MemberDispatch {
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
-        if (!(switchboard.getMember() instanceof Coordinator)) {
+        if (!(switchboard.getMember() instanceof ProducerCoordinator)) {
             log.warning(String.format("ReplicatorMessage %s must be targeted at producer coordinator, not %s",
                                       this, switchboard.getMember()));
         }
-        Coordinator coordinator = (Coordinator) switchboard.getMember();
+        ProducerCoordinator coordinator = (ProducerCoordinator) switchboard.getMember();
         if (!coordinator.getId().equals(arguments[0])) {
             switchboard.forwardToNextInRing(new Message(sender, this, arguments),
                                             coordinator.getNextProducerMembership());

@@ -45,12 +45,12 @@ public enum RebalancedMessage implements MemberDispatch {
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
-        if (!(switchboard.getMember() instanceof Coordinator)) {
+        if (!(switchboard.getMember() instanceof WeaverCoordinator)) {
             log.warning(String.format("RebalancedMessage %s must be targeted at weaver coordinator, not %s",
                                       this, switchboard.getMember()));
             return;
         }
-        Coordinator coordinator = (Coordinator) switchboard.getMember();
+        WeaverCoordinator coordinator = (WeaverCoordinator) switchboard.getMember();
         coordinator.dispatch(this, sender, arguments, time);
     }
 }

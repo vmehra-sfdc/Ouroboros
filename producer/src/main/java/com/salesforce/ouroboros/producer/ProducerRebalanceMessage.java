@@ -44,7 +44,7 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
         @Override
         void dispatch(Switchboard switchboard, Node sender,
                       Serializable[] arguments, long time,
-                      Coordinator coordinator) {
+                      ProducerCoordinator coordinator) {
             coordinator.dispatch(this, sender, arguments, time, switchboard);
         }
 
@@ -52,7 +52,7 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
     TAKEOVER {
         void dispatch(Switchboard switchboard, Node sender,
                       Serializable[] arguments, long time,
-                      Coordinator coordinator) {
+                      ProducerCoordinator coordinator) {
             coordinator.dispatch(this, sender, arguments, time, switchboard);
             switchboard.forwardToNextInRing(new Message(sender, this, arguments),
                                             coordinator.getActiveProducers());
@@ -64,18 +64,18 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
-        if (!(switchboard.getMember() instanceof Coordinator)) {
+        if (!(switchboard.getMember() instanceof ProducerCoordinator)) {
             log.warning(String.format("ReplicatorMessage %s must be targeted at producer coordinator, not %s",
                                       this, switchboard.getMember()));
             return;
         }
-        Coordinator coordinator = (Coordinator) switchboard.getMember();
+        ProducerCoordinator coordinator = (ProducerCoordinator) switchboard.getMember();
         dispatch(switchboard, sender, arguments, time, coordinator);
 
     }
 
     void dispatch(Switchboard switchboard, Node sender,
-                  Serializable[] arguments, long time, Coordinator coordinator) {
+                  Serializable[] arguments, long time, ProducerCoordinator coordinator) {
         coordinator.dispatch(this, sender, arguments, time, switchboard);
         switchboard.forwardToNextInRing(new Message(sender, this, arguments),
                                         coordinator.getNextProducerMembership());

@@ -57,11 +57,11 @@ import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
 import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.Coordinator;
-import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
-import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Weaver;
+import com.salesforce.ouroboros.spindle.WeaverCoordinator;
+import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext.BootstrapFSM;
+import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
@@ -85,18 +85,18 @@ public class TestSpindleCluster {
             spindle.class, spindle2.class                         };
     private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
-    private List<Coordinator>                        coordinators;
+    private List<WeaverCoordinator>                        coordinators;
     private List<TestNode>                           fullPartition;
     private List<Node>                               fullPartitionId;
     private BitView                                  fullView;
     private List<TestNode>                           majorGroup;
-    private List<Coordinator>                        majorPartition;
+    private List<WeaverCoordinator>                        majorPartition;
     private List<Node>                               majorPartitionId;
     private BitView                                  majorView;
     private List<Weaver>                             majorWeavers;
     private List<AnnotationConfigApplicationContext> memberContexts;
     private List<TestNode>                           minorGroup;
-    private List<Coordinator>                        minorPartition;
+    private List<WeaverCoordinator>                        minorPartition;
     private List<Node>                               minorPartitionId;
     private BitView                                  minorView;
     private List<Weaver>                             minorWeavers;
@@ -125,7 +125,7 @@ public class TestSpindleCluster {
         clusterMaster = clusterMasterContext.getBean(ClusterMaster.class);
         memberContexts = createMembers();
         fullPartition = new ArrayList<TestNode>();
-        coordinators = new ArrayList<Coordinator>();
+        coordinators = new ArrayList<WeaverCoordinator>();
         weavers = new ArrayList<Weaver>();
         log.info("Awaiting initial partition stability");
         boolean success = false;
@@ -139,7 +139,7 @@ public class TestSpindleCluster {
                 assertNotNull("Can't find node: "
                                       + context.getBean(Identity.class), node);
                 fullPartition.add(node);
-                Coordinator coordinator = context.getBean(Coordinator.class);
+                WeaverCoordinator coordinator = context.getBean(WeaverCoordinator.class);
                 fullPartitionId.add(coordinator.getId());
                 assertNotNull("Can't find coordinator in context: " + context,
                               coordinator);
@@ -160,8 +160,8 @@ public class TestSpindleCluster {
         minorView = new BitView();
         fullView = new BitView();
 
-        majorPartition = new ArrayList<Coordinator>();
-        minorPartition = new ArrayList<Coordinator>();
+        majorPartition = new ArrayList<WeaverCoordinator>();
+        minorPartition = new ArrayList<WeaverCoordinator>();
 
         majorGroup = new ArrayList<TestNode>();
         minorGroup = new ArrayList<TestNode>();
@@ -177,7 +177,7 @@ public class TestSpindleCluster {
         // Form the major partition
         for (int i = 0; i < majorPartitionSize; i++) {
             TestNode member = fullPartition.get(i);
-            Coordinator coordinator = coordinators.get(i);
+            WeaverCoordinator coordinator = coordinators.get(i);
             majorPartitionId.add(fullPartitionId.get(i));
             majorPartition.add(coordinator);
             fullView.add(member.getIdentity());
@@ -192,7 +192,7 @@ public class TestSpindleCluster {
         // Form the minor partition
         for (int i = majorPartitionSize; i < coordinators.size(); i++) {
             TestNode member = fullPartition.get(i);
-            Coordinator coordinator = coordinators.get(i);
+            WeaverCoordinator coordinator = coordinators.get(i);
             minorPartitionId.add(coordinator.getId());
             minorPartition.add(coordinator);
             fullView.add(member.getIdentity());
@@ -308,7 +308,7 @@ public class TestSpindleCluster {
 
         // Rebalance the open channels across the major partition
         log.info("Initiating rebalance on majority partition");
-        Coordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
+        WeaverCoordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
         assertTrue("coordinator is not the leader",
                    partitionLeader.isActiveLeader());
         partitionLeader.initiateRebalance();
@@ -335,7 +335,7 @@ public class TestSpindleCluster {
         log.info("Activating minor partition");
         // Now add the minor partition back into the active set
         ArrayList<Node> minorPartitionNodes = new ArrayList<Node>();
-        for (Coordinator c : minorPartition) {
+        for (WeaverCoordinator c : minorPartition) {
             minorPartitionNodes.add(c.getId());
         }
         partitionLeader.initiateRebalance(minorPartitionNodes.toArray(new Node[0]));
@@ -424,7 +424,7 @@ public class TestSpindleCluster {
 
         // Rebalance the open channels across the major partition
         log.info("Initiating rebalance on majority partition");
-        Coordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
+        WeaverCoordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
         assertTrue("coordinator is not the leader",
                    partitionLeader.isActiveLeader());
         partitionLeader.initiateRebalance();
@@ -451,7 +451,7 @@ public class TestSpindleCluster {
         log.info("Activating minor partition");
         // Now add the minor partition back into the active set
         ArrayList<Node> minorPartitionNodes = new ArrayList<Node>();
-        for (Coordinator c : minorPartition) {
+        for (WeaverCoordinator c : minorPartition) {
             minorPartitionNodes.add(c.getId());
         }
         partitionLeader.initiateRebalance(minorPartitionNodes.toArray(new Node[0]));
@@ -661,10 +661,10 @@ public class TestSpindleCluster {
         }
     }
 
-    protected void assertPartitionActive(List<Coordinator> partition)
+    protected void assertPartitionActive(List<WeaverCoordinator> partition)
                                                                      throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
+        for (WeaverCoordinator coordinator : partition) {
+            final WeaverCoordinator c = coordinator;
             waitFor("Coordinator never entered the bootstrapping state: "
                     + coordinator, new Condition() {
                 @Override
@@ -675,10 +675,10 @@ public class TestSpindleCluster {
         }
     }
 
-    protected void assertPartitionBootstrapping(List<Coordinator> partition)
+    protected void assertPartitionBootstrapping(List<WeaverCoordinator> partition)
                                                                             throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
+        for (WeaverCoordinator coordinator : partition) {
+            final WeaverCoordinator c = coordinator;
             waitFor("Coordinator never entered the bootstrapping state: "
                     + coordinator, new Condition() {
                 @Override
@@ -690,10 +690,10 @@ public class TestSpindleCluster {
         }
     }
 
-    protected void assertPartitionInactive(List<Coordinator> partition)
+    protected void assertPartitionInactive(List<WeaverCoordinator> partition)
                                                                        throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
+        for (WeaverCoordinator coordinator : partition) {
+            final WeaverCoordinator c = coordinator;
             waitFor("Coordinator never entered the bootstrapping state: "
                     + coordinator, new Condition() {
                 @Override
@@ -704,10 +704,10 @@ public class TestSpindleCluster {
         }
     }
 
-    protected void assertPartitionStable(List<Coordinator> partition)
+    protected void assertPartitionStable(List<WeaverCoordinator> partition)
                                                                      throws InterruptedException {
-        for (Coordinator coordinator : partition) {
-            final Coordinator c = coordinator;
+        for (WeaverCoordinator coordinator : partition) {
+            final WeaverCoordinator c = coordinator;
             waitFor("Coordinator never entered the stable state: "
                     + coordinator, new Condition() {
                 @Override

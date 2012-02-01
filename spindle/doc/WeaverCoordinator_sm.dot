@@ -1,4 +1,4 @@
-digraph Coordinator {
+digraph WeaverCoordinator {
 
     node
         [shape=Mrecord width=1.5];

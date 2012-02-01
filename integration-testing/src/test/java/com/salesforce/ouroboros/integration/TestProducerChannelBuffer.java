@@ -29,42 +29,33 @@ import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.smartfrog.services.anubis.partition.Partition;
 import org.smartfrog.services.anubis.partition.util.Identity;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 
-import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.testUtil.TestController;
 import com.hellblazer.jackal.testUtil.TestNode;
 import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode1Cfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode2Cfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
-import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardFSM;
-import com.salesforce.ouroboros.producer.Producer;
-import com.salesforce.ouroboros.producer.ProducerConfiguration;
-import com.salesforce.ouroboros.spindle.Weaver;
-import com.salesforce.ouroboros.spindle.WeaverConfigation;
+import com.salesforce.ouroboros.producer.ProducerCoordinator;
+import com.salesforce.ouroboros.producer.ProducerCoordinatorContext;
+import com.salesforce.ouroboros.spindle.WeaverCoordinator;
+import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext;
 import com.salesforce.ouroboros.testUtils.Util;
 import com.salesforce.ouroboros.util.Utils;
 
@@ -74,142 +65,43 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class TestProducerChannelBuffer {
+    private static AtomicInteger id = new AtomicInteger(-1);
 
-    public static class Source implements EventSource {
-
-        @Override
-        public void assumePrimary(Map<UUID, Long> newPrimaries) {
-        }
-
-        @Override
-        public void closed(UUID channel) {
-        }
-
-        @Override
-        public void opened(UUID channel) {
-        }
-
+    public static void reset() {
+        id.set(-1);
     }
 
     @Configuration
-    static class ProducerCfg extends GossipDiscoveryNode1Cfg {
+    @Import(ProducerCfg.class)
+    static class pCfg extends GossipDiscoveryNode1Cfg {
 
-        @Autowired
-        private Partition partitionManager;
+        private int node = -1;
 
-        @Bean
-        public ProducerConfiguration configuration() {
-            return new ProducerConfiguration();
-        }
-
-        @Bean
-        public com.salesforce.ouroboros.producer.Coordinator coordinator()
-                                                                          throws IOException {
-            return new com.salesforce.ouroboros.producer.Coordinator(
-                                                                     switchboard(),
-                                                                     producer());
-        }
-
-        @Bean
-        public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(
-                                                      memberNode(),
-                                                      partitionManager,
-                                                      Generators.timeBasedGenerator());
-            return switchboard;
-        }
-
-        @Bean
-        public Node memberNode() {
-            return new Node(node(), node(), node());
-        }
-
-        /* (non-Javadoc)
-         * @see org.smartfrog.services.anubis.BasicConfiguration#node()
-         */
-        @Override
         public int node() {
-            return 2;
-        }
-
-        @Bean
-        public Producer producer() throws IOException {
-            return new Producer(memberNode(), source(), configuration());
-        }
-
-        @Bean
-        public Source source() {
-            return new Source();
+            if (node == -1) {
+                node = id.incrementAndGet();
+            }
+            return node;
         }
     }
 
     @Configuration
-    static class WeaverCfg extends GossipDiscoveryNode2Cfg {
-        @Autowired
-        private Partition partitionManager;
+    @Import(WeaverCfg.class)
+    static class cbConfig extends GossipDiscoveryNode2Cfg {
 
-        @Bean
-        public com.salesforce.ouroboros.spindle.Coordinator coordinator()
-                                                                         throws IOException {
-            return new com.salesforce.ouroboros.spindle.Coordinator(
-                                                                    timer(),
-                                                                    switchboard(),
-                                                                    weaver());
-        }
+        private int node = -1;
 
-        @Bean
-        public Switchboard switchboard() {
-            Switchboard switchboard = new Switchboard(
-                                                      memberNode(),
-                                                      partitionManager,
-                                                      Generators.timeBasedGenerator());
-            return switchboard;
-        }
-
-        @Bean
-        public Node memberNode() {
-            return new Node(node(), node(), node());
-        }
-
-        /* (non-Javadoc)
-         * @see org.smartfrog.services.anubis.BasicConfiguration#node()
-         */
-        @Override
         public int node() {
-            return 3;
-        }
-
-        @Bean
-        public ScheduledExecutorService timer() {
-            return Executors.newSingleThreadScheduledExecutor();
-        }
-
-        @Bean
-        public Weaver weaver() throws IOException {
-            return new Weaver(weaverConfiguration());
-        }
-
-        private WeaverConfigation weaverConfiguration() throws IOException {
-            File directory = rootDirectory();
-            WeaverConfigation weaverConfigation = new WeaverConfigation();
-            weaverConfigation.setId(memberNode());
-            weaverConfigation.addRoot(directory);
-            return weaverConfigation;
-        }
-
-        @Bean
-        public File rootDirectory() throws IOException {
-            File directory = File.createTempFile("prod-CB", ".root");
-            directory.delete();
-            directory.mkdirs();
-            directory.deleteOnExit();
-            return directory;
+            if (node == -1) {
+                node = id.incrementAndGet();
+            }
+            return node;
         }
     }
 
     private static final Logger        log = Logger.getLogger(TestProducerChannelBuffer.class.getCanonicalName());
     static {
-        GossipTestCfg.setTestPorts(24020, 24040);
+        GossipTestCfg.setTestPorts(24120, 24140);
     }
 
     TestController                     controller;
@@ -229,9 +121,8 @@ public class TestProducerChannelBuffer {
         controller = controllerContext.getBean(TestController.class);
         controller.cardinality = 2;
         controller.latch = initialLatch;
-        producerContext = new AnnotationConfigApplicationContext(
-                                                                 ProducerCfg.class);
-        weaverContext = new AnnotationConfigApplicationContext(WeaverCfg.class);
+        producerContext = new AnnotationConfigApplicationContext(pCfg.class);
+        weaverContext = new AnnotationConfigApplicationContext(cbConfig.class);
         log.info("Awaiting initial partition stability");
         boolean success = false;
         try {
@@ -306,8 +197,8 @@ public class TestProducerChannelBuffer {
                          }
                      }, 30000, 200);
 
-        final com.salesforce.ouroboros.producer.Coordinator producer = producerContext.getBean(com.salesforce.ouroboros.producer.Coordinator.class);
-        final com.salesforce.ouroboros.spindle.Coordinator weaver = weaverContext.getBean(com.salesforce.ouroboros.spindle.Coordinator.class);
+        final ProducerCoordinator producer = producerContext.getBean(ProducerCoordinator.class);
+        final WeaverCoordinator weaver = weaverContext.getBean(WeaverCoordinator.class);
 
         weaver.initiateBootstrap();
 
@@ -315,7 +206,7 @@ public class TestProducerChannelBuffer {
                      new Util.Condition() {
                          @Override
                          public boolean value() {
-                             return weaver.getState() == com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM.Stable;
+                             return weaver.getState() == WeaverCoordinatorContext.CoordinatorFSM.Stable;
                          }
                      }, 30000, 200);
 
@@ -325,7 +216,7 @@ public class TestProducerChannelBuffer {
                      new Util.Condition() {
                          @Override
                          public boolean value() {
-                             return producer.getState() == com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorFSM.Stable;
+                             return producer.getState() == ProducerCoordinatorContext.CoordinatorFSM.Stable;
                          }
                      }, 30000, 200);
     }

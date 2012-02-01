@@ -12,7 +12,7 @@ import com.fasterxml.uuid.Generators;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.producer.Coordinator;
+import com.salesforce.ouroboros.producer.ProducerCoordinator;
 import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.ProducerConfiguration;
 
@@ -24,8 +24,8 @@ public class nodeCfg {
     private Identity  partitionIdentity;
 
     @Bean
-    public Coordinator coordinator() throws IOException {
-        return new Coordinator(switchboard(), producer());
+    public ProducerCoordinator coordinator() throws IOException {
+        return new ProducerCoordinator(switchboard(), producer());
     }
 
     @Bean

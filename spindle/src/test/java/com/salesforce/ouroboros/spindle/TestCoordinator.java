@@ -59,10 +59,10 @@ import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
-import com.salesforce.ouroboros.spindle.CoordinatorContext.BootstrapFSM;
-import com.salesforce.ouroboros.spindle.CoordinatorContext.ControllerFSM;
-import com.salesforce.ouroboros.spindle.CoordinatorContext.CoordinatorFSM;
-import com.salesforce.ouroboros.spindle.CoordinatorContext.ReplicatorFSM;
+import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext.BootstrapFSM;
+import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext.ControllerFSM;
+import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext.CoordinatorFSM;
+import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
 
@@ -89,7 +89,7 @@ public class TestCoordinator {
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        WeaverCoordinator coordinator = new WeaverCoordinator(timer, switchboard, weaver);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -159,7 +159,7 @@ public class TestCoordinator {
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        WeaverCoordinator coordinator = new WeaverCoordinator(timer, switchboard, weaver);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);
@@ -203,7 +203,7 @@ public class TestCoordinator {
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
         Switchboard switchboard = mock(Switchboard.class);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        WeaverCoordinator coordinator = new WeaverCoordinator(timer, switchboard, weaver);
         Answer<Void> answer = new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
@@ -238,7 +238,7 @@ public class TestCoordinator {
         Node localNode = new Node(0, 0, 0);
         when(weaver.getId()).thenReturn(localNode);
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        WeaverCoordinator coordinator = new WeaverCoordinator(timer, switchboard, weaver);
         coordinator.setActive(true);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 2, 2);
@@ -270,7 +270,7 @@ public class TestCoordinator {
         Switchboard switchboard = mock(Switchboard.class);
         when(weaver.getId()).thenReturn(new Node(0, 0, 0));
         when(weaver.getContactInformation()).thenReturn(dummyInfo);
-        Coordinator coordinator = new Coordinator(timer, switchboard, weaver);
+        WeaverCoordinator coordinator = new WeaverCoordinator(timer, switchboard, weaver);
         Node node1 = new Node(1, 1, 1);
         Node node2 = new Node(2, 1, 1);
         Node node3 = new Node(3, 1, 1);

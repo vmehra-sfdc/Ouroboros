@@ -54,8 +54,8 @@ import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
-import com.salesforce.ouroboros.producer.CoordinatorContext.CoordinatorState;
 import com.salesforce.ouroboros.producer.Producer.UpdateState;
+import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.ProducerCoordinatorState;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
@@ -64,18 +64,18 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * @author hhildebrand
  * 
  */
-public class Coordinator implements Member {
+public class ProducerCoordinator implements Member {
     private static enum Pending {
         PENDING, PRIMARY_OPENED, MIRROR_OPENED
     };
 
-    private final static Logger                 log                    = Logger.getLogger(Coordinator.class.getCanonicalName());
+    private final static Logger                 log                    = Logger.getLogger(ProducerCoordinator.class.getCanonicalName());
 
     private boolean                             active                 = false;
     private final SortedSet<Node>               activeProducers        = new ConcurrentSkipListSet<Node>();
     private final SortedSet<Node>               activeWeavers          = new ConcurrentSkipListSet<Node>();
-    private final CoordinatorContext            fsm                    = new CoordinatorContext(
-                                                                                                this);
+    private final ProducerCoordinatorContext    fsm                    = new ProducerCoordinatorContext(
+                                                                                                        this);
     private final SortedSet<Node>               inactiveMembers        = new ConcurrentSkipListSet<Node>();
     private final SortedSet<Node>               inactiveWeavers        = new ConcurrentSkipListSet<Node>();
     private Node[]                              joiningProducers       = new Node[0];
@@ -83,13 +83,13 @@ public class Coordinator implements Member {
     private final Producer                      producer;
     private final Node                          self;
     private final Switchboard                   switchboard;
-    private final ConcurrentMap<UUID, Pending>  pendingChannels        = new ConcurrentHashMap<UUID, Coordinator.Pending>();
+    private final ConcurrentMap<UUID, Pending>  pendingChannels        = new ConcurrentHashMap<UUID, ProducerCoordinator.Pending>();
     private final Map<Node, ContactInformation> yellowPages            = new ConcurrentHashMap<Node, ContactInformation>();
     private final AtomicInteger                 tally                  = new AtomicInteger();
     private final List<UpdateState>             rebalanceUpdates       = new ArrayList<Producer.UpdateState>();
 
-    public Coordinator(Switchboard switchboard, Producer producer)
-                                                                  throws IOException {
+    public ProducerCoordinator(Switchboard switchboard, Producer producer)
+                                                                          throws IOException {
         this.producer = producer;
         self = producer.getId();
         fsm.setName(Integer.toString(self.processId));
@@ -120,7 +120,7 @@ public class Coordinator implements Member {
                          Serializable[] arguments, long time) {
         Node[] nodes = (Node[]) arguments[0];
         switch (type) {
-            case BOOTSTAP_PRODUCERS: {
+            case BOOTSTRAP_PRODUCERS: {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Bootstrapping producers on: %s",
                                            self));
@@ -342,7 +342,7 @@ public class Coordinator implements Member {
      * @return the state of the reciver. return null if the state is undefined,
      *         such as when the coordinator is transititioning between states
      */
-    public CoordinatorState getState() {
+    public ProducerCoordinatorState getState() {
         try {
             return fsm.getState();
         } catch (StateUndefinedException e) {
@@ -478,7 +478,7 @@ public class Coordinator implements Member {
                                    self));
         }
         switchboard.ringCast(new Message(self,
-                                         BootstrapMessage.BOOTSTAP_PRODUCERS,
+                                         BootstrapMessage.BOOTSTRAP_PRODUCERS,
                                          (Serializable) joiningProducers));
     }
 

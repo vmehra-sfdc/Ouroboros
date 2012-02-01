@@ -41,7 +41,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
 public enum ReplicatorMessage implements MemberDispatch {
     BEGIN_REBALANCE {
         @Override
-        protected void disptach(Coordinator coordinator, Node sender,
+        protected void disptach(WeaverCoordinator coordinator, Node sender,
                                 Serializable[] arguments, long time,
                                 Switchboard switchboard) {
             coordinator.dispatch(this, sender, arguments, time);
@@ -51,7 +51,7 @@ public enum ReplicatorMessage implements MemberDispatch {
     },
     ESTABLISH_REPLICATORS {
         @Override
-        protected void disptach(Coordinator coordinator, Node sender,
+        protected void disptach(WeaverCoordinator coordinator, Node sender,
                                 Serializable[] arguments, long time,
                                 Switchboard switchboard) {
             switchboard.forwardToNextInRing(new Message(sender, this, arguments),
@@ -64,7 +64,7 @@ public enum ReplicatorMessage implements MemberDispatch {
          * Forwarding must be done at dispatch site
          */
         @Override
-        protected void disptach(Coordinator coordinator, Node sender,
+        protected void disptach(WeaverCoordinator coordinator, Node sender,
                                 Serializable[] arguments, long time,
                                 Switchboard switchboard) {
             coordinator.dispatch(this, sender, arguments, time);
@@ -77,16 +77,16 @@ public enum ReplicatorMessage implements MemberDispatch {
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
-        if (!(switchboard.getMember() instanceof Coordinator)) {
+        if (!(switchboard.getMember() instanceof WeaverCoordinator)) {
             log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
                                       this, switchboard.getMember()));
         }
-        disptach((Coordinator) switchboard.getMember(), sender, arguments,
+        disptach((WeaverCoordinator) switchboard.getMember(), sender, arguments,
                  time, switchboard);
 
     }
 
-    abstract protected void disptach(Coordinator coordinator, Node sender,
+    abstract protected void disptach(WeaverCoordinator coordinator, Node sender,
                                      Serializable[] arguments, long time,
                                      Switchboard switchboard);
 }
