@@ -82,7 +82,6 @@ public class TestSpindleCluster {
     private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs       = new Class[] {
             spindle1.class, spindle.class, spindle.class, spindle.class,
-            spindle.class, spindle.class, spindle.class, spindle.class,
             spindle.class, spindle2.class                         };
     private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
