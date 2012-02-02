@@ -105,7 +105,9 @@ public class Spinner implements CommunicationsHandler {
      * Close the receiver
      */
     public void close() {
-        handler.close();
+        if (handler != null) {
+            handler.close();
+        }
     }
 
     /**
@@ -135,7 +137,9 @@ public class Spinner implements CommunicationsHandler {
     public void failover() {
         writer.failover();
         ack.failover();
-        handler.close();
+        if (handler != null) {
+            handler.close();
+        }
     }
 
     /**

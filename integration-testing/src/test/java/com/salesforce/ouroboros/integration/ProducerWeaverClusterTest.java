@@ -25,7 +25,9 @@
  */
 package com.salesforce.ouroboros.integration;
 
+import static com.salesforce.ouroboros.testUtils.Util.waitFor;
 import static junit.framework.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +40,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.smartfrog.services.anubis.partition.Partition;
+import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.BitView;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -57,23 +60,19 @@ import com.salesforce.ouroboros.integration.util.ClusterDiscoveryNode4Cfg;
 import com.salesforce.ouroboros.integration.util.ClusterNodeCfg;
 import com.salesforce.ouroboros.integration.util.ClusterTestCfg;
 import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.producer.ProducerCoordinator;
+import com.salesforce.ouroboros.producer.ProducerCoordinatorContext;
+import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.ControllerFSM;
+import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.CoordinatorFSM;
+import com.salesforce.ouroboros.spindle.WeaverCoordinator;
+import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext;
+import com.salesforce.ouroboros.testUtils.Util.Condition;
 
 /**
  * @author hhildebrand
  * 
  */
 public class ProducerWeaverClusterTest {
-    private static Logger        log = Logger.getLogger(ProducerWeaverClusterTest.class.getCanonicalName());
-    private static AtomicInteger id  = new AtomicInteger(-1);
-
-    public static void reset() {
-        id.set(-1);
-    }
-
-    static {
-        ClusterTestCfg.setTestPorts(24020, 24040, 24060, 24080);
-    }
-
     @Configuration
     static class master extends ClusterNodeCfg {
 
@@ -83,6 +82,14 @@ public class ProducerWeaverClusterTest {
         @Autowired
         public ClusterMaster clusterMaster(Switchboard switchboard) {
             return new ClusterMaster(switchboard);
+        }
+
+        @Override
+        public int node() {
+            if (node == -1) {
+                node = id.incrementAndGet();
+            }
+            return node;
         }
 
         @Bean
@@ -96,7 +103,15 @@ public class ProducerWeaverClusterTest {
                                                       Generators.timeBasedGenerator());
             return switchboard;
         }
+    }
 
+    @Configuration
+    @Import(ProducerCfg.class)
+    static class producer extends ClusterNodeCfg {
+
+        private int node = -1;
+
+        @Override
         public int node() {
             if (node == -1) {
                 node = id.incrementAndGet();
@@ -111,20 +126,7 @@ public class ProducerWeaverClusterTest {
 
         private int node = -1;
 
-        public int node() {
-            if (node == -1) {
-                node = id.incrementAndGet();
-            }
-            return node;
-        }
-    }
-
-    @Configuration
-    @Import(ProducerCfg.class)
-    static class producer extends ClusterNodeCfg {
-
-        private int node = -1;
-
+        @Override
         public int node() {
             if (node == -1) {
                 node = id.incrementAndGet();
@@ -139,20 +141,7 @@ public class ProducerWeaverClusterTest {
 
         private int node = -1;
 
-        public int node() {
-            if (node == -1) {
-                node = id.incrementAndGet();
-            }
-            return node;
-        }
-    }
-
-    @Configuration
-    @Import(WeaverCfg.class)
-    static class weaver1 extends ClusterDiscoveryNode2Cfg {
-
-        private int node = -1;
-
+        @Override
         public int node() {
             if (node == -1) {
                 node = id.incrementAndGet();
@@ -167,6 +156,22 @@ public class ProducerWeaverClusterTest {
 
         private int node = -1;
 
+        @Override
+        public int node() {
+            if (node == -1) {
+                node = id.incrementAndGet();
+            }
+            return node;
+        }
+    }
+
+    @Configuration
+    @Import(WeaverCfg.class)
+    static class weaver1 extends ClusterDiscoveryNode2Cfg {
+
+        private int node = -1;
+
+        @Override
         public int node() {
             if (node == -1) {
                 node = id.incrementAndGet();
@@ -181,6 +186,7 @@ public class ProducerWeaverClusterTest {
 
         private int node = -1;
 
+        @Override
         public int node() {
             if (node == -1) {
                 node = id.incrementAndGet();
@@ -189,28 +195,49 @@ public class ProducerWeaverClusterTest {
         }
     }
 
+    private static AtomicInteger id  = new AtomicInteger(-1);
+
+    private static Logger        log = Logger.getLogger(ProducerWeaverClusterTest.class.getCanonicalName());
+
+    static {
+        ClusterTestCfg.setTestPorts(24020, 24040, 24060, 24080);
+    }
+
+    public static void reset() {
+        id.set(-1);
+    }
+
+    private ArrayList<AnnotationConfigApplicationContext> allContexts;
     private ClusterMaster                                 clusterMaster;
     private TestController                                controller;
-    private ArrayList<AnnotationConfigApplicationContext> allContexts;
-    private ArrayList<AnnotationConfigApplicationContext> weaverContexts;
     private ArrayList<TestNode>                           fullPartition;
+    private BitView                                       fullView;
     private BitView                                       majorView;
-
-    private Class<?>[] weaverConfigurations() {
-        return new Class<?>[] { weaver1.class, weaver.class, weaver.class,
-                weaver.class, weaver2.class };
-    }
-
-    private Class<?>[] producerConfigurations() {
-        return new Class<?>[] { producer1.class, producer.class,
-                producer.class, producer.class, producer2.class };
-    }
+    private ArrayList<TestNode>                           majorViewNodes;
+    private ArrayList<ProducerCoordinator>                majorProducers;
+    private ArrayList<ProducerCoordinator>                producers;
+    private ArrayList<Node>                               producerNodes;
+    private ArrayList<WeaverCoordinator>                  weavers;
+    private ArrayList<WeaverCoordinator>                  majorWeavers;
+    private ArrayList<Node>                               weaverNodes;
 
     @Before
     public void startUp() throws Exception {
         ClusterTestCfg.incrementPorts();
         reset();
         log.info("Setting up initial partition");
+        allContexts = new ArrayList<AnnotationConfigApplicationContext>();
+        fullPartition = new ArrayList<TestNode>();
+        majorView = new BitView();
+        fullView = new BitView();
+        majorViewNodes = new ArrayList<TestNode>();
+        weavers = new ArrayList<WeaverCoordinator>();
+        majorWeavers = new ArrayList<WeaverCoordinator>();
+        weaverNodes = new ArrayList<Node>();
+        producers = new ArrayList<ProducerCoordinator>();
+        majorProducers = new ArrayList<ProducerCoordinator>();
+        producerNodes = new ArrayList<Node>();
+
         Class<?>[] weaverConfigs = weaverConfigurations();
         Class<?>[] producerConfigs = producerConfigurations();
 
@@ -228,7 +255,6 @@ public class ProducerWeaverClusterTest {
         List<AnnotationConfigApplicationContext> weaverContexts = createContexts(weaverConfigs);
         List<AnnotationConfigApplicationContext> producerContexts = createContexts(producerConfigs);
 
-        allContexts = new ArrayList<AnnotationConfigApplicationContext>();
         allContexts.add(clusterMasterContext);
         allContexts.addAll(weaverContexts);
         allContexts.addAll(producerContexts);
@@ -238,7 +264,45 @@ public class ProducerWeaverClusterTest {
         assertTrue("Initial partition did not acheive stability",
                    initialLatch.await(120, TimeUnit.SECONDS));
         log.info("Initial partition stable");
-        fullPartition = new ArrayList<TestNode>();
+
+        Identity nodeId = clusterMasterContext.getBean(Identity.class);
+        majorView.add(nodeId);
+        fullView.add(nodeId);
+        TestNode testNode = (TestNode) controller.getNode(nodeId);
+        majorViewNodes.add(testNode);
+
+        int i = 0;
+        for (AnnotationConfigApplicationContext ctxt : weaverContexts) {
+            WeaverCoordinator coordinator = ctxt.getBean(WeaverCoordinator.class);
+            weavers.add(coordinator);
+            nodeId = ctxt.getBean(Identity.class);
+            testNode = (TestNode) controller.getNode(nodeId);
+            weaverNodes.add(ctxt.getBean(Node.class));
+            if (i < weavers.size() / 2 + 1) {
+                majorView.add(nodeId);
+                fullView.add(nodeId);
+                majorViewNodes.add(testNode);
+                majorWeavers.add(coordinator);
+            }
+            i++;
+        }
+        i = 0;
+        for (AnnotationConfigApplicationContext ctxt : producerContexts) {
+            nodeId = ctxt.getBean(Identity.class);
+            testNode = (TestNode) controller.getNode(nodeId);
+            producerNodes.add(ctxt.getBean(Node.class));
+            ProducerCoordinator coordinator = ctxt.getBean(ProducerCoordinator.class);
+            producers.add(coordinator);
+            if (i < producers.size() / 2 + 1) {
+                nodeId = ctxt.getBean(Identity.class);
+                majorView.add(nodeId);
+                fullView.add(nodeId);
+                majorViewNodes.add(testNode);
+                majorProducers.add(coordinator);
+            }
+            i++;
+        }
+        log.info(String.format("Major partition: %s", majorViewNodes));
     }
 
     @After
@@ -254,7 +318,133 @@ public class ProducerWeaverClusterTest {
         }
     }
 
-    private List<AnnotationConfigApplicationContext> createContexts(Class<?>[] configs) {
+    @Test
+    public void testPartitioning() throws Exception {
+        bootstrap();
+        asymmetricallyPartition();
+        reformPartition();
+    }
+
+    protected void assertProducersBootstrapping(List<ProducerCoordinator> partition)
+                                                                                    throws InterruptedException {
+        for (ProducerCoordinator coordinator : partition) {
+            final ProducerCoordinator c = coordinator;
+            waitFor("Coordinator never entered the bootstrapping state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return CoordinatorFSM.Bootstrapping == c.getState()
+                           || ControllerFSM.Bootstrap == c.getState();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    protected void assertProducersStable(List<ProducerCoordinator> partition)
+                                                                             throws InterruptedException {
+        for (ProducerCoordinator coordinator : partition) {
+            final ProducerCoordinator c = coordinator;
+            waitFor("Coordinator never entered the stable state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return ProducerCoordinatorContext.CoordinatorFSM.Stable == c.getState();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    protected void assertWeaversBootstrapping(List<WeaverCoordinator> partition)
+                                                                                throws InterruptedException {
+        for (WeaverCoordinator coordinator : partition) {
+            final WeaverCoordinator c = coordinator;
+            waitFor("Coordinator never entered the bootstrapping state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return WeaverCoordinatorContext.CoordinatorFSM.Bootstrapping == c.getState()
+                           || WeaverCoordinatorContext.BootstrapFSM.Bootstrap == c.getState();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    protected void assertWeaversStable(List<WeaverCoordinator> partition)
+                                                                         throws InterruptedException {
+        for (WeaverCoordinator coordinator : partition) {
+            final WeaverCoordinator c = coordinator;
+            waitFor("Coordinator never entered the stable state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return WeaverCoordinatorContext.CoordinatorFSM.Stable == c.getState();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    void assertProducersActive(List<ProducerCoordinator> partition)
+                                                                   throws InterruptedException {
+        for (ProducerCoordinator coordinator : partition) {
+            final ProducerCoordinator c = coordinator;
+            waitFor("Coordinator never entered the active state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return c.isActive();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    void assertWeaversActive(List<WeaverCoordinator> partition)
+                                                               throws InterruptedException {
+        for (WeaverCoordinator coordinator : partition) {
+            final WeaverCoordinator c = coordinator;
+            waitFor("Coordinator never entered the active state: "
+                    + coordinator, new Condition() {
+                @Override
+                public boolean value() {
+                    return c.isActive();
+                }
+            }, 120000, 1000);
+        }
+    }
+
+    void asymmetricallyPartition() throws InterruptedException {
+        CountDownLatch latchA = latch(majorViewNodes);
+        log.info("Asymmetrically partitioning");
+        controller.asymPartition(majorView);
+
+        log.info("Awaiting stability of major partition");
+        assertTrue("major partition did not stabilize",
+                   latchA.await(60, TimeUnit.SECONDS));
+
+        log.info("Major partition has stabilized");
+
+        // Check to see everything is as expected.
+        for (TestNode member : majorViewNodes) {
+            assertEquals(majorView, member.getPartition());
+        }
+        // Check to see if the major partition is stable.
+        assertWeaversStable(majorWeavers);
+        assertProducersStable(majorProducers);
+    }
+
+    void bootstrap() throws InterruptedException {
+        assertWeaversBootstrapping(weavers);
+        assertProducersBootstrapping(producers);
+        log.info("Bootstrapping the weavers");
+        weavers.get(weavers.size() - 1).initiateBootstrap();
+        producers.get(producers.size() - 1).initiateBootstrap();
+
+        assertWeaversStable(weavers);
+        assertProducersStable(producers);
+        assertProducersActive(producers);
+        assertWeaversActive(weavers);
+    }
+
+    List<AnnotationConfigApplicationContext> createContexts(Class<?>[] configs) {
         ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
         for (Class<?> config : configs) {
             contexts.add(new AnnotationConfigApplicationContext(config));
@@ -262,8 +452,45 @@ public class ProducerWeaverClusterTest {
         return contexts;
     }
 
-    @Test
-    public void testPartitioning() {
+    CountDownLatch latch(List<TestNode> group) {
+        CountDownLatch latch = new CountDownLatch(group.size());
+        for (TestNode member : group) {
+            member.latch = latch;
+            member.cardinality = group.size();
+        }
+        return latch;
+    }
 
+    Class<?>[] producerConfigurations() {
+        return new Class<?>[] { producer1.class, producer.class,
+                producer.class, producer.class, producer.class, producer2.class };
+    }
+
+    void reformPartition() throws InterruptedException {
+        // reform
+        CountDownLatch latch = latch(fullPartition);
+
+        // Clear the partition
+        log.info("Reforming partition");
+        controller.clearPartitions();
+
+        log.info("Awaiting stability of reformed partition");
+        assertTrue("Full partition did not stablize",
+                   latch.await(60, TimeUnit.SECONDS));
+
+        log.info("Full partition has stabilized");
+
+        // Check to see everything is kosher
+        for (TestNode member : fullPartition) {
+            assertEquals(fullView, member.getPartition());
+        }
+        // Check to see if the participants are stable.
+        assertWeaversStable(weavers);
+        assertProducersStable(producers);
+    }
+
+    Class<?>[] weaverConfigurations() {
+        return new Class<?>[] { weaver1.class, weaver.class, weaver.class,
+                weaver.class, weaver.class, weaver2.class };
     }
 }

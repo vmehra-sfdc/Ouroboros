@@ -78,6 +78,9 @@ public class TestSpindleCluster {
 
     static final Logger                              log           = Logger.getLogger(TestSpindleCluster.class.getCanonicalName());
 
+    static {
+        GossipTestCfg.setTestPorts(24506, 24320);
+    }
     private ClusterMaster                            clusterMaster;
     private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs       = new Class[] {
@@ -85,29 +88,26 @@ public class TestSpindleCluster {
             spindle.class, spindle2.class                         };
     private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
-    private List<WeaverCoordinator>                        coordinators;
+    private List<WeaverCoordinator>                  coordinators;
     private List<TestNode>                           fullPartition;
     private List<Node>                               fullPartitionId;
     private BitView                                  fullView;
     private List<TestNode>                           majorGroup;
-    private List<WeaverCoordinator>                        majorPartition;
+    private List<WeaverCoordinator>                  majorPartition;
     private List<Node>                               majorPartitionId;
     private BitView                                  majorView;
     private List<Weaver>                             majorWeavers;
     private List<AnnotationConfigApplicationContext> memberContexts;
     private List<TestNode>                           minorGroup;
-    private List<WeaverCoordinator>                        minorPartition;
+    private List<WeaverCoordinator>                  minorPartition;
     private List<Node>                               minorPartitionId;
     private BitView                                  minorView;
     private List<Weaver>                             minorWeavers;
+    private ChannelHandler                           producerHandler;
     private MersenneTwister                          twister       = new MersenneTwister(
                                                                                          666);
-    private List<Weaver>                             weavers;
-    private ChannelHandler                           producerHandler;
 
-    static {
-        GossipTestCfg.setTestPorts(24506, 24320);
-    }
+    private List<Weaver>                             weavers;
 
     @Before
     public void startUp() throws Exception {
@@ -662,7 +662,7 @@ public class TestSpindleCluster {
     }
 
     protected void assertPartitionActive(List<WeaverCoordinator> partition)
-                                                                     throws InterruptedException {
+                                                                           throws InterruptedException {
         for (WeaverCoordinator coordinator : partition) {
             final WeaverCoordinator c = coordinator;
             waitFor("Coordinator never entered the bootstrapping state: "
@@ -676,7 +676,7 @@ public class TestSpindleCluster {
     }
 
     protected void assertPartitionBootstrapping(List<WeaverCoordinator> partition)
-                                                                            throws InterruptedException {
+                                                                                  throws InterruptedException {
         for (WeaverCoordinator coordinator : partition) {
             final WeaverCoordinator c = coordinator;
             waitFor("Coordinator never entered the bootstrapping state: "
@@ -691,7 +691,7 @@ public class TestSpindleCluster {
     }
 
     protected void assertPartitionInactive(List<WeaverCoordinator> partition)
-                                                                       throws InterruptedException {
+                                                                             throws InterruptedException {
         for (WeaverCoordinator coordinator : partition) {
             final WeaverCoordinator c = coordinator;
             waitFor("Coordinator never entered the bootstrapping state: "
@@ -705,7 +705,7 @@ public class TestSpindleCluster {
     }
 
     protected void assertPartitionStable(List<WeaverCoordinator> partition)
-                                                                     throws InterruptedException {
+                                                                           throws InterruptedException {
         for (WeaverCoordinator coordinator : partition) {
             final WeaverCoordinator c = coordinator;
             waitFor("Coordinator never entered the stable state: "

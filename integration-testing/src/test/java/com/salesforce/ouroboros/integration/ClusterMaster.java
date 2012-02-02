@@ -45,17 +45,6 @@ public class ClusterMaster implements Member {
     @Override
     public void dispatch(BootstrapMessage type, Node sender,
                          Serializable[] arguments, long time) {
-        switch (type) {
-            case BOOTSTRAP_SPINDLES:
-                semaphore.release();
-                break;
-            case BOOTSTRAP_PRODUCERS:
-                semaphore.release();
-                break;
-            default:
-                break;
-
-        }
     }
 
     @Override
@@ -110,18 +99,6 @@ public class ClusterMaster implements Member {
         switchboard.ringCast(new Message(switchboard.getId(),
                                          ChannelMessage.PRIMARY_OPENED,
                                          new Serializable[] { channel }));
-        return acquire(timeout, unit).get();
-    }
-
-    public boolean bootstrap(Node[] spindles, Node[] producers, long timeout,
-                             TimeUnit unit) throws InterruptedException {
-        semaphore.release(); // need an extra permit
-        switchboard.ringCast(new Message(switchboard.getId(),
-                                         BootstrapMessage.BOOTSTRAP_SPINDLES,
-                                         (Serializable) spindles));
-        switchboard.ringCast(new Message(switchboard.getId(),
-                                         BootstrapMessage.BOOTSTRAP_PRODUCERS,
-                                         (Serializable) producers));
         return acquire(timeout, unit).get();
     }
 
