@@ -34,6 +34,8 @@
 
 %class BatchWriter
 %package com.salesforce.ouroboros.producer.spinner
+%import java.util.Map
+%import com.salesforce.ouroboros.BatchIdentity
 %access public
 
 %start BatchWriterFSM::Suspended
@@ -41,20 +43,14 @@
 %%
 Suspended {
 	connect
-		[ctxt.hasPendingBatch()]
-		WriteBatchHeader {
-			nextBatch();
-			selectForWrite();
-		}
-		
-	connect
-		[!ctxt.hasPendingBatch()]
 		Waiting {}
 }
 
 Waiting {
-	pushBatch
-		WriteBatchHeader {}
+	pushBatch(batch: Batch,  pending: Map<BatchIdentity, Batch>)
+		WriteBatchHeader {
+			enqueue(batch, pending);
+		}
 }
 
 WriteBatchHeader
@@ -70,18 +66,13 @@ Entry {
 		
 	writeReady
 		[ctxt.inError()]
-		Closed{
-			close();
-		}
+		Closed{}
 
 	writeReady
 		WriteEventHeader{}
 		
 	batchHeaderWritten
 		WriteEventHeader{}
-		
-	queuedEmpty
-		Waiting{}
 } 
 
 WriteEventHeader
@@ -97,9 +88,10 @@ Entry {
 		
 	writeReady
 		[ctxt.inError()]
-		Closed{
-			close();
-		}
+		Closed{}
+
+	writeReady
+		WritePayload{}
 
 	eventHeaderWritten
 		WritePayload{}
@@ -117,37 +109,57 @@ Entry {
 		}
 		
 	writeReady
-		[!ctxt.batch.isEmpty() && !ctxt.inError()]
+		[ctxt.inError()]
+		Closed{}
+		
+	writeReady
+		[!ctxt.batch.isEmpty()]
 		WriteEventHeader{}
 		
 	writeReady
-		[ctxt.inError()]
-		Closed{
-			close();
-		}
-	
-	payloadWritten
+		[ctxt.hasNext()]
 		WriteEventHeader{}
 		
-	waiting
+	writeReady
+		Waiting{}
+		
+	payloadWritten
+		[!ctxt.batch.isEmpty()]
+		WriteEventHeader{}
+		
+	payloadWritten
+		[ctxt.hasNext()]
+		WriteBatchHeader{}
+		
+	payloadWritten
 		Waiting{}
 }
 
-Closed {
+Closed
+Entry{
+	close();
+}
+{
+	failover
+		nil{}
+		
+	close
+		nil{}
+		
+	pushBatch(batch: Batch,  pending: Map<BatchIdentity, Batch>)
+		nil{}
 }
 
 Default {
 	failover
-		Closed{
-			close();
-		}
+		Closed{}
 
-	pushBatch
-		nil {}
+	pushBatch(batch: Batch,  pending: Map<BatchIdentity, Batch>)
+		nil {
+			enqueue(batch, pending);
+		}
 
 	close
-		Closed{
-			close();
-		}
+		Closed{}
 }
 %%

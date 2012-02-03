@@ -33,6 +33,7 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.producer.spinner.BatchAcknowledgementContext.BatchAcknowledgementState;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * The state machine implementing the batch event acknowledgement protocol
@@ -50,8 +51,9 @@ public class BatchAcknowledgement {
     private boolean                           inError   = false;
     private final Spinner                     spinner;
 
-    public BatchAcknowledgement(Spinner spinner) {
+    public BatchAcknowledgement(Spinner spinner, String fsmName) {
         this.spinner = spinner;
+        fsm.setName(fsmName);
     }
 
     public void closing() {
@@ -87,8 +89,11 @@ public class BatchAcknowledgement {
                 return false;
             }
         } catch (IOException e) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.log(Level.WARNING, "Error reading batch acknowlegement", e);
+            if (!Utils.isClose(e)) {
+                if (log.isLoggable(Level.WARNING)) {
+                    log.log(Level.WARNING,
+                            "Error reading batch acknowlegement", e);
+                }
             }
             inError = true;
             return false;

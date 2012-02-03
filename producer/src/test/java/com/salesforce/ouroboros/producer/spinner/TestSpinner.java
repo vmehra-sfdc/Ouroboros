@@ -76,8 +76,9 @@ public class TestSpinner {
         when(handler.getChannel()).thenReturn(channel);
         Producer producer = mock(Producer.class);
         final Node node = new Node(0x1638);
+        Node toNode = new Node(0x16);
         when(producer.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(producer, 100);
+        Spinner spinner = new Spinner(producer, toNode, 100);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -105,8 +106,9 @@ public class TestSpinner {
         when(handler.getChannel()).thenReturn(outbound);
         Producer producer = mock(Producer.class);
         Node node = new Node(0x1638);
+        Node toNode = new Node(0x16);
         when(producer.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(producer, 100);
+        Spinner spinner = new Spinner(producer, toNode, 100);
         spinner.connect(handler);
 
         long timestamp = 100000L;
@@ -147,8 +149,9 @@ public class TestSpinner {
         when(handler.getChannel()).thenReturn(channel);
         Producer producer = mock(Producer.class);
         Node node = new Node(0x1638);
+        Node toNode = new Node(0x16);
         when(producer.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(producer, 100);
+        Spinner spinner = new Spinner(producer, toNode, 100);
         spinner.connect(handler);
 
         Node mirror = new Node(0x1638);

@@ -84,7 +84,8 @@ public class TestSpinnerSpindle {
         EventChannel eventChannel = mock(EventChannel.class);
         Segment segment = new Segment(segmentFile);
         final Bundle bundle = mock(Bundle.class);
-        when(bundle.getId()).thenReturn(new Node(0));
+        Node toNode = new Node(0);
+        when(bundle.getId()).thenReturn(toNode);
         Node mirror = new Node(3);
         UUID channel = UUID.randomUUID();
         long timestamp = System.currentTimeMillis();
@@ -142,7 +143,7 @@ public class TestSpinnerSpindle {
         Node coordNode = new Node(2);
         Producer producer = mock(Producer.class);
         when(producer.getId()).thenReturn(coordNode);
-        final Spinner spinner = new Spinner(producer, 10);
+        final Spinner spinner = new Spinner(producer, toNode, 10);
 
         spindleHandler.connectTo(spindleAddress, spinner);
 

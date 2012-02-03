@@ -44,6 +44,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+
 import com.hellblazer.pinkie.ChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.ContactInformation;
@@ -131,6 +134,7 @@ public class Producer {
                                             configuration.getSpinners());
         maxQueueLength = configuration.getMaxQueueLength();
         retryLimit = configuration.getRetryLimit();
+        openPublishingGate();
     }
 
     /**
@@ -336,6 +340,7 @@ public class Producer {
     /**
      * Start the coordinator
      */
+    @PostConstruct
     public void start() {
         spinnerHandler.start();
     }
@@ -343,6 +348,7 @@ public class Producer {
     /**
      * Terminate the coordinator
      */
+    @PreDestroy
     public void terminate() {
         spinnerHandler.terminate();
     }
@@ -497,7 +503,11 @@ public class Producer {
             ContactInformation info = yellowPages.get(n);
             assert info != null : String.format("Did not find any connection information for node %s",
                                                 n);
-            Spinner spinner = new Spinner(this, maxQueueLength);
+            Spinner spinner = new Spinner(this, n, maxQueueLength);
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Connecting spinner to %s on %s address %s",
+                                       n, self, info.spindle));
+            }
             try {
                 spinnerHandler.connectTo(info.spindle, spinner);
             } catch (IOException e) {
@@ -751,6 +761,10 @@ public class Producer {
             log.info(String.format("Rebalancing for %s from primary %s to new mirror %s",
                                    args));
         }
+    }
+
+    public void activate() {
+        openPublishingGate();
     }
 
     public void inactivate() {

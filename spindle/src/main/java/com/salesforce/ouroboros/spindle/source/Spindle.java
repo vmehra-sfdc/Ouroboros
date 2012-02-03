@@ -59,7 +59,7 @@ public class Spindle implements CommunicationsHandler {
     final Appender               appender;
 
     public Spindle(Bundle bundle) {
-        fsm.setName(Integer.toString(bundle.getId().processId));
+        fsm.setName(String.format("?>%s", bundle.getId().processId));
         acknowledger = new Acknowledger();
         appender = new Appender(bundle, acknowledger);
         this.bundle = bundle;
@@ -119,6 +119,12 @@ public class Spindle implements CommunicationsHandler {
             return;
         }
         Node producer = new Node(handshake);
+        String fsmName = String.format("%s>%s", producer.processId,
+                                       bundle.getId().processId);
+        fsm.setName(fsmName);
+        appender.setFsmName(fsmName);
+        acknowledger.setFsmName(String.format("%s<%s", producer.processId,
+                                              bundle.getId().processId));
         bundle.map(producer, acknowledger);
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Established on %s for %s", bundle.getId(),

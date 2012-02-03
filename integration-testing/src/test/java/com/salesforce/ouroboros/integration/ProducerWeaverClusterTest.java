@@ -29,8 +29,10 @@ import static com.salesforce.ouroboros.testUtils.Util.waitFor;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,6 +44,7 @@ import org.junit.Test;
 import org.smartfrog.services.anubis.partition.Partition;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.BitView;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -52,6 +55,7 @@ import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.testUtil.TestController;
 import com.hellblazer.jackal.testUtil.TestNode;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.integration.util.ClusterControllerCfg;
 import com.salesforce.ouroboros.integration.util.ClusterDiscoveryNode1Cfg;
 import com.salesforce.ouroboros.integration.util.ClusterDiscoveryNode2Cfg;
@@ -67,6 +71,7 @@ import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.CoordinatorF
 import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
+import com.salesforce.ouroboros.util.MersenneTwister;
 
 /**
  * @author hhildebrand
@@ -212,14 +217,18 @@ public class ProducerWeaverClusterTest {
     private TestController                                controller;
     private ArrayList<TestNode>                           fullPartition;
     private BitView                                       fullView;
+    private ArrayList<ProducerCoordinator>                majorProducers;
     private BitView                                       majorView;
     private ArrayList<TestNode>                           majorViewNodes;
-    private ArrayList<ProducerCoordinator>                majorProducers;
-    private ArrayList<ProducerCoordinator>                producers;
-    private ArrayList<Node>                               producerNodes;
-    private ArrayList<WeaverCoordinator>                  weavers;
     private ArrayList<WeaverCoordinator>                  majorWeavers;
+    private ArrayList<Node>                               producerNodes;
+    private ArrayList<ProducerCoordinator>                producers;
+    private MersenneTwister                               twister = new MersenneTwister(
+                                                                                        666);
     private ArrayList<Node>                               weaverNodes;
+    private ArrayList<WeaverCoordinator>                  weavers;
+
+    private List<Source>                                  sources;
 
     @Before
     public void startUp() throws Exception {
@@ -303,6 +312,8 @@ public class ProducerWeaverClusterTest {
             i++;
         }
         log.info(String.format("Major partition: %s", majorViewNodes));
+
+        sources = getSources(producerContexts);
     }
 
     @After
@@ -323,6 +334,44 @@ public class ProducerWeaverClusterTest {
         bootstrap();
         asymmetricallyPartition();
         reformPartition();
+    }
+
+    @Test
+    public void testSimplePublishing() throws Exception {
+        bootstrap();
+        List<UUID> channels = openChannels();
+
+        // Open the channels
+        for (UUID channel : channels) {
+            assertTrue(String.format("Channel not opened: %s", channel),
+                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
+        }
+
+        for (Source source : sources) {
+            for (UUID channel : source.channels.keySet()) {
+                for (long timestamp = 0; timestamp < 4; timestamp++) {
+                    ArrayList<ByteBuffer> events = new ArrayList<ByteBuffer>();
+                    for (int i = 0; i < 2; i++) {
+                        events.add(ByteBuffer.wrap(String.format("%s Give me Slack or give me Food or Kill me %s",
+                                                                 channel,
+                                                                 channel).getBytes()));
+                    }
+                    boolean published = false;
+                    while (!published) {
+                        try {
+                            source.producer.publish(channel, timestamp, events);
+                            published = true;
+                        } catch (RateLimiteExceededException e) {
+                            log.info(String.format("Rate limit exceeded for %s",
+                                                   channel));
+                            Thread.sleep(100);
+                        }
+                    }
+                }
+            }
+        }
+
+        Thread.sleep(5000);
     }
 
     protected void assertProducersBootstrapping(List<ProducerCoordinator> partition)
@@ -492,5 +541,29 @@ public class ProducerWeaverClusterTest {
     Class<?>[] weaverConfigurations() {
         return new Class<?>[] { weaver1.class, weaver.class, weaver.class,
                 weaver.class, weaver.class, weaver2.class };
+    }
+
+    ArrayList<UUID> openChannels() throws InterruptedException {
+        log.info("Creating some channels");
+
+        int numOfChannels = 5;
+        ArrayList<UUID> channels = new ArrayList<UUID>();
+        for (int i = 0; i < numOfChannels; i++) {
+            UUID channel = new UUID(twister.nextLong(), twister.nextLong());
+            channels.add(channel);
+            log.info(String.format("Opening channel: %s", channel));
+            assertTrue(String.format("Channel %s did not successfully open",
+                                     channel),
+                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
+        }
+        return channels;
+    }
+
+    List<Source> getSources(List<AnnotationConfigApplicationContext> contexts) {
+        ArrayList<Source> sources = new ArrayList<Source>();
+        for (BeanFactory f : contexts) {
+            sources.add(f.getBean(Source.class));
+        }
+        return sources;
     }
 }

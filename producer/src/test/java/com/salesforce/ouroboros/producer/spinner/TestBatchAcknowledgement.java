@@ -55,7 +55,7 @@ public class TestBatchAcknowledgement {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(inbound);
         Spinner spinner = mock(Spinner.class);
-        BatchAcknowledgement ba = new BatchAcknowledgement(spinner);
+        BatchAcknowledgement ba = new BatchAcknowledgement(spinner, "test");
         assertEquals(BatchAcknowledgementFSM.Suspended, ba.getState());
         ba.connect(handler);
         assertEquals(BatchAcknowledgementFSM.ReadAcknowledgement, ba.getState());

@@ -92,4 +92,11 @@ public class Appender extends AbstractAppender {
     protected void markPosition() {
         startPosition = (int) position;
     }
+
+    /**
+     * @param fsmName
+     */
+    public void setFsmName(String fsmName) {
+        fsm.setName(fsmName);
+    }
 }

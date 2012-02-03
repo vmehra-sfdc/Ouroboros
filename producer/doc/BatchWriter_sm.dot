@@ -36,9 +36,6 @@ digraph BatchWriter {
         // Transitions (Edges)
         //
 
-        "BatchWriterFSM::Suspended" -> "BatchWriterFSM::WriteBatchHeader"
-            [label="connect/\l"];
-
         "BatchWriterFSM::Suspended" -> "BatchWriterFSM::Waiting"
             [label="connect/\l"];
 
@@ -66,9 +63,6 @@ digraph BatchWriter {
         "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::WriteEventHeader"
             [label="batchHeaderWritten/\l"];
 
-        "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::Waiting"
-            [label="queuedEmpty/\l"];
-
         "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::Closed"
             [label="failover/\l"];
 
@@ -76,6 +70,9 @@ digraph BatchWriter {
             [label="close/\l"];
 
         "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::Closed"
+            [label="writeReady/\l"];
+
+        "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::WritePayload"
             [label="writeReady/\l"];
 
         "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::WritePayload"
@@ -87,28 +84,31 @@ digraph BatchWriter {
         "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::Closed"
             [label="close/\l"];
 
+        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Closed"
+            [label="writeReady/\l"];
+
         "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"
             [label="writeReady/\l"];
 
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Closed"
+        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"
+            [label="writeReady/\l"];
+
+        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Waiting"
             [label="writeReady/\l"];
 
         "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"
             [label="payloadWritten/\l"];
 
+        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteBatchHeader"
+            [label="payloadWritten/\l"];
+
         "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Waiting"
-            [label="waiting/\l"];
+            [label="payloadWritten/\l"];
 
         "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Closed"
             [label="failover/\l"];
 
         "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Closed"
-            [label="close/\l"];
-
-        "BatchWriterFSM::Closed" -> "BatchWriterFSM::Closed"
-            [label="failover/\l"];
-
-        "BatchWriterFSM::Closed" -> "BatchWriterFSM::Closed"
             [label="close/\l"];
 
         "%start" -> "BatchWriterFSM::Suspended"

@@ -27,21 +27,36 @@ package com.salesforce.ouroboros.integration;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.salesforce.ouroboros.api.producer.EventSource;
+import com.salesforce.ouroboros.producer.Producer;
 
 public class Source implements EventSource {
 
+    public final ConcurrentHashMap<UUID, Long> channels = new ConcurrentHashMap<UUID, Long>();
+    public Producer                            producer;
+
     @Override
     public void assumePrimary(Map<UUID, Long> newPrimaries) {
+        channels.putAll(newPrimaries);
     }
 
     @Override
     public void closed(UUID channel) {
+        channels.remove(channel);
     }
 
     @Override
     public void opened(UUID channel) {
+        channels.put(channel, 0L);
+    }
+
+    /**
+     * @param producer
+     */
+    public void setProducer(Producer producer) {
+        this.producer = producer;
     }
 
 }

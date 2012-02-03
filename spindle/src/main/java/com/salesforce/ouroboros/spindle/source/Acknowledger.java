@@ -132,4 +132,8 @@ public class Acknowledger {
         }
         return !buffer.hasRemaining();
     }
+
+    public void setFsmName(String fsmName) {
+        fsm.setName(fsmName);
+    }
 }

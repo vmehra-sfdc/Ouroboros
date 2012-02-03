@@ -51,7 +51,10 @@ public class ProducerCfg {
     @Bean
     @Autowired
     public Producer producer(Node memberNode) throws IOException {
-        return new Producer(memberNode, source(), configuration());
+        Source source = source();
+        Producer producer = new Producer(memberNode, source, configuration());
+        source.setProducer(producer);
+        return producer;
     }
 
     @Bean

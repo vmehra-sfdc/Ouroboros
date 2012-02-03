@@ -30,7 +30,7 @@ package com.salesforce.ouroboros.api.producer;
  * @author hhildebrand
  * 
  */
-public class RateLimiteExceededException extends Exception {
+public class RateLimiteExceededException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     public RateLimiteExceededException() {

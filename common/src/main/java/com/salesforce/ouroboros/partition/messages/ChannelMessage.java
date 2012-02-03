@@ -38,7 +38,15 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * 
  */
 public enum ChannelMessage implements MemberDispatch {
-    CLOSE, OPEN, PRIMARY_OPENED, MIRROR_OPENED;
+    CLOSE, OPEN {
+        @Override
+        public void dispatch(Switchboard switchboard, Node sender,
+                             Serializable[] arguments, long time) {
+            switchboard.forwardToNextInRing(new Message(sender, this, arguments));
+            switchboard.dispatchToMember(this, sender, arguments, time);
+        }
+    },
+    PRIMARY_OPENED, MIRROR_OPENED;
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,

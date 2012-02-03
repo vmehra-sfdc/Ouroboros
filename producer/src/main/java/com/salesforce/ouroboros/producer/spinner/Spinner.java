@@ -54,8 +54,8 @@ public class Spinner implements CommunicationsHandler {
     public static final int                          MAGIC               = 0x1638;
     private final static Logger                      log                 = Logger.getLogger(Spinner.class.getCanonicalName());
 
-    private final BatchAcknowledgement               ack                 = new BatchAcknowledgement(
-                                                                                                    this);
+    private final BatchAcknowledgement               ack;
+    private boolean                                  established         = false;
     private final Producer                           producer;
     private final SpinnerContext                     fsm                 = new SpinnerContext(
                                                                                               this);
@@ -65,12 +65,20 @@ public class Spinner implements CommunicationsHandler {
     private final NavigableMap<BatchIdentity, Batch> pending             = new ConcurrentSkipListMap<BatchIdentity, Batch>();
     private final BatchWriter                        writer;
 
-    public Spinner(Producer producer, int maxQueueLength) {
+    public Spinner(Producer producer, Node to, int maxQueueLength) {
+        String fsmName = String.format("%s>%s", producer.getId().processId,
+                                       to.processId);
+        fsm.setName(fsmName);
         this.producer = producer;
         handshake.putInt(MAGIC);
         producer.getId().serialize(handshake);
         handshake.flip();
-        writer = new BatchWriter(maxQueueLength);
+        writer = new BatchWriter(maxQueueLength, fsmName);
+        ack = new BatchAcknowledgement(
+                                       this,
+                                       String.format("%s<%s",
+                                                     producer.getId().processId,
+                                                     to.processId));
     }
 
     @Override
@@ -183,7 +191,7 @@ public class Spinner implements CommunicationsHandler {
 
     @Override
     public void writeReady() {
-        if (fsm.getState() == SpinnerFSM.Established) {
+        if (established) {
             writer.writeReady();
         } else {
             fsm.writeReady();
@@ -226,5 +234,9 @@ public class Spinner implements CommunicationsHandler {
             return false;
         }
         return !handshake.hasRemaining();
+    }
+
+    protected void establish() {
+        established = true;
     }
 }

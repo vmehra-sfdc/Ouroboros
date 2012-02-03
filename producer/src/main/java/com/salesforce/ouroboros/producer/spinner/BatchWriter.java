@@ -30,8 +30,7 @@ import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.Queue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -40,8 +39,9 @@ import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
-import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterFSM;
 import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterState;
+import com.salesforce.ouroboros.util.RingBuffer;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * The event action context for the batch writing protocol FSM
@@ -51,24 +51,22 @@ import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterS
  */
 public class BatchWriter {
 
-    private static final Logger        log         = Logger.getLogger(BatchWriter.class.getCanonicalName());
-    private final BatchHeader          batchHeader = new BatchHeader();
-    private final BatchWriterContext   fsm         = new BatchWriterContext(
-                                                                            this);
-    private SocketChannelHandler       handler;
-    private final EventHeader          header      = new EventHeader();
-    private boolean                    inError     = false;
-    private final BlockingQueue<Batch> queued;
-    final Deque<ByteBuffer>            batch       = new LinkedList<ByteBuffer>();
+    private static final Logger      log         = Logger.getLogger(BatchWriter.class.getCanonicalName());
+    private final BatchHeader        batchHeader = new BatchHeader();
+    private final BatchWriterContext fsm         = new BatchWriterContext(this);
+    private SocketChannelHandler     handler;
+    private final EventHeader        header      = new EventHeader();
+    private boolean                  inError     = false;
+    private final Queue<Batch>       queued;
+    final Deque<ByteBuffer>          batch       = new LinkedList<ByteBuffer>();
 
-    public BatchWriter(int maxQueueLength) {
-        queued = new ArrayBlockingQueue<Batch>(maxQueueLength);
+    public BatchWriter(int maxQueueLength, String fsmName) {
+        queued = new RingBuffer<Batch>(maxQueueLength);
+        fsm.setName(fsmName);
     }
 
     public void closing() {
-        if (!fsm.isInTransition()) {
-            fsm.close();
-        }
+        fsm.close();
     }
 
     public void connect(SocketChannelHandler handler) {
@@ -100,29 +98,19 @@ public class BatchWriter {
      */
     public void push(Batch events, Map<BatchIdentity, Batch> pending)
                                                                      throws RateLimiteExceededException {
-        if (!queued.offer(events)) {
-            throw new RateLimiteExceededException(
-                                                  "The maximum number of queued event batches has been exceeded");
-        }
-        pending.put(events, events);
-        if (!fsm.isInTransition()) {
-            fsm.pushBatch();
-        }
-        if (fsm.getState() == BatchWriterFSM.Closed) {
-            queued.clear();
-            pending.remove(events);
-        }
+        fsm.pushBatch(events, pending);
     }
 
     protected void batch(Batch entry, Map<BatchIdentity, Batch> pending) {
         pending.put(entry, entry);
         int totalSize = 0;
         for (ByteBuffer event : entry.events) {
+            event.rewind();
             totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
             batch.add(event);
         }
-        batchHeader.initialize(entry.mirror, totalSize, BatchHeader.MAGIC, entry.channel,
-                               entry.timestamp);
+        batchHeader.initialize(entry.mirror, totalSize, BatchHeader.MAGIC,
+                               entry.channel, entry.timestamp);
         batchHeader.rewind();
         handler.selectForWrite();
     }
@@ -135,6 +123,24 @@ public class BatchWriter {
         queued.clear();
     }
 
+    /**
+     * @param batch
+     * @param pending
+     * @throws RateLimiteExceededException
+     *             - if the event publishing rate has been exceeded
+     */
+    protected void enqueue(Batch batch, Map<BatchIdentity, Batch> pending) {
+        if (!queued.offer(batch)) {
+            throw new RateLimiteExceededException(
+                                                  "The maximum number of queued event batches has been exceeded");
+        }
+        pending.put(batch, batch);
+    }
+
+    protected boolean hasNext() {
+        return !queued.isEmpty();
+    }
+
     protected boolean hasPendingBatch() {
         return queued.poll() != null;
     }
@@ -144,18 +150,19 @@ public class BatchWriter {
     }
 
     protected void nextBatch() {
-        Batch entry = queued.poll();
-        if (entry == null) {
-            fsm.queuedEmpty();
-            return;
-        }
+        Batch entry = queued.remove();
         int totalSize = 0;
         for (ByteBuffer event : entry.events) {
+            event.rewind();
             totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
             batch.add(event);
         }
-        batchHeader.initialize(entry.mirror, totalSize, BatchHeader.MAGIC, entry.channel,
-                               entry.timestamp);
+        batchHeader.initialize(entry.mirror, totalSize, BatchHeader.MAGIC,
+                               entry.channel, entry.timestamp);
+        if (log.isLoggable(Level.FINE)) {
+            log.fine(String.format("push %s #events: %s", batchHeader,
+                                   entry.events.size()));
+        }
         batchHeader.rewind();
         if (writeBatchHeader()) {
             fsm.batchHeaderWritten();
@@ -163,16 +170,13 @@ public class BatchWriter {
             if (inError) {
                 fsm.close();
             } else {
-                if (inError) {
-                    fsm.close();
-                } else {
-                    handler.selectForWrite();
-                }
+                handler.selectForWrite();
             }
         }
     }
 
     protected void nextEventHeader() {
+        assert batch.peekFirst() != null : "No more events!";
         header.initialize(BatchHeader.MAGIC, batch.peekFirst());
         header.rewind();
         if (writeEventHeader()) {
@@ -181,22 +185,15 @@ public class BatchWriter {
             if (inError) {
                 fsm.close();
             } else {
-                if (inError) {
-                    fsm.close();
-                } else {
-                    handler.selectForWrite();
-                }
+                handler.selectForWrite();
             }
         }
     }
 
     protected void nextPayload() {
+        batch.peek().rewind();
         if (writePayload()) {
-            if (batch.isEmpty()) {
-                fsm.waiting();
-            } else {
-                fsm.payloadWritten();
-            }
+            fsm.payloadWritten();
         } else {
             if (inError) {
                 fsm.close();
@@ -224,9 +221,8 @@ public class BatchWriter {
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
-                                    String.format("Unable to write batch header %s on %s",
-                                                  batchHeader,
-                                                  handler.getChannel()), e);
+                        String.format("Unable to write batch header %s on %s",
+                                      batchHeader, handler.getChannel()), e);
             }
             inError = true;
             return false;
@@ -238,11 +234,12 @@ public class BatchWriter {
         try {
             header.write(handler.getChannel());
         } catch (IOException e) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.log(Level.WARNING,
-                                    String.format("Unable to write header %s on %s",
-                                                  header, handler.getChannel()),
-                                    e);
+            if (!Utils.isClose(e)) {
+                if (log.isLoggable(Level.WARNING)) {
+                    log.log(Level.WARNING,
+                            String.format("Unable to write header %s on %s",
+                                          header, handler.getChannel()), e);
+                }
             }
             inError = true;
             return false;
@@ -262,8 +259,8 @@ public class BatchWriter {
         } catch (IOException e) {
             if (log.isLoggable(Level.WARNING)) {
                 log.log(Level.WARNING,
-                                    String.format("Unable to write event batch payload %s",
-                                                  handler.getChannel()), e);
+                        String.format("Unable to write event batch payload %s",
+                                      handler.getChannel()), e);
             }
             inError = true;
             return false;

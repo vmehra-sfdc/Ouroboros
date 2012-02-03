@@ -172,7 +172,7 @@ public class ProducerCoordinator implements Member {
                 UUID channel = (UUID) arguments[0];
                 if (producer.isResponsibleFor(channel)) {
                     Pending state = pendingChannels.get(channel);
-                    assert state != null : String.format("No pending state for %s on: %",
+                    assert state != null : String.format("No pending state for %s on: %s",
                                                          channel, self);
                     switch (state) {
                         case PENDING:
@@ -198,7 +198,7 @@ public class ProducerCoordinator implements Member {
                 UUID channel = (UUID) arguments[0];
                 if (producer.isResponsibleFor(channel)) {
                     Pending state = pendingChannels.get(channel);
-                    assert state != null : String.format("No pending state for %s on: %",
+                    assert state != null : String.format("No pending state for %s on: %s",
                                                          channel, self);
                     switch (state) {
                         case PENDING:
