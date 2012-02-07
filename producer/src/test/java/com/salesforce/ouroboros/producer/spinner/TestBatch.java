@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import org.junit.Test;
 
+import com.salesforce.ouroboros.Batch;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;

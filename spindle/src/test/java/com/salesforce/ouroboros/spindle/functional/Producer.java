@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle.functional;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -35,8 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.BatchHeader;
-import com.salesforce.ouroboros.Event;
+import com.salesforce.ouroboros.Batch;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.source.Spindle;
 
@@ -52,7 +52,6 @@ public class Producer implements CommunicationsHandler {
     private final AtomicInteger  batches        = new AtomicInteger();
     private volatile ByteBuffer  batch;
     private final AtomicInteger  timestamp      = new AtomicInteger(0);
-    private volatile BatchHeader currentHeader;
     private final CountDownLatch latch;
     private final List<UUID>     channelIds;
     private final AtomicInteger  currentChannel = new AtomicInteger();
@@ -117,20 +116,6 @@ public class Producer implements CommunicationsHandler {
 
     @Override
     public void writeReady() {
-        if (currentHeader.hasRemaining()) {
-            try {
-                if (currentHeader.write(handler.getChannel()) < 0) {
-                    handler.close();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                return;
-            }
-            if (currentHeader.hasRemaining()) {
-                handler.selectForWrite();
-                return;
-            }
-        }
         try {
             handler.getChannel().write(batch);
         } catch (IOException e) {
@@ -144,11 +129,10 @@ public class Producer implements CommunicationsHandler {
         }
     }
 
-    private Event event(UUID channelId) {
+    private ByteBuffer event(UUID channelId) {
         byte[] payload = String.format("%s Give me Slack, or give me Food, or Kill me %s",
                                        channelId, channelId).getBytes();
-        ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        return new Event(666, payloadBuffer);
+        return ByteBuffer.wrap(payload);
     }
 
     private void nextBatch() {
@@ -165,17 +149,12 @@ public class Producer implements CommunicationsHandler {
             batches.incrementAndGet();
         }
         UUID channelId = channelIds.get(channel);
-        Event event = event(channelId);
-        int batchLength = batchSize * event.totalSize();
-        batch = ByteBuffer.allocate(batchLength);
+        ByteBuffer event = event(channelId);
+        List<ByteBuffer> events = new ArrayList<ByteBuffer>();
         for (int i = 0; i < batchSize; i++) {
-            event.rewind();
-            batch.put(event.getBytes());
+            events.add(event);
         }
-        currentHeader = new BatchHeader(producerNode, batchLength,
-                                        BatchHeader.MAGIC, channelId,
-                                        timestamp.incrementAndGet());
-        batch.rewind();
+        batch = new Batch(producerNode, channelId, timestamp.get(), events).batch;
         handler.selectForWrite();
     }
 

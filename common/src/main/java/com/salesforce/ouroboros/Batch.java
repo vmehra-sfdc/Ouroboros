@@ -23,17 +23,12 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer.spinner;
+package com.salesforce.ouroboros;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.UUID;
 
-import com.salesforce.ouroboros.BatchHeader;
-import com.salesforce.ouroboros.BatchIdentity;
-import com.salesforce.ouroboros.Event;
-import com.salesforce.ouroboros.EventHeader;
-import com.salesforce.ouroboros.Node;
 
 /**
  * 

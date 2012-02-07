@@ -48,13 +48,13 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 
 import com.hellblazer.pinkie.ChannelHandler;
+import com.salesforce.ouroboros.Batch;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.api.producer.UnknownChannelException;
-import com.salesforce.ouroboros.producer.spinner.Batch;
 import com.salesforce.ouroboros.producer.spinner.Spinner;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Gate;
