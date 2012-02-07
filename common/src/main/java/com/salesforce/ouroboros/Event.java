@@ -134,6 +134,10 @@ public class Event extends EventHeader {
         return event;
     }
 
+    public Event() {
+        super();
+    }
+
     public Event(ByteBuffer bytes) {
         super(bytes);
     }
@@ -161,7 +165,9 @@ public class Event extends EventHeader {
     public ByteBuffer getPayload() {
         bytes.rewind();
         bytes.position(HEADER_BYTE_SIZE);
-        return bytes.slice().asReadOnlyBuffer();
+        ByteBuffer payload = bytes.slice();
+        payload.limit(size());
+        return payload.asReadOnlyBuffer();
     }
 
     @Override
@@ -181,5 +187,18 @@ public class Event extends EventHeader {
      */
     public boolean validate() {
         return getCrc32() == crc32(bytes, HEADER_BYTE_SIZE);
+    }
+
+    /**
+     * @param buffer
+     * @return
+     */
+    public static Event readFrom(ByteBuffer buffer) {
+        int position = buffer.position();
+        ByteBuffer slice = buffer.slice();
+        int totalSize = slice.getInt() + HEADER_BYTE_SIZE;
+        slice.limit(totalSize);
+        buffer.position(position + totalSize);
+        return new Event(slice.asReadOnlyBuffer());
     }
 }

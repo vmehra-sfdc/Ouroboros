@@ -29,11 +29,12 @@ import static com.salesforce.ouroboros.testUtils.Util.waitFor;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
@@ -55,7 +56,6 @@ import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.testUtil.TestController;
 import com.hellblazer.jackal.testUtil.TestNode;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.integration.util.ClusterControllerCfg;
 import com.salesforce.ouroboros.integration.util.ClusterDiscoveryNode1Cfg;
 import com.salesforce.ouroboros.integration.util.ClusterDiscoveryNode2Cfg;
@@ -78,6 +78,10 @@ import com.salesforce.ouroboros.util.MersenneTwister;
  * 
  */
 public class ProducerWeaverClusterTest {
+    private static final int BATCH_SIZE    = 10;
+    private static final int BATCH_COUNT   = 500;
+    private static final int CHANNEL_COUNT = 100;
+
     @Configuration
     static class master extends ClusterNodeCfg {
 
@@ -340,6 +344,8 @@ public class ProducerWeaverClusterTest {
     public void testSimplePublishing() throws Exception {
         bootstrap();
         List<UUID> channels = openChannels();
+        Executor executor = Executors.newCachedThreadPool();
+        CountDownLatch latch = new CountDownLatch(sources.size());
 
         // Open the channels
         for (UUID channel : channels) {
@@ -348,29 +354,10 @@ public class ProducerWeaverClusterTest {
         }
 
         for (Source source : sources) {
-            for (UUID channel : source.channels.keySet()) {
-                for (long timestamp = 0; timestamp < 4; timestamp++) {
-                    ArrayList<ByteBuffer> events = new ArrayList<ByteBuffer>();
-                    for (int i = 0; i < 2; i++) {
-                        events.add(ByteBuffer.wrap(String.format("%s Give me Slack or give me Food or Kill me %s",
-                                                                 channel,
-                                                                 channel).getBytes()));
-                    }
-                    boolean published = false;
-                    while (!published) {
-                        try {
-                            source.producer.publish(channel, timestamp, events);
-                            published = true;
-                        } catch (RateLimiteExceededException e) {
-                            log.info(String.format("Rate limit exceeded for %s",
-                                                   channel));
-                            Thread.sleep(100);
-                        }
-                    }
-                }
-            }
+            source.publish(BATCH_COUNT, BATCH_SIZE, executor, latch);
         }
-
+        
+        latch.await(60, TimeUnit.SECONDS);
         Thread.sleep(5000);
     }
 
@@ -546,7 +533,7 @@ public class ProducerWeaverClusterTest {
     ArrayList<UUID> openChannels() throws InterruptedException {
         log.info("Creating some channels");
 
-        int numOfChannels = 5;
+        int numOfChannels = CHANNEL_COUNT;
         ArrayList<UUID> channels = new ArrayList<UUID>();
         for (int i = 0; i < numOfChannels; i++) {
             UUID channel = new UUID(twister.nextLong(), twister.nextLong());

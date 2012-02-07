@@ -17,14 +17,8 @@ digraph BatchWriter {
         "BatchWriterFSM::Waiting"
             [label="{Waiting}"];
 
-        "BatchWriterFSM::WriteBatchHeader"
-            [label="{WriteBatchHeader}"];
-
-        "BatchWriterFSM::WriteEventHeader"
-            [label="{WriteEventHeader}"];
-
-        "BatchWriterFSM::WritePayload"
-            [label="{WritePayload}"];
+        "BatchWriterFSM::WriteBatch"
+            [label="{WriteBatch}"];
 
         "BatchWriterFSM::Closed"
             [label="{Closed}"];
@@ -45,7 +39,7 @@ digraph BatchWriter {
         "BatchWriterFSM::Suspended" -> "BatchWriterFSM::Closed"
             [label="close/\l"];
 
-        "BatchWriterFSM::Waiting" -> "BatchWriterFSM::WriteBatchHeader"
+        "BatchWriterFSM::Waiting" -> "BatchWriterFSM::WriteBatch"
             [label="pushBatch/\l"];
 
         "BatchWriterFSM::Waiting" -> "BatchWriterFSM::Closed"
@@ -54,61 +48,25 @@ digraph BatchWriter {
         "BatchWriterFSM::Waiting" -> "BatchWriterFSM::Closed"
             [label="close/\l"];
 
-        "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::Closed"
+        "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::Closed"
             [label="writeReady/\l"];
 
-        "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::WriteEventHeader"
+        "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::WriteBatch"
             [label="writeReady/\l"];
 
-        "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::WriteEventHeader"
-            [label="batchHeaderWritten/\l"];
-
-        "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::Closed"
-            [label="failover/\l"];
-
-        "BatchWriterFSM::WriteBatchHeader" -> "BatchWriterFSM::Closed"
-            [label="close/\l"];
-
-        "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::Closed"
+        "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::Waiting"
             [label="writeReady/\l"];
 
-        "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::WritePayload"
-            [label="writeReady/\l"];
-
-        "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::WritePayload"
-            [label="eventHeaderWritten/\l"];
-
-        "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::Closed"
-            [label="failover/\l"];
-
-        "BatchWriterFSM::WriteEventHeader" -> "BatchWriterFSM::Closed"
-            [label="close/\l"];
-
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Closed"
-            [label="writeReady/\l"];
-
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"
-            [label="writeReady/\l"];
-
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"
-            [label="writeReady/\l"];
-
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Waiting"
-            [label="writeReady/\l"];
-
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteEventHeader"
+        "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::WriteBatch"
             [label="payloadWritten/\l"];
 
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::WriteBatchHeader"
+        "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::Waiting"
             [label="payloadWritten/\l"];
 
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Waiting"
-            [label="payloadWritten/\l"];
-
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Closed"
+        "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::Closed"
             [label="failover/\l"];
 
-        "BatchWriterFSM::WritePayload" -> "BatchWriterFSM::Closed"
+        "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::Closed"
             [label="close/\l"];
 
         "%start" -> "BatchWriterFSM::Suspended"

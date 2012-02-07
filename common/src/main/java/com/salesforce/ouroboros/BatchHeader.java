@@ -68,10 +68,16 @@ public class BatchHeader {
         bytes = b;
     }
 
+    public static BatchHeader readFrom(ByteBuffer buffer) {
+        ByteBuffer slice = buffer.slice();
+        buffer.position(buffer.position() + HEADER_BYTE_SIZE);
+        return new BatchHeader(slice.asReadOnlyBuffer());
+    }
+
     public BatchHeader(Node mirror, int batchByteLength, int magic,
                        UUID channel, long timestamp) {
         this();
-        initialize(mirror, batchByteLength, magic, channel, timestamp);
+        append(bytes, mirror, batchByteLength, magic, channel, timestamp);
     }
 
     @Override
@@ -130,16 +136,6 @@ public class BatchHeader {
         return bytes.hasRemaining();
     }
 
-    public void initialize(Node mirror, int batchByteLength, int magic,
-                           UUID channel, long timestamp) {
-        bytes.putInt(BATCH_BYTE_LENGTH_OFFSET, batchByteLength);
-        bytes.putInt(MAGIC_OFFSET, magic);
-        bytes.putInt(PRODUCER_MIRROR_OFFSET, mirror.processId);
-        bytes.putLong(CH_MSB_OFFSET, channel.getMostSignificantBits());
-        bytes.putLong(CH_LSB_OFFSET, channel.getLeastSignificantBits());
-        bytes.putLong(TIMESTAMP_OFFSET, timestamp);
-    }
-
     /**
      * Read the header from the channel
      * 
@@ -181,5 +177,27 @@ public class BatchHeader {
 
     protected int getHeaderSize() {
         return HEADER_BYTE_SIZE;
+    }
+
+    /**
+     * @param bytes
+     * @param mirror
+     * @param batchByteSize
+     * @param magic
+     * @param channel
+     * @param timestamp
+     */
+    public static void append(ByteBuffer bytes, Node mirror, int batchByteSize,
+                              int magic, UUID channel, long timestamp) {
+        int position = bytes.position();
+        bytes.putInt(position + BATCH_BYTE_LENGTH_OFFSET, batchByteSize);
+        bytes.putInt(position + MAGIC_OFFSET, magic);
+        bytes.putInt(position + PRODUCER_MIRROR_OFFSET, mirror.processId);
+        bytes.putLong(position + CH_MSB_OFFSET,
+                      channel.getMostSignificantBits());
+        bytes.putLong(position + CH_LSB_OFFSET,
+                      channel.getLeastSignificantBits());
+        bytes.putLong(position + TIMESTAMP_OFFSET, timestamp);
+        bytes.position(position + HEADER_BYTE_SIZE);
     }
 }

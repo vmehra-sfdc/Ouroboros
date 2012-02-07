@@ -119,10 +119,10 @@ public class Producer {
                     ProducerConfiguration configuration) throws IOException {
         controller = new RateController(
                                         new RateLimiter(
-                                                        configuration.getTargetEventRate(),
+                                                        configuration.getTargetBandwidth(),
                                                         configuration.getTokenLimit(),
                                                         configuration.getMinimumTokenRegenerationTime()),
-                                        configuration.getMinimumEventRate(),
+                                        configuration.getMinimumBandwidth(),
                                         configuration.getMaximumEventRate(),
                                         configuration.getSampleWindowSize(),
                                         configuration.getSampleFrequency());
@@ -231,7 +231,11 @@ public class Producer {
                                                   String.format("The channel %s does not exist",
                                                                 channel));
             }
-            if (!controller.accept(events.size())) {
+            Batch batch = new Batch(getProducerReplicationPair(channel)[1],
+                                    channel, timestamp, events);
+            /**
+            if (!controller.accept(batch.batchByteSize)) {
+                System.out.println("*** Rate limited by controller");
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Rate limit exceeded for push to %s",
                                            channel));
@@ -239,9 +243,8 @@ public class Producer {
                 throw new RateLimiteExceededException(
                                                       String.format("The rate limit for this producer has been exceeded"));
             }
-            state.spinner.push(new Batch(
-                                         getProducerReplicationPair(channel)[1],
-                                         channel, timestamp, events));
+            */
+            state.spinner.push(batch);
         } finally {
             publishingThreads.decrementAndGet();
         }

@@ -48,62 +48,18 @@ Suspended {
 
 Waiting {
 	pushBatch(batch: Batch,  pending: Map<BatchIdentity, Batch>)
-		WriteBatchHeader {
+		WriteBatch {
 			enqueue(batch, pending);
 		}
 }
 
-WriteBatchHeader
+WriteBatch
 Entry {
 	nextBatch();
 }
 {
 	writeReady
-		[!ctxt.writeBatchHeader() && !ctxt.inError()]
-		nil {
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{}
-
-	writeReady
-		WriteEventHeader{}
-		
-	batchHeaderWritten
-		WriteEventHeader{}
-} 
-
-WriteEventHeader
-Entry {
-	nextEventHeader();
-}
-{
-	writeReady
-		[!ctxt.writeEventHeader() && !ctxt.inError()]
-		nil {
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{}
-
-	writeReady
-		WritePayload{}
-
-	eventHeaderWritten
-		WritePayload{}
-} 
-
-WritePayload
-Entry {
-	nextPayload();
-}
-{
-	writeReady
-		[!ctxt.writePayload() && !ctxt.inError()]
+		[!ctxt.writeBatch() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}
@@ -113,23 +69,15 @@ Entry {
 		Closed{}
 		
 	writeReady
-		[!ctxt.batch.isEmpty()]
-		WriteEventHeader{}
-		
-	writeReady
 		[ctxt.hasNext()]
-		WriteEventHeader{}
+		WriteBatch{}
 		
 	writeReady
 		Waiting{}
 		
 	payloadWritten
-		[!ctxt.batch.isEmpty()]
-		WriteEventHeader{}
-		
-	payloadWritten
 		[ctxt.hasNext()]
-		WriteBatchHeader{}
+		WriteBatch{}
 		
 	payloadWritten
 		Waiting{}

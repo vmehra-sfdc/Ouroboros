@@ -26,6 +26,7 @@
 package com.salesforce.ouroboros.producer.spinner;
 
 import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -47,7 +48,6 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
-import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterFSM;
 
@@ -84,88 +84,37 @@ public class TestBatchWriter {
         Node mirror = new Node(0x1638);
         Batch batch = new Batch(mirror, channel, timestamp,
                                 Arrays.asList(payloads));
-        Answer<Integer> readBatchHeader = new Answer<Integer>() {
+        Answer<Integer> readBatch = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                BatchHeader header = new BatchHeader(buffer);
+                int totalLength = buffer.remaining();
+                BatchHeader header = BatchHeader.readFrom(buffer);
                 assertEquals(channel, header.getChannel());
-                buffer.position(buffer.limit());
-                return BatchHeader.HEADER_BYTE_SIZE;
+                for (int i = 0; i < 3; i++) {
+                    Event event = Event.readFrom(buffer);
+                    byte[] buf = new byte[events[i].getBytes().length];
+                    event.getPayload().get(buf);
+                    String payload = new String(buf);
+                    assertEquals(events[i].getBytes().length, event.size());
+                    assertEquals(crc32[i], event.getCrc32());
+                    assertTrue("event failed CRC check", event.validate());
+                    assertEquals(String.format("unexpected event content '%s'",
+                                               payload), events[i], payload);
+                }
+                assertEquals(0, buffer.remaining());
+                return totalLength;
             }
         };
-        Answer<Integer> readEventHeader0 = new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                EventHeader header = new EventHeader(buffer);
-                assertEquals(events[0].getBytes().length, header.size());
-                assertEquals(crc32[0], header.getCrc32());
-                buffer.position(buffer.limit());
-                return EventHeader.HEADER_BYTE_SIZE;
-            }
-        };
-        Answer<Integer> readPayload0 = new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                byte[] b = new byte[events[0].getBytes().length];
-                buffer.get(b, 0, b.length);
-                assertEquals(events[0], new String(b));
-                return b.length;
-            }
-        };
-        Answer<Integer> readEventHeader1 = new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                EventHeader header = new EventHeader(buffer);
-                assertEquals(events[1].getBytes().length, header.size());
-                assertEquals(crc32[1], header.getCrc32());
-                buffer.position(buffer.limit());
-                return EventHeader.HEADER_BYTE_SIZE;
-            }
-        };
-        Answer<Integer> readPayload1 = new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                byte[] b = new byte[events[1].getBytes().length];
-                buffer.get(b, 0, b.length);
-                assertEquals(events[1], new String(b));
-                return b.length;
-            }
-        };
-        Answer<Integer> readEventHeader2 = new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                EventHeader header = new EventHeader(buffer);
-                assertEquals(events[2].getBytes().length, header.size());
-                assertEquals(crc32[2], header.getCrc32());
-                buffer.position(buffer.limit());
-                return EventHeader.HEADER_BYTE_SIZE;
-            }
-        };
-        Answer<Integer> readPayload2 = new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                byte[] b = new byte[events[2].getBytes().length];
-                buffer.get(b, 0, b.length);
-                assertEquals(events[2], new String(b));
-                return b.length;
-            }
-        };
-        when(outbound.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readBatchHeader).thenAnswer(readEventHeader0).thenAnswer(readPayload0).thenAnswer(readEventHeader1).thenAnswer(readPayload1).thenAnswer(readEventHeader2).thenAnswer(readPayload2);
+        when(outbound.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readBatch);
 
         batchWriter.push(batch, pending);
         assertEquals(1, pending.size());
         assertEquals(batch, pending.get(batch));
-        assertEquals(BatchWriterFSM.WriteBatchHeader, batchWriter.getState());
+        assertEquals(BatchWriterFSM.WriteBatch, batchWriter.getState());
 
         batchWriter.writeReady();
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
-        verify(outbound, new Times(8)).write(isA(ByteBuffer.class));
+        verify(outbound, new Times(2)).write(isA(ByteBuffer.class));
     }
 }

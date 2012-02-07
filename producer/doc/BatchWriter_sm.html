@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=9>
+        <th colspan=7>
           Transition
         </th>
       </tr>
@@ -27,16 +27,10 @@
          Exit
         </th>
         <th>
-          batchHeaderWritten
-        </th>
-        <th>
           close
         </th>
         <th>
           connect
-        </th>
-        <th>
-          eventHeaderWritten
         </th>
         <th>
           failover
@@ -69,14 +63,10 @@
         <td>
         </td>
         <td>
-        </td>
-        <td>
           <pre>
   Waiting
   {}
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -106,12 +96,8 @@
         <td>
         </td>
         <td>
-        </td>
-        <td>
-        </td>
-        <td>
           <pre>
-  WriteBatchHeader
+  WriteBatch
   {
     enqueue(batch, pending);
   }
@@ -124,7 +110,7 @@
       </tr>
       <tr>
         <td>
-          WriteBatchHeader
+          WriteBatch
         </td>
         <td>
           <pre>
@@ -134,18 +120,6 @@
         <td>
         </td>
         <td>
-          <pre>
-  WriteEventHeader
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -153,100 +127,8 @@
         </td>
         <td>
           <pre>
-[!ctxt.writeBatchHeader() && !ctxt.inError()]
-  WriteBatchHeader
-  {
-    selectForWrite();
-  }
-
-[ctxt.inError()]
-  Closed
-  {}
-
-  WriteEventHeader
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          WriteEventHeader
-        </td>
-        <td>
-          <pre>
-    nextEventHeader();
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  WritePayload
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-[!ctxt.writeEventHeader() && !ctxt.inError()]
-  WriteEventHeader
-  {
-    selectForWrite();
-  }
-
-[ctxt.inError()]
-  Closed
-  {}
-
-  WritePayload
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          WritePayload
-        </td>
-        <td>
-          <pre>
-    nextPayload();
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-[!ctxt.batch.isEmpty()]
-  WriteEventHeader
-  {}
-
 [ctxt.hasNext()]
-  WriteBatchHeader
+  WriteBatch
   {}
 
   Waiting
@@ -257,8 +139,8 @@
         </td>
         <td>
           <pre>
-[!ctxt.writePayload() && !ctxt.inError()]
-  WritePayload
+[!ctxt.writeBatch() && !ctxt.inError()]
+  WriteBatch
   {
     selectForWrite();
   }
@@ -267,12 +149,8 @@
   Closed
   {}
 
-[!ctxt.batch.isEmpty()]
-  WriteEventHeader
-  {}
-
 [ctxt.hasNext()]
-  WriteEventHeader
+  WriteBatch
   {}
 
   Waiting
@@ -294,14 +172,10 @@
         <td>
         </td>
         <td>
-        </td>
-        <td>
           <pre>
   Closed
   {}
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>

@@ -37,24 +37,24 @@ import com.salesforce.ouroboros.util.LabeledThreadFactory;
  * 
  */
 public class ProducerConfiguration {
-    private double              maximumEventRate             = 2000.0;
+    private double              maximumBandwidth             = 20000000.0;
     private int                 maxQueueLength               = 100;
-    private double              minimumEventRate             = 500.0;
-    private int                 minimumTokenRegenerationTime = 10;
+    private double              minimumBandwidth             = 500000.0;
+    private int                 minimumTokenRegenerationTime = 1;
     private int                 retryLimit                   = 10;
     private int                 sampleFrequency              = 10;
     private int                 sampleWindowSize             = 1000;
     private ExecutorService     spinners                     = Executors.newCachedThreadPool(new LabeledThreadFactory(
                                                                                                                       "Spinner"));
     private final SocketOptions spinnerSocketOptions         = new SocketOptions();
-    private double              targetEventRate              = 1000.0;
-    private int                 tokenLimit                   = 1000;
+    private double              targetBandwidth              = 10000000.0;
+    private int                 tokenLimit                   = 2000000;
 
     /**
      * @return the maximumEventRate
      */
     public double getMaximumEventRate() {
-        return maximumEventRate;
+        return maximumBandwidth;
     }
 
     public int getMaxQueueLength() {
@@ -64,8 +64,8 @@ public class ProducerConfiguration {
     /**
      * @return the minimumEventRate
      */
-    public double getMinimumEventRate() {
-        return minimumEventRate;
+    public double getMinimumBandwidth() {
+        return minimumBandwidth;
     }
 
     /**
@@ -108,10 +108,10 @@ public class ProducerConfiguration {
     }
 
     /**
-     * @return the targetEventRate
+     * @return the targetBandwidth
      */
-    public double getTargetEventRate() {
-        return targetEventRate;
+    public double getTargetBandwidth() {
+        return targetBandwidth;
     }
 
     /**
@@ -125,8 +125,8 @@ public class ProducerConfiguration {
      * @param maximumEventRate
      *            the maximumEventRate to set
      */
-    public void setMaximumEventRate(double maximumEventRate) {
-        this.maximumEventRate = maximumEventRate;
+    public void setMaximumBandwidth(double maximumEventRate) {
+        this.maximumBandwidth = maximumEventRate;
     }
 
     public void setMaxQueueLength(int maxQueueLength) {
@@ -137,8 +137,8 @@ public class ProducerConfiguration {
      * @param minimumEventRate
      *            the minimumEventRate to set
      */
-    public void setMinimumEventRate(double minimumEventRate) {
-        this.minimumEventRate = minimumEventRate;
+    public void setMinimumBandwidth(double minimumEventRate) {
+        this.minimumBandwidth = minimumEventRate;
     }
 
     /**
@@ -178,11 +178,11 @@ public class ProducerConfiguration {
     }
 
     /**
-     * @param targetEventRate
-     *            the targetEventRate to set
+     * @param targetBandwidth
+     *            the targetBandwidth to set
      */
-    public void setTargetEventRate(double targetEventRate) {
-        this.targetEventRate = targetEventRate;
+    public void setTargetBandwidth(double targetBandwidth) {
+        this.targetBandwidth = targetBandwidth;
     }
 
     /**

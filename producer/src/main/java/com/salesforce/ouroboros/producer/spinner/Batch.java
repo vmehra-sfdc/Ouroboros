@@ -29,7 +29,10 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.UUID;
 
+import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
+import com.salesforce.ouroboros.Event;
+import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
 
 /**
@@ -38,16 +41,43 @@ import com.salesforce.ouroboros.Node;
  * 
  */
 public class Batch extends BatchIdentity {
-    public final Collection<ByteBuffer> events;
-    public final Node                   mirror;
-    private final long                  created = System.currentTimeMillis();
+    public final ByteBuffer batch;
+    public final int        batchByteSize;
+    public final Node       mirror;
+    private final long      created = System.currentTimeMillis();
 
+    /**
+     * @param mirror
+     * @param channel
+     * @param timestamp
+     * @param events
+     */
     public Batch(Node mirror, UUID channel, long timestamp,
                  Collection<ByteBuffer> events) {
         super(channel, timestamp);
         assert events != null : "events must not be null";
-        this.events = events;
         this.mirror = mirror;
+        int totalSize = 0;
+        int batchSize = 0;
+
+        for (ByteBuffer event : events) {
+            event.rewind();
+            totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
+            batchSize += event.remaining();
+        }
+        batchByteSize = batchSize;
+
+        batch = ByteBuffer.allocate(totalSize + BatchHeader.HEADER_BYTE_SIZE);
+        BatchHeader.append(batch, mirror, totalSize, BatchHeader.MAGIC,
+                           channel, timestamp);
+
+        for (ByteBuffer event : events) {
+            event.rewind();
+            Event.append(BatchHeader.MAGIC, event, batch);
+        }
+
+        assert batch.remaining() == 0;
+        batch.rewind();
     }
 
     /**
@@ -63,7 +93,7 @@ public class Batch extends BatchIdentity {
      */
     @Override
     public String toString() {
-        return "Batch [#events=" + events.size() + ", created=" + created
+        return "Batch [#events=" + batch.capacity() + ", created=" + created
                + ", channel=" + channel + ", timestamp=" + timestamp + "]";
     }
 }
