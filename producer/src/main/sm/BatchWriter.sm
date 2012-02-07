@@ -36,6 +36,7 @@
 %package com.salesforce.ouroboros.producer.spinner
 %import java.util.Map
 %import com.salesforce.ouroboros.BatchIdentity
+%import com.salesforce.ouroboros.Batch
 %access public
 
 %start BatchWriterFSM::Suspended
