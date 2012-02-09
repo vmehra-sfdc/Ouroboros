@@ -36,20 +36,23 @@ public interface Predicate {
 
     /**
      * Evaluate the predicate, using the default cost
+     * @param currentTime TODO
      * 
      * @return true if the predicated rate is valid, false otherwise
      */
-    boolean accept();
+    boolean accept(long currentTime);
 
     /**
      * Evaluate the predicate, using the supplied cost
      * 
      * @param cost
      *            - the cost of accepting
+     * @param currentTime
+     *            - the current time to use for the request
      * @return true if the predicated rate is valid given the cost, false
      *         otherwise
      */
-    boolean accept(int cost);
+    boolean accept(int cost, long currentTime);
 
     /**
      * Set the target rate of the predicate

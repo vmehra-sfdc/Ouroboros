@@ -61,24 +61,23 @@ public class RateLimiter implements Predicate {
         }
         maxTokens = tokenLimit;
         currentTokens = tokenLimit * 1.0;
-        last = System.currentTimeMillis();
+        last = -1;
     }
 
     /* (non-Javadoc)
      * @see com.salesforce.ouroboros.util.rate.Predicate#accept()
      */
     @Override
-    public boolean accept() {
-        return accept(1);
+    public boolean accept(long currentTime) {
+        return accept(1, currentTime);
     }
 
     /* (non-Javadoc)
      * @see com.salesforce.ouroboros.util.rate.Predicate#accept(int)
      */
     @Override
-    public synchronized boolean accept(int cost) {
-        long curtime = System.currentTimeMillis();
-        long delay = curtime - last;
+    public synchronized boolean accept(int cost, long currentTime) {
+        long delay = last == -1L ? 0 : currentTime - last;
 
         if (delay >= minimumRegenerationTime) {
             // Regenerate tokens
@@ -87,7 +86,7 @@ public class RateLimiter implements Predicate {
             if (currentTokens > maxTokens) {
                 currentTokens = maxTokens;
             }
-            last = curtime;
+            last = currentTime;
         }
 
         if (currentTokens >= cost) {

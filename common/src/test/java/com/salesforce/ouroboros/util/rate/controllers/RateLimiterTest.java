@@ -41,25 +41,23 @@ public class RateLimiterTest {
     @Test
     public void testLimiter() throws InterruptedException {
         RateLimiter limiter = new RateLimiter(10.0, 10, 0);
-        assertTrue(limiter.accept());
+        assertTrue(limiter.accept(0));
         assertEquals(9, limiter.getCurrentTokens());
         for (int i = 0; i < 9; i++) {
-            assertTrue(limiter.accept());
+            assertTrue(limiter.accept(0));
         }
-        assertFalse(limiter.accept());
-        // wait for a token to regenerate
-        Thread.sleep(100);
-        assertTrue(limiter.accept());
+        assertFalse(limiter.accept(0));
+        // wait for a token to regenerate 
+        assertTrue(limiter.accept(100));
         // clear any remaining tokens 
         for (int i = 0; i < limiter.getCurrentTokens(); i++) {
-            assertTrue(limiter.accept());
+            assertTrue(limiter.accept(100));
         }
         assertEquals(0, limiter.getCurrentTokens());
 
         limiter.setTargetRate(2);
-        Thread.sleep(500);
         // Only one token should regenerate
-        assertTrue(limiter.accept());
-        assertFalse(limiter.accept());
+        assertTrue(limiter.accept(1000));
+        assertFalse(limiter.accept(1000));
     }
 }

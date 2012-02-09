@@ -42,7 +42,7 @@ import com.salesforce.ouroboros.util.rate.Predicate;
 public class RateController implements Controller {
     private volatile double     additiveIncrease       = 0.5;
     private volatile double     highWaterMark          = 1.2D;
-    private volatile long       lastSampled            = System.currentTimeMillis();
+    private volatile long       lastSampled            = 0;
     private final ReentrantLock lock                   = new ReentrantLock();
     private volatile double     lowWaterMark           = 0.9D;
     private volatile double     maximum                = 5000.0;
@@ -76,13 +76,13 @@ public class RateController implements Controller {
     }
 
     @Override
-    public boolean accept() {
-        return predicate.accept();
+    public boolean accept(long currentTime) {
+        return predicate.accept(currentTime);
     }
 
     @Override
-    public boolean accept(int cost) {
-        return predicate.accept(cost);
+    public boolean accept(int cost, long currentTime) {
+        return predicate.accept(cost, currentTime);
     }
 
     public double getAdditiveIncrease() {
@@ -138,7 +138,7 @@ public class RateController implements Controller {
     }
 
     @Override
-    public void sample(double sample) {
+    public void sample(double sample, long currentTime) {
         // Only sample every N batches
         if (sampleCount.incrementAndGet() % sampleFrequency != 0) {
             return;
@@ -149,13 +149,12 @@ public class RateController implements Controller {
             return;
         }
         try {
-            long curtime = System.currentTimeMillis();
 
-            if (curtime - lastSampled < sampleRate) {
+            if (currentTime - lastSampled < sampleRate) {
                 return;
             }
             window.sample(sample);
-            lastSampled = curtime;
+            lastSampled = currentTime;
             double ninetieth = window.getPercentile(0.9);
 
             if (ninetieth < lowWaterMark * target) {

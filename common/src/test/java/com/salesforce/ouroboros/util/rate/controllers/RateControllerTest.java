@@ -23,23 +23,38 @@ public class RateControllerTest {
         controller.setTarget(1);
 
         controller.setSampleRate(0);
-        for (int responseTime : new int[] { 10, 10, 10, 10, 10, 10, 1 }) {
-            controller.sample(responseTime);
+
+        long sampleTime = 0L;
+        int[] responseTimes = new int[] { 10, 10, 10, 10, 10, 10, 1 };
+        for (int i = 0; i < responseTimes.length; i++) {
+            controller.sample(responseTimes[i], sampleTime);
+            sampleTime += 10;
         }
         for (int i = 0; i < 25; i++) {
-            controller.sample(0);
+            controller.sample(0, sampleTime);
+            sampleTime += 10;
         }
 
-        controller.sample(0);
-        controller.sample(0);
-        controller.sample(0);
-        controller.sample(1);
-        controller.sample(1);
-        controller.sample(1);
-        controller.sample(1);
-        controller.sample(0);
-        controller.sample(0);
-        controller.sample(0);
+        controller.sample(0, sampleTime);
+        sampleTime += 10;
+        controller.sample(0, sampleTime);
+        sampleTime += 10;
+        controller.sample(0, sampleTime);
+        sampleTime += 10;
+        controller.sample(1, sampleTime);
+        sampleTime += 10;
+        controller.sample(1, sampleTime);
+        sampleTime += 10;
+        controller.sample(1, sampleTime);
+        sampleTime += 10;
+        controller.sample(1, sampleTime);
+        sampleTime += 10;
+        controller.sample(0, sampleTime);
+        sampleTime += 10;
+        controller.sample(0, sampleTime);
+        sampleTime += 10;
+        controller.sample(0, sampleTime);
+        sampleTime += 10;
         verify(predicate).setTargetRate(0.5);
         verify(predicate).setTargetRate(0.25);
         verify(predicate).setTargetRate(0.125);
