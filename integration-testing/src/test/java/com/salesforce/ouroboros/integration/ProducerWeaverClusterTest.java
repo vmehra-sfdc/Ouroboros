@@ -79,7 +79,7 @@ import com.salesforce.ouroboros.util.MersenneTwister;
  */
 public class ProducerWeaverClusterTest {
     private static final int BATCH_SIZE    = 10;
-    private static final int BATCH_COUNT   = 2500;
+    private static final int BATCH_COUNT   = 500;
     private static final int CHANNEL_COUNT = 100;
 
     @Configuration
