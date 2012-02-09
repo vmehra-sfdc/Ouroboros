@@ -145,7 +145,6 @@ public class Producer {
      *            - The committed event batch
      */
     public void acknowledge(Batch batch) {
-        batch.timestamp();
         controller.sample(batch.rate(), System.currentTimeMillis());
         channelState.get(batch.channel).timestamp = batch.timestamp;
     }
