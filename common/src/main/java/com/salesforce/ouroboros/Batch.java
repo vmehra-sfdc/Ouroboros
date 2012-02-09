@@ -29,7 +29,6 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.UUID;
 
-
 /**
  * 
  * @author hhildebrand
@@ -40,6 +39,7 @@ public class Batch extends BatchIdentity {
     public final int        batchByteSize;
     public final Node       mirror;
     private final long      created = System.currentTimeMillis();
+    private long            interval;
 
     /**
      * @param mirror
@@ -79,8 +79,8 @@ public class Batch extends BatchIdentity {
      * @return the interval, in milliseconds, between when the batch was
      *         submitted and when it was acknowledged
      */
-    public int interval() {
-        return (int) (System.currentTimeMillis() - created);
+    public long interval() {
+        return interval;
     }
 
     /* (non-Javadoc)
@@ -90,5 +90,19 @@ public class Batch extends BatchIdentity {
     public String toString() {
         return "Batch [#events=" + batch.capacity() + ", created=" + created
                + ", channel=" + channel + ", timestamp=" + timestamp + "]";
+    }
+
+    /**
+     * @return the transfer rate in bytes per second of this batch.
+     */
+    public double rate() {
+        return batchByteSize / interval;
+    }
+
+    /**
+     * 
+     */
+    public void timestamp() {
+        interval = System.currentTimeMillis() - created;
     }
 }

@@ -47,7 +47,7 @@ public class ProducerConfiguration {
     private ExecutorService     spinners                     = Executors.newCachedThreadPool(new LabeledThreadFactory(
                                                                                                                       "Spinner"));
     private final SocketOptions spinnerSocketOptions         = new SocketOptions();
-    private double              targetBandwidth              = 10000000.0;
+    private double              targetBandwidth              = 1000000.0;
     private int                 tokenLimit                   = 2000000;
 
     /**

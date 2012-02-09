@@ -145,7 +145,8 @@ public class Producer {
      *            - The committed event batch
      */
     public void acknowledge(Batch batch) {
-        controller.sample(batch.interval(), System.currentTimeMillis());
+        batch.timestamp();
+        controller.sample(batch.rate(), System.currentTimeMillis());
         channelState.get(batch.channel).timestamp = batch.timestamp;
     }
 
@@ -233,9 +234,7 @@ public class Producer {
             }
             Batch batch = new Batch(getProducerReplicationPair(channel)[1],
                                     channel, timestamp, events);
-            /**
             if (!controller.accept(batch.batchByteSize)) {
-                System.out.println("*** Rate limited by controller");
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Rate limit exceeded for push to %s",
                                            channel));
@@ -243,7 +242,6 @@ public class Producer {
                 throw new RateLimiteExceededException(
                                                       String.format("The rate limit for this producer has been exceeded"));
             }
-            */
             state.spinner.push(batch);
         } finally {
             publishingThreads.decrementAndGet();
