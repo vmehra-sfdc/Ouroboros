@@ -10,4 +10,3 @@ Ouroboros is built using Maven 2.x.  You can build the project by cd'ing into th
 The Ouroboros Wiki is here: https://github.com/sfdc-hhildebrand/Ouroboros/wiki
 	
 Dendencies are now pulled from the Ouroboros project's continuous build, so this project can be built without any additional preconditions.
-
