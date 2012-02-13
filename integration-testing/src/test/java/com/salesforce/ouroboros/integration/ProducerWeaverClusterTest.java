@@ -26,6 +26,7 @@
 package com.salesforce.ouroboros.integration;
 
 import static com.salesforce.ouroboros.testUtils.Util.waitFor;
+import static com.salesforce.ouroboros.util.Utils.point;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
@@ -64,6 +65,7 @@ import com.salesforce.ouroboros.integration.util.ClusterDiscoveryNode4Cfg;
 import com.salesforce.ouroboros.integration.util.ClusterNodeCfg;
 import com.salesforce.ouroboros.integration.util.ClusterTestCfg;
 import com.salesforce.ouroboros.partition.Switchboard;
+import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.ProducerCoordinator;
 import com.salesforce.ouroboros.producer.ProducerCoordinatorContext;
 import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.ControllerFSM;
@@ -71,6 +73,7 @@ import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.CoordinatorF
 import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
+import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.MersenneTwister;
 
 /**
@@ -343,6 +346,10 @@ public class ProducerWeaverClusterTest {
     @Test
     public void testSimplePublishing() throws Exception {
         bootstrap();
+        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>();
+        for (ProducerCoordinator producer : producers) {
+            producerRing.add(producer.getProducer(), producer.getId().capacity);
+        }
         List<UUID> channels = openChannels();
         Executor executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(sources.size());
@@ -356,9 +363,22 @@ public class ProducerWeaverClusterTest {
         for (Source source : sources) {
             source.publish(BATCH_COUNT, BATCH_SIZE, executor, latch);
         }
-        
+
         latch.await(60, TimeUnit.SECONDS);
-        Thread.sleep(5000);
+        final Long target = Long.valueOf(BATCH_COUNT - 1);
+        for (UUID channel : channels) {
+            final UUID c = channel;
+            final List<Producer> pair = producerRing.hash(point(channel), 2);
+            waitFor(String.format("Did not receive all acks for %s", channel),
+                    new Condition() {
+                        @Override
+                        public boolean value() {
+                            Long ts = pair.get(1).getMirrorTimestampFor(c);
+                            System.out.println("TS: " + ts);
+                            return target.equals(ts);
+                        }
+                    }, 60000L, 1000L);
+        }
     }
 
     protected void assertProducersBootstrapping(List<ProducerCoordinator> partition)

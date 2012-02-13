@@ -34,6 +34,7 @@
 
 %class Acknowledger
 %package com.salesforce.ouroboros.spindle.source
+%import java.util.UUID
 %access public
 
 %start AcknowledgerFSM::Waiting
@@ -44,8 +45,10 @@ Entry {
 	processPendingAcks();
 }
 {
-	ack
-		WriteAck{}
+	ack(channel: UUID, timestamp: long)
+		WriteBatch{
+			enqueue(channel, timestamp);
+		}
 
 	waiting
 		nil {}
@@ -54,13 +57,13 @@ Entry {
 		nil {}
 }
 
-WriteAck
+WriteBatch
 Entry {
 	processPendingAcks();
 }
 {
 	writeReady
-		[!ctxt.writeAck() && !ctxt.inError()]
+		[!ctxt.writeBuffer() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}
@@ -70,8 +73,11 @@ Entry {
 		Closed{}
 		
 	writeReady
-		[!ctxt.pending.isEmpty()]
-		WriteAck{}
+		[ctxt.hasPending()]
+		WriteBatch{}
+		
+	writeReady 
+		Waiting{}
 		
 	waiting
 		Waiting{}
@@ -85,8 +91,10 @@ Entry {
 }
 
 Default {
-	ack
-		nil{}
+	ack(channel: UUID, timestamp: long)
+		nil{
+			enqueue(channel, timestamp);
+		}
 	close
 		Closed{}
 }

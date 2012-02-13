@@ -28,6 +28,10 @@
         </th>
         <th>
           ack
+          <br>
+          (UUID,
+          <br>
+          long)
         </th>
         <th>
           close
@@ -55,8 +59,10 @@ processPendingAcks();
         </td>
         <td>
           <pre>
-  WriteAck
-  {}
+  WriteBatch
+  {
+    enqueue(channel, timestamp);
+  }
           </pre>
         </td>
         <td>
@@ -78,11 +84,11 @@ processPendingAcks();
       </tr>
       <tr>
         <td>
-          WriteAck
+          WriteBatch
         </td>
         <td>
           <pre>
-processPendingAcks();
+    processPendingAcks();
           </pre>
         </td>
         <td>
@@ -99,8 +105,8 @@ processPendingAcks();
         </td>
         <td>
           <pre>
-[!ctxt.writeAck() && !ctxt.inError()]
-  WriteAck
+[!ctxt.writeBuffer() && !ctxt.inError()]
+  WriteBatch
   {
     selectForWrite();
   }
@@ -109,8 +115,11 @@ processPendingAcks();
   Closed
   {}
 
-[!ctxt.pending.isEmpty()]
-  WriteAck
+[ctxt.hasPending()]
+  WriteBatch
+  {}
+
+  Waiting
   {}
           </pre>
         </td>

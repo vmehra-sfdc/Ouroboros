@@ -27,13 +27,14 @@ package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.LinkedList;
 import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.spindle.source.AcknowledgerContext.AcknowledgerState;
 
@@ -46,12 +47,11 @@ public class Acknowledger {
 
     static final Logger               log     = Logger.getLogger(Acknowledger.class.getCanonicalName());
 
-    private final ByteBuffer          buffer  = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
-    private BatchIdentity             current;
+    private ByteBuffer                buffer;
     private final AcknowledgerContext fsm     = new AcknowledgerContext(this);
     private SocketChannelHandler      handler;
     private boolean                   inError;
-    final Queue<BatchIdentity>        pending = new LinkedBlockingQueue<BatchIdentity>();
+    final Queue<BatchIdentity>        pending = new LinkedList<BatchIdentity>();
 
     /**
      * Replicate the event to the mirror
@@ -62,8 +62,7 @@ public class Acknowledger {
      * @param size
      */
     public void acknowledge(UUID channel, long timestamp) {
-        pending.add(new BatchIdentity(channel, timestamp));
-        fsm.ack();
+        fsm.ack(channel, timestamp);
     }
 
     public void close() {
@@ -85,7 +84,7 @@ public class Acknowledger {
 
     private void error() {
         inError = true;
-        current = null;
+        buffer = null;
     }
 
     protected boolean inError() {
@@ -93,19 +92,26 @@ public class Acknowledger {
     }
 
     protected void processPendingAcks() {
-        current = pending.poll();
-        while (current != null) {
+        if (pending.isEmpty()) {
+            return;
+        }
+        int batchByteSize = pending.size() * BatchHeader.HEADER_BYTE_SIZE;
+        if (buffer != null && buffer.capacity() >= batchByteSize) {
             buffer.rewind();
-            current.serializeOn(buffer);
-            if (!writeAck()) {
-                if (inError) {
-                    fsm.close();
-                } else {
-                    handler.selectForWrite();
-                }
-                return;
+        } else {
+            buffer = ByteBuffer.allocateDirect(batchByteSize);
+        }
+        while (!pending.isEmpty()) {
+            pending.remove().serializeOn(buffer);
+        }
+        buffer.flip();
+        if (!writeBuffer()) {
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForWrite();
             }
-            current = pending.poll();
+            return;
         }
         fsm.waiting();
     }
@@ -114,7 +120,7 @@ public class Acknowledger {
         handler.selectForWrite();
     }
 
-    protected boolean writeAck() {
+    protected boolean writeBuffer() {
         try {
             if (handler.getChannel().write(buffer) < 0) {
                 if (log.isLoggable(Level.FINE)) {
@@ -125,8 +131,8 @@ public class Acknowledger {
             }
         } catch (IOException e) {
             log.log(Level.WARNING,
-                    String.format("Unable to write batch commit acknowledgement: %s",
-                                  current), e);
+                    String.format("Unable to write batch commit acknowledgement %s",
+                                  fsm.getName()), e);
             error();
             return false;
         }
@@ -135,5 +141,13 @@ public class Acknowledger {
 
     public void setFsmName(String fsmName) {
         fsm.setName(fsmName);
+    }
+
+    protected void enqueue(UUID channel, long timestamp) {
+        pending.add(new BatchIdentity(channel, timestamp));
+    }
+
+    protected boolean hasPending() {
+        return !pending.isEmpty();
     }
 }

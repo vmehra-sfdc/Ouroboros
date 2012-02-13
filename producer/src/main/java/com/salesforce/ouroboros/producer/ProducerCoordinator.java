@@ -675,4 +675,11 @@ public class ProducerCoordinator implements Member {
     protected boolean tallyComplete() {
         return tally.get() == 0;
     }
+
+    /**
+     * @return
+     */
+    public Producer getProducer() {
+        return producer;
+    }
 }

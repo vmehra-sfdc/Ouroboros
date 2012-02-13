@@ -67,7 +67,7 @@ import com.salesforce.ouroboros.util.rate.controllers.RateLimiter;
  * @author hhildebrand
  * 
  */
-public class Producer {
+public class Producer implements Comparable<Producer> {
 
     public static class UpdateState implements Serializable {
         private static final long serialVersionUID = 1L;
@@ -773,5 +773,45 @@ public class Producer {
         mirrors.clear();
         spinners.clear();
         spinnerHandler.closeOpenHandlers();
+    }
+
+    public Long getMirrorTimestampFor(UUID channel) {
+        return mirrors.get(channel);
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        return self.hashCode();
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        Producer other = (Producer) obj;
+        if (self == null) {
+            if (other.self != null)
+                return false;
+        } else if (!self.equals(other.self))
+            return false;
+        return true;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Comparable#compareTo(java.lang.Object)
+     */
+    @Override
+    public int compareTo(Producer p) {
+        return self.compareTo(p.self);
     }
 }

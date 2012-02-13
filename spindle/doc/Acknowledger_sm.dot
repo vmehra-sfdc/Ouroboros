@@ -14,8 +14,8 @@ digraph Acknowledger {
         "AcknowledgerFSM::Waiting"
             [label="{Waiting}"];
 
-        "AcknowledgerFSM::WriteAck"
-            [label="{WriteAck}"];
+        "AcknowledgerFSM::WriteBatch"
+            [label="{WriteBatch}"];
 
         "AcknowledgerFSM::Closed"
             [label="{Closed}"];
@@ -27,22 +27,25 @@ digraph Acknowledger {
         // Transitions (Edges)
         //
 
-        "AcknowledgerFSM::Waiting" -> "AcknowledgerFSM::WriteAck"
+        "AcknowledgerFSM::Waiting" -> "AcknowledgerFSM::WriteBatch"
             [label="ack/\l"];
 
         "AcknowledgerFSM::Waiting" -> "AcknowledgerFSM::Closed"
             [label="close/\l"];
 
-        "AcknowledgerFSM::WriteAck" -> "AcknowledgerFSM::Closed"
+        "AcknowledgerFSM::WriteBatch" -> "AcknowledgerFSM::Closed"
             [label="writeReady/\l"];
 
-        "AcknowledgerFSM::WriteAck" -> "AcknowledgerFSM::WriteAck"
+        "AcknowledgerFSM::WriteBatch" -> "AcknowledgerFSM::WriteBatch"
             [label="writeReady/\l"];
 
-        "AcknowledgerFSM::WriteAck" -> "AcknowledgerFSM::Waiting"
+        "AcknowledgerFSM::WriteBatch" -> "AcknowledgerFSM::Waiting"
+            [label="writeReady/\l"];
+
+        "AcknowledgerFSM::WriteBatch" -> "AcknowledgerFSM::Waiting"
             [label="waiting/\l"];
 
-        "AcknowledgerFSM::WriteAck" -> "AcknowledgerFSM::Closed"
+        "AcknowledgerFSM::WriteBatch" -> "AcknowledgerFSM::Closed"
             [label="close/\l"];
 
         "AcknowledgerFSM::Closed" -> "AcknowledgerFSM::Closed"

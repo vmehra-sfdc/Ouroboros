@@ -103,6 +103,6 @@ public class Batch extends BatchIdentity {
      * 
      */
     public void timestamp() {
-        interval = System.currentTimeMillis() - created;
+        interval = Math.max(1, System.currentTimeMillis() - created);
     }
 }
