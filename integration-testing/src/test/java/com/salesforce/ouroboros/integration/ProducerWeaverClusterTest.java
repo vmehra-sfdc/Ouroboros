@@ -374,7 +374,6 @@ public class ProducerWeaverClusterTest {
                         @Override
                         public boolean value() {
                             Long ts = pair.get(1).getMirrorTimestampFor(c);
-                            System.out.println("TS: " + ts);
                             return target.equals(ts);
                         }
                     }, 60000L, 1000L);
