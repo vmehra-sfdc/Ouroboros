@@ -682,4 +682,18 @@ public class ProducerCoordinator implements Member {
     public Producer getProducer() {
         return producer;
     }
+
+    public boolean equals(Object o) {
+        if (o == null) {
+            return false;
+        }
+        if (o instanceof ProducerCoordinator) {
+            return self.equals(((ProducerCoordinator) o).self);
+        }
+        return false;
+    }
+
+    public int hashCode() {
+        return self.hashCode();
+    }
 }

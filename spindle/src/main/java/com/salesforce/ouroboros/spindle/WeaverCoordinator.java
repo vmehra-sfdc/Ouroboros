@@ -890,4 +890,25 @@ public class WeaverCoordinator implements Member {
     void setNextRing(ConsistentHashFunction<Node> ring) {
         weaver.setNextRing(ring);
     }
+
+    /**
+     * @return
+     */
+    public Weaver getWeaver() {
+        return weaver;
+    }
+
+    public boolean equals(Object o) {
+        if (o == null) {
+            return false;
+        }
+        if (o instanceof WeaverCoordinator) {
+            return self.equals(((WeaverCoordinator) o).self);
+        }
+        return false;
+    }
+
+    public int hashCode() {
+        return self.hashCode();
+    }
 }

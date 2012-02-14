@@ -39,6 +39,7 @@ import java.util.logging.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
@@ -253,9 +254,9 @@ public class EventChannel {
     /**
      * Close the channel
      */
-    public void close() {
-        log.info(String.format("Closing channel %s, root directory: %s", id,
-                               channel));
+    public void close(Node producerId) {
+        log.info(String.format("Closing channel %s on %s, root directory: %s",
+                               id, producerId, channel));
         deleteDirectory(channel);
         if (log.isLoggable(Level.FINE)) {
             log.fine(String.format("Deleted channel root directory: %s",

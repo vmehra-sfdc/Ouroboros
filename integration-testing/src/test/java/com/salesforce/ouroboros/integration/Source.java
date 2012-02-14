@@ -27,11 +27,13 @@ package com.salesforce.ouroboros.integration;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -43,6 +45,8 @@ import com.salesforce.ouroboros.producer.Producer;
 public class Source implements EventSource {
     private static final Logger                log      = Logger.getLogger(Source.class.getCanonicalName());
 
+    public final AtomicBoolean                 failed   = new AtomicBoolean();
+    public Exception                           failure;
     public final ConcurrentHashMap<UUID, Long> channels = new ConcurrentHashMap<UUID, Long>();
     private Producer                           producer;
 
@@ -69,17 +73,20 @@ public class Source implements EventSource {
     }
 
     public void publish(final int batchCount, final int batchSize,
-                        Executor executor, final CountDownLatch latch) {
+                        Executor executor, final CountDownLatch latch,
+                        final long initialTimestamp) {
         executor.execute(new Runnable() {
             @Override
             public void run() {
-                publish(batchCount, batchSize, latch);
+                publish(batchCount, batchSize, latch, initialTimestamp);
             }
         });
     }
 
-    private void publish(int batchCount, int batchSize, CountDownLatch latch) {
-        for (long timestamp = 0; timestamp < batchCount; timestamp++) {
+    private void publish(int batchCount, int batchSize, CountDownLatch latch,
+                         long initialTimestamp) {
+        for (long timestamp = initialTimestamp; timestamp < initialTimestamp
+                                                            + batchCount; timestamp++) {
             for (UUID channel : channels.keySet()) {
                 ArrayList<ByteBuffer> events = new ArrayList<ByteBuffer>();
                 for (int i = 0; i < batchSize; i++) {
@@ -92,7 +99,12 @@ public class Source implements EventSource {
                         try {
                             producer.publish(channel, timestamp, events);
                         } catch (UnknownChannelException e) {
-                            log.log(Level.SEVERE, "Unknown channel", e);
+                            log.log(Level.SEVERE,
+                                    String.format("Unknown channel %s on %s",
+                                                  channel, producer.getId()));
+                            failed.set(true);
+                            failure = e;
+                            return;
                         } catch (InterruptedException e) {
                             return;
                         }
@@ -110,5 +122,22 @@ public class Source implements EventSource {
             }
         }
         latch.countDown();
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.api.producer.EventSource#deadChannels(java.util.List)
+     */
+    @Override
+    public void deactivated(Collection<UUID> deadChannels) {
+        for (UUID channel : deadChannels) {
+            channels.remove(channel);
+        }
+    }
+
+    /**
+     * @return
+     */
+    public String failureString() {
+        return failure == null ? "Successful!" : failure.toString();
     }
 }

@@ -27,8 +27,9 @@ package com.salesforce.ouroboros.integration;
 
 import static com.salesforce.ouroboros.testUtils.Util.waitFor;
 import static com.salesforce.ouroboros.util.Utils.point;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
-import static org.junit.Assert.assertEquals;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,6 +71,7 @@ import com.salesforce.ouroboros.producer.ProducerCoordinator;
 import com.salesforce.ouroboros.producer.ProducerCoordinatorContext;
 import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.ControllerFSM;
 import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.CoordinatorFSM;
+import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
@@ -219,40 +221,33 @@ public class ProducerWeaverClusterTest {
         id.set(-1);
     }
 
-    private ArrayList<AnnotationConfigApplicationContext> allContexts;
+    private ArrayList<AnnotationConfigApplicationContext> allContexts    = new ArrayList<AnnotationConfigApplicationContext>();
     private ClusterMaster                                 clusterMaster;
     private TestController                                controller;
-    private ArrayList<TestNode>                           fullPartition;
-    private BitView                                       fullView;
-    private ArrayList<ProducerCoordinator>                majorProducers;
-    private BitView                                       majorView;
-    private ArrayList<TestNode>                           majorViewNodes;
-    private ArrayList<WeaverCoordinator>                  majorWeavers;
-    private ArrayList<Node>                               producerNodes;
-    private ArrayList<ProducerCoordinator>                producers;
-    private MersenneTwister                               twister = new MersenneTwister(
-                                                                                        666);
-    private ArrayList<Node>                               weaverNodes;
-    private ArrayList<WeaverCoordinator>                  weavers;
+    private final ArrayList<TestNode>                     fullPartition  = new ArrayList<TestNode>();
+    private final BitView                                 fullView       = new BitView();
+    private final ArrayList<ProducerCoordinator>          majorProducers = new ArrayList<ProducerCoordinator>();
+    private final ArrayList<Producer>                     minorProducers = new ArrayList<Producer>();
+    private final BitView                                 majorView      = new BitView();
+    private final ArrayList<TestNode>                     majorViewNodes = new ArrayList<TestNode>();
+    private final ArrayList<TestNode>                     minorViewNodes = new ArrayList<TestNode>();
+    private final ArrayList<WeaverCoordinator>            majorWeavers   = new ArrayList<WeaverCoordinator>();
+    private final ArrayList<Weaver>                       minorWeavers   = new ArrayList<Weaver>();
+    private final ArrayList<Node>                         producerNodes  = new ArrayList<Node>();
+    private final ArrayList<ProducerCoordinator>          producers      = new ArrayList<ProducerCoordinator>();
+    private final MersenneTwister                         twister        = new MersenneTwister(
+                                                                                               666);
+    private final ArrayList<Node>                         weaverNodes    = new ArrayList<Node>();
+    private final ArrayList<WeaverCoordinator>            weavers        = new ArrayList<WeaverCoordinator>();
 
-    private List<Source>                                  sources;
+    private ArrayList<Source>                             sources;
+    private ArrayList<Source>                             majorSources;
 
     @Before
     public void startUp() throws Exception {
         ClusterTestCfg.incrementPorts();
         reset();
         log.info("Setting up initial partition");
-        allContexts = new ArrayList<AnnotationConfigApplicationContext>();
-        fullPartition = new ArrayList<TestNode>();
-        majorView = new BitView();
-        fullView = new BitView();
-        majorViewNodes = new ArrayList<TestNode>();
-        weavers = new ArrayList<WeaverCoordinator>();
-        majorWeavers = new ArrayList<WeaverCoordinator>();
-        weaverNodes = new ArrayList<Node>();
-        producers = new ArrayList<ProducerCoordinator>();
-        majorProducers = new ArrayList<ProducerCoordinator>();
-        producerNodes = new ArrayList<Node>();
 
         Class<?>[] weaverConfigs = weaverConfigurations();
         Class<?>[] producerConfigs = producerConfigurations();
@@ -299,9 +294,13 @@ public class ProducerWeaverClusterTest {
                 fullView.add(nodeId);
                 majorViewNodes.add(testNode);
                 majorWeavers.add(coordinator);
+            } else {
+                minorWeavers.add(coordinator.getWeaver());
+                minorViewNodes.add(testNode);
             }
             i++;
         }
+        ArrayList<AnnotationConfigApplicationContext> majorProducerContexts = new ArrayList<AnnotationConfigApplicationContext>();
         i = 0;
         for (AnnotationConfigApplicationContext ctxt : producerContexts) {
             nodeId = ctxt.getBean(Identity.class);
@@ -315,12 +314,17 @@ public class ProducerWeaverClusterTest {
                 fullView.add(nodeId);
                 majorViewNodes.add(testNode);
                 majorProducers.add(coordinator);
+                majorProducerContexts.add(ctxt);
+            } else {
+                minorProducers.add(coordinator.getProducer());
+                minorViewNodes.add(testNode);
             }
             i++;
         }
         log.info(String.format("Major partition: %s", majorViewNodes));
 
         sources = getSources(producerContexts);
+        majorSources = getSources(majorProducerContexts);
     }
 
     @After
@@ -357,14 +361,59 @@ public class ProducerWeaverClusterTest {
         // Open the channels
         for (UUID channel : channels) {
             assertTrue(String.format("Channel not opened: %s", channel),
-                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
+                       clusterMaster.open(channel, 5, TimeUnit.SECONDS));
         }
 
         for (Source source : sources) {
-            source.publish(BATCH_COUNT, BATCH_SIZE, executor, latch);
+            source.publish(BATCH_COUNT, BATCH_SIZE, executor, latch, 0L);
         }
 
-        latch.await(60, TimeUnit.SECONDS);
+        assertTrue("not all publishers completed",
+                   latch.await(20, TimeUnit.SECONDS));
+
+        final Long target = Long.valueOf(BATCH_COUNT - 1);
+        for (UUID channel : channels) {
+            final UUID c = channel;
+            final List<Producer> pair = producerRing.hash(point(channel), 2);
+            waitFor(String.format("Did not receive all acks for %s", channel),
+                    new Condition() {
+                        @Override
+                        public boolean value() {
+                            Long ts = pair.get(1).getMirrorTimestampFor(c);
+                            return target.equals(ts);
+                        }
+                    }, 20000L, 1000L);
+        }
+    }
+
+    @Test
+    public void testPublishingAfterPartition() throws Exception {
+        bootstrap();
+        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>();
+        for (ProducerCoordinator producer : producers) {
+            producerRing.add(producer.getProducer(), producer.getId().capacity);
+        }
+        ConsistentHashFunction<Weaver> weaverRing = new ConsistentHashFunction<Weaver>();
+        for (WeaverCoordinator weaver : weavers) {
+            weaverRing.add(weaver.getWeaver(), weaver.getId().capacity);
+        }
+        ArrayList<UUID> channels = openChannels();
+        Executor executor = Executors.newCachedThreadPool();
+        CountDownLatch latch = new CountDownLatch(sources.size());
+
+        // Open the channels
+        for (UUID channel : channels) {
+            assertTrue(String.format("Channel not opened: %s", channel),
+                       clusterMaster.open(channel, 5, TimeUnit.SECONDS));
+        }
+
+        for (Source source : sources) {
+            source.publish(BATCH_COUNT, BATCH_SIZE, executor, latch, 0L);
+        }
+
+        assertTrue("not all publishers completed",
+                   latch.await(20, TimeUnit.SECONDS));
+
         final Long target = Long.valueOf(BATCH_COUNT - 1);
         for (UUID channel : channels) {
             final UUID c = channel;
@@ -377,6 +426,30 @@ public class ProducerWeaverClusterTest {
                             return target.equals(ts);
                         }
                     }, 60000L, 1000L);
+        }
+
+        asymmetricallyPartition();
+        reformPartition();
+
+        System.out.println(String.format("** Dead channels from weaver partition: %s",
+                                         filterChannelsByWeavers(channels,
+                                                                 weaverRing)));
+
+        System.out.println(String.format("** Dead channels from producer partition: %s",
+                                         filterChannelsByProducers(channels,
+                                                                   producerRing)));
+
+        latch = new CountDownLatch(majorSources.size());
+        for (Source source : majorSources) {
+            source.publish(BATCH_COUNT, BATCH_SIZE, executor, latch,
+                           BATCH_COUNT);
+        }
+
+        assertTrue("not all publishers completed",
+                   latch.await(20, TimeUnit.SECONDS));
+
+        for (Source source : majorSources) {
+            assertFalse(source.failureString(), source.failed.get());
         }
     }
 
@@ -565,11 +638,35 @@ public class ProducerWeaverClusterTest {
         return channels;
     }
 
-    List<Source> getSources(List<AnnotationConfigApplicationContext> contexts) {
+    ArrayList<Source> getSources(List<AnnotationConfigApplicationContext> contexts) {
         ArrayList<Source> sources = new ArrayList<Source>();
         for (BeanFactory f : contexts) {
             sources.add(f.getBean(Source.class));
         }
         return sources;
+    }
+
+    ArrayList<UUID> filterChannelsByWeavers(ArrayList<UUID> channels,
+                                            ConsistentHashFunction<Weaver> ring) {
+        ArrayList<UUID> lostChannels = new ArrayList<UUID>();
+        for (UUID channel : channels) {
+            if (minorWeavers.containsAll(ring.hash(point(channel), 2))) {
+                lostChannels.add(channel);
+            }
+        }
+        channels.removeAll(lostChannels);
+        return lostChannels;
+    }
+
+    ArrayList<UUID> filterChannelsByProducers(ArrayList<UUID> channels,
+                                              ConsistentHashFunction<Producer> ring) {
+        ArrayList<UUID> lostChannels = new ArrayList<UUID>();
+        for (UUID channel : channels) {
+            if (minorProducers.containsAll(ring.hash(point(channel), 2))) {
+                lostChannels.add(channel);
+            }
+        }
+        channels.removeAll(lostChannels);
+        return lostChannels;
     }
 }

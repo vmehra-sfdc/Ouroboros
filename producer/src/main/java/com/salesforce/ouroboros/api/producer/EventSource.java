@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.api.producer;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 
@@ -60,5 +61,13 @@ public interface EventSource {
      *            the id of the channel
      */
     void opened(UUID channel);
+
+    /**
+     * Notification that the list of channels have been lost and cannot be
+     * recovered.
+     * 
+     * @param deadChannels
+     */
+    void deactivated(Collection<UUID> deadChannels);
 
 }

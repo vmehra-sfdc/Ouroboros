@@ -105,6 +105,7 @@ public class TestTransfer {
 
     @After
     public void teardown() throws IOException {
+        Node dummy = new Node(0);
         if (spindleHandler != null) {
             spindleHandler.terminate();
         }
@@ -112,7 +113,7 @@ public class TestTransfer {
             replicatorHandler.terminate();
         }
         if (primaryEventChannel != null) {
-            primaryEventChannel.close();
+            primaryEventChannel.close(dummy);
         }
         if (primarySinkHandler != null) {
             primarySinkHandler.terminate();
@@ -122,17 +123,17 @@ public class TestTransfer {
         }
 
         if (primaryEventChannel != null) {
-            primaryEventChannel.close();
+            primaryEventChannel.close(dummy);
         }
         if (mirrorEventChannel != null) {
-            mirrorEventChannel.close();
+            mirrorEventChannel.close(dummy);
         }
 
         if (primarySinkEventChannel != null) {
-            primarySinkEventChannel.close();
+            primarySinkEventChannel.close(dummy);
         }
         if (mirrorSinkEventChannel != null) {
-            mirrorSinkEventChannel.close();
+            mirrorSinkEventChannel.close(dummy);
         }
 
         if (primaryRoot != null) {

@@ -1,5 +1,6 @@
 package com.salesforce.ouroboros.producer.functional;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 
@@ -17,6 +18,10 @@ public class Source implements EventSource {
 
     @Override
     public void opened(UUID channel) {
+    }
+
+    @Override
+    public void deactivated(Collection<UUID> deadChannels) {
     }
 
 }

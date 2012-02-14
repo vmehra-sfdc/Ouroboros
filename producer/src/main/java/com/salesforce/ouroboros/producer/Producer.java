@@ -377,6 +377,7 @@ public class Producer implements Comparable<Producer> {
 
         // Failover mirror channels for which this node is now the primary
         Map<UUID, Long> newPrimaries = new HashMap<UUID, Long>();
+        ArrayList<UUID> deadChannels = new ArrayList<UUID>();
         for (Iterator<Entry<UUID, Long>> mirrored = mirrors.entrySet().iterator(); mirrored.hasNext();) {
             Entry<UUID, Long> entry = mirrored.next();
             UUID channel = entry.getKey();
@@ -404,6 +405,8 @@ public class Producer implements Comparable<Producer> {
                         log.warning(String.format("Both the primary and the secondary for %s have failed!",
                                                   entry.getKey()));
                     }
+                    deadChannels.add(entry.getKey());
+                    channelState.remove(entry.getKey());
                 } else {
                     ChannelState failedPrimary = entry.getValue();
                     // Fail over to the new primary
@@ -449,6 +452,9 @@ public class Producer implements Comparable<Producer> {
 
         if (newPrimaries.size() != 0) {
             source.assumePrimary(newPrimaries);
+        }
+        if (deadChannels.size() != 0) {
+            source.deactivated(deadChannels);
         }
     }
 
@@ -768,7 +774,7 @@ public class Producer implements Comparable<Producer> {
     }
 
     public void inactivate() {
-        // TODO - notify source of inactivation
+        source.deactivated(channelState.keySet());
         channelState.clear();
         mirrors.clear();
         spinners.clear();
