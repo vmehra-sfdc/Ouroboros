@@ -43,6 +43,7 @@ import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.spinner.SpinnerContext.SpinnerFSM;
 import com.salesforce.ouroboros.producer.spinner.SpinnerContext.SpinnerState;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * 
@@ -230,7 +231,12 @@ public class Spinner implements CommunicationsHandler {
                 return false;
             }
         } catch (IOException e) {
-            log.log(Level.WARNING, "Unable to write handshake", e);
+            if (Utils.isClose(e)) {
+                log.log(Level.INFO,
+                        String.format("closing spinner %s ", fsm.getName()), e);
+            } else {
+                log.log(Level.WARNING, "Unable to write handshake", e);
+            }
             inError = true;
             handshake = null;
             return false;

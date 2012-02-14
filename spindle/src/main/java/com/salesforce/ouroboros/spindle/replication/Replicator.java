@@ -41,6 +41,7 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorState;
 import com.salesforce.ouroboros.util.Rendezvous;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * A full duplex replicator of event streams. The replicator provides both
@@ -227,9 +228,15 @@ public class Replicator implements CommunicationsHandler {
                 return false;
             }
         } catch (IOException e) {
-            log.log(Level.WARNING,
-                    String.format("unable to read handshake on %s",
-                                  handler.getChannel()), e);
+            if (Utils.isClose(e)) {
+                log.log(Level.INFO,
+                        String.format("closing replicator %s>%s",
+                                      bundle.getId(), partner), e);
+            } else {
+                log.log(Level.WARNING,
+                        String.format("unable to read handshake on %s",
+                                      handler.getChannel()), e);
+            }
             inError = true;
             return false;
         }
@@ -271,9 +278,15 @@ public class Replicator implements CommunicationsHandler {
                 return false;
             }
         } catch (IOException e) {
-            log.log(Level.WARNING,
-                    String.format("Unable to write handshake from: %s",
-                                  handler.getChannel()), e);
+            if (Utils.isClose(e)) {
+                log.log(Level.INFO,
+                        String.format("closing replicator %s>%s",
+                                      bundle.getId(), partner), e);
+            } else {
+                log.log(Level.WARNING,
+                        String.format("Unable to write handshake from: %s",
+                                      handler.getChannel()), e);
+            }
             inError = true;
             return false;
         }

@@ -38,6 +38,7 @@ import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterState;
 import com.salesforce.ouroboros.util.RingBuffer;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * The event action context for the batch writing protocol FSM
@@ -161,10 +162,16 @@ public class BatchWriter {
                 return false;
             }
         } catch (IOException e) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.log(Level.WARNING,
-                        String.format("Unable to write event batch payload %s",
-                                      handler.getChannel()), e);
+            if (Utils.isClose(e)) {
+                log.log(Level.INFO,
+                        String.format("closing batch writer %s ", fsm.getName()),
+                        e);
+            } else {
+                if (log.isLoggable(Level.WARNING)) {
+                    log.log(Level.WARNING,
+                            String.format("Unable to write event batch payload %s",
+                                          handler.getChannel()), e);
+                }
             }
             inError = true;
             return false;

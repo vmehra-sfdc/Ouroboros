@@ -41,6 +41,7 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.transfer.SinkContext.SinkState;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * The inbound half of the Xerox, which receives the bulk transfer from the
@@ -296,10 +297,15 @@ public class Sink implements CommunicationsHandler {
             }
         } catch (IOException e) {
             error = true;
-            if (log.isLoggable(Level.WARNING)) {
-                log.log(Level.WARNING,
-                        String.format("Error reading header on %s",
-                                      bundle.getId()), e);
+            if (Utils.isClose(e)) {
+                log.log(Level.INFO,
+                        String.format("closing sink %s ", fsm.getName()), e);
+            } else {
+                if (log.isLoggable(Level.WARNING)) {
+                    log.log(Level.WARNING,
+                            String.format("Error reading header on %s",
+                                          bundle.getId()), e);
+                }
             }
             error = true;
             return false;
@@ -404,7 +410,7 @@ public class Sink implements CommunicationsHandler {
     protected void sendAck() {
         if (log.isLoggable(Level.FINER)) {
             log.finer(String.format("Copy complete, sending ack from %s",
-                                   bundle.getId()));
+                                    bundle.getId()));
         }
         buffer.clear();
         buffer.limit(ACK_HEADER_SIZE);

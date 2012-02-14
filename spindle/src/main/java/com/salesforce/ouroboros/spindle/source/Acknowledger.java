@@ -37,6 +37,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.spindle.source.AcknowledgerContext.AcknowledgerState;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * 
@@ -130,9 +131,15 @@ public class Acknowledger {
                 return false;
             }
         } catch (IOException e) {
-            log.log(Level.WARNING,
-                    String.format("Unable to write batch commit acknowledgement %s",
-                                  fsm.getName()), e);
+            if (Utils.isClose(e)) {
+                log.log(Level.INFO,
+                        String.format("closing acknowledger %s ", fsm.getName()),
+                        e);
+            } else {
+                log.log(Level.WARNING,
+                        String.format("Unable to write batch commit acknowledgement %s",
+                                      fsm.getName()), e);
+            }
             error();
             return false;
         }

@@ -36,6 +36,7 @@ import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.source.SpindleContext.SpindleFSM;
 import com.salesforce.ouroboros.spindle.source.SpindleContext.SpindleState;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * The communications wrapper that ties together the appender and the
@@ -161,7 +162,13 @@ public class Spindle implements CommunicationsHandler {
             }
         } catch (IOException e) {
             inError = true;
-            log.log(Level.WARNING, String.format("Error reading handshake"), e);
+            if (Utils.isClose(e)) {
+                log.log(Level.INFO,
+                        String.format("closing Spindle %s ", fsm.getName()), e);
+            } else {
+                log.log(Level.WARNING,
+                        String.format("Error reading handshake"), e);
+            }
             return false;
         }
         return !handshake.hasRemaining();

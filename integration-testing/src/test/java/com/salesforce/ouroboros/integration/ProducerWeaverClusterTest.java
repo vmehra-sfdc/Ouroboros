@@ -361,7 +361,7 @@ public class ProducerWeaverClusterTest {
         // Open the channels
         for (UUID channel : channels) {
             assertTrue(String.format("Channel not opened: %s", channel),
-                       clusterMaster.open(channel, 5, TimeUnit.SECONDS));
+                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
         }
 
         for (Source source : sources) {
@@ -369,7 +369,7 @@ public class ProducerWeaverClusterTest {
         }
 
         assertTrue("not all publishers completed",
-                   latch.await(20, TimeUnit.SECONDS));
+                   latch.await(60, TimeUnit.SECONDS));
 
         final Long target = Long.valueOf(BATCH_COUNT - 1);
         for (UUID channel : channels) {
@@ -382,7 +382,7 @@ public class ProducerWeaverClusterTest {
                             Long ts = pair.get(1).getMirrorTimestampFor(c);
                             return target.equals(ts);
                         }
-                    }, 20000L, 1000L);
+                    }, 60000L, 1000L);
         }
     }
 
@@ -404,7 +404,7 @@ public class ProducerWeaverClusterTest {
         // Open the channels
         for (UUID channel : channels) {
             assertTrue(String.format("Channel not opened: %s", channel),
-                       clusterMaster.open(channel, 5, TimeUnit.SECONDS));
+                       clusterMaster.open(channel, 10, TimeUnit.SECONDS));
         }
 
         for (Source source : sources) {
@@ -412,7 +412,7 @@ public class ProducerWeaverClusterTest {
         }
 
         assertTrue("not all publishers completed",
-                   latch.await(20, TimeUnit.SECONDS));
+                   latch.await(60, TimeUnit.SECONDS));
 
         final Long target = Long.valueOf(BATCH_COUNT - 1);
         for (UUID channel : channels) {
@@ -431,14 +431,6 @@ public class ProducerWeaverClusterTest {
         asymmetricallyPartition();
         reformPartition();
 
-        System.out.println(String.format("** Dead channels from weaver partition: %s",
-                                         filterChannelsByWeavers(channels,
-                                                                 weaverRing)));
-
-        System.out.println(String.format("** Dead channels from producer partition: %s",
-                                         filterChannelsByProducers(channels,
-                                                                   producerRing)));
-
         latch = new CountDownLatch(majorSources.size());
         for (Source source : majorSources) {
             source.publish(BATCH_COUNT, BATCH_SIZE, executor, latch,
@@ -446,7 +438,7 @@ public class ProducerWeaverClusterTest {
         }
 
         assertTrue("not all publishers completed",
-                   latch.await(20, TimeUnit.SECONDS));
+                   latch.await(60, TimeUnit.SECONDS));
 
         for (Source source : majorSources) {
             assertFalse(source.failureString(), source.failed.get());

@@ -34,6 +34,7 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorState;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * A duplicator of event streams. The duplicator provides outbound replication
@@ -180,9 +181,14 @@ public final class Duplicator {
             }
         } catch (IOException e) {
             inError = true;
-            log.log(Level.WARNING,
-                    String.format("Unable to replicate payload for %s from: %s",
-                                  current.header, current.segment), e);
+            if (Utils.isClose(e)) {
+                log.log(Level.INFO,
+                        String.format("closing duplicator on: %s", thisNode), e);
+            } else {
+                log.log(Level.WARNING,
+                        String.format("Unable to replicate payload for %s from: %s",
+                                      current.header, current.segment), e);
+            }
         }
         return false;
     }
@@ -194,9 +200,14 @@ public final class Duplicator {
                 return false;
             }
         } catch (IOException e) {
-            log.log(Level.WARNING,
-                    String.format("Unable to write batch header: %s",
-                                  current.header), e);
+            if (Utils.isClose(e)) {
+                log.log(Level.INFO,
+                        String.format("closing duplicator on: %s", thisNode), e);
+            } else {
+                log.log(Level.WARNING,
+                        String.format("Unable to write batch header: %s",
+                                      current.header), e);
+            }
             inError = true;
             return false;
         }
