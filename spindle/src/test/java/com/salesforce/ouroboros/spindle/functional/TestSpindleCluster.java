@@ -285,7 +285,7 @@ public class TestSpindleCluster {
         ArrayList<UUID> channels = openChannels();
 
         // Construct the hash ring that maps the channels to nodes
-        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+        ConsistentHashFunction<Node> ring = weavers.get(0).createRing();
         for (Node node : fullPartitionId) {
             ring.add(node, node.capacity);
         }
@@ -324,7 +324,7 @@ public class TestSpindleCluster {
         assertPartitionActive(majorPartition);
         assertPartitionInactive(minorPartition);
 
-        ring = new ConsistentHashFunction<Node>();
+        ring = weavers.get(0).createRing();
         for (Node node : majorPartitionId) {
             ring.add(node, node.capacity);
         }
@@ -347,7 +347,7 @@ public class TestSpindleCluster {
         assertPartitionActive(coordinators);
 
         // Everything should be back to normal
-        ring = new ConsistentHashFunction<Node>();
+        ring = weavers.get(0).createRing();
         for (Node node : fullPartitionId) {
             ring.add(node, node.capacity);
         }
@@ -381,7 +381,7 @@ public class TestSpindleCluster {
         ArrayList<UUID> channels = openChannels();
 
         // Construct the hash ring that maps the channels to nodes
-        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+        ConsistentHashFunction<Node> ring = weavers.get(0).createRing();
         for (Node node : fullPartitionId) {
             ring.add(node, node.capacity);
         }
@@ -440,7 +440,7 @@ public class TestSpindleCluster {
         assertPartitionActive(majorPartition);
         assertPartitionInactive(minorPartition);
 
-        ring = new ConsistentHashFunction<Node>();
+        ring = weavers.get(0).createRing();
         for (Node node : majorPartitionId) {
             ring.add(node, node.capacity);
         }
@@ -463,7 +463,7 @@ public class TestSpindleCluster {
         assertPartitionActive(coordinators);
 
         // Everything should be back to normal
-        ring = new ConsistentHashFunction<Node>();
+        ring = weavers.get(0).createRing();
         for (Node node : fullPartitionId) {
             ring.add(node, node.capacity);
         }

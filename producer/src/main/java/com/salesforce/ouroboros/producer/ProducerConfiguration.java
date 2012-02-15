@@ -29,6 +29,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.DefaultSkipStrategy;
+import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.util.ConsistentHashFunction.SkipStrategy;
 import com.salesforce.ouroboros.util.LabeledThreadFactory;
 
 /**
@@ -41,14 +44,26 @@ public class ProducerConfiguration {
     private int                 maxQueueLength               = 100;
     private double              minimumBandwidth             = 500000.0;
     private int                 minimumTokenRegenerationTime = 1;
+    private int                 numberOfReplicas             = 200;
     private int                 retryLimit                   = 10;
     private int                 sampleFrequency              = 10;
     private int                 sampleWindowSize             = 1000;
+    private SkipStrategy<Node>  skipStrategy                 = new DefaultSkipStrategy();
     private ExecutorService     spinners                     = Executors.newCachedThreadPool(new LabeledThreadFactory(
                                                                                                                       "Spinner"));
+
     private final SocketOptions spinnerSocketOptions         = new SocketOptions();
+
     private double              targetBandwidth              = 1000000.0;
+
     private int                 tokenLimit                   = 2000000;
+
+    /**
+     * @return the maximumBandwidth
+     */
+    public double getMaximumBandwidth() {
+        return maximumBandwidth;
+    }
 
     /**
      * @return the maximumEventRate
@@ -75,6 +90,13 @@ public class ProducerConfiguration {
         return minimumTokenRegenerationTime;
     }
 
+    /**
+     * @return the numberOfReplicas
+     */
+    public int getNumberOfReplicas() {
+        return numberOfReplicas;
+    }
+
     public int getRetryLimit() {
         return retryLimit;
     }
@@ -91,6 +113,13 @@ public class ProducerConfiguration {
      */
     public int getSampleWindowSize() {
         return sampleWindowSize;
+    }
+
+    /**
+     * @return the skipStrategy
+     */
+    public SkipStrategy<Node> getSkipStrategy() {
+        return skipStrategy;
     }
 
     /**
@@ -126,7 +155,7 @@ public class ProducerConfiguration {
      *            the maximumEventRate to set
      */
     public void setMaximumBandwidth(double maximumEventRate) {
-        this.maximumBandwidth = maximumEventRate;
+        maximumBandwidth = maximumEventRate;
     }
 
     public void setMaxQueueLength(int maxQueueLength) {
@@ -138,7 +167,7 @@ public class ProducerConfiguration {
      *            the minimumEventRate to set
      */
     public void setMinimumBandwidth(double minimumEventRate) {
-        this.minimumBandwidth = minimumEventRate;
+        minimumBandwidth = minimumEventRate;
     }
 
     /**
@@ -149,8 +178,16 @@ public class ProducerConfiguration {
         this.minimumTokenRegenerationTime = minimumTokenRegenerationTime;
     }
 
+    /**
+     * @param numberOfReplicas
+     *            the numberOfReplicas to set
+     */
+    public void setNumberOfReplicas(int numberOfReplicas) {
+        this.numberOfReplicas = numberOfReplicas;
+    }
+
     public void setRetryLimit(int resendLimit) {
-        this.retryLimit = resendLimit;
+        retryLimit = resendLimit;
     }
 
     /**
@@ -167,6 +204,14 @@ public class ProducerConfiguration {
      */
     public void setSampleWindowSize(int sampleWindowSize) {
         this.sampleWindowSize = sampleWindowSize;
+    }
+
+    /**
+     * @param skipStrategy
+     *            the skipStrategy to set
+     */
+    public void setSkipStrategy(SkipStrategy<Node> skipStrategy) {
+        this.skipStrategy = skipStrategy;
     }
 
     /**

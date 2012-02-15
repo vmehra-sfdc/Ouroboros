@@ -76,20 +76,20 @@ public class TestProducerCluster {
             weaver.class, weaver2.class                     };
     private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
-    private List<ProducerCoordinator>                        coordinators;
+    private List<ProducerCoordinator>                coordinators;
     private List<AnnotationConfigApplicationContext> fakeSpindleContexts;
     private Node[]                                   fakeSpindleNodes;
     private List<TestNode>                           fullPartition;
     private List<Node>                               fullPartitionId;
     private BitView                                  fullView;
     private List<TestNode>                           majorGroup;
-    private List<ProducerCoordinator>                        majorPartition;
+    private List<ProducerCoordinator>                majorPartition;
     private List<Node>                               majorPartitionId;
     private List<Producer>                           majorProducers;
     private BitView                                  majorView;
     private List<AnnotationConfigApplicationContext> memberContexts;
     private List<TestNode>                           minorGroup;
-    private List<ProducerCoordinator>                        minorPartition;
+    private List<ProducerCoordinator>                minorPartition;
     private List<Node>                               minorPartitionId;
     private List<Producer>                           minorProducers;
     private BitView                                  minorView;
@@ -263,7 +263,7 @@ public class TestProducerCluster {
 
         ArrayList<UUID> channels = getChannelIds();
 
-        ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+        ConsistentHashFunction<Node> ring = producers.get(0).createRing();
         for (Producer p : producers) {
             Node n = p.getId();
             ring.add(n, n.capacity);
@@ -335,7 +335,7 @@ public class TestProducerCluster {
         // Entire partition should be stable
         assertPartitionStable(coordinators);
 
-        ring = new ConsistentHashFunction<Node>();
+        ring = producers.get(0).createRing();
         for (Node node : majorPartitionId) {
             ring.add(node, node.capacity);
         }
@@ -358,7 +358,7 @@ public class TestProducerCluster {
         assertPartitionActive(coordinators);
 
         // Everything should be back to normal
-        ring = new ConsistentHashFunction<Node>();
+        ring = producers.get(0).createRing();
         for (Node node : fullPartitionId) {
             ring.add(node, node.capacity);
         }
@@ -481,7 +481,7 @@ public class TestProducerCluster {
     }
 
     protected void assertPartitionActive(List<ProducerCoordinator> partition)
-                                                                     throws InterruptedException {
+                                                                             throws InterruptedException {
         for (ProducerCoordinator coordinator : partition) {
             final ProducerCoordinator c = coordinator;
             waitFor("Coordinator never entered the active state: "
@@ -495,7 +495,7 @@ public class TestProducerCluster {
     }
 
     protected void assertPartitionAwaitingFailover(List<ProducerCoordinator> partition)
-                                                                               throws InterruptedException {
+                                                                                       throws InterruptedException {
         for (ProducerCoordinator coordinator : partition) {
             final ProducerCoordinator c = coordinator;
             waitFor("Coordinator never entered the awaiting failover state: "
@@ -509,7 +509,7 @@ public class TestProducerCluster {
     }
 
     protected void assertPartitionBootstrapping(List<ProducerCoordinator> partition)
-                                                                            throws InterruptedException {
+                                                                                    throws InterruptedException {
         for (ProducerCoordinator coordinator : partition) {
             final ProducerCoordinator c = coordinator;
             waitFor("Coordinator never entered the bootstrapping state: "
@@ -524,7 +524,7 @@ public class TestProducerCluster {
     }
 
     protected void assertPartitionInactive(List<ProducerCoordinator> partition)
-                                                                       throws InterruptedException {
+                                                                               throws InterruptedException {
         for (ProducerCoordinator coordinator : partition) {
             final ProducerCoordinator c = coordinator;
             waitFor("Coordinator never entered the inactive state: "
@@ -538,7 +538,7 @@ public class TestProducerCluster {
     }
 
     protected void assertPartitionStable(List<ProducerCoordinator> partition)
-                                                                     throws InterruptedException {
+                                                                             throws InterruptedException {
         for (ProducerCoordinator coordinator : partition) {
             final ProducerCoordinator c = coordinator;
             waitFor("Coordinator never entered the stable state: "

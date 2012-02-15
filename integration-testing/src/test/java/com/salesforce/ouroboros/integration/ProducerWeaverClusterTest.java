@@ -350,7 +350,9 @@ public class ProducerWeaverClusterTest {
     @Test
     public void testSimplePublishing() throws Exception {
         bootstrap();
-        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>();
+        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
+                                                                                             new ProducerSkipStrategy(),
+                                                                                             producers.get(0).getProducer().createRing().replicaePerBucket);
         for (ProducerCoordinator producer : producers) {
             producerRing.add(producer.getProducer(), producer.getId().capacity);
         }
@@ -389,11 +391,15 @@ public class ProducerWeaverClusterTest {
     @Test
     public void testPublishingAfterPartition() throws Exception {
         bootstrap();
-        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>();
+        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
+                                                                                             new ProducerSkipStrategy(),
+                                                                                             producers.get(0).getProducer().createRing().replicaePerBucket);
         for (ProducerCoordinator producer : producers) {
             producerRing.add(producer.getProducer(), producer.getId().capacity);
         }
-        ConsistentHashFunction<Weaver> weaverRing = new ConsistentHashFunction<Weaver>();
+        ConsistentHashFunction<Weaver> weaverRing = new ConsistentHashFunction<Weaver>(
+                                                                                       new WeaverSkipStrategy(),
+                                                                                       weavers.get(0).getWeaver().createRing().replicaePerBucket);
         for (WeaverCoordinator weaver : weavers) {
             weaverRing.add(weaver.getWeaver(), weaver.getId().capacity);
         }

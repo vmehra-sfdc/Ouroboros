@@ -284,6 +284,17 @@ public class WeaverCoordinator implements Member {
         }
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (o == null) {
+            return false;
+        }
+        if (o instanceof WeaverCoordinator) {
+            return self.equals(((WeaverCoordinator) o).self);
+        }
+        return false;
+    }
+
     public Node getId() {
         return self;
     }
@@ -298,6 +309,18 @@ public class WeaverCoordinator implements Member {
         } catch (StateUndefinedException e) {
             return null;
         }
+    }
+
+    /**
+     * @return
+     */
+    public Weaver getWeaver() {
+        return weaver;
+    }
+
+    @Override
+    public int hashCode() {
+        return self.hashCode();
     }
 
     /**
@@ -465,7 +488,7 @@ public class WeaverCoordinator implements Member {
      * member set
      */
     protected void calculateNextRing() {
-        ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
+        ConsistentHashFunction<Node> newRing = weaver.createRing();
         for (Node node : activeMembers) {
             newRing.add(node, node.capacity);
         }
@@ -889,26 +912,5 @@ public class WeaverCoordinator implements Member {
      */
     void setNextRing(ConsistentHashFunction<Node> ring) {
         weaver.setNextRing(ring);
-    }
-
-    /**
-     * @return
-     */
-    public Weaver getWeaver() {
-        return weaver;
-    }
-
-    public boolean equals(Object o) {
-        if (o == null) {
-            return false;
-        }
-        if (o instanceof WeaverCoordinator) {
-            return self.equals(((WeaverCoordinator) o).self);
-        }
-        return false;
-    }
-
-    public int hashCode() {
-        return self.hashCode();
     }
 }

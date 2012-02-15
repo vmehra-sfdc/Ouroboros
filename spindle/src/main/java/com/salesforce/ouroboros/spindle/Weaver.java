@@ -98,19 +98,22 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     private final ConcurrentMap<Node, Acknowledger> acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
     private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
     private final ContactInformation                contactInfo;
-    private final Node                              self;
     private final long                              maxSegmentSize;
     private ConsistentHashFunction<Node>            nextRing;
     private final ServerSocketChannelHandler        replicationHandler;
     private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
-    private final ConsistentHashFunction<File>      roots             = new ConsistentHashFunction<File>();
+    private final ConsistentHashFunction<File>      roots;
+    private final Node                              self;
     private final ServerSocketChannelHandler        spindleHandler;
-    private ConsistentHashFunction<Node>            weaverRing        = new ConsistentHashFunction<Node>();
+    private ConsistentHashFunction<Node>            weaverRing;
     private final ServerSocketChannelHandler        xeroxHandler;
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
         self = configuration.getId();
+        roots = new ConsistentHashFunction<File>(
+                                                 configuration.getRootSkipStrategy(),
+                                                 configuration.getNumberOfRootReplicas());
         for (RootDirectory root : configuration.getRoots()) {
             roots.add(root.directory, root.weight);
             if (!root.directory.exists()) {
@@ -149,6 +152,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                                              spindleHandler.getLocalAddress(),
                                              replicationHandler.getLocalAddress(),
                                              xeroxHandler.getLocalAddress());
+        weaverRing = new ConsistentHashFunction<Node>(
+                                                      configuration.getSkipStrategy(),
+                                                      configuration.getNumberOfReplicas());
     }
 
     public void bootstrap(Node[] bootsrappingMembers) {
@@ -170,6 +176,34 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         if (replicator != null) {
             replicator.close();
         }
+    }
+
+    public void commitRing() {
+        weaverRing = nextRing;
+        for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
+            UUID channelId = entry.getKey();
+            Node[] pair = getReplicationPair(channelId);
+            EventChannel channel = entry.getValue();
+            if (channel != null) {
+                if (!pair[0].equals(self) && !pair[1].equals(self)) {
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Rebalancing, closing channel %s on %s",
+                                               channelId, self));
+                    }
+                    channels.remove(channelId);
+                    channel.close(self);
+                }
+            }
+        }
+        nextRing = null;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Comparable#compareTo(java.lang.Object)
+     */
+    @Override
+    public int compareTo(Weaver weaver) {
+        return self.compareTo(weaver.self);
     }
 
     /**
@@ -225,34 +259,23 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         }
     }
 
-    @Override
-    public EventChannel xeroxEventChannel(UUID channel) {
-        if (log.isLoggable(Level.FINE)) {
-            log.fine(String.format("%s created a new channel for %s", self,
-                                   channel));
-        }
+    /**
+     * @return
+     */
+    public ConsistentHashFunction<Node> createRing() {
+        return new ConsistentHashFunction<Node>(weaverRing.getSkipStrategy(),
+                                                weaverRing.replicaePerBucket);
+    }
 
-        List<Node> pair = nextRing.hash(point(channel), 2);
-        Role role;
-        EventChannel ec;
-        if (self.equals(pair.get(0))) {
-            role = Role.PRIMARY;
-            Replicator replicator = replicators.get(pair.get(0));
-            assert replicator == null : String.format("Replicator for %s is null on %s",
-                                                      channel, self);
-            ec = new EventChannel(role, pair.get(1), channel,
-                                  roots.hash(point(channel)), maxSegmentSize,
-                                  replicator);
-        } else {
-            role = Role.MIRROR;
-            ec = new EventChannel(role, pair.get(0), channel,
-                                  roots.hash(point(channel)), maxSegmentSize,
-                                  null);
+    @Override
+    public boolean equals(Object o) {
+        if (o == null) {
+            return false;
         }
-        EventChannel previous = channels.put(channel, ec);
-        assert previous == null : String.format("Xeroxed event channel %s is currently hosted on %s",
-                                                channel, self);
-        return ec;
+        if (o instanceof Weaver) {
+            return self.equals(((Weaver) o).self);
+        }
+        return false;
     }
 
     @Override
@@ -327,6 +350,11 @@ public class Weaver implements Bundle, Comparable<Weaver> {
 
     public Replicator getReplicator(Node node) {
         return replicators.get(node);
+    }
+
+    @Override
+    public int hashCode() {
+        return self.hashCode();
     }
 
     public void inactivate() {
@@ -515,14 +543,14 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         }
     }
 
-    protected void xeroxTo(EventChannel eventChannel, Node node,
-                           Map<Node, Xerox> xeroxes) {
-        Xerox xerox = xeroxes.get(node);
-        if (xerox == null) {
-            xerox = new Xerox(self, node);
-            xeroxes.put(node, xerox);
-        }
-        xerox.addChannel(eventChannel);
+    /**
+     * Set the consistent hash function for the next weaver processs ring.
+     * 
+     * @param ring
+     *            - the updated consistent hash function
+     */
+    public void setNextRing(ConsistentHashFunction<Node> ring) {
+        nextRing = ring;
     }
 
     public void setRing(ConsistentHashFunction<Node> nextRing) {
@@ -559,6 +587,43 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                              replicationHandler.getLocalAddress());
     }
 
+    @Override
+    public EventChannel xeroxEventChannel(UUID channel) {
+        if (log.isLoggable(Level.FINE)) {
+            log.fine(String.format("%s created a new channel for %s", self,
+                                   channel));
+        }
+
+        List<Node> pair = nextRing.hash(point(channel), 2);
+        Role role;
+        EventChannel ec;
+        if (self.equals(pair.get(0))) {
+            role = Role.PRIMARY;
+            Replicator replicator = replicators.get(pair.get(0));
+            assert replicator == null : String.format("Replicator for %s is null on %s",
+                                                      channel, self);
+            ec = new EventChannel(role, pair.get(1), channel,
+                                  roots.hash(point(channel)), maxSegmentSize,
+                                  replicator);
+        } else {
+            role = Role.MIRROR;
+            ec = new EventChannel(role, pair.get(0), channel,
+                                  roots.hash(point(channel)), maxSegmentSize,
+                                  null);
+        }
+        EventChannel previous = channels.put(channel, ec);
+        assert previous == null : String.format("Xeroxed event channel %s is currently hosted on %s",
+                                                channel, self);
+        return ec;
+    }
+
+    private void infoLog(String logString, Object... args) {
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Rebalancing for %s from primary %s to new mirror %s",
+                                   args));
+        }
+    }
+
     /**
      * Answer the remapped primary/mirror pairs using the nextRing
      * 
@@ -585,62 +650,13 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         return remapped;
     }
 
-    public void commitRing() {
-        weaverRing = nextRing;
-        for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
-            UUID channelId = entry.getKey();
-            Node[] pair = getReplicationPair(channelId);
-            EventChannel channel = entry.getValue();
-            if (channel != null) {
-                if (!pair[0].equals(self) && !pair[1].equals(self)) {
-                    if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Rebalancing, closing channel %s on %s",
-                                               channelId, self));
-                    }
-                    channels.remove(channelId);
-                    channel.close(self);
-                }
-            }
+    protected void xeroxTo(EventChannel eventChannel, Node node,
+                           Map<Node, Xerox> xeroxes) {
+        Xerox xerox = xeroxes.get(node);
+        if (xerox == null) {
+            xerox = new Xerox(self, node);
+            xeroxes.put(node, xerox);
         }
-        nextRing = null;
-    }
-
-    /**
-     * Set the consistent hash function for the next weaver processs ring.
-     * 
-     * @param ring
-     *            - the updated consistent hash function
-     */
-    public void setNextRing(ConsistentHashFunction<Node> ring) {
-        nextRing = ring;
-    }
-
-    private void infoLog(String logString, Object... args) {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Rebalancing for %s from primary %s to new mirror %s",
-                                   args));
-        }
-    }
-
-    /* (non-Javadoc)
-     * @see java.lang.Comparable#compareTo(java.lang.Object)
-     */
-    @Override
-    public int compareTo(Weaver weaver) {
-        return self.compareTo(weaver.self);
-    }
-
-    public boolean equals(Object o) {
-        if (o == null) {
-            return false;
-        }
-        if (o instanceof Weaver) {
-            return self.equals(((Weaver) o).self);
-        }
-        return false;
-    }
-
-    public int hashCode() {
-        return self.hashCode();
+        xerox.addChannel(eventChannel);
     }
 }

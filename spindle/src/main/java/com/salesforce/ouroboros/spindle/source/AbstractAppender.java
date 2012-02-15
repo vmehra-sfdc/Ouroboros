@@ -62,7 +62,6 @@ abstract public class AbstractAppender {
     protected Segment                       segment;
 
     public AbstractAppender(Bundle bundle) {
-        super();
         fsm.setName(Integer.toString(bundle.getId().processId));
         this.bundle = bundle;
         batchHeader = createBatchHeader();

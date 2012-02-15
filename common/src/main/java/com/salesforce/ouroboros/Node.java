@@ -28,10 +28,7 @@ package com.salesforce.ouroboros;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
-import java.util.List;
 import java.util.SortedSet;
-
-import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
  * Representation of the identity of a node. Each node has a unique process id.
@@ -43,24 +40,6 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  */
 public class Node implements Comparable<Node>, Serializable {
 
-    /**
-     * Skip processes that share machines or rack ids
-     * 
-     */
-    public class NodeSkipStrategy implements
-                    ConsistentHashFunction.SkipStrategy<Node> {
-        @Override
-        public boolean isSkippable(List<Node> previous, Node bucket) {
-            for (Node node : previous) {
-                if (node.machineId == machineId || node.rackId == rackId
-                    || node.releaseGroup == releaseGroup) {
-                    return true;
-                }
-            }
-            return false;
-        }
-    }
-
     public static final int   BYTE_LENGTH      = 4 + 4 + 4 + 4 + 4;
     private static final long serialVersionUID = 1L;
 
@@ -69,6 +48,7 @@ public class Node implements Comparable<Node>, Serializable {
     public final int          processId;
     public final int          rackId;
     public final int          releaseGroup;
+    private transient boolean down             = false;
 
     public Node(ByteBuffer buffer) {
         processId = buffer.getInt();
@@ -79,11 +59,11 @@ public class Node implements Comparable<Node>, Serializable {
     }
 
     public Node(int processId) {
-        this(processId, 0, 0);
+        this(processId, processId, processId);
     }
 
     public Node(int processId, int machineId, int rackId) {
-        this(processId, machineId, rackId, 1, 0);
+        this(processId, machineId, rackId, 1, processId);
     }
 
     public Node(int processId, int machineId, int rackId, int capacity,
@@ -143,5 +123,17 @@ public class Node implements Comparable<Node>, Serializable {
     @Override
     public String toString() {
         return String.format("Node[%s]", processId);
+    }
+
+    public boolean isDown() {
+        return down;
+    }
+
+    public void markAsDown() {
+        down = true;
+    }
+
+    public void markAsUp() {
+        down = true;
     }
 }

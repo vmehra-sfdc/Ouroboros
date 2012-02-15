@@ -125,7 +125,7 @@ public class ProducerCoordinator implements Member {
                     log.info(String.format("Bootstrapping producers on: %s",
                                            self));
                 }
-                ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+                ConsistentHashFunction<Node> ring = producer.createRing();
                 for (Node node : nodes) {
                     ring.add(node, node.capacity);
                     inactiveMembers.remove(node);
@@ -137,7 +137,7 @@ public class ProducerCoordinator implements Member {
                 break;
             }
             case BOOTSTRAP_SPINDLES: {
-                ConsistentHashFunction<Node> ring = new ConsistentHashFunction<Node>();
+                ConsistentHashFunction<Node> ring = producer.createRing();
                 for (Node node : nodes) {
                     ring.add(node, node.capacity);
                     inactiveWeavers.remove(node);
@@ -444,7 +444,7 @@ public class ProducerCoordinator implements Member {
     }
 
     private void calculateNextProducerRing() {
-        ConsistentHashFunction<Node> newRing = new ConsistentHashFunction<Node>();
+        ConsistentHashFunction<Node> newRing = producer.createRing();
         for (Node node : activeProducers) {
             newRing.add(node, node.capacity);
         }

@@ -34,7 +34,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.DefaultSkipStrategy;
+import com.salesforce.ouroboros.NoSkipStrategy;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.util.ConsistentHashFunction.SkipStrategy;
 import com.salesforce.ouroboros.util.LabeledThreadFactory;
 
 /**
@@ -66,6 +69,7 @@ public class WeaverConfigation {
 
     private Node                      id;
     private long                      maxSegmentSize                 = DEFAULT_MAX_SEGMENTSIZE;
+    private int                       numberOfReplicas               = 200;
     private long                      partitionTimeout               = DEFAULT_PARTITION_TIMEOUT;
     private TimeUnit                  partitionTimeoutUnit           = DEFAULT_PARTITION_TIMEOUT_UNIT;
     private InetSocketAddress         replicationAddress             = new InetSocketAddress(
@@ -76,19 +80,53 @@ public class WeaverConfigation {
     private ExecutorService           replicators                    = Executors.newCachedThreadPool(new LabeledThreadFactory(
                                                                                                                               REPLICATOR));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
-    private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
-                                                                                             "127.0.0.1",
-                                                                                             0);
-    private ExecutorService           spindles                       = Executors.newCachedThreadPool(new LabeledThreadFactory(
-                                                                                                                              SPINDLE));
-    private final SocketOptions       spindleSocketOptions           = new SocketOptions();
-    private String                    stateName                      = DEFAULT_STATE_NAME;
-    private InetSocketAddress         xeroxAddress                   = new InetSocketAddress(
-                                                                                             "127.0.0.1",
-                                                                                             0);
-    private ExecutorService           xeroxes                        = Executors.newCachedThreadPool(new LabeledThreadFactory(
-                                                                                                                              XEROX));
-    private final SocketOptions       xeroxSocketOptions             = new SocketOptions();
+    private SkipStrategy<Node>        skipStrategy                   = new DefaultSkipStrategy();
+    private SkipStrategy<File>        rootSkipStrategy               = new NoSkipStrategy<File>();
+    private int                       numberOfRootReplicas           = 200;
+
+    /**
+     * @return the rootSkipStrategy
+     */
+    public SkipStrategy<File> getRootSkipStrategy() {
+        return rootSkipStrategy;
+    }
+
+    /**
+     * @param rootSkipStrategy
+     *            the rootSkipStrategy to set
+     */
+    public void setRootSkipStrategy(SkipStrategy<File> rootSkipStrategy) {
+        this.rootSkipStrategy = rootSkipStrategy;
+    }
+
+    /**
+     * @return the numberOfRootReplicas
+     */
+    public int getNumberOfRootReplicas() {
+        return numberOfRootReplicas;
+    }
+
+    /**
+     * @param numberOfRootReplicas
+     *            the numberOfRootReplicas to set
+     */
+    public void setNumberOfRootReplicas(int numberOfRootReplicas) {
+        this.numberOfRootReplicas = numberOfRootReplicas;
+    }
+
+    private InetSocketAddress   spindleAddress       = new InetSocketAddress(
+                                                                             "127.0.0.1",
+                                                                             0);
+    private ExecutorService     spindles             = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                              SPINDLE));
+    private final SocketOptions spindleSocketOptions = new SocketOptions();
+    private String              stateName            = DEFAULT_STATE_NAME;
+    private InetSocketAddress   xeroxAddress         = new InetSocketAddress(
+                                                                             "127.0.0.1",
+                                                                             0);
+    private ExecutorService     xeroxes              = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                              XEROX));
+    private final SocketOptions xeroxSocketOptions   = new SocketOptions();
 
     public void addRoot(File directory) {
         addRoot(directory, 1);
@@ -110,6 +148,13 @@ public class WeaverConfigation {
      */
     public long getMaxSegmentSize() {
         return maxSegmentSize;
+    }
+
+    /**
+     * @return the numberOfReplicas
+     */
+    public int getNumberOfReplicas() {
+        return numberOfReplicas;
     }
 
     /**
@@ -159,6 +204,13 @@ public class WeaverConfigation {
      */
     public List<RootDirectory> getRoots() {
         return roots;
+    }
+
+    /**
+     * @return the skipStrategy
+     */
+    public SkipStrategy<Node> getSkipStrategy() {
+        return skipStrategy;
     }
 
     /**
@@ -227,6 +279,14 @@ public class WeaverConfigation {
     }
 
     /**
+     * @param numberOfReplicas
+     *            the numberOfReplicas to set
+     */
+    public void setNumberOfReplicas(int numberOfReplicas) {
+        this.numberOfReplicas = numberOfReplicas;
+    }
+
+    /**
      * @param partitionTimeout
      *            the partitionTimeout to set
      */
@@ -264,6 +324,14 @@ public class WeaverConfigation {
      */
     public void setReplicators(ExecutorService replicators) {
         this.replicators = replicators;
+    }
+
+    /**
+     * @param skipStrategy
+     *            the skipStrategy to set
+     */
+    public void setSkipStrategy(SkipStrategy<Node> skipStrategy) {
+        this.skipStrategy = skipStrategy;
     }
 
     /**
