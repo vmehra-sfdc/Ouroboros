@@ -74,10 +74,12 @@ public class TestEventChannel {
         long maxSegmentSize = 16 * 1024;
         int eventSize = 256;
         Node node = new Node(0);
+        Node secondary = new Node(1);
         UUID channel = UUID.randomUUID();
         int timestamp = 0;
-        EventChannel eventChannel = new EventChannel(Role.PRIMARY, channel,
-                                                     root, maxSegmentSize, null);
+        EventChannel eventChannel = new EventChannel(Role.PRIMARY, secondary,
+                                                     channel, root,
+                                                     maxSegmentSize, null);
         long offset = 0;
         BatchHeader batchHeader;
         AppendSegment logicalSegment;

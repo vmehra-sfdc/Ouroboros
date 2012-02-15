@@ -167,12 +167,14 @@ public class TestTransfer {
         Replicator primaryReplicator = new Replicator(primaryBundle,
                                                       mirrorNode, rendezvous);
         Replicator mirrorReplicator = new Replicator(mirrorBundle);
-        primaryEventChannel = new EventChannel(Role.PRIMARY, channelId,
-                                               primaryRoot, maxSegmentSize,
+        primaryEventChannel = new EventChannel(Role.PRIMARY, mirrorNode,
+                                               channelId, primaryRoot,
+                                               maxSegmentSize,
                                                primaryReplicator);
 
-        mirrorEventChannel = new EventChannel(Role.MIRROR, channelId,
-                                              mirrorRoot, maxSegmentSize, null);
+        mirrorEventChannel = new EventChannel(Role.MIRROR, primaryNode,
+                                              channelId, mirrorRoot,
+                                              maxSegmentSize, null);
 
         when(primaryBundle.eventChannelFor(channelId)).thenReturn(primaryEventChannel);
         when(mirrorBundle.eventChannelFor(channelId)).thenReturn(mirrorEventChannel);
@@ -220,13 +222,14 @@ public class TestTransfer {
         Sink primarySink = new Sink(primarySinkBundle);
         Sink mirrorSink = new Sink(mirrorSinkBundle);
 
-        primarySinkEventChannel = new EventChannel(Role.PRIMARY, channelId,
+        primarySinkEventChannel = new EventChannel(Role.PRIMARY,
+                                                   mirrorSinkNode, channelId,
                                                    primarySinkRoot,
                                                    maxSegmentSize,
                                                    primaryReplicator);
 
-        mirrorSinkEventChannel = new EventChannel(Role.MIRROR, channelId,
-                                                  mirrorSinkRoot,
+        mirrorSinkEventChannel = new EventChannel(Role.MIRROR, primarySinkNode,
+                                                  channelId, mirrorSinkRoot,
                                                   maxSegmentSize, null);
 
         when(primarySinkBundle.xeroxEventChannel(channelId)).thenReturn(primarySinkEventChannel);

@@ -27,7 +27,6 @@ package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -38,6 +37,7 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderState;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * The abstract appender of events. Instances of this class are responsible for
@@ -90,9 +90,15 @@ abstract public class AbstractAppender {
             written = segment.transferFrom(handler.getChannel(), position,
                                            remaining);
         } catch (IOException e) {
-            getLogger().log(Level.SEVERE,
-                            String.format("Exception during append on %s",
-                                          bundle.getId()), e);
+            if (Utils.isClose(e)) {
+                getLogger().log(Level.INFO,
+                                String.format("closing appender %s ",
+                                              fsm.getName()), e);
+            } else {
+                getLogger().log(Level.SEVERE,
+                                String.format("Exception during append on %s",
+                                              bundle.getId()), e);
+            }
             error();
             return false;
         }
@@ -184,9 +190,15 @@ abstract public class AbstractAppender {
                 return false;
             }
         } catch (IOException e) {
-            getLogger().log(Level.SEVERE,
-                            String.format("Exception during append on %s",
-                                          bundle.getId()), e);
+            if (Utils.isClose(e)) {
+                getLogger().log(Level.INFO,
+                                String.format("closing appender %s ",
+                                              fsm.getName()), e);
+            } else {
+                getLogger().log(Level.SEVERE,
+                                String.format("Exception during append on %s",
+                                              bundle.getId()), e);
+            }
             error();
             return false;
         }
@@ -259,13 +271,16 @@ abstract public class AbstractAppender {
                 error();
                 return false;
             }
-        } catch (ClosedChannelException e) {
-            error();
-            return false;
         } catch (IOException e) {
-            getLogger().log(Level.SEVERE,
-                            String.format("Exception during batch header read on %s",
-                                          bundle.getId()), e);
+            if (Utils.isClose(e)) {
+                getLogger().log(Level.INFO,
+                                String.format("closing appender %s ",
+                                              fsm.getName()), e);
+            } else {
+                getLogger().log(Level.SEVERE,
+                                String.format("Exception during batch header read on %s",
+                                              bundle.getId()), e);
+            }
             error();
             return false;
         }

@@ -186,20 +186,24 @@ public class EventChannel {
 
     private final File       channel;
     private volatile long    commited;
+    private boolean          failedOver = false;
     private final UUID       id;
     private volatile long    lastTimestamp;
     private final long       maxSegmentSize;
     private volatile long    nextOffset;
+    private final Node       partner;
     private final Replicator replicator;
 
     private Role             role;
 
-    public EventChannel(Role role, final UUID channelId, final File root,
-                        final long maxSegmentSize, final Replicator replicator) {
+    public EventChannel(Role role, Node partnerId, final UUID channelId,
+                        final File root, final long maxSegmentSize,
+                        final Replicator replicator) {
         assert root != null : "Root directory must not be null";
         assert channelId != null : "Channel id must not be null";
 
         this.role = role;
+        partner = partnerId;
         id = channelId;
         channel = new File(root, channelId.toString().replace('-', '/'));
         this.maxSegmentSize = maxSegmentSize;
@@ -285,8 +289,33 @@ public class EventChannel {
         return channel.equals(((EventChannel) o).channel);
     }
 
+    public void failOver() {
+        failedOver = true;
+        role = Role.PRIMARY;
+    }
+
     public UUID getId() {
         return id;
+    }
+
+    public Node[] getOriginalMapping(Node self) {
+        switch (role) {
+            case PRIMARY: {
+                if (failedOver) {
+                    return new Node[] { partner, self };
+                }
+                return new Node[] { self, partner };
+            }
+            case MIRROR: {
+                return new Node[] { partner, self };
+            }
+            default:
+                throw new IllegalStateException("Invalid role: " + role);
+        }
+    }
+
+    public Node getPartnerId() {
+        return partner;
     }
 
     /**
@@ -354,6 +383,16 @@ public class EventChannel {
         return role == Role.PRIMARY;
     }
 
+    public void rebalanceAsMirror() {
+        failedOver = false;
+        role = Role.MIRROR;
+    }
+
+    public void rebalanceAsPrimary() {
+        failedOver = false;
+        role = Role.PRIMARY;
+    }
+
     public AppendSegment segmentFor(BatchHeader batchHeader) {
         AppendSegmentName logicalSegment = mappedSegmentFor(nextOffset,
                                                             batchHeader.getBatchByteLength(),
@@ -387,14 +426,6 @@ public class EventChannel {
         File segment = new File(channel, segmentName(prefixFor(offset,
                                                                maxSegmentSize)));
         return getSegment(offset, position, segment);
-    }
-
-    public void setMirror() {
-        role = Role.MIRROR;
-    }
-
-    public void setPrimary() {
-        role = Role.PRIMARY;
     }
 
     private AppendSegment getSegment(long offset, int position, File segment) {

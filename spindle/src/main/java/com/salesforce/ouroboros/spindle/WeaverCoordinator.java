@@ -408,7 +408,7 @@ public class WeaverCoordinator implements Member {
             // This node is the secondary.
             if (activeMembers.contains(pair[0])) {
                 // Primary is active
-                weaver.openMirror(channel);
+                weaver.openMirror(channel, pair[0]);
             } else {
                 weaver.openPrimary(channel, null);
                 switchboard.ringCast(new Message(self,

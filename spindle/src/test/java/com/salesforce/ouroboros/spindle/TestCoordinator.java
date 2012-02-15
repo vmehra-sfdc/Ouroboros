@@ -259,7 +259,7 @@ public class TestCoordinator {
         coordinator.open(primary);
         coordinator.open(mirror);
         verify(weaver).openPrimary(eq(primary), (Node) eq(null));
-        verify(weaver).openMirror(eq(mirror));
+        verify(weaver).openMirror(eq(mirror), eq(node1));
     }
 
     @SuppressWarnings("unchecked")

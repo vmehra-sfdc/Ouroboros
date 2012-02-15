@@ -234,18 +234,21 @@ public class Weaver implements Bundle, Comparable<Weaver> {
 
         List<Node> pair = nextRing.hash(point(channel), 2);
         Role role;
-        Replicator replicator = null;
+        EventChannel ec;
         if (self.equals(pair.get(0))) {
             role = Role.PRIMARY;
-            replicator = replicators.get(pair.get(0));
+            Replicator replicator = replicators.get(pair.get(0));
             assert replicator == null : String.format("Replicator for %s is null on %s",
                                                       channel, self);
+            ec = new EventChannel(role, pair.get(1), channel,
+                                  roots.hash(point(channel)), maxSegmentSize,
+                                  replicator);
         } else {
             role = Role.MIRROR;
+            ec = new EventChannel(role, pair.get(0), channel,
+                                  roots.hash(point(channel)), maxSegmentSize,
+                                  null);
         }
-        EventChannel ec = new EventChannel(role, channel,
-                                           roots.hash(point(channel)),
-                                           maxSegmentSize, replicator);
         EventChannel previous = channels.put(channel, ec);
         assert previous == null : String.format("Xeroxed event channel %s is currently hosted on %s",
                                                 channel, self);
@@ -284,7 +287,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                     log.info(String.format("%s assuming primary role for: %s, old primary: %s",
                                            self, channelId, pair[0]));
                 }
-                channel.setPrimary();
+                channel.failOver();
             }
         }
     }
@@ -360,8 +363,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
      * 
      * @param channel
      *            - The new subscription
+     * @param pair
      */
-    public void openMirror(UUID channel) {
+    public void openMirror(UUID channel, Node primary) {
         if (channels.get(channel) != null) {
             return;
         }
@@ -369,10 +373,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
             log.info(String.format(" %s is the mirror for the new subscription %s",
                                    self, channel));
         }
-        channels.put(channel,
-                     new EventChannel(Role.MIRROR, channel,
-                                      roots.hash(point(channel)),
-                                      maxSegmentSize, null));
+        channels.put(channel, new EventChannel(Role.MIRROR, primary, channel,
+                                               roots.hash(point(channel)),
+                                               maxSegmentSize, null));
     }
 
     /**
@@ -396,10 +399,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         if (mirror != null) {
             replicator = replicators.get(mirror);
         }
-        channels.put(channel,
-                     new EventChannel(Role.PRIMARY, channel,
-                                      roots.hash(point(channel)),
-                                      maxSegmentSize, replicator));
+        channels.put(channel, new EventChannel(Role.PRIMARY, mirror, channel,
+                                               roots.hash(point(channel)),
+                                               maxSegmentSize, replicator));
     }
 
     /**
@@ -458,7 +460,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                     // Self becomes the new mirror
                     infoLog("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
                             eventChannel.getId(), self);
-                    eventChannel.setMirror();
+                    eventChannel.rebalanceAsMirror();
                     xeroxTo(eventChannel, remappedPrimary, xeroxes);
                 } else {
                     // Xerox state to new primary and mirror
@@ -475,7 +477,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                         eventChannel.getId(), self, remappedPrimary);
                 xeroxTo(eventChannel, remappedPrimary, xeroxes);
                 if (self.equals(remappedMirror)) {
-                    eventChannel.setMirror();
+                    eventChannel.rebalanceAsMirror();
                 }
             }
         } else if (deadMembers.contains(originalPrimary)) {
@@ -492,7 +494,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                 // Self becomes the new primary
                 infoLog("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
                         eventChannel.getId(), self, remappedMirror);
-                eventChannel.setPrimary();
+                eventChannel.rebalanceAsPrimary();
                 xeroxTo(eventChannel, remappedMirror, xeroxes);
             } else {
                 // Xerox state to the new primary and mirror
@@ -567,19 +569,16 @@ public class Weaver implements Bundle, Comparable<Weaver> {
      */
     protected Map<UUID, Node[][]> remap() {
         Map<UUID, Node[][]> remapped = new HashMap<UUID, Node[][]>();
-        for (UUID channel : channels.keySet()) {
-            long channelPoint = point(channel);
+        for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
+            long channelPoint = point(entry.getKey());
             List<Node> newPair = nextRing.hash(channelPoint, 2);
-            List<Node> oldPair = weaverRing.hash(channelPoint, 2);
-            if (oldPair.contains(self)) {
-                if (!oldPair.get(0).equals(newPair.get(0))
-                    || !oldPair.get(1).equals(newPair.get(1))) {
-                    remapped.put(channel,
-                                 new Node[][] {
-                                         new Node[] { oldPair.get(0),
-                                                 oldPair.get(1) },
-                                         new Node[] { newPair.get(0),
-                                                 newPair.get(1) } });
+            Node[] oldPair = entry.getValue().getOriginalMapping(self);
+            if (oldPair[0].equals(self) || oldPair[1].equals(self)) {
+                if (!oldPair[0].equals(newPair.get(0))
+                    || !oldPair[1].equals(newPair.get(1))) {
+                    remapped.put(entry.getKey(), new Node[][] {
+                            entry.getValue().getOriginalMapping(self),
+                            new Node[] { newPair.get(0), newPair.get(1) } });
                 }
             }
         }
