@@ -134,6 +134,6 @@ public class Node implements Comparable<Node>, Serializable {
     }
 
     public void markAsUp() {
-        down = true;
+        down = false;
     }
 }

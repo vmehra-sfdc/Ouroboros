@@ -378,6 +378,18 @@ public class Producer implements Comparable<Producer> {
                 entries.remove();
             }
         }
+        
+        for (Node node: producerRing) {
+            if (deadMembers.contains(node)) {
+                node.markAsDown();
+            }
+        }
+        
+        for (Node node: weaverRing) {
+            if (deadMembers.contains(node)) {
+                node.markAsDown();
+            }
+        }
 
         // Let any publishing threads precede
         openPublishingGate();
