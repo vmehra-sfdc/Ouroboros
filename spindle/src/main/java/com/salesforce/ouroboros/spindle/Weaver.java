@@ -313,6 +313,13 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                 channel.failOver();
             }
         }
+
+        // Clean up the ring
+        for (Node node : weaverRing.getBuckets()) {
+            if (deadMembers.contains(node)) {
+                node.markAsDown();
+            }
+        }
     }
 
     /* (non-Javadoc)
