@@ -89,8 +89,8 @@ public class Producer implements Comparable<Producer> {
 
     private static class MirrorState {
         volatile long timestamp;
-        final Node    primary;
-        final Node    mirror;
+        private Node  primary;
+        private Node  mirror;
 
         public MirrorState(Node[] pair, long timestamp) {
             this.primary = pair[0];
@@ -103,6 +103,15 @@ public class Producer implements Comparable<Producer> {
          */
         public Node[] getOldMapping() {
             return new Node[] { primary, mirror };
+        }
+
+        /**
+         * @param remappedPrimary
+         * @param remappedMirror
+         */
+        public void remap(Node remappedPrimary, Node remappedMirror) {
+            primary = remappedPrimary;
+            mirror = remappedMirror;
         }
     }
 
@@ -542,16 +551,13 @@ public class Producer implements Comparable<Producer> {
                           UUID channel, Node originalPrimary,
                           Node originalMirror, Node remappedPrimary,
                           Node remappedMirror, Collection<Node> deadMembers) {
-        PrimaryState state = channelState.get(channel);
-        long timestamp;
+        MirrorState state = channelState.get(channel);
         if (state == null) {
-            Long ts = mirrors.get(channel).timestamp;
-            assert ts != null : String.format("The event channel  %s to rebalance does not exist on %s",
-                                              channel, self);
-            timestamp = ts;
-        } else {
-            timestamp = state.timestamp;
+            state = mirrors.get(channel);
+            assert state != null : String.format("The event channel  %s to rebalance does not exist on %s",
+                                                 channel, self);
         }
+        state.remap(remappedPrimary, remappedMirror);
         if (self.equals(originalPrimary)) {
             // self is the primary
             if (deadMembers.contains(originalMirror)) {
@@ -561,28 +567,28 @@ public class Producer implements Comparable<Producer> {
                     // Xerox state to the new mirror
                     infoLog("Rebalancing for %s from primary %s to new mirror %s",
                             channel, self, remappedMirror);
-                    remap(channel, timestamp, remappedMirror, remapped);
+                    remap(channel, state.timestamp, remappedMirror, remapped);
                 } else if (self.equals(remappedMirror)) {
                     // Self becomes the new mirror
                     infoLog("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
                             channel, self);
-                    remap(channel, timestamp, self, remapped);
-                    remap(channel, timestamp, remappedPrimary, remapped);
+                    remap(channel, state.timestamp, self, remapped);
+                    remap(channel, state.timestamp, remappedPrimary, remapped);
                 } else {
                     // Xerox state to new primary and mirror
                     infoLog("Rebalancing for %s from old primary %s to new primary %s, new mirror %s",
                             channel, self, remappedPrimary, remappedMirror);
-                    remap(channel, timestamp, remappedPrimary, remapped);
-                    remap(channel, timestamp, remappedMirror, remapped);
+                    remap(channel, state.timestamp, remappedPrimary, remapped);
+                    remap(channel, state.timestamp, remappedMirror, remapped);
                 }
             } else if (!self.equals(remappedPrimary)) {
                 // mirror is up
                 // Xerox state to the new primary
                 infoLog("Rebalancing for %s from old primary %s to new primary %s",
                         channel, self, remappedPrimary);
-                remap(channel, timestamp, remappedPrimary, remapped);
+                remap(channel, state.timestamp, remappedPrimary, remapped);
                 if (self.equals(remappedMirror)) {
-                    remap(channel, timestamp, self, remapped);
+                    remap(channel, state.timestamp, self, remapped);
                 }
             }
         } else if (deadMembers.contains(originalPrimary)) {
@@ -594,19 +600,19 @@ public class Producer implements Comparable<Producer> {
                 // Xerox state to the new primary
                 infoLog("Rebalancing for %s from mirror %s to new primary %s",
                         channel, self, remappedPrimary);
-                remap(channel, timestamp, remappedPrimary, remapped);
+                remap(channel, state.timestamp, remappedPrimary, remapped);
             } else if (self.equals(remappedPrimary)) {
                 // Self becomes the new primary
                 infoLog("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
                         channel, self, remappedMirror);
-                remap(channel, timestamp, self, remapped);
-                remap(channel, timestamp, remappedMirror, remapped);
+                remap(channel, state.timestamp, self, remapped);
+                remap(channel, state.timestamp, remappedMirror, remapped);
             } else {
                 // Xerox state to the new primary and mirror
                 infoLog("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s",
                         channel, self, remappedPrimary, remappedMirror);
-                remap(channel, timestamp, remappedPrimary, remapped);
-                remap(channel, timestamp, remappedMirror, remapped);
+                remap(channel, state.timestamp, remappedPrimary, remapped);
+                remap(channel, state.timestamp, remappedMirror, remapped);
             }
         } else if (!self.equals(remappedMirror)
                    && !remappedMirror.equals(originalPrimary)) {
@@ -615,7 +621,7 @@ public class Producer implements Comparable<Producer> {
             // Xerox state to the new mirror
             infoLog("Rebalancing for %s from old mirror %s to new mirror %s",
                     channel, self, remappedMirror);
-            remap(channel, timestamp, remappedMirror, remapped);
+            remap(channel, state.timestamp, remappedMirror, remapped);
         }
     }
 
@@ -811,35 +817,27 @@ public class Producer implements Comparable<Producer> {
      */
     protected Map<UUID, Node[][]> remap() {
         Map<UUID, Node[][]> remapped = new HashMap<UUID, Node[][]>();
-        for (UUID channel : channelState.keySet()) {
-            long channelPoint = point(channel);
+        for (Entry<UUID, PrimaryState> entry : channelState.entrySet()) {
+            long channelPoint = point(entry.getKey());
             List<Node> newPair = nextProducerRing.hash(channelPoint, 2);
-            List<Node> oldPair = producerRing.hash(channelPoint, 2);
-            if (oldPair.contains(self)) {
-                if (!oldPair.get(0).equals(newPair.get(0))
-                    || !oldPair.get(1).equals(newPair.get(1))) {
-                    remapped.put(channel,
-                                 new Node[][] {
-                                         new Node[] { oldPair.get(0),
-                                                 oldPair.get(1) },
-                                         new Node[] { newPair.get(0),
-                                                 newPair.get(1) } });
+            Node[] oldPair = entry.getValue().getOldMapping();
+            if (oldPair[0].equals(self) || oldPair[1].equals(self)) {
+                if (!oldPair[0].equals(newPair.get(0))
+                    || !oldPair[1].equals(newPair.get(1))) {
+                    remapped.put(entry.getKey(), new Node[][] { oldPair,
+                            new Node[] { newPair.get(0), newPair.get(1) } });
                 }
             }
         }
-        for (UUID channel : mirrors.keySet()) {
-            long channelPoint = point(channel);
+        for (Entry<UUID, MirrorState> entry : mirrors.entrySet()) {
+            long channelPoint = point(entry.getKey());
             List<Node> newPair = nextProducerRing.hash(channelPoint, 2);
-            List<Node> oldPair = producerRing.hash(channelPoint, 2);
-            if (oldPair.contains(self)) {
-                if (!oldPair.get(0).equals(newPair.get(0))
-                    || !oldPair.get(1).equals(newPair.get(1))) {
-                    remapped.put(channel,
-                                 new Node[][] {
-                                         new Node[] { oldPair.get(0),
-                                                 oldPair.get(1) },
-                                         new Node[] { newPair.get(0),
-                                                 newPair.get(1) } });
+            Node[] oldPair = entry.getValue().getOldMapping();
+            if (oldPair[0].equals(self) || oldPair[1].equals(self)) {
+                if (!oldPair[0].equals(newPair.get(0))
+                    || !oldPair[1].equals(newPair.get(1))) {
+                    remapped.put(entry.getKey(), new Node[][] { oldPair,
+                            new Node[] { newPair.get(0), newPair.get(1) } });
                 }
             }
         }
