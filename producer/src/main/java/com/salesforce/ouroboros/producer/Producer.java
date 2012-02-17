@@ -533,7 +533,7 @@ public class Producer implements Comparable<Producer> {
             }
             Batch batch = new Batch(getProducerReplicationPair(channel)[1],
                                     channel, timestamp, events);
-            if (!controller.accept(batch.batchByteSize)) {
+            if (!controller.accept(batch.batchByteSize())) {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Rate limit exceeded for push to %s",
                                            channel));

@@ -92,7 +92,7 @@ abstract public class AbstractAppender {
             if (Utils.isClose(e)) {
                 getLogger().log(Level.INFO,
                                 String.format("closing appender %s ",
-                                              fsm.getName()), e);
+                                              fsm.getName()));
             } else {
                 getLogger().log(Level.SEVERE,
                                 String.format("Exception during append on %s",
@@ -192,7 +192,7 @@ abstract public class AbstractAppender {
             if (Utils.isClose(e)) {
                 getLogger().log(Level.INFO,
                                 String.format("closing appender %s ",
-                                              fsm.getName()), e);
+                                              fsm.getName()));
             } else {
                 getLogger().log(Level.SEVERE,
                                 String.format("Exception during append on %s",
@@ -274,7 +274,7 @@ abstract public class AbstractAppender {
             if (Utils.isClose(e)) {
                 getLogger().log(Level.INFO,
                                 String.format("closing appender %s ",
-                                              fsm.getName()), e);
+                                              fsm.getName()));
             } else {
                 getLogger().log(Level.SEVERE,
                                 String.format("Exception during batch header read on %s",

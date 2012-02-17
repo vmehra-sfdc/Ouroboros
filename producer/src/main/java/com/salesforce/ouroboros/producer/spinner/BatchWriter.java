@@ -26,9 +26,13 @@
 package com.salesforce.ouroboros.producer.spinner;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.Map;
-import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,8 +40,8 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Batch;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
+import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterFSM;
 import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterState;
-import com.salesforce.ouroboros.util.RingBuffer;
 import com.salesforce.ouroboros.util.Utils;
 
 /**
@@ -48,16 +52,59 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class BatchWriter {
 
-    private static final Logger      log     = Logger.getLogger(BatchWriter.class.getCanonicalName());
-    private final BatchWriterContext fsm     = new BatchWriterContext(this);
-    private SocketChannelHandler     handler;
-    private boolean                  inError = false;
-    private final Queue<ByteBuffer>  queued;
-    private ByteBuffer               batch;
+    private static final Logger        log     = Logger.getLogger(BatchWriter.class.getCanonicalName());
+    private final BatchWriterContext   fsm     = new BatchWriterContext(this);
+    private SocketChannelHandler       handler;
+    private boolean                    inError = false;
+    private final BlockingQueue<Batch> queued;
+    private Batch                      batch;
+    private final AtomicBoolean        run     = new AtomicBoolean(true);
+    private final Thread               consumer;
+    private final Semaphore            quantum = new Semaphore(0);
 
     public BatchWriter(int maxQueueLength, String fsmName) {
-        queued = new RingBuffer<ByteBuffer>(maxQueueLength);
+        queued = new ArrayBlockingQueue<Batch>(maxQueueLength);
         fsm.setName(fsmName);
+        consumer = new Thread(
+                              consumerAction(),
+                              String.format("Consumer thread for BatchWriter[%s]",
+                                            fsmName));
+        consumer.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                log.log(Level.WARNING,
+                        String.format("Uncaught exception on %s", t), e);
+            }
+        });
+        consumer.setDaemon(true);
+        consumer.start();
+    }
+
+    protected void nextQuantum() {
+        quantum.release();
+    }
+
+    protected Runnable consumerAction() {
+        return new Runnable() {
+
+            @Override
+            public void run() {
+                while (run.get()) {
+                    try {
+                        quantum.acquire();
+                        while (batch == null) {
+                            batch = queued.poll(4, TimeUnit.SECONDS);
+                            if (!run.get()) {
+                                return;
+                            }
+                        }
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                    fsm.writeBatch();
+                }
+            }
+        };
     }
 
     public void closing() {
@@ -93,33 +140,32 @@ public class BatchWriter {
      */
     public void push(Batch events, Map<BatchIdentity, Batch> pending)
                                                                      throws RateLimiteExceededException {
-        fsm.pushBatch(events, pending);
+        if (fsm.getState() == BatchWriterFSM.Closed) {
+            return;
+        }
+        pending.put(events, events);
+        if (!queued.offer(events)) {
+            pending.remove(events);
+            System.out.println(String.format("**** Queue size exceeded %s %s",
+                                             fsm.getState(),
+                                             quantum.availablePermits()));
+            throw new RateLimiteExceededException();
+        }
     }
 
     protected void close() {
+        queued.clear();
+        run.set(false);
+        quantum.release(10);
         if (handler != null) {
             handler.close();
         }
         batch = null;
-        queued.clear();
-    }
-
-    /**
-     * @param batch
-     * @param pending
-     * @throws RateLimiteExceededException
-     *             - if the event publishing rate has been exceeded
-     */
-    protected void enqueue(Batch batch, Map<BatchIdentity, Batch> pending) {
-        if (!queued.offer(batch.batch)) {
-            throw new RateLimiteExceededException(
-                                                  "The maximum number of queued event batches has been exceeded");
-        }
-        pending.put(batch, batch);
     }
 
     protected boolean hasNext() {
-        return !queued.isEmpty();
+        batch = queued.poll();
+        return batch != null;
     }
 
     protected boolean hasPendingBatch() {
@@ -131,7 +177,6 @@ public class BatchWriter {
     }
 
     protected void nextBatch() {
-        batch = queued.remove();
         batch.rewind();
         if (writeBatch()) {
             fsm.payloadWritten();
@@ -153,8 +198,36 @@ public class BatchWriter {
     }
 
     protected boolean writeBatch() {
+        if (batch.header.hasRemaining()) {
+            try {
+                if (batch.header.write(handler.getChannel()) < 0) {
+                    if (log.isLoggable(Level.FINE)) {
+                        log.fine("Closing channel");
+                    }
+                    inError = true;
+                    return false;
+                }
+            } catch (IOException e) {
+                if (Utils.isClose(e)) {
+                    log.log(Level.INFO,
+                            String.format("closing batch writer %s ",
+                                          fsm.getName()));
+                } else {
+                    if (log.isLoggable(Level.WARNING)) {
+                        log.log(Level.WARNING,
+                                String.format("Unable to write event batch payload %s",
+                                              handler.getChannel()), e);
+                    }
+                }
+                inError = true;
+                return false;
+            }
+            if (batch.header.hasRemaining()) {
+                return false;
+            }
+        }
         try {
-            if (handler.getChannel().write(batch) < 0) {
+            if (handler.getChannel().write(batch.batch) < 0) {
                 if (log.isLoggable(Level.FINE)) {
                     log.fine("Closing channel");
                 }
@@ -164,8 +237,7 @@ public class BatchWriter {
         } catch (IOException e) {
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing batch writer %s ", fsm.getName()),
-                        e);
+                        String.format("closing batch writer %s ", fsm.getName()));
             } else {
                 if (log.isLoggable(Level.WARNING)) {
                     log.log(Level.WARNING,
@@ -176,7 +248,11 @@ public class BatchWriter {
             inError = true;
             return false;
         }
-        return !batch.hasRemaining();
+        if (batch.batch.hasRemaining()) {
+            return false;
+        }
+        batch = null;
+        return true;
     }
 
     protected void writeReady() {

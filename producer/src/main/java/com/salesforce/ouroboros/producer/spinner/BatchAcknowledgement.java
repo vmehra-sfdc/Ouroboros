@@ -90,9 +90,9 @@ public class BatchAcknowledgement {
             }
         } catch (IOException e) {
             if (!Utils.isClose(e)) {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.log(Level.WARNING,
-                            "Error reading batch acknowlegement", e);
+                if (log.isLoggable(Level.INFO)) {
+                    log.log(Level.INFO,
+                            "Closing batch acknowlegement");
                 }
             }
             inError = true;

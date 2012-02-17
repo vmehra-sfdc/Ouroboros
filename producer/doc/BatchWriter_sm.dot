@@ -40,7 +40,7 @@ digraph BatchWriter {
             [label="close/\l"];
 
         "BatchWriterFSM::Waiting" -> "BatchWriterFSM::WriteBatch"
-            [label="pushBatch/\l"];
+            [label="writeBatch/\l"];
 
         "BatchWriterFSM::Waiting" -> "BatchWriterFSM::Closed"
             [label="failover/\l"];

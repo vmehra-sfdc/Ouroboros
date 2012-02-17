@@ -183,7 +183,7 @@ public final class Duplicator {
             inError = true;
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing duplicator on: %s", thisNode), e);
+                        String.format("closing duplicator on: %s", thisNode));
             } else {
                 log.log(Level.WARNING,
                         String.format("Unable to replicate payload for %s from: %s",
@@ -202,7 +202,7 @@ public final class Duplicator {
         } catch (IOException e) {
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing duplicator on: %s", thisNode), e);
+                        String.format("closing duplicator on: %s", thisNode));
             } else {
                 log.log(Level.WARNING,
                         String.format("Unable to write batch header: %s",

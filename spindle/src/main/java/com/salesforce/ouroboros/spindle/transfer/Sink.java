@@ -299,7 +299,7 @@ public class Sink implements CommunicationsHandler {
             error = true;
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing sink %s ", fsm.getName()), e);
+                        String.format("closing sink %s ", fsm.getName()));
             } else {
                 if (log.isLoggable(Level.WARNING)) {
                     log.log(Level.WARNING,

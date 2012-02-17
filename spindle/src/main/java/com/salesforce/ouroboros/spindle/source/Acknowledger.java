@@ -133,8 +133,7 @@ public class Acknowledger {
         } catch (IOException e) {
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing acknowledger %s ", fsm.getName()),
-                        e);
+                        String.format("closing acknowledger %s ", fsm.getName()));
             } else {
                 log.log(Level.WARNING,
                         String.format("Unable to write batch commit acknowledgement %s",

@@ -85,13 +85,21 @@ public class TestBatchWriter {
         Node mirror = new Node(0x1638);
         Batch batch = new Batch(mirror, channel, timestamp,
                                 Arrays.asList(payloads));
-        Answer<Integer> readBatch = new Answer<Integer>() {
+        Answer<Integer> readBatchHeader = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 int totalLength = buffer.remaining();
                 BatchHeader header = BatchHeader.readFrom(buffer);
                 assertEquals(channel, header.getChannel());
+                return totalLength;
+            }
+        };
+        Answer<Integer> readBatch = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                int totalLength = buffer.remaining();
                 for (int i = 0; i < 3; i++) {
                     Event event = Event.readFrom(buffer);
                     byte[] buf = new byte[events[i].getBytes().length];
@@ -107,15 +115,16 @@ public class TestBatchWriter {
                 return totalLength;
             }
         };
-        when(outbound.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readBatch);
+        when(outbound.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readBatchHeader).thenAnswer(readBatch);
 
         batchWriter.push(batch, pending);
-        assertEquals(1, pending.size());
-        assertEquals(batch, pending.get(batch));
+        Thread.sleep(1);
         assertEquals(BatchWriterFSM.WriteBatch, batchWriter.getState());
 
         batchWriter.writeReady();
+        assertEquals(1, pending.size());
+        assertEquals(batch, pending.get(batch));
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
-        verify(outbound, new Times(2)).write(isA(ByteBuffer.class));
+        verify(outbound, new Times(3)).write(isA(ByteBuffer.class));
     }
 }

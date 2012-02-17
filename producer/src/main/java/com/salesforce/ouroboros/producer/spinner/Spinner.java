@@ -233,7 +233,7 @@ public class Spinner implements CommunicationsHandler {
         } catch (IOException e) {
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing spinner %s ", fsm.getName()), e);
+                        String.format("closing spinner %s ", fsm.getName()));
             } else {
                 log.log(Level.WARNING, "Unable to write handshake", e);
             }

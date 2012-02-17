@@ -28,7 +28,6 @@ package com.salesforce.ouroboros.integration;
 import static com.salesforce.ouroboros.testUtils.Util.waitFor;
 import static com.salesforce.ouroboros.util.Utils.point;
 import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 
 import java.util.ArrayList;
@@ -447,7 +446,71 @@ public class ProducerWeaverClusterTest {
                    latch.await(60, TimeUnit.SECONDS));
 
         for (Source source : majorSources) {
-            assertFalse(source.failureString(), source.failed.get());
+            assertTrue(source.failedChannels.isEmpty());
+        }
+    }
+
+    // @Test
+    public void testPublishingDuringPartition() throws Exception {
+        bootstrap();
+        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
+                                                                                             new ProducerSkipStrategy(),
+                                                                                             producers.get(0).getProducer().createRing().replicaePerBucket);
+        for (ProducerCoordinator producer : producers) {
+            producerRing.add(producer.getProducer(), producer.getId().capacity);
+        }
+        ConsistentHashFunction<Weaver> weaverRing = new ConsistentHashFunction<Weaver>(
+                                                                                       new WeaverSkipStrategy(),
+                                                                                       weavers.get(0).getWeaver().createRing().replicaePerBucket);
+        for (WeaverCoordinator weaver : weavers) {
+            weaverRing.add(weaver.getWeaver(), weaver.getId().capacity);
+        }
+        ArrayList<UUID> channels = openChannels();
+        Executor executor = Executors.newCachedThreadPool();
+        CountDownLatch latch = new CountDownLatch(majorSources.size());
+
+        // Open the channels
+        for (UUID channel : channels) {
+            assertTrue(String.format("Channel not opened: %s", channel),
+                       clusterMaster.open(channel, 10, TimeUnit.SECONDS));
+        }
+
+        int targetCount = BATCH_COUNT * 20;
+        for (Source source : sources) {
+            source.publish(targetCount, BATCH_SIZE, executor, latch, 0L);
+        }
+
+        asymmetricallyPartition();
+
+        assertTrue("not all publishers completed",
+                   latch.await(60, TimeUnit.SECONDS));
+
+        ArrayList<UUID> lostChannels = filterChannelsByProducers(channels,
+                                                                 producerRing);
+        lostChannels.addAll(filterChannelsByWeavers(lostChannels, weaverRing));
+
+        final Long target = Long.valueOf(targetCount - 1);
+        for (UUID channel : channels) {
+            final UUID c = channel;
+            final List<Producer> pair = producerRing.hash(point(channel), 2);
+            if (majorProducers.contains(pair.get(1))) {
+                waitFor(String.format("Did not receive all acks for %s",
+                                      channel), new Condition() {
+                    @Override
+                    public boolean value() {
+                        Long ts = pair.get(1).getMirrorTimestampFor(c);
+                        return target.equals(ts);
+                    }
+                }, 60000L, 1000L);
+            }
+        }
+
+        for (Source source : majorSources) {
+            if (!source.failedChannels.isEmpty()) {
+                for (UUID channel : source.failedChannels) {
+                    assertTrue(lostChannels.contains(channel));
+                }
+            }
         }
     }
 

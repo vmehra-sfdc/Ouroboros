@@ -364,7 +364,7 @@ public class Xerox implements CommunicationsHandler {
         } catch (IOException e) {
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing xerox %s ", fsm.getName()), e);
+                        String.format("closing xerox %s ", fsm.getName()));
             } else {
                 log.log(Level.WARNING,
                         String.format("Error writing header for %s on %s",
@@ -406,7 +406,7 @@ public class Xerox implements CommunicationsHandler {
         } catch (IOException e) {
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing xerox %s ", fsm.getName()), e);
+                        String.format("closing xerox %s ", fsm.getName()));
             } else {
                 log.log(Level.WARNING,
                         String.format("Error writing segment header for %s to %s on %s",

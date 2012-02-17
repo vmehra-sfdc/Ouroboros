@@ -33,8 +33,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.api.producer.EventSource;
@@ -43,12 +41,10 @@ import com.salesforce.ouroboros.api.producer.UnknownChannelException;
 import com.salesforce.ouroboros.producer.Producer;
 
 public class Source implements EventSource {
-    private static final Logger                log      = Logger.getLogger(Source.class.getCanonicalName());
-
-    public final AtomicBoolean                 failed   = new AtomicBoolean();
-    public Exception                           failure;
-    public final ConcurrentHashMap<UUID, Long> channels = new ConcurrentHashMap<UUID, Long>();
+    private static final Logger                log            = Logger.getLogger(Source.class.getCanonicalName());
+    public final ConcurrentHashMap<UUID, Long> channels       = new ConcurrentHashMap<UUID, Long>();
     private Producer                           producer;
+    public final ArrayList<UUID>               failedChannels = new ArrayList<UUID>();
 
     @Override
     public void assumePrimary(Map<UUID, Long> newPrimaries) {
@@ -94,24 +90,20 @@ public class Source implements EventSource {
                                                              channel, channel).getBytes()));
                 }
                 boolean published = false;
-                while (!published) {
+                while (!published && channels.containsKey(channel)) {
                     try {
                         try {
                             producer.publish(channel, timestamp, events);
                         } catch (UnknownChannelException e) {
-                            log.log(Level.SEVERE,
-                                    String.format("Unknown channel %s on %s",
-                                                  channel, producer.getId()));
-                            failed.set(true);
-                            failure = e;
-                            return;
+                            failedChannels.add(channel);
+                            continue;
                         } catch (InterruptedException e) {
                             return;
                         }
                         published = true;
                     } catch (RateLimiteExceededException e) {
-                        log.info(String.format("Rate limit exceeded for %s",
-                                               channel));
+                        log.info(String.format("Rate limit exceeded for %s on %s",
+                                               channel, producer.getId()));
                         try {
                             Thread.sleep(100);
                         } catch (InterruptedException e1) {
@@ -132,12 +124,5 @@ public class Source implements EventSource {
         for (UUID channel : deadChannels) {
             channels.remove(channel);
         }
-    }
-
-    /**
-     * @return
-     */
-    public String failureString() {
-        return failure == null ? "Successful!" : failure.toString();
     }
 }

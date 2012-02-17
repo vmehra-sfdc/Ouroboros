@@ -231,7 +231,7 @@ public class Replicator implements CommunicationsHandler {
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
                         String.format("closing replicator %s>%s",
-                                      bundle.getId(), partner), e);
+                                      bundle.getId(), partner));
             } else {
                 log.log(Level.WARNING,
                         String.format("unable to read handshake on %s",
@@ -281,7 +281,7 @@ public class Replicator implements CommunicationsHandler {
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
                         String.format("closing replicator %s>%s",
-                                      bundle.getId(), partner), e);
+                                      bundle.getId(), partner));
             } else {
                 log.log(Level.WARNING,
                         String.format("Unable to write handshake from: %s",

@@ -35,11 +35,10 @@ import java.util.UUID;
  * 
  */
 public class Batch extends BatchIdentity {
-    public final ByteBuffer batch;
-    public final int        batchByteSize;
-    public final Node       mirror;
-    private final long      created = System.currentTimeMillis();
-    private long            interval;
+    public final BatchHeader header;
+    public final ByteBuffer  batch;
+    private final long       created = System.currentTimeMillis();
+    private long             interval;
 
     /**
      * @param mirror
@@ -51,20 +50,16 @@ public class Batch extends BatchIdentity {
                  Collection<ByteBuffer> events) {
         super(channel, timestamp);
         assert events != null : "events must not be null";
-        this.mirror = mirror;
         int totalSize = 0;
-        int batchSize = 0;
 
         for (ByteBuffer event : events) {
             event.rewind();
             totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
-            batchSize += event.remaining();
         }
-        batchByteSize = batchSize;
 
-        batch = ByteBuffer.allocate(totalSize + BatchHeader.HEADER_BYTE_SIZE);
-        BatchHeader.append(batch, mirror, totalSize, BatchHeader.MAGIC,
-                           channel, timestamp);
+        batch = ByteBuffer.allocate(totalSize);
+        header = new BatchHeader(mirror, totalSize, BatchHeader.MAGIC, channel,
+                                 timestamp);
 
         for (ByteBuffer event : events) {
             event.rewind();
@@ -96,7 +91,7 @@ public class Batch extends BatchIdentity {
      * @return the transfer rate in bytes per second of this batch.
      */
     public double rate() {
-        return batchByteSize / interval;
+        return batchByteSize() / interval;
     }
 
     /**
@@ -104,5 +99,20 @@ public class Batch extends BatchIdentity {
      */
     public void timestamp() {
         interval = Math.max(1, System.currentTimeMillis() - created);
+    }
+
+    /**
+     * @return
+     */
+    public long batchByteSize() {
+        return batch.capacity() + BatchHeader.HEADER_BYTE_SIZE;
+    }
+
+    /**
+     * 
+     */
+    public void rewind() {
+        header.rewind();
+        batch.rewind();
     }
 }

@@ -164,7 +164,7 @@ public class Spindle implements CommunicationsHandler {
             inError = true;
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing Spindle %s ", fsm.getName()), e);
+                        String.format("closing Spindle %s ", fsm.getName()));
             } else {
                 log.log(Level.WARNING,
                         String.format("Error reading handshake"), e);

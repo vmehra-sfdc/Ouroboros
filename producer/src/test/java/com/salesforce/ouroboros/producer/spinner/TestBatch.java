@@ -12,7 +12,6 @@ import java.util.UUID;
 import org.junit.Test;
 
 import com.salesforce.ouroboros.Batch;
-import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 
@@ -36,7 +35,6 @@ public class TestBatch {
         Batch batch = new Batch(new Node(0), UUID.randomUUID(), 0L,
                                 Arrays.asList(payloads));
         ByteBuffer buffer = batch.batch;
-        BatchHeader.readFrom(buffer);
         for (int i = 0; i < 3; i++) {
             Event event = Event.readFrom(buffer);
             byte[] buf = new byte[events[i].getBytes().length];

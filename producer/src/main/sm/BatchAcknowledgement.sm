@@ -66,6 +66,8 @@ ReadAcknowledgement {
 }
 
 Closed {
+	readReady
+		nil {}
 }
 
 Default {

@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
@@ -86,7 +87,8 @@ final public class Utils {
     }
 
     public static boolean isClose(IOException ioe) {
-        return "Broken pipe".equals(ioe.getMessage())
+        return (ioe instanceof ClosedChannelException)
+               || "Broken pipe".equals(ioe.getMessage())
                || "Connection reset by peer".equals(ioe.getMessage());
     }
 }
