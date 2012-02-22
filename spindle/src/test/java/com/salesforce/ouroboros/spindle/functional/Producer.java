@@ -50,7 +50,7 @@ public class Producer implements CommunicationsHandler {
     private final int            numberOfBatches;
     private SocketChannelHandler handler;
     private final AtomicInteger  batches        = new AtomicInteger();
-    private volatile ByteBuffer  batch;
+    private volatile Batch       batch;
     private final AtomicInteger  timestamp      = new AtomicInteger(0);
     private final CountDownLatch latch;
     private final List<UUID>     channelIds;
@@ -116,13 +116,25 @@ public class Producer implements CommunicationsHandler {
 
     @Override
     public void writeReady() {
+        if (batch.header.hasRemaining()) {
+            try {
+                batch.header.write(handler.getChannel());
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+            if (batch.header.hasRemaining()) {
+                handler.selectForWrite();
+                return;
+            }
+        }
         try {
-            handler.getChannel().write(batch);
+            handler.getChannel().write(batch.batch);
         } catch (IOException e) {
             e.printStackTrace();
             return;
         }
-        if (batch.hasRemaining()) {
+        if (batch.batch.hasRemaining()) {
             handler.selectForWrite();
         } else {
             nextBatch();
@@ -154,7 +166,8 @@ public class Producer implements CommunicationsHandler {
         for (int i = 0; i < batchSize; i++) {
             events.add(event);
         }
-        batch = new Batch(producerNode, channelId, timestamp.get(), events).batch;
+        batch = new Batch(producerNode, channelId, timestamp.get(), events);
+        batch.header.rewind();
         handler.selectForWrite();
     }
 
