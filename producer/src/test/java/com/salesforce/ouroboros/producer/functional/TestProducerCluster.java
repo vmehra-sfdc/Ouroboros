@@ -103,6 +103,7 @@ public class TestProducerCluster {
 
     @Before
     public void startUp() throws Exception {
+        FakeSpindle.PORT++;
         GossipTestCfg.incrementPorts();
         weaver.reset();
         log.info("Setting up initial partition");
