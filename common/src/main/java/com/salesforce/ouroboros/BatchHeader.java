@@ -200,4 +200,8 @@ public class BatchHeader {
         bytes.putLong(position + TIMESTAMP_OFFSET, timestamp);
         bytes.position(position + HEADER_BYTE_SIZE);
     }
+
+    public void resetMirror(Node mirror) {
+        bytes.putInt(PRODUCER_MIRROR_OFFSET, mirror.processId);
+    }
 }

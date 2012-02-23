@@ -288,7 +288,7 @@ public class ProducerWeaverClusterTest {
             nodeId = ctxt.getBean(Identity.class);
             testNode = (TestNode) controller.getNode(nodeId);
             weaverNodes.add(ctxt.getBean(Node.class));
-            if (i < weavers.size() / 2 + 1) {
+            if (i < (weaverContexts.size() / 2) + 1) {
                 majorView.add(nodeId);
                 fullView.add(nodeId);
                 majorViewNodes.add(testNode);
@@ -307,7 +307,7 @@ public class ProducerWeaverClusterTest {
             producerNodes.add(ctxt.getBean(Node.class));
             ProducerCoordinator coordinator = ctxt.getBean(ProducerCoordinator.class);
             producers.add(coordinator);
-            if (i < producers.size() / 2 + 1) {
+            if (i < (producerContexts.size() / 2) + 1) {
                 nodeId = ctxt.getBean(Identity.class);
                 majorView.add(nodeId);
                 fullView.add(nodeId);
@@ -320,7 +320,7 @@ public class ProducerWeaverClusterTest {
             }
             i++;
         }
-        log.info(String.format("Major partition: %s", majorViewNodes));
+        log.info(String.format("Major partition: %s", majorView));
 
         sources = getSources(producerContexts);
         majorSources = getSources(majorProducerContexts);
@@ -602,7 +602,7 @@ public class ProducerWeaverClusterTest {
 
     void asymmetricallyPartition() throws InterruptedException {
         CountDownLatch latchA = latch(majorViewNodes);
-        log.info("Asymmetrically partitioning");
+        log.info(String.format("Asymmetrically partitioning: %s", majorView));
         controller.asymPartition(majorView);
 
         log.info("Awaiting stability of major partition");
@@ -667,8 +667,6 @@ public class ProducerWeaverClusterTest {
         assertTrue("Full partition did not stablize",
                    latch.await(60, TimeUnit.SECONDS));
 
-        log.info("Full partition has stabilized");
-
         // Check to see everything is kosher
         for (TestNode member : fullPartition) {
             assertEquals(fullView, member.getPartition());
@@ -676,6 +674,8 @@ public class ProducerWeaverClusterTest {
         // Check to see if the participants are stable.
         assertWeaversStable(weavers);
         assertProducersStable(producers);
+
+        log.info("Full partition has stabilized");
     }
 
     Class<?>[] weaverConfigurations() {

@@ -725,7 +725,7 @@ public class WeaverCoordinator implements Member {
      * Rebalance the weaver process group.
      */
     protected void rebalance() {
-        rebalance(weaver.remap(), switchboard.getDeadMembers());
+        rebalance(weaver.remap());
     }
 
     /**
@@ -733,12 +733,8 @@ public class WeaverCoordinator implements Member {
      * 
      * @param remapped
      *            - the mapping of channels to their new primary/mirror pairs
-     * @param deadMembers
-     *            - the weaver nodes that have failed and are no longer part of
-     *            the partition
      */
-    protected void rebalance(Map<UUID, Node[][]> remapped,
-                             Collection<Node> deadMembers) {
+    protected void rebalance(Map<UUID, Node[][]> remapped) {
         final Map<Node, Xerox> xeroxes = new HashMap<Node, Xerox>();
 
         Runnable rendezvousAction = new Runnable() {
@@ -780,7 +776,7 @@ public class WeaverCoordinator implements Member {
         for (Entry<UUID, Node[][]> entry : remapped.entrySet()) {
             weaver.rebalance(xeroxes, entry.getKey(), entry.getValue()[0][0],
                              entry.getValue()[0][1], entry.getValue()[1][0],
-                             entry.getValue()[1][1], deadMembers);
+                             entry.getValue()[1][1], activeMembers);
         }
 
         if (xeroxes.isEmpty()) {

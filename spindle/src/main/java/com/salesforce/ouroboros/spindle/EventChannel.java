@@ -184,17 +184,17 @@ public class EventChannel {
         return Long.toHexString(segmentPrefix).toLowerCase() + SEGMENT_SUFFIX;
     }
 
-    private final File       channel;
-    private volatile long    commited;
-    private boolean          failedOver = false;
-    private final UUID       id;
-    private volatile long    lastTimestamp;
-    private final long       maxSegmentSize;
-    private volatile long    nextOffset;
-    private final Node       partner;
-    private final Replicator replicator;
+    private final File          channel;
+    private volatile long       commited;
+    private boolean             failedOver = false;
+    private final UUID          id;
+    private volatile long       lastTimestamp;
+    private final long          maxSegmentSize;
+    private volatile long       nextOffset;
+    private final Node          partner;
+    private volatile Replicator replicator;
 
-    private Role             role;
+    private Role                role;
 
     public EventChannel(Role role, Node partnerId, final UUID channelId,
                         final File root, final long maxSegmentSize,
@@ -251,8 +251,12 @@ public class EventChannel {
                        Acknowledger acknowledger, SocketChannelHandler handler)
                                                                                throws IOException {
         append(batchHeader, batchHeader.getOffset(), segment);
-        replicator.replicate(new EventEntry(batchHeader, this, segment,
-                                            acknowledger, handler));
+        if (replicator == null) {
+            handler.selectForRead();
+        } else {
+            replicator.replicate(new EventEntry(batchHeader, this, segment,
+                                                acknowledger, handler));
+        }
     }
 
     /**
@@ -292,6 +296,7 @@ public class EventChannel {
     public void failOver() {
         failedOver = true;
         role = Role.PRIMARY;
+        replicator = null;
     }
 
     public UUID getId() {
@@ -316,13 +321,6 @@ public class EventChannel {
 
     public Node getPartnerId() {
         return partner;
-    }
-
-    /**
-     * @return the replicator
-     */
-    public Replicator getReplicator() {
-        return replicator;
     }
 
     public Role getRole() {
@@ -447,5 +445,9 @@ public class EventChannel {
             log.log(Level.WARNING, msg, e);
             throw new IllegalStateException(msg);
         }
+    }
+
+    public void failMirror() {
+        replicator = null;
     }
 }

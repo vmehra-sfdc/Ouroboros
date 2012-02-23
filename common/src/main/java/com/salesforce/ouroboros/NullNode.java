@@ -25,22 +25,18 @@
  */
 package com.salesforce.ouroboros;
 
-import java.util.List;
-
-import com.salesforce.ouroboros.util.ConsistentHashFunction.SkipStrategy;
-
 /**
+ * The null node which doesn't exist.
+ * 
  * @author hhildebrand
  * 
  */
-public class NoSkipStrategy<T> implements SkipStrategy<T> {
+public class NullNode extends Node {
+    private static final long    serialVersionUID = 1L;
+    public static final NullNode INSTANCE         = new NullNode();
 
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.util.ConsistentHashFunction.SkipStrategy#isSkippable(java.util.List, java.lang.Object)
-     */
-    @Override
-    public boolean isSkippable(List<T> previous, T bucket) {
-        return false;
+    private NullNode() {
+        super(-1);
     }
 
 }

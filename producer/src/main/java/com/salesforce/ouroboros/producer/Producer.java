@@ -52,6 +52,7 @@ import com.salesforce.ouroboros.Batch;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.NullNode;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.api.producer.UnknownChannelException;
@@ -89,38 +90,74 @@ public class Producer implements Comparable<Producer> {
 
     private static class MirrorState {
         volatile long timestamp;
-        private Node  primary;
-        private Node  mirror;
+        Node          primaryProducer;
+        Node          mirrorProducer;
+        Node          primaryWeaver;
+        Node          mirrorWeaver;
 
-        public MirrorState(Node[] pair, long timestamp) {
-            this.primary = pair[0];
+        public MirrorState(Node[] producerPair, long timestamp,
+                           Node[] weaverPair) {
+            primaryProducer = producerPair[0];
             this.timestamp = timestamp;
-            this.mirror = pair[1];
+            mirrorProducer = producerPair[1];
+            primaryWeaver = weaverPair[0];
+            mirrorWeaver = weaverPair[1];
+        }
+
+        public Node getMirrorProducer() {
+            return mirrorProducer;
         }
 
         /**
          * @return
          */
-        public Node[] getOldMapping() {
-            return new Node[] { primary, mirror };
+        public Node[] getOldProducerMapping() {
+            return new Node[] { primaryProducer, mirrorProducer };
+        }
+
+        /**
+         * @return
+         */
+        public Node[] getOldWeaverMapping() {
+            return new Node[] { primaryWeaver, mirrorWeaver };
         }
 
         /**
          * @param remappedPrimary
          * @param remappedMirror
          */
-        public void remap(Node remappedPrimary, Node remappedMirror) {
-            primary = remappedPrimary;
-            mirror = remappedMirror;
+        public void remapProducers(Node remappedPrimary, Node remappedMirror) {
+            primaryProducer = remappedPrimary;
+            mirrorProducer = remappedMirror;
         }
     }
 
     private static class PrimaryState extends MirrorState {
+        boolean failedOver = false;
         Spinner spinner;
 
-        public PrimaryState(Node[] pair, long timestamp, Spinner spinner) {
-            super(pair, timestamp);
+        public PrimaryState(Node[] producerPair, long timestamp,
+                            Spinner spinner, Node[] weaverPair) {
+            super(producerPair, timestamp, weaverPair);
             this.spinner = spinner;
+        }
+
+        public void failedOver() {
+            failedOver = true;
+        }
+
+        @Override
+        public Node getMirrorProducer() {
+            if (failedOver) {
+                return NullNode.INSTANCE;
+            }
+            return super.getMirrorProducer();
+        }
+
+        @Override
+        public void remapProducers(Node remappedPrimary, Node remappedMirror) {
+            failedOver = false;
+            super.remapProducers(remappedPrimary, remappedMirror);
         }
     }
 
@@ -190,7 +227,12 @@ public class Producer implements Comparable<Producer> {
      *            - the identity of the batch
      */
     public void acknowledge(BatchIdentity ack) {
-        mirrors.get(ack.channel).timestamp = ack.timestamp;
+        MirrorState mirrorState = mirrors.get(ack.channel);
+        if (mirrorState != null) {
+            mirrorState.timestamp = ack.timestamp;
+        } else {
+            log.info(String.format("null mirror state for %s on %s", ack, self));
+        }
     }
 
     public void activate() {
@@ -240,8 +282,11 @@ public class Producer implements Comparable<Producer> {
                     log.info(String.format("%s assuming mirror for %s", self,
                                            update));
                 }
-                mirrors.put(update.channel, new MirrorState(producerPair,
-                                                            update.timestamp));
+                mirrors.put(update.channel,
+                            new MirrorState(
+                                            producerPair,
+                                            update.timestamp,
+                                            getChannelBufferReplicationPair(update.channel)));
             }
         }
         nextProducerRing = null;
@@ -313,7 +358,7 @@ public class Producer implements Comparable<Producer> {
         for (Iterator<Entry<UUID, MirrorState>> mirrored = mirrors.entrySet().iterator(); mirrored.hasNext();) {
             Entry<UUID, MirrorState> entry = mirrored.next();
             UUID channel = entry.getKey();
-            Node[] producerPair = getProducerReplicationPair(channel);
+            Node[] producerPair = entry.getValue().getOldProducerMapping();
             if (deadMembers.contains(producerPair[0])) {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("%s is assuming primary role for channel %s from Producer[%s]",
@@ -322,20 +367,24 @@ public class Producer implements Comparable<Producer> {
                 }
                 newPrimaries.put(channel, entry.getValue().timestamp);
                 mirrored.remove();
-                PrimaryState previous = mapSpinner(channel, producerPair);
+                PrimaryState previous = mapSpinner(channel, new Node[] { self,
+                        NullNode.INSTANCE });
                 assert previous == null : String.format("Apparently node %s is already primary for %s");
             }
         }
 
-        // Assign failover mirror for dead primaries
+        // Assign failover mirror for dead primaries, null out dead producer mirrors
         for (Entry<UUID, PrimaryState> entry : channelState.entrySet()) {
-            Node[] pair = getChannelBufferReplicationPair(entry.getKey());
+            if (deadMembers.contains(entry.getValue().getMirrorProducer())) {
+                entry.getValue().failedOver();
+            }
+            Node[] pair = entry.getValue().getOldWeaverMapping();
             if (deadMembers.contains(pair[0])) {
                 Spinner newPrimary = spinners.get(entry.getKey());
                 if (newPrimary == null) {
                     if (log.isLoggable(Level.WARNING)) {
-                        log.warning(String.format("Both the primary and the secondary for %s have failed!",
-                                                  entry.getKey()));
+                        log.warning(String.format("Both the primary and the secondary channelbuffers for %s have failed on %s",
+                                                  entry.getKey(), self));
                     }
                     deadChannels.add(entry.getKey());
                     channelState.remove(entry.getKey());
@@ -378,14 +427,14 @@ public class Producer implements Comparable<Producer> {
                 entries.remove();
             }
         }
-        
-        for (Node node: producerRing) {
+
+        for (Node node : producerRing) {
             if (deadMembers.contains(node)) {
                 node.markAsDown();
             }
         }
-        
-        for (Node node: weaverRing) {
+
+        for (Node node : weaverRing) {
             if (deadMembers.contains(node)) {
                 node.markAsDown();
             }
@@ -481,7 +530,11 @@ public class Producer implements Comparable<Producer> {
     public void opened(UUID channel) {
         Node[] pair = getProducerReplicationPair(channel);
         if (self.equals(pair[1])) {
-            mirrors.put(channel, new MirrorState(pair, 0L));
+            mirrors.put(channel,
+                        new MirrorState(
+                                        pair,
+                                        0L,
+                                        getChannelBufferReplicationPair(channel)));
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Channel %s opened on mirror %s",
                                        channel, this));
@@ -531,8 +584,8 @@ public class Producer implements Comparable<Producer> {
                                                   String.format("The channel %s does not exist",
                                                                 channel));
             }
-            Batch batch = new Batch(getProducerReplicationPair(channel)[1],
-                                    channel, timestamp, events);
+            Batch batch = new Batch(state.getMirrorProducer(), channel,
+                                    timestamp, events);
             if (!controller.accept(batch.batchByteSize())) {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Rate limit exceeded for push to %s",
@@ -562,17 +615,17 @@ public class Producer implements Comparable<Producer> {
     public void rebalance(HashMap<Node, List<UpdateState>> remapped,
                           UUID channel, Node originalPrimary,
                           Node originalMirror, Node remappedPrimary,
-                          Node remappedMirror, Collection<Node> deadMembers) {
+                          Node remappedMirror, Collection<Node> activeProducers) {
         MirrorState state = channelState.get(channel);
         if (state == null) {
             state = mirrors.get(channel);
             assert state != null : String.format("The event channel  %s to rebalance does not exist on %s",
                                                  channel, self);
         }
-        state.remap(remappedPrimary, remappedMirror);
+        state.remapProducers(remappedPrimary, remappedMirror);
         if (self.equals(originalPrimary)) {
             // self is the primary
-            if (deadMembers.contains(originalMirror)) {
+            if (!activeProducers.contains(originalMirror)) {
                 // mirror is down
                 if (self.equals(remappedPrimary)) {
                     // if self is still the primary
@@ -603,7 +656,7 @@ public class Producer implements Comparable<Producer> {
                     remap(channel, state.timestamp, self, remapped);
                 }
             }
-        } else if (deadMembers.contains(originalPrimary)) {
+        } else if (!activeProducers.contains(originalPrimary)) {
             assert self.equals(originalMirror);
             // self is the secondary
             // primary is down
@@ -682,6 +735,13 @@ public class Producer implements Comparable<Producer> {
         weaverRing = nextWeaverRing;
     }
 
+    /**
+     * @param to
+     */
+    public void removeSpinner(Node to) {
+        spinners.remove(to);
+    }
+
     public void setNextProducerRing(ConsistentHashFunction<Node> newRing) {
         nextProducerRing = newRing;
     }
@@ -737,7 +797,8 @@ public class Producer implements Comparable<Producer> {
                 }
                 return channelState.putIfAbsent(channel,
                                                 new PrimaryState(producerPair,
-                                                                 -1L, spinner));
+                                                                 -1L, spinner,
+                                                                 channelPair));
             }
         } else {
             if (log.isLoggable(Level.INFO)) {
@@ -746,7 +807,8 @@ public class Producer implements Comparable<Producer> {
             }
             return channelState.putIfAbsent(channel,
                                             new PrimaryState(producerPair, -1,
-                                                             spinner));
+                                                             spinner,
+                                                             channelPair));
         }
     }
 
@@ -832,25 +894,21 @@ public class Producer implements Comparable<Producer> {
         for (Entry<UUID, PrimaryState> entry : channelState.entrySet()) {
             long channelPoint = point(entry.getKey());
             List<Node> newPair = nextProducerRing.hash(channelPoint, 2);
-            Node[] oldPair = entry.getValue().getOldMapping();
-            if (oldPair[0].equals(self) || oldPair[1].equals(self)) {
-                if (!oldPair[0].equals(newPair.get(0))
-                    || !oldPair[1].equals(newPair.get(1))) {
-                    remapped.put(entry.getKey(), new Node[][] { oldPair,
-                            new Node[] { newPair.get(0), newPair.get(1) } });
-                }
+            Node[] oldPair = entry.getValue().getOldProducerMapping();
+            if (!oldPair[0].equals(newPair.get(0))
+                || !oldPair[1].equals(newPair.get(1))) {
+                remapped.put(entry.getKey(), new Node[][] { oldPair,
+                        new Node[] { newPair.get(0), newPair.get(1) } });
             }
         }
         for (Entry<UUID, MirrorState> entry : mirrors.entrySet()) {
             long channelPoint = point(entry.getKey());
             List<Node> newPair = nextProducerRing.hash(channelPoint, 2);
-            Node[] oldPair = entry.getValue().getOldMapping();
-            if (oldPair[0].equals(self) || oldPair[1].equals(self)) {
-                if (!oldPair[0].equals(newPair.get(0))
-                    || !oldPair[1].equals(newPair.get(1))) {
-                    remapped.put(entry.getKey(), new Node[][] { oldPair,
-                            new Node[] { newPair.get(0), newPair.get(1) } });
-                }
+            Node[] oldPair = entry.getValue().getOldProducerMapping();
+            if (!oldPair[0].equals(newPair.get(0))
+                || !oldPair[1].equals(newPair.get(1))) {
+                remapped.put(entry.getKey(), new Node[][] { oldPair,
+                        new Node[] { newPair.get(0), newPair.get(1) } });
             }
         }
         return remapped;

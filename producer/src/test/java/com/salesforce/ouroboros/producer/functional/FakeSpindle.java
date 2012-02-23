@@ -15,7 +15,7 @@ import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 
 public class FakeSpindle implements Member {
-    int               PORT = 55555;
+    static int        PORT = 55555;
     final Switchboard switchboard;
 
     public FakeSpindle(Switchboard switchboard) {
@@ -28,7 +28,7 @@ public class FakeSpindle implements Member {
         ContactInformation info = new ContactInformation(
                                                          new InetSocketAddress(
                                                                                "127.0.0.1",
-                                                                               PORT++),
+                                                                               PORT),
                                                          null, null);
         switchboard.ringCast(new Message(
                                          switchboard.getId(),

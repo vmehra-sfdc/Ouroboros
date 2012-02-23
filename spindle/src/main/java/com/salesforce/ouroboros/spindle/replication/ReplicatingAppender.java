@@ -31,6 +31,7 @@ import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.NullNode;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.source.AbstractAppender;
@@ -70,8 +71,10 @@ public class ReplicatingAppender extends AbstractAppender {
         Node node = batchHeader.getProducerMirror();
         Acknowledger acknowledger = bundle.getAcknowledger(node);
         if (acknowledger == null) {
-            log.warning(String.format("Could not find an acknowledger for %s",
-                                      node));
+            if (node.processId != NullNode.INSTANCE.processId) {
+                log.warning(String.format("Could not find an acknowledger for %s",
+                                          node));
+            }
             return;
         }
         if (log.isLoggable(Level.FINER)) {

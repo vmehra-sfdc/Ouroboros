@@ -57,7 +57,6 @@ public final class Duplicator {
     private final Node              thisNode;
 
     public Duplicator(Node node) {
-        fsm.setName(Integer.toString(node.processId));
         thisNode = node;
     }
 
@@ -78,7 +77,7 @@ public final class Duplicator {
     public void replicate(EventEntry event) {
         if (log.isLoggable(Level.FINE)) {
             log.fine(String.format("Replicating event %s on %s", event,
-                                   thisNode));
+                                   fsm.getName()));
         }
         fsm.replicate(event);
     }
@@ -106,6 +105,7 @@ public final class Duplicator {
 
     public void closing() {
         if (current != null) {
+            current.handler.selectForRead();
             try {
                 current.segment.close();
             } catch (IOException e1) {
@@ -113,7 +113,6 @@ public final class Duplicator {
                                                     current.segment), e1);
             }
         }
-        current = null;
         for (EventEntry entry : pending) {
             entry.handler.selectForRead();
         }
@@ -144,7 +143,7 @@ public final class Duplicator {
         current = pending.remove();
         if (log.isLoggable(Level.FINER)) {
             log.finer(String.format("Processing %s on %s", current.header,
-                                    thisNode));
+                                    fsm.getName()));
         }
         current.handler.selectForRead();
         remaining = current.header.getBatchByteLength();
@@ -171,7 +170,7 @@ public final class Duplicator {
                 current.eventChannel.commit(current.header.getOffset());
                 if (log.isLoggable(Level.FINER)) {
                     log.finer(String.format("Acknowledging replication of %s, on %s",
-                                            current.header, thisNode));
+                                            current.header, fsm.getName()));
                 }
                 current.acknowledger.acknowledge(current.header.getChannel(),
                                                  current.header.getTimestamp());
@@ -183,7 +182,7 @@ public final class Duplicator {
             inError = true;
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing duplicator on: %s", thisNode));
+                        String.format("closing duplicator: %s", fsm.getName()));
             } else {
                 log.log(Level.WARNING,
                         String.format("Unable to replicate payload for %s from: %s",
@@ -202,7 +201,7 @@ public final class Duplicator {
         } catch (IOException e) {
             if (Utils.isClose(e)) {
                 log.log(Level.INFO,
-                        String.format("closing duplicator on: %s", thisNode));
+                        String.format("closing duplicator: %s", fsm.getName()));
             } else {
                 log.log(Level.WARNING,
                         String.format("Unable to write batch header: %s",
@@ -215,7 +214,7 @@ public final class Duplicator {
         if (written) {
             if (log.isLoggable(Level.FINER)) {
                 log.finer(String.format("written header %s on %s",
-                                        current.header, thisNode));
+                                        current.header, fsm.getName()));
             }
         }
         return written;
@@ -231,5 +230,12 @@ public final class Duplicator {
      */
     protected void enqueue(EventEntry event) {
         pending.add(event);
+    }
+
+    /**
+     * @param format
+     */
+    public void setFsmName(String name) {
+        fsm.setName(name);
     }
 }

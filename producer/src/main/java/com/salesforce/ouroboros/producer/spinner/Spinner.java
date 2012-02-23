@@ -66,10 +66,12 @@ public class Spinner implements CommunicationsHandler {
     private boolean                                  inError;
     private final NavigableMap<BatchIdentity, Batch> pending             = new ConcurrentSkipListMap<BatchIdentity, Batch>();
     private final BatchWriter                        writer;
+    private final Node                               to;
 
     public Spinner(Producer producer, Node to, int maxQueueLength) {
         String fsmName = String.format("%s>%s", producer.getId().processId,
                                        to.processId);
+        this.to = to;
         fsm.setName(fsmName);
         this.producer = producer;
         handshake.putInt(MAGIC);
@@ -106,8 +108,8 @@ public class Spinner implements CommunicationsHandler {
         } else {
             producer.acknowledge(ack);
             if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Acknowledgement for %s on mirror %s",
-                                        ack, producer.getId()));
+                log.finer(String.format("Acknowledgement for %s on mirror %s [%s]",
+                                        ack, producer.getId(), fsm.getName()));
             }
         }
     }
@@ -135,6 +137,8 @@ public class Spinner implements CommunicationsHandler {
     public void closing() {
         ack.closing();
         writer.closing();
+        producer.removeSpinner(to);
+        log.info(String.format("Closing spinner %s", fsm.getName()));
     }
 
     @Override

@@ -1,12 +1,19 @@
 package com.salesforce.ouroboros.producer.functional;
 
+import java.io.IOException;
 import java.io.Serializable;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Message;
@@ -22,6 +29,7 @@ public class ClusterMaster implements Member {
     Semaphore                      semaphore = new Semaphore(0);
     final Switchboard              switchboard;
     final ScheduledExecutorService timer     = Executors.newSingleThreadScheduledExecutor();
+    private ServerSocket           socket;
 
     public ClusterMaster(Switchboard switchboard) {
         this.switchboard = switchboard;
@@ -58,7 +66,11 @@ public class ClusterMaster implements Member {
     @Override
     public void dispatch(ChannelMessage type, Node sender,
                          Serializable[] arguments, long time) {
-        semaphore.release();
+        switch (type) {
+            case MIRROR_OPENED:
+                semaphore.release();
+            default:
+        }
     }
 
     @Override
@@ -81,18 +93,16 @@ public class ClusterMaster implements Member {
                                          FailoverMessage.FAILOVER));
     }
 
-    public boolean mirrorOpened(UUID channel, long timeout, TimeUnit unit)
-                                                                          throws InterruptedException {
-        switchboard.ringCast(new Message(switchboard.getId(),
-                                         ChannelMessage.MIRROR_OPENED,
-                                         new Serializable[] { channel }));
-        return acquire(timeout, unit).get();
-    }
-
     public boolean open(UUID channel, long timeout, TimeUnit unit)
                                                                   throws InterruptedException {
         switchboard.ringCast(new Message(switchboard.getId(),
                                          ChannelMessage.OPEN,
+                                         new Serializable[] { channel }));
+        switchboard.ringCast(new Message(switchboard.getId(),
+                                         ChannelMessage.PRIMARY_OPENED,
+                                         new Serializable[] { channel }));
+        switchboard.ringCast(new Message(switchboard.getId(),
+                                         ChannelMessage.MIRROR_OPENED,
                                          new Serializable[] { channel }));
         return acquire(timeout, unit).get();
     }
@@ -102,19 +112,9 @@ public class ClusterMaster implements Member {
                                          FailoverMessage.PREPARE));
     }
 
-    public boolean primaryOpened(UUID channel, long timeout, TimeUnit unit)
-                                                                           throws InterruptedException {
-        switchboard.ringCast(new Message(switchboard.getId(),
-                                         ChannelMessage.PRIMARY_OPENED,
-                                         new Serializable[] { channel }));
-        return acquire(timeout, unit).get();
-    }
-
     public boolean bootstrapSpindles(Node[] spindles, long timeout,
-                                     TimeUnit unit)
-                                                   throws InterruptedException {
-        switchboard.ringCast(new Message(
-                                         switchboard.getId(),
+                                     TimeUnit unit) throws InterruptedException {
+        switchboard.ringCast(new Message(switchboard.getId(),
                                          BootstrapMessage.BOOTSTRAP_SPINDLES,
                                          (Serializable) spindles));
         return acquire(timeout, unit).get();
@@ -138,4 +138,16 @@ public class ClusterMaster implements Member {
         return acquired;
     }
 
+    @PostConstruct
+    public void openChannel() throws UnknownHostException, IOException {
+        socket = new ServerSocket(FakeSpindle.PORT, 100,
+                                  InetAddress.getByName("127.0.01"));
+    }
+
+    @PreDestroy
+    public void closeChannel() throws IOException {
+        if (socket != null) {
+            socket.close();
+        }
+    }
 }

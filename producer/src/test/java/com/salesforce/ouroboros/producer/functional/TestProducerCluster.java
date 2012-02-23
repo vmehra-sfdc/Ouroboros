@@ -273,11 +273,6 @@ public class TestProducerCluster {
         for (UUID channel : channels) {
             assertTrue("Channel OPEN message not received",
                        clusterMaster.open(channel, 60, TimeUnit.SECONDS));
-            assertTrue("Channel OPEN_PRIMARY message not received",
-                       clusterMaster.primaryOpened(channel, 60,
-                                                   TimeUnit.SECONDS));
-            assertTrue("Channel OPEN_MIRROR message not received",
-                       clusterMaster.mirrorOpened(channel, 60, TimeUnit.SECONDS));
         }
 
         assertChannelMappings(channels, producers, ring);
@@ -577,12 +572,28 @@ public class TestProducerCluster {
                                 producer.isActingMirrorFor(channel));
                 } else {
                     if (mirror.equals(producer.getId())) {
-                        assertTrue(String.format("%s should be the mirror for %s, but doesn't host it",
-                                                 mirror, channel),
-                                   producer.isActingMirrorFor(channel));
-                        assertFalse(String.format("%s should be the mirror for %s, but is primary",
-                                                  mirror, channel),
-                                    producer.isActingPrimaryFor(channel));
+                        boolean failed = true;
+                        for (Producer p : producers) {
+                            if (p.getId().equals(primary)) {
+                                failed = false;
+                                break;
+                            }
+                        }
+                        if (failed) {
+                            assertTrue(String.format("%s should be the fail over primary for %s",
+                                                     mirror, channel),
+                                       producer.isActingPrimaryFor(channel));
+                            assertFalse(String.format("%s should not be the mirror for %s",
+                                                      mirror, channel),
+                                        producer.isActingMirrorFor(channel));
+                        } else {
+                            assertTrue(String.format("%s should be the mirror for %s, but doesn't host it",
+                                                     mirror, channel),
+                                       producer.isActingMirrorFor(channel));
+                            assertFalse(String.format("%s should be the mirror for %s, but is primary",
+                                                      mirror, channel),
+                                        producer.isActingPrimaryFor(channel));
+                        }
                     } else {
                         assertFalse(String.format("%s claims to host %s as primary, but isn't marked as primary or mirror",
                                                   producer.getId(), channel),

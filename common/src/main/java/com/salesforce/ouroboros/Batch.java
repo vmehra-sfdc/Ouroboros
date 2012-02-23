@@ -115,4 +115,11 @@ public class Batch extends BatchIdentity {
         header.rewind();
         batch.rewind();
     }
+
+    /**
+     * @param node
+     */
+    public void resetMirror(Node node) {
+        header.resetMirror(node);
+    }
 }

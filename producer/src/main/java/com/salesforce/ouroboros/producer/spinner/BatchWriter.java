@@ -146,9 +146,6 @@ public class BatchWriter {
         pending.put(events, events);
         if (!queued.offer(events)) {
             pending.remove(events);
-            System.out.println(String.format("**** Queue size exceeded %s %s",
-                                             fsm.getState(),
-                                             quantum.availablePermits()));
             throw new RateLimiteExceededException();
         }
     }

@@ -28,7 +28,6 @@ package com.salesforce.ouroboros.producer;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -572,7 +571,7 @@ public class ProducerCoordinator implements Member {
     }
 
     protected void rebalance() {
-        rebalance(producer.remap(), switchboard.getDeadMembers());
+        rebalance(producer.remap());
     }
 
     /**
@@ -580,18 +579,14 @@ public class ProducerCoordinator implements Member {
      * 
      * @param remapped
      *            - the mapping of channels to their new primary/mirror pairs
-     * @param deadMembers
-     *            - the producer nodes that have failed and are no longer part
-     *            of the partition
      */
-    protected void rebalance(Map<UUID, Node[][]> remappping,
-                             Collection<Node> deadMembers) {
+    protected void rebalance(Map<UUID, Node[][]> remappping) {
         HashMap<Node, List<UpdateState>> remapped = new HashMap<Node, List<UpdateState>>();
         for (Entry<UUID, Node[][]> entry : remappping.entrySet()) {
             producer.rebalance(remapped, entry.getKey(),
                                entry.getValue()[0][0], entry.getValue()[0][1],
                                entry.getValue()[1][0], entry.getValue()[1][1],
-                               deadMembers);
+                               activeProducers);
         }
 
         for (Map.Entry<Node, List<Producer.UpdateState>> entry : remapped.entrySet()) {

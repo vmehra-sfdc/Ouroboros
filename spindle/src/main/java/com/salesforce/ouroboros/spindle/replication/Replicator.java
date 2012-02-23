@@ -93,6 +93,8 @@ public class Replicator implements CommunicationsHandler {
         appender = new ReplicatingAppender(bundle);
         this.partner = partner;
         this.rendezvous = rendezvous;
+        duplicator.setFsmName(String.format("%s>%s", bundle.getId().processId,
+                                            partner.processId));
     }
 
     @Override
@@ -257,6 +259,8 @@ public class Replicator implements CommunicationsHandler {
                                     bundle.getId(), partner));
         }
         bundle.map(partner, this);
+        duplicator.setFsmName(String.format("%s>%s", bundle.getId().processId,
+                                            partner.processId));
         return true;
     }
 

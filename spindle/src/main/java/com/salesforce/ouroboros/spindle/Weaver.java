@@ -300,15 +300,17 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
             UUID channelId = entry.getKey();
             EventChannel channel = entry.getValue();
-            Node[] pair = getReplicationPair(channelId);
-            if (!self.equals(pair[0]) && deadMembers.contains(pair[0])
-                && channel != null) {
+            if (channel.isPrimary()
+                && deadMembers.contains(channel.getPartnerId())) {
+                channel.failMirror();
+            } else if (deadMembers.contains(channel.getPartnerId())) {
                 assert channel.isMirror() : String.format("%s thinks it is the primary for % when it should be the mirror",
                                                           self, channel.getId());
                 // This node is now the primary for the channel, xerox state to the new mirror
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("%s assuming primary role for: %s, old primary: %s",
-                                           self, channelId, pair[0]));
+                                           self, channelId,
+                                           channel.getPartnerId()));
                 }
                 channel.failOver();
             }
@@ -477,13 +479,13 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     public void rebalance(Map<Node, Xerox> xeroxes, UUID channel,
                           Node originalPrimary, Node originalMirror,
                           Node remappedPrimary, Node remappedMirror,
-                          Collection<Node> deadMembers) {
+                          Collection<Node> activeMembers) {
         EventChannel eventChannel = channels.get(channel);
         assert eventChannel != null : String.format("The event channel to rebalance does not exist: %s",
                                                     channel);
         if (self.equals(originalPrimary)) {
             // self is the primary
-            if (deadMembers.contains(originalMirror)) {
+            if (!activeMembers.contains(originalMirror)) {
                 // mirror is down
                 if (self.equals(remappedPrimary)) {
                     // if self is still the primary
@@ -494,7 +496,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                 } else if (self.equals(remappedMirror)) {
                     // Self becomes the new mirror
                     infoLog("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
-                            eventChannel.getId(), self);
+                            eventChannel.getId(), self, remappedPrimary);
                     eventChannel.rebalanceAsMirror();
                     xeroxTo(eventChannel, remappedPrimary, xeroxes);
                 } else {
@@ -515,7 +517,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                     eventChannel.rebalanceAsMirror();
                 }
             }
-        } else if (deadMembers.contains(originalPrimary)) {
+        } else if (!activeMembers.contains(originalPrimary)) {
             assert self.equals(originalMirror);
             // self is the secondary
             // primary is down
