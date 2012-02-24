@@ -475,7 +475,7 @@ public class ProducerWeaverClusterTest {
         }
 
         int targetCount = BATCH_COUNT * 20;
-        for (Source source : majorSources) {
+        for (Source source : sources) {
             source.publish(BATCH_SIZE, executor, latch, targetCount);
         }
 
@@ -488,7 +488,7 @@ public class ProducerWeaverClusterTest {
                                                                  producerRing);
         lostChannels.addAll(filterChannelsByWeavers(lostChannels, weaverRing));
 
-        final Long target = Long.valueOf(targetCount - 1);
+        final Long target = Long.valueOf(targetCount);
         for (UUID channel : channels) {
             final UUID c = channel;
             final List<Producer> pair = producerRing.hash(point(channel), 2);
