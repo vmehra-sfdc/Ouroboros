@@ -450,7 +450,7 @@ public class ProducerWeaverClusterTest {
         }
     }
 
-    // @Test
+    @Test
     public void testPublishingDuringPartition() throws Exception {
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
@@ -508,7 +508,8 @@ public class ProducerWeaverClusterTest {
         for (Source source : majorSources) {
             if (!source.failedChannels.isEmpty()) {
                 for (UUID channel : source.failedChannels) {
-                    assertTrue(lostChannels.contains(channel));
+                    assertTrue("Faile to publish on " + channel,
+                               lostChannels.contains(channel));
                 }
             }
         }

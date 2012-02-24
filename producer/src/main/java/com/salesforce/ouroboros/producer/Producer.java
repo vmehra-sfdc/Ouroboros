@@ -385,10 +385,11 @@ public class Producer implements Comparable<Producer> {
             }
             Node[] pair = entry.getValue().getOldWeaverMapping();
             if (deadMembers.contains(pair[0])) {
-                Spinner newPrimary = spinners.get(entry.getKey());
+                Spinner newPrimary = spinners.get(pair[1]);
                 if (newPrimary == null) {
                     if (log.isLoggable(Level.WARNING)) {
-                        log.warning(String.format("Both the primary and the secondary channelbuffers for %s have failed on %s",
+                        log.warning(String.format("Both the primary %s and the secondary %s channelbuffers for %s have failed on %s",
+                                                  pair[0], pair[1],
                                                   entry.getKey(), self));
                     }
                     deadChannels.add(entry.getKey());
