@@ -83,6 +83,7 @@ public class TestSpinnerSpindle {
         segmentFile.deleteOnExit();
         EventChannel eventChannel = mock(EventChannel.class);
         Segment segment = new Segment(segmentFile);
+        segment.open();
         final Bundle bundle = mock(Bundle.class);
         Node toNode = new Node(0);
         when(bundle.getId()).thenReturn(toNode);

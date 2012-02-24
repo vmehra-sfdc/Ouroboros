@@ -28,9 +28,11 @@ package com.salesforce.ouroboros.spindle;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentMap;
 
 import org.junit.After;
 import org.junit.Before;
@@ -77,9 +79,12 @@ public class TestEventChannel {
         Node secondary = new Node(1);
         UUID channel = UUID.randomUUID();
         int timestamp = 0;
+        @SuppressWarnings("unchecked")
+        ConcurrentMap<File, Segment> segmentCache = mock(ConcurrentMap.class);
         EventChannel eventChannel = new EventChannel(Role.PRIMARY, secondary,
                                                      channel, root,
-                                                     maxSegmentSize, null);
+                                                     maxSegmentSize, null,
+                                                     segmentCache);
         long offset = 0;
         BatchHeader batchHeader;
         AppendSegment logicalSegment;

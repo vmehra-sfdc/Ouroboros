@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +55,7 @@ import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
+import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
@@ -160,6 +162,9 @@ public class TestTransfer {
         Rendezvous rendezvous = mock(Rendezvous.class);
         final Bundle primaryBundle = mock(Bundle.class);
         final Bundle mirrorBundle = mock(Bundle.class);
+
+        @SuppressWarnings("unchecked")
+        ConcurrentMap<File, Segment> segmentCache = mock(ConcurrentMap.class);
         when(primaryBundle.getId()).thenReturn(primaryNode);
         when(mirrorBundle.getId()).thenReturn(mirrorNode);
 
@@ -170,11 +175,12 @@ public class TestTransfer {
         primaryEventChannel = new EventChannel(Role.PRIMARY, mirrorNode,
                                                channelId, primaryRoot,
                                                maxSegmentSize,
-                                               primaryReplicator);
+                                               primaryReplicator, segmentCache);
 
         mirrorEventChannel = new EventChannel(Role.MIRROR, primaryNode,
                                               channelId, mirrorRoot,
-                                              maxSegmentSize, null);
+                                              maxSegmentSize, null,
+                                              segmentCache);
 
         when(primaryBundle.eventChannelFor(channelId)).thenReturn(primaryEventChannel);
         when(mirrorBundle.eventChannelFor(channelId)).thenReturn(mirrorEventChannel);
@@ -226,11 +232,13 @@ public class TestTransfer {
                                                    mirrorSinkNode, channelId,
                                                    primarySinkRoot,
                                                    maxSegmentSize,
-                                                   primaryReplicator);
+                                                   primaryReplicator,
+                                                   segmentCache);
 
         mirrorSinkEventChannel = new EventChannel(Role.MIRROR, primarySinkNode,
                                                   channelId, mirrorSinkRoot,
-                                                  maxSegmentSize, null);
+                                                  maxSegmentSize, null,
+                                                  segmentCache);
 
         when(primarySinkBundle.xeroxEventChannel(channelId)).thenReturn(primarySinkEventChannel);
         when(mirrorSinkBundle.xeroxEventChannel(channelId)).thenReturn(mirrorSinkEventChannel);

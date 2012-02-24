@@ -86,17 +86,6 @@ public class Sink implements CommunicationsHandler {
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Closing %s", bundle.getId()));
         }
-        if (current != null) {
-            try {
-                current.close();
-            } catch (IOException e) {
-                if (log.isLoggable(Level.FINEST)) {
-                    log.log(Level.FINEST,
-                            String.format("Error copying segment %s on %s",
-                                          current, bundle.getId()), e);
-                }
-            }
-        }
         channel = null;
     }
 
@@ -159,17 +148,6 @@ public class Sink implements CommunicationsHandler {
                                     bundle.getId()));
         }
         if (bytesWritten == segmentSize) {
-            try {
-                current.close();
-            } catch (IOException e) {
-                error = true;
-                if (log.isLoggable(Level.WARNING)) {
-                    log.log(Level.WARNING,
-                            String.format("Error closing segment %s on %s",
-                                          current, bundle.getId()), e);
-                }
-                return false;
-            }
             segmentCount--;
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Sink segment %s copy finished on %s",
@@ -324,7 +302,15 @@ public class Sink implements CommunicationsHandler {
                 return false;
             }
             long offset = buffer.getLong();
-            current = channel.segmentFor(offset).segment;
+            try {
+                current = channel.segmentFor(offset).segment;
+            } catch (IOException e) {
+                log.log(Level.WARNING,
+                        String.format("Cannot retrieve segment, shutting down sink %s",
+                                      fsm.getName()), e);
+                error = true;
+                return false;
+            }
             if (current == null) {
                 error = true;
                 if (log.isLoggable(Level.WARNING)) {

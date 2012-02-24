@@ -90,6 +90,7 @@ public class Source implements EventSource {
                                                              channel, channel).getBytes()));
                 }
                 boolean published = false;
+                int i = 0;
                 while (!published && channels.containsKey(channel)) {
                     try {
                         try {
@@ -104,8 +105,13 @@ public class Source implements EventSource {
                     } catch (RateLimiteExceededException e) {
                         log.info(String.format("Rate limit exceeded for %s on %s",
                                                channel, producer.getId()));
+                        if (i > 10) {
+                            log.info(String.format("Giving up on sending event to %s on %s",
+                                                   channel, producer.getId()));
+                            return;
+                        }
                         try {
-                            Thread.sleep(100);
+                            Thread.sleep(100 * i++);
                         } catch (InterruptedException e1) {
                             return;
                         }

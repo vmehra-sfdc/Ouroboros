@@ -75,6 +75,9 @@ abstract public class AbstractAppender {
         handler.close();
     }
 
+    public void closing() {
+    }
+
     public AbstractAppenderState getState() {
         return fsm.getState();
     }
@@ -137,7 +140,16 @@ abstract public class AbstractAppender {
             fsm.close();
             return;
         }
-        AppendSegment logicalSegment = getLogicalSegment();
+        AppendSegment logicalSegment;
+        try {
+            logicalSegment = getLogicalSegment();
+        } catch (IOException e) {
+            getLogger().log(Level.WARNING,
+                            String.format("Cannot retrieve segment, shutting down appender %s",
+                                          fsm.getName()), e);
+            error();
+            return;
+        }
         segment = logicalSegment.segment;
         offset = logicalSegment.offset;
         position = logicalSegment.position;
@@ -146,15 +158,6 @@ abstract public class AbstractAppender {
         if (eventChannel.isDuplicate(batchHeader)) {
             getLogger().warning(String.format("Duplicate event batch %s received on %s",
                                               batchHeader, fsm.getName()));
-            try {
-                segment.close();
-            } catch (IOException e) {
-                if (getLogger().isLoggable(Level.WARNING)) {
-                    getLogger().log(Level.WARNING,
-                                    String.format("Unable to close segment %s on %s",
-                                                  segment, fsm.getName()), e);
-                }
-            }
             fsm.drain();
             return;
         }
@@ -226,14 +229,6 @@ abstract public class AbstractAppender {
 
     protected void error() {
         inError = true;
-        if (segment != null) {
-            try {
-                segment.close();
-            } catch (IOException e) {
-                getLogger().finest(String.format("Error closing segment %s on %s",
-                                                 segment, fsm.getName()));
-            }
-        }
         segment = null;
         eventChannel = null;
         devNull = null;
@@ -241,7 +236,7 @@ abstract public class AbstractAppender {
 
     abstract protected Logger getLogger();
 
-    abstract protected AppendSegment getLogicalSegment();
+    abstract protected AppendSegment getLogicalSegment() throws IOException;
 
     protected boolean inError() {
         return inError;

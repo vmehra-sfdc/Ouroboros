@@ -61,7 +61,7 @@ public class Spindle implements CommunicationsHandler {
 
     public Spindle(Bundle bundle) {
         fsm.setName(String.format("?>%s", bundle.getId().processId));
-        acknowledger = new Acknowledger();
+        acknowledger = new Acknowledger(bundle);
         appender = new Appender(bundle, acknowledger);
         this.bundle = bundle;
     }
@@ -80,6 +80,8 @@ public class Spindle implements CommunicationsHandler {
 
     @Override
     public void closing() {
+        acknowledger.closing();
+        appender.closing();
     }
 
     @Override
@@ -126,6 +128,7 @@ public class Spindle implements CommunicationsHandler {
         appender.setFsmName(fsmName);
         acknowledger.setFsmName(String.format("%s<%s", producer.processId,
                                               bundle.getId().processId));
+        acknowledger.setProducer(producer);
         bundle.map(producer, acknowledger);
         if (log.isLoggable(Level.INFO)) {
             log.info(String.format("Established on %s for %s", bundle.getId(),

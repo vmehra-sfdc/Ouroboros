@@ -74,6 +74,7 @@ public class TestAppender {
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
+        writeSegment.open();
         final Appender appender = new Appender(bundle, acknowledger);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);

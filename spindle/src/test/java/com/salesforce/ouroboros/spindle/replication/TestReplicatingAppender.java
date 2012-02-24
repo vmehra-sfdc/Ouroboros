@@ -64,6 +64,7 @@ public class TestReplicatingAppender {
         File tmpFile = File.createTempFile("inbound-replication", ".tst");
         tmpFile.deleteOnExit();
         Segment segment = new Segment(tmpFile);
+        segment.open();
         Acknowledger acknowledger = mock(Acknowledger.class);
 
         int magic = BatchHeader.MAGIC;
@@ -141,6 +142,7 @@ public class TestReplicatingAppender {
         assertEquals(AbstractAppenderFSM.Ready, replicator.getState());
 
         segment = new Segment(tmpFile);
+        segment.open();
         Event replicatedEvent = new Event(segment);
         assertEquals(event.size(), replicatedEvent.size());
         assertEquals(event.getMagic(), replicatedEvent.getMagic());

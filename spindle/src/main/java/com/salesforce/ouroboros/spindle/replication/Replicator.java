@@ -113,9 +113,8 @@ public class Replicator implements CommunicationsHandler {
     @Override
     public void closing() {
         duplicator.closing();
-        if (partner != null) {
-            bundle.closeReplicator(partner);
-        }
+        appender.closing();
+        bundle.closeReplicator(partner);
     }
 
     public void connect(Map<Node, ContactInformation> yellowPages,

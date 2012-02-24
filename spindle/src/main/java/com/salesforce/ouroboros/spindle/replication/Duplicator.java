@@ -28,6 +28,7 @@ package com.salesforce.ouroboros.spindle.replication;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -55,6 +56,7 @@ public final class Duplicator {
     private long                    position;
     private int                     remaining;
     private final Node              thisNode;
+    private AtomicBoolean           closed  = new AtomicBoolean();
 
     public Duplicator(Node node) {
         thisNode = node;
@@ -75,11 +77,15 @@ public final class Duplicator {
      * Replicate the event to the mirror
      */
     public void replicate(EventEntry event) {
-        if (log.isLoggable(Level.FINE)) {
-            log.fine(String.format("Replicating event %s on %s", event,
-                                   fsm.getName()));
+        if (closed.get()) {
+            event.handler.selectForRead();
+        } else {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine(String.format("Replicating event %s on %s", event,
+                                       fsm.getName()));
+            }
+            fsm.replicate(event);
         }
-        fsm.replicate(event);
     }
 
     public void writeReady() {
@@ -104,14 +110,9 @@ public final class Duplicator {
     }
 
     public void closing() {
+        closed.set(true);
         if (current != null) {
             current.handler.selectForRead();
-            try {
-                current.segment.close();
-            } catch (IOException e1) {
-                log.log(Level.FINEST, String.format("Error closing segment %s",
-                                                    current.segment), e1);
-            }
         }
         for (EventEntry entry : pending) {
             entry.handler.selectForRead();
@@ -141,9 +142,9 @@ public final class Duplicator {
 
     protected void processHeader() {
         current = pending.remove();
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Processing %s on %s", current.header,
-                                    fsm.getName()));
+        if (log.isLoggable(Level.FINEST)) {
+            log.finest(String.format("Processing %s on %s", current.header,
+                                     fsm.getName()));
         }
         current.handler.selectForRead();
         remaining = current.header.getBatchByteLength();
@@ -174,7 +175,6 @@ public final class Duplicator {
                 }
                 current.acknowledger.acknowledge(current.header.getChannel(),
                                                  current.header.getTimestamp());
-                current.segment.close();
                 current = null;
                 return true;
             }

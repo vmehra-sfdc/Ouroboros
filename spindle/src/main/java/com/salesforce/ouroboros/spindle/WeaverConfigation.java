@@ -68,8 +68,11 @@ public class WeaverConfigation {
     private static final String       XEROX                          = "xerox";
 
     private Node                      id;
+    private int                       initialSegmentCapacity         = 16;
+    private int                       maximumSegmentCapacity         = 4096;
     private long                      maxSegmentSize                 = DEFAULT_MAX_SEGMENTSIZE;
     private int                       numberOfReplicas               = 200;
+    private int                       numberOfRootReplicas           = 200;
     private long                      partitionTimeout               = DEFAULT_PARTITION_TIMEOUT;
     private TimeUnit                  partitionTimeoutUnit           = DEFAULT_PARTITION_TIMEOUT_UNIT;
     private InetSocketAddress         replicationAddress             = new InetSocketAddress(
@@ -80,53 +83,23 @@ public class WeaverConfigation {
     private ExecutorService           replicators                    = Executors.newCachedThreadPool(new LabeledThreadFactory(
                                                                                                                               REPLICATOR));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
-    private SkipStrategy<Node>        skipStrategy                   = new DefaultSkipStrategy();
     private SkipStrategy<File>        rootSkipStrategy               = new NoSkipStrategy<File>();
-    private int                       numberOfRootReplicas           = 200;
+    private int                       segmentConcurrencyLevel        = 16;
+    private SkipStrategy<Node>        skipStrategy                   = new DefaultSkipStrategy();
+    private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
+                                                                                             "127.0.0.1",
+                                                                                             0);
+    private ExecutorService           spindles                       = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                              SPINDLE));
 
-    /**
-     * @return the rootSkipStrategy
-     */
-    public SkipStrategy<File> getRootSkipStrategy() {
-        return rootSkipStrategy;
-    }
-
-    /**
-     * @param rootSkipStrategy
-     *            the rootSkipStrategy to set
-     */
-    public void setRootSkipStrategy(SkipStrategy<File> rootSkipStrategy) {
-        this.rootSkipStrategy = rootSkipStrategy;
-    }
-
-    /**
-     * @return the numberOfRootReplicas
-     */
-    public int getNumberOfRootReplicas() {
-        return numberOfRootReplicas;
-    }
-
-    /**
-     * @param numberOfRootReplicas
-     *            the numberOfRootReplicas to set
-     */
-    public void setNumberOfRootReplicas(int numberOfRootReplicas) {
-        this.numberOfRootReplicas = numberOfRootReplicas;
-    }
-
-    private InetSocketAddress   spindleAddress       = new InetSocketAddress(
-                                                                             "127.0.0.1",
-                                                                             0);
-    private ExecutorService     spindles             = Executors.newCachedThreadPool(new LabeledThreadFactory(
-                                                                                                              SPINDLE));
-    private final SocketOptions spindleSocketOptions = new SocketOptions();
-    private String              stateName            = DEFAULT_STATE_NAME;
-    private InetSocketAddress   xeroxAddress         = new InetSocketAddress(
-                                                                             "127.0.0.1",
-                                                                             0);
-    private ExecutorService     xeroxes              = Executors.newCachedThreadPool(new LabeledThreadFactory(
-                                                                                                              XEROX));
-    private final SocketOptions xeroxSocketOptions   = new SocketOptions();
+    private final SocketOptions       spindleSocketOptions           = new SocketOptions();
+    private String                    stateName                      = DEFAULT_STATE_NAME;
+    private InetSocketAddress         xeroxAddress                   = new InetSocketAddress(
+                                                                                             "127.0.0.1",
+                                                                                             0);
+    private ExecutorService           xeroxes                        = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                              XEROX));
+    private final SocketOptions       xeroxSocketOptions             = new SocketOptions();
 
     public void addRoot(File directory) {
         addRoot(directory, 1);
@@ -144,6 +117,20 @@ public class WeaverConfigation {
     }
 
     /**
+     * @return the initialSegmentCapacity
+     */
+    public int getInitialSegmentCapacity() {
+        return initialSegmentCapacity;
+    }
+
+    /**
+     * @return the maximumSegmentCapacity
+     */
+    public int getMaximumSegmentCapacity() {
+        return maximumSegmentCapacity;
+    }
+
+    /**
      * @return the maxSegmentSize
      */
     public long getMaxSegmentSize() {
@@ -155,6 +142,13 @@ public class WeaverConfigation {
      */
     public int getNumberOfReplicas() {
         return numberOfReplicas;
+    }
+
+    /**
+     * @return the numberOfRootReplicas
+     */
+    public int getNumberOfRootReplicas() {
+        return numberOfRootReplicas;
     }
 
     /**
@@ -204,6 +198,20 @@ public class WeaverConfigation {
      */
     public List<RootDirectory> getRoots() {
         return roots;
+    }
+
+    /**
+     * @return the rootSkipStrategy
+     */
+    public SkipStrategy<File> getRootSkipStrategy() {
+        return rootSkipStrategy;
+    }
+
+    /**
+     * @return the segmentConcurrencyLevel
+     */
+    public int getSegmentConcurrencyLevel() {
+        return segmentConcurrencyLevel;
     }
 
     /**
@@ -271,6 +279,22 @@ public class WeaverConfigation {
     }
 
     /**
+     * @param initialSegmentCapacity
+     *            the initialSegmentCapacity to set
+     */
+    public void setInitialSegmentCapacity(int initialSegmentCapacity) {
+        this.initialSegmentCapacity = initialSegmentCapacity;
+    }
+
+    /**
+     * @param maximumSegmentCapacity
+     *            the maximumSegmentCapacity to set
+     */
+    public void setMaximumSegmentCapacity(int maximumSegmentCapacity) {
+        this.maximumSegmentCapacity = maximumSegmentCapacity;
+    }
+
+    /**
      * @param maxSegmentSize
      *            the maxSegmentSize to set
      */
@@ -284,6 +308,14 @@ public class WeaverConfigation {
      */
     public void setNumberOfReplicas(int numberOfReplicas) {
         this.numberOfReplicas = numberOfReplicas;
+    }
+
+    /**
+     * @param numberOfRootReplicas
+     *            the numberOfRootReplicas to set
+     */
+    public void setNumberOfRootReplicas(int numberOfRootReplicas) {
+        this.numberOfRootReplicas = numberOfRootReplicas;
     }
 
     /**
@@ -324,6 +356,22 @@ public class WeaverConfigation {
      */
     public void setReplicators(ExecutorService replicators) {
         this.replicators = replicators;
+    }
+
+    /**
+     * @param rootSkipStrategy
+     *            the rootSkipStrategy to set
+     */
+    public void setRootSkipStrategy(SkipStrategy<File> rootSkipStrategy) {
+        this.rootSkipStrategy = rootSkipStrategy;
+    }
+
+    /**
+     * @param segmentConcurrencyLevel
+     *            the segmentConcurrencyLevel to set
+     */
+    public void setSegmentConcurrencyLevel(int segmentConcurrencyLevel) {
+        this.segmentConcurrencyLevel = segmentConcurrencyLevel;
     }
 
     /**

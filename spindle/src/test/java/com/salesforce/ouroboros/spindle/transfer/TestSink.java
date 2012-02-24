@@ -294,11 +294,13 @@ public class TestSink {
         inboundTmpFile1.delete();
         inboundTmpFile1.deleteOnExit();
         Segment inboundSegment1 = new Segment(inboundTmpFile1);
+        inboundSegment1.open();
 
         File inboundTmpFile2 = File.createTempFile("sink2", ".tst");
         inboundTmpFile2.delete();
         inboundTmpFile2.deleteOnExit();
         Segment inboundSegment2 = new Segment(inboundTmpFile2);
+        inboundSegment2.open();
 
         EventChannel outboundEventChannel = mock(EventChannel.class);
         SocketChannelHandler outboundHandler = mock(SocketChannelHandler.class);
@@ -308,12 +310,14 @@ public class TestSink {
         tmpOutboundFile1.delete();
         tmpOutboundFile1.deleteOnExit();
         Segment outboundSegment1 = new Segment(tmpOutboundFile1);
+        outboundSegment1.open();
 
         File tmpOutboundFile2 = new File(Long.toHexString(prefix2)
                                          + EventChannel.SEGMENT_SUFFIX);
         tmpOutboundFile2.delete();
         tmpOutboundFile2.deleteOnExit();
         Segment outboundSegment2 = new Segment(tmpOutboundFile2);
+        outboundSegment2.open();
         LinkedList<Segment> segments = new LinkedList<Segment>(
                                                                Arrays.asList(outboundSegment1,
                                                                              outboundSegment2));
@@ -425,7 +429,9 @@ public class TestSink {
         inboundSegment2.close();
 
         inboundSegment1 = new Segment(inboundTmpFile1);
+        inboundSegment1.open();
         inboundSegment2 = new Segment(inboundTmpFile2);
+        inboundSegment2.open();
 
         Event testEvent = new Event(inboundSegment1);
         assertEquals(event1.getCrc32(), testEvent.getCrc32());

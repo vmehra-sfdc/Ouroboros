@@ -57,14 +57,12 @@ import java.nio.channels.WritableByteChannel;
 public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         GatheringByteChannel, ScatteringByteChannel, Cloneable {
 
-    private final FileChannel      channel;
+    private FileChannel      channel;
     private final File             file;
-    private final RandomAccessFile raf;
+    private RandomAccessFile raf;
 
     public Segment(File file) throws FileNotFoundException {
         this.file = file;
-        raf = new RandomAccessFile(file, "rw");
-        channel = raf.getChannel();
     }
 
     /**
@@ -359,5 +357,14 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     public long write(ByteBuffer[] paramArrayOfByteBuffer, int paramInt1,
                       int paramInt2) throws IOException {
         return channel.write(paramArrayOfByteBuffer, paramInt1, paramInt2);
+    }
+
+    /**
+     * @throws FileNotFoundException 
+     * 
+     */
+    public void open() throws FileNotFoundException {
+        raf = new RandomAccessFile(file, "rw");
+        channel = raf.getChannel();
     }
 }

@@ -36,6 +36,8 @@ import java.util.logging.Logger;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
+import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.source.AcknowledgerContext.AcknowledgerState;
 import com.salesforce.ouroboros.util.Utils;
 
@@ -46,13 +48,19 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class Acknowledger {
 
-    static final Logger               log     = Logger.getLogger(Acknowledger.class.getCanonicalName());
+    static final Logger                log     = Logger.getLogger(Acknowledger.class.getCanonicalName());
 
-    private ByteBuffer                buffer;
-    private final AcknowledgerContext fsm     = new AcknowledgerContext(this);
-    private SocketChannelHandler      handler;
-    private boolean                   inError;
-    final Queue<BatchIdentity>        pending = new LinkedList<BatchIdentity>();
+    private ByteBuffer                 buffer;
+    private final AcknowledgerContext  fsm     = new AcknowledgerContext(this);
+    private SocketChannelHandler       handler;
+    private boolean                    inError;
+    private final Queue<BatchIdentity> pending = new LinkedList<BatchIdentity>();
+    private final Bundle               bundle;
+    private Node                       producer;
+
+    public Acknowledger(Bundle bundle) {
+        this.bundle = bundle;
+    }
 
     /**
      * Replicate the event to the mirror
@@ -68,7 +76,11 @@ public class Acknowledger {
 
     public void close() {
         handler.close();
+    }
+
+    public void closing() {
         pending.clear();
+        bundle.closeAcknowledger(producer);
     }
 
     public void connect(SocketChannelHandler handler) {
@@ -155,5 +167,12 @@ public class Acknowledger {
 
     protected boolean hasPending() {
         return !pending.isEmpty();
+    }
+
+    /**
+     * @param producer
+     */
+    public void setProducer(Node producer) {
+        this.producer = producer;
     }
 }

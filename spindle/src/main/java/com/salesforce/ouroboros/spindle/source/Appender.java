@@ -84,7 +84,7 @@ public class Appender extends AbstractAppender {
     }
 
     @Override
-    protected AppendSegment getLogicalSegment() {
+    protected AppendSegment getLogicalSegment() throws IOException {
         return eventChannel.segmentFor(batchHeader);
     }
 

@@ -137,9 +137,10 @@ public class Producer implements Comparable<Producer> {
         Spinner spinner;
 
         public PrimaryState(Node[] producerPair, long timestamp,
-                            Spinner spinner, Node[] weaverPair) {
+                            Spinner spinner, Node[] weaverPair, boolean failover) {
             super(producerPair, timestamp, weaverPair);
             this.spinner = spinner;
+            this.failedOver = failover;
         }
 
         public void failedOver() {
@@ -231,7 +232,12 @@ public class Producer implements Comparable<Producer> {
         if (mirrorState != null) {
             mirrorState.timestamp = ack.timestamp;
         } else {
-            log.info(String.format("null mirror state for %s on %s", ack, self));
+            PrimaryState primaryState = channelState.get(ack.channel);
+            log.info(String.format("null mirror state for %s on %s, channel state mirror: %s",
+                                   ack,
+                                   self,
+                                   primaryState == null ? "primary state is null"
+                                                       : primaryState.getMirrorProducer()));
         }
     }
 
@@ -276,7 +282,7 @@ public class Producer implements Comparable<Producer> {
                     log.info(String.format("%s assuming primary for %s", self,
                                            update));
                 }
-                mapSpinner(update.channel, producerPair);
+                mapSpinner(update.channel, producerPair, false);
             } else {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("%s assuming mirror for %s", self,
@@ -367,8 +373,7 @@ public class Producer implements Comparable<Producer> {
                 }
                 newPrimaries.put(channel, entry.getValue().timestamp);
                 mirrored.remove();
-                PrimaryState previous = mapSpinner(channel, new Node[] { self,
-                        NullNode.INSTANCE });
+                PrimaryState previous = mapSpinner(channel, producerPair, true);
                 assert previous == null : String.format("Apparently node %s is already primary for %s");
             }
         }
@@ -540,7 +545,7 @@ public class Producer implements Comparable<Producer> {
                                        channel, this));
             }
         } else {
-            mapSpinner(channel, pair);
+            mapSpinner(channel, pair, false);
             source.opened(channel);
             if (log.isLoggable(Level.INFO)) {
                 log.info(String.format("Channel %s opened on primary %s",
@@ -774,7 +779,8 @@ public class Producer implements Comparable<Producer> {
         }
     }
 
-    private PrimaryState mapSpinner(UUID channel, Node[] producerPair) {
+    private PrimaryState mapSpinner(UUID channel, Node[] producerPair,
+                                    boolean failover) {
         Node[] channelPair = getChannelBufferReplicationPair(channel);
         Spinner spinner = spinners.get(channelPair[0]);
         if (spinner == null) {
@@ -798,7 +804,8 @@ public class Producer implements Comparable<Producer> {
                 return channelState.putIfAbsent(channel,
                                                 new PrimaryState(producerPair,
                                                                  -1L, spinner,
-                                                                 channelPair));
+                                                                 channelPair,
+                                                                 failover));
             }
         } else {
             if (log.isLoggable(Level.INFO)) {
@@ -808,7 +815,8 @@ public class Producer implements Comparable<Producer> {
             return channelState.putIfAbsent(channel,
                                             new PrimaryState(producerPair, -1,
                                                              spinner,
-                                                             channelPair));
+                                                             channelPair,
+                                                             failover));
         }
     }
 

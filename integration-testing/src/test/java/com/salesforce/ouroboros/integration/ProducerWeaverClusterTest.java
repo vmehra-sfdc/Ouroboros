@@ -476,7 +476,7 @@ public class ProducerWeaverClusterTest {
         }
 
         int targetCount = BATCH_COUNT * 20;
-        for (Source source : sources) {
+        for (Source source : majorSources) {
             source.publish(targetCount, BATCH_SIZE, executor, latch, 0L);
         }
 

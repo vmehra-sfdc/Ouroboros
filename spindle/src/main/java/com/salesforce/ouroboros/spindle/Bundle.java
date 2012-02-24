@@ -94,4 +94,9 @@ public interface Bundle {
      * @param replicator
      */
     void map(Node partner, Replicator replicator);
+
+    /**
+     * @param to
+     */
+    void closeAcknowledger(Node to);
 }

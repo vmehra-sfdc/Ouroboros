@@ -112,6 +112,7 @@ public class TestDuplicator {
         File tmpFile = File.createTempFile("outbound-replication", ".tst");
         tmpFile.deleteOnExit();
         Segment segment = new Segment(tmpFile);
+        segment.open();
         Bundle bundle = mock(Bundle.class);
         Acknowledger acknowledger = mock(Acknowledger.class);
 
@@ -199,6 +200,7 @@ public class TestDuplicator {
         File inboundTmpFile = File.createTempFile("inbound-replication", ".tst");
         inboundTmpFile.deleteOnExit();
         Segment inboundSegment = new Segment(inboundTmpFile);
+        inboundSegment.open();
         EventChannel inboundEventChannel = mock(EventChannel.class);
         Bundle inboundBundle = mock(Bundle.class);
         when(inboundBundle.getId()).thenReturn(new Node(0));
@@ -212,6 +214,7 @@ public class TestDuplicator {
         File tmpOutboundFile = File.createTempFile("outbound", ".tst");
         tmpOutboundFile.deleteOnExit();
         Segment outboundSegment = new Segment(tmpOutboundFile);
+        outboundSegment.open();
 
         int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
@@ -308,6 +311,7 @@ public class TestDuplicator {
         outboundSegment.close();
 
         Segment segment = new Segment(inboundTmpFile);
+        segment.open();
         assertTrue("Nothing written to inbound segment", segment.size() > 0);
         Event replicatedEvent = new Event(segment);
         assertEquals(event.size(), replicatedEvent.size());

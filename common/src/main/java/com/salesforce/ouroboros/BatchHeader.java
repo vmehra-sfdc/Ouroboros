@@ -61,7 +61,7 @@ public class BatchHeader {
     private final ByteBuffer   bytes;
 
     public BatchHeader() {
-        bytes = ByteBuffer.allocate(getHeaderSize());
+        bytes = ByteBuffer.allocateDirect(getHeaderSize());
     }
 
     public BatchHeader(ByteBuffer b) {

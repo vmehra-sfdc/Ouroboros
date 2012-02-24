@@ -96,17 +96,6 @@ public class Xerox implements CommunicationsHandler {
 
     @Override
     public void closing() {
-        if (segments != null) {
-            for (Segment segment : segments) {
-                try {
-                    segment.close();
-                } catch (IOException e1) {
-                    log.log(Level.FINE,
-                            String.format("Error closing: %s on %s", segment,
-                                          idString()), e1);
-                }
-            }
-        }
     }
 
     @Override
@@ -165,16 +154,7 @@ public class Xerox implements CommunicationsHandler {
                                     currentSegment, written, position, from, to));
         }
         if (position == segmentSize) {
-            try {
-                currentSegment.close();
-                return true;
-            } catch (IOException e) {
-                log.log(Level.FINE, String.format("Error closing: %s on %s",
-                                                  currentSegment, idString()),
-                        e);
-                inError = true;
-                return false;
-            }
+            return true;
         }
         return false;
     }

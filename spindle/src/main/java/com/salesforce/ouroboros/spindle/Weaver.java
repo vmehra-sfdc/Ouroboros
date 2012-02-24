@@ -55,6 +55,9 @@ import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.spindle.transfer.Sink;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
+import com.salesforce.ouroboros.spindle.util.ConcurrentLinkedHashMap;
+import com.salesforce.ouroboros.spindle.util.EvictionListener;
+import com.salesforce.ouroboros.spindle.util.ConcurrentLinkedHashMap.Builder;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
 
@@ -88,28 +91,46 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         }
     }
 
-    private static final Logger                     log               = Logger.getLogger(Weaver.class.getCanonicalName());
-    private static final String                     WEAVER_REPLICATOR = "Weaver Replicator";
-    private static final String                     WEAVER_SPINDLE    = "Weaver Spindle";
-    private static final String                     WEAVER_XEROX      = "Weaver Xerox";
-    static final int                                HANDSHAKE_SIZE    = Node.BYTE_LENGTH + 4;
-    static final int                                MAGIC             = 0x1638;
+    private static final Logger                          log               = Logger.getLogger(Weaver.class.getCanonicalName());
+    private static final String                          WEAVER_REPLICATOR = "Weaver Replicator";
+    private static final String                          WEAVER_SPINDLE    = "Weaver Spindle";
+    private static final String                          WEAVER_XEROX      = "Weaver Xerox";
+    static final int                                     HANDSHAKE_SIZE    = Node.BYTE_LENGTH + 4;
+    static final int                                     MAGIC             = 0x1638;
 
-    private final ConcurrentMap<Node, Acknowledger> acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
-    private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
-    private final ContactInformation                contactInfo;
-    private final long                              maxSegmentSize;
-    private ConsistentHashFunction<Node>            nextRing;
-    private final ServerSocketChannelHandler        replicationHandler;
-    private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
-    private final ConsistentHashFunction<File>      roots;
-    private final Node                              self;
-    private final ServerSocketChannelHandler        spindleHandler;
-    private ConsistentHashFunction<Node>            weaverRing;
-    private final ServerSocketChannelHandler        xeroxHandler;
+    private final ConcurrentMap<Node, Acknowledger>      acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
+    private final ConcurrentMap<UUID, EventChannel>      channels          = new ConcurrentHashMap<UUID, EventChannel>();
+    private final ContactInformation                     contactInfo;
+    private final long                                   maxSegmentSize;
+    private ConsistentHashFunction<Node>                 nextRing;
+    private final ServerSocketChannelHandler             replicationHandler;
+    private final ConcurrentMap<Node, Replicator>        replicators       = new ConcurrentHashMap<Node, Replicator>();
+    private final ConsistentHashFunction<File>           roots;
+    private final ConcurrentLinkedHashMap<File, Segment> segmentCache;
+    private final Node                                   self;
+    private final ServerSocketChannelHandler             spindleHandler;
+    private ConsistentHashFunction<Node>                 weaverRing;
+    private final ServerSocketChannelHandler             xeroxHandler;
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
+        Builder<File, Segment> builder = new Builder<File, Segment>();
+        builder.initialCapacity(configuration.getInitialSegmentCapacity());
+        builder.concurrencyLevel(configuration.getSegmentConcurrencyLevel());
+        builder.maximumWeightedCapacity(configuration.getMaximumSegmentCapacity());
+        builder.listener(new EvictionListener<File, Segment>() {
+            @Override
+            public void onEviction(File file, Segment segment) {
+                try {
+                    segment.close();
+                } catch (IOException e) {
+                    log.log(Level.FINEST,
+                            String.format("Error closing %s" + segment), e);
+                }
+                log.fine(String.format("%s evicted on %s", segment, self));
+            }
+        });
+        segmentCache = builder.build();
         self = configuration.getId();
         roots = new ConsistentHashFunction<File>(
                                                  configuration.getRootSkipStrategy(),
@@ -167,6 +188,17 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         EventChannel eventChannel = channels.remove(channel);
         if (channel != null) {
             eventChannel.close(self);
+        }
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.Bundle#removeAcknowledger(com.salesforce.ouroboros.Node)
+     */
+    @Override
+    public void closeAcknowledger(Node producer) {
+        Acknowledger ack = acknowledgers.remove(producer);
+        if (ack != null) {
+            ack.close();
         }
     }
 
@@ -295,6 +327,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                 log.info(String.format("Removing %s from the partition on %s",
                                        node, self));
             }
+            closeAcknowledger(node);
             closeReplicator(node);
         }
         for (Entry<UUID, EventChannel> entry : channels.entrySet()) {
@@ -412,7 +445,8 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         }
         channels.put(channel, new EventChannel(Role.MIRROR, primary, channel,
                                                roots.hash(point(channel)),
-                                               maxSegmentSize, null));
+                                               maxSegmentSize, null,
+                                               segmentCache));
     }
 
     /**
@@ -438,7 +472,8 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         }
         channels.put(channel, new EventChannel(Role.PRIMARY, mirror, channel,
                                                roots.hash(point(channel)),
-                                               maxSegmentSize, replicator));
+                                               maxSegmentSize, replicator,
+                                               segmentCache));
     }
 
     /**
@@ -531,7 +566,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                 // Self becomes the new primary
                 infoLog("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
                         eventChannel.getId(), self, remappedMirror);
-                eventChannel.rebalanceAsPrimary();
+                eventChannel.rebalanceAsPrimary(replicators.get(remappedMirror));
                 xeroxTo(eventChannel, remappedMirror, xeroxes);
             } else {
                 // Xerox state to the new primary and mirror
@@ -604,21 +639,18 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         }
 
         List<Node> pair = nextRing.hash(point(channel), 2);
-        Role role;
         EventChannel ec;
         if (self.equals(pair.get(0))) {
-            role = Role.PRIMARY;
             Replicator replicator = replicators.get(pair.get(0));
             assert replicator == null : String.format("Replicator for %s is null on %s",
                                                       channel, self);
-            ec = new EventChannel(role, pair.get(1), channel,
+            ec = new EventChannel(Role.PRIMARY, pair.get(1), channel,
                                   roots.hash(point(channel)), maxSegmentSize,
-                                  replicator);
+                                  replicator, segmentCache);
         } else {
-            role = Role.MIRROR;
-            ec = new EventChannel(role, pair.get(0), channel,
+            ec = new EventChannel(Role.MIRROR, pair.get(0), channel,
                                   roots.hash(point(channel)), maxSegmentSize,
-                                  null);
+                                  null, segmentCache);
         }
         EventChannel previous = channels.put(channel, ec);
         assert previous == null : String.format("Xeroxed event channel %s is currently hosted on %s",

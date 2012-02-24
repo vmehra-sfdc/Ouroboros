@@ -34,6 +34,7 @@ import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -184,21 +185,22 @@ public class EventChannel {
         return Long.toHexString(segmentPrefix).toLowerCase() + SEGMENT_SUFFIX;
     }
 
-    private final File          channel;
-    private volatile long       commited;
-    private boolean             failedOver = false;
-    private final UUID          id;
-    private volatile long       lastTimestamp;
-    private final long          maxSegmentSize;
-    private volatile long       nextOffset;
-    private final Node          partner;
-    private volatile Replicator replicator;
-
-    private Role                role;
+    private final File                         channel;
+    private volatile long                      commited;
+    private boolean                            failedOver = false;
+    private final UUID                         id;
+    private volatile long                      lastTimestamp;
+    private final long                         maxSegmentSize;
+    private volatile long                      nextOffset;
+    private final Node                         partner;
+    private volatile Replicator                replicator;
+    private Role                               role;
+    private final ConcurrentMap<File, Segment> segmentCache;
 
     public EventChannel(Role role, Node partnerId, final UUID channelId,
                         final File root, final long maxSegmentSize,
-                        final Replicator replicator) {
+                        final Replicator replicator,
+                        ConcurrentMap<File, Segment> segmentCache) {
         assert root != null : "Root directory must not be null";
         assert channelId != null : "Channel id must not be null";
 
@@ -222,6 +224,7 @@ public class EventChannel {
             }
         }
         this.replicator = replicator;
+        this.segmentCache = segmentCache;
     }
 
     /**
@@ -265,6 +268,16 @@ public class EventChannel {
     public void close(Node producerId) {
         log.info(String.format("Closing channel %s on %s, root directory: %s",
                                id, producerId, channel));
+        for (File segmentFile : getSegmentFiles()) {
+            Segment segment = segmentCache.remove(segmentFile);
+            if (segment != null) {
+                try {
+                    segment.close();
+                } catch (IOException e) {
+                    log.finest(String.format("Error closing %s", segment));
+                }
+            }
+        }
         deleteDirectory(channel);
         if (log.isLoggable(Level.FINE)) {
             log.fine(String.format("Deleted channel root directory: %s",
@@ -335,17 +348,11 @@ public class EventChannel {
      *             found
      */
     public Deque<Segment> getSegmentStack() {
-        File[] segmentFiles = channel.listFiles(SEGMENT_FILTER);
-        Arrays.sort(segmentFiles, new Comparator<File>() {
-            @Override
-            public int compare(File o1, File o2) {
-                return o2.getName().compareTo(o1.getName());
-            }
-        });
+        File[] segmentFiles = getSegmentFiles();
         Deque<Segment> segments = new LinkedList<Segment>();
         for (File segmentFile : segmentFiles) {
             try {
-                segments.push(new Segment(segmentFile));
+                segments.push(getCachedSegment(segmentFile));
             } catch (FileNotFoundException e) {
                 String msg = String.format("Cannot find segment file: %s",
                                            segmentFile);
@@ -354,6 +361,20 @@ public class EventChannel {
             }
         }
         return segments;
+    }
+
+    private File[] getSegmentFiles() {
+        File[] segmentFiles = channel.listFiles(SEGMENT_FILTER);
+        if (segmentFiles == null) {
+            return new File[0];
+        }
+        Arrays.sort(segmentFiles, new Comparator<File>() {
+            @Override
+            public int compare(File o1, File o2) {
+                return o2.getName().compareTo(o1.getName());
+            }
+        });
+        return segmentFiles;
     }
 
     @Override
@@ -384,14 +405,16 @@ public class EventChannel {
     public void rebalanceAsMirror() {
         failedOver = false;
         role = Role.MIRROR;
+        replicator = null;
     }
 
-    public void rebalanceAsPrimary() {
+    public void rebalanceAsPrimary(Replicator replicator) {
         failedOver = false;
         role = Role.PRIMARY;
+        this.replicator = replicator;
     }
 
-    public AppendSegment segmentFor(BatchHeader batchHeader) {
+    public AppendSegment segmentFor(BatchHeader batchHeader) throws IOException {
         AppendSegmentName logicalSegment = mappedSegmentFor(nextOffset,
                                                             batchHeader.getBatchByteLength(),
                                                             maxSegmentSize);
@@ -406,8 +429,9 @@ public class EventChannel {
      * @param offset
      *            - the offset of the event
      * @return the segment for the event
+     * @throws IOException
      */
-    public AppendSegment segmentFor(long offset) {
+    public AppendSegment segmentFor(long offset) throws IOException {
         File segment = new File(channel, segmentName(prefixFor(offset,
                                                                maxSegmentSize)));
         return getSegment(offset, -1, segment);
@@ -419,32 +443,28 @@ public class EventChannel {
      * @param offset
      *            - the offset of the event
      * @return the segment for the event
+     * @throws IOException
      */
-    public AppendSegment segmentFor(long offset, int position) {
+    public AppendSegment segmentFor(long offset, int position)
+                                                              throws IOException {
         File segment = new File(channel, segmentName(prefixFor(offset,
                                                                maxSegmentSize)));
         return getSegment(offset, position, segment);
     }
 
-    private AppendSegment getSegment(long offset, int position, File segment) {
-        if (!segment.exists()) {
-            try {
-                segment.createNewFile();
-            } catch (IOException e) {
-                String msg = String.format("Cannot create the new segment file: %s",
-                                           segment.getAbsolutePath());
-                log.log(Level.WARNING, msg, e);
-                throw new IllegalStateException(msg);
-            }
+    private AppendSegment getSegment(long offset, int position, File segment)
+                                                                             throws IOException {
+        return new AppendSegment(getCachedSegment(segment), offset, position);
+    }
+
+    private Segment getCachedSegment(File segment) throws FileNotFoundException {
+        Segment newSegment = new Segment(segment);
+        Segment currentSegment = segmentCache.putIfAbsent(segment, newSegment);
+        if (currentSegment == null) {
+            currentSegment = newSegment;
+            currentSegment.open();
         }
-        try {
-            return new AppendSegment(new Segment(segment), offset, position);
-        } catch (FileNotFoundException e) {
-            String msg = String.format("The segment file cannot be found, yet was created: %s",
-                                       segment.getAbsolutePath());
-            log.log(Level.WARNING, msg, e);
-            throw new IllegalStateException(msg);
-        }
+        return currentSegment;
     }
 
     public void failMirror() {
