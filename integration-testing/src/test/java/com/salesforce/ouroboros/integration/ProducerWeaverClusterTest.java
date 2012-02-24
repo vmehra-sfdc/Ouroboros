@@ -366,13 +366,13 @@ public class ProducerWeaverClusterTest {
         }
 
         for (Source source : sources) {
-            source.publish(BATCH_COUNT, BATCH_SIZE, executor, latch, 0L);
+            source.publish(BATCH_SIZE, executor, latch, BATCH_COUNT);
         }
 
         assertTrue("not all publishers completed",
                    latch.await(60, TimeUnit.SECONDS));
 
-        final Long target = Long.valueOf(BATCH_COUNT - 1);
+        final Long target = Long.valueOf(BATCH_COUNT);
         for (UUID channel : channels) {
             final UUID c = channel;
             final List<Producer> pair = producerRing.hash(point(channel), 2);
@@ -413,13 +413,13 @@ public class ProducerWeaverClusterTest {
         }
 
         for (Source source : sources) {
-            source.publish(BATCH_COUNT, BATCH_SIZE, executor, latch, 0L);
+            source.publish(BATCH_SIZE, executor, latch, BATCH_COUNT);
         }
 
         assertTrue("not all publishers completed",
                    latch.await(60, TimeUnit.SECONDS));
 
-        final Long target = Long.valueOf(BATCH_COUNT - 1);
+        final Long target = Long.valueOf(BATCH_COUNT);
         for (UUID channel : channels) {
             final UUID c = channel;
             final List<Producer> pair = producerRing.hash(point(channel), 2);
@@ -438,8 +438,7 @@ public class ProducerWeaverClusterTest {
 
         latch = new CountDownLatch(majorSources.size());
         for (Source source : majorSources) {
-            source.publish(BATCH_COUNT, BATCH_SIZE, executor, latch,
-                           BATCH_COUNT);
+            source.publish(BATCH_SIZE, executor, latch, 2 * BATCH_COUNT);
         }
 
         assertTrue("not all publishers completed",
@@ -477,7 +476,7 @@ public class ProducerWeaverClusterTest {
 
         int targetCount = BATCH_COUNT * 20;
         for (Source source : majorSources) {
-            source.publish(targetCount, BATCH_SIZE, executor, latch, 0L);
+            source.publish(BATCH_SIZE, executor, latch, targetCount);
         }
 
         asymmetricallyPartition();

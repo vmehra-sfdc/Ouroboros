@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -68,54 +69,63 @@ public class Source implements EventSource {
         this.producer = producer;
     }
 
-    public void publish(final int batchCount, final int batchSize,
-                        Executor executor, final CountDownLatch latch,
-                        final long initialTimestamp) {
+    public void publish(final int batchSize, Executor executor,
+                        final CountDownLatch latch, final long targetTimestamp) {
         executor.execute(new Runnable() {
             @Override
             public void run() {
-                publish(batchCount, batchSize, latch, initialTimestamp);
+                publish(batchSize, latch, targetTimestamp);
             }
         });
     }
 
-    private void publish(int batchCount, int batchSize, CountDownLatch latch,
-                         long initialTimestamp) {
-        for (long timestamp = initialTimestamp; timestamp < initialTimestamp
-                                                            + batchCount; timestamp++) {
-            for (UUID channel : channels.keySet()) {
-                ArrayList<ByteBuffer> events = new ArrayList<ByteBuffer>();
-                for (int i = 0; i < batchSize; i++) {
-                    events.add(ByteBuffer.wrap(String.format("%s Give me Slack or give me Food or Kill me %s",
-                                                             channel, channel).getBytes()));
-                }
-                boolean published = false;
-                int i = 0;
-                while (!published && channels.containsKey(channel)) {
-                    try {
+    private void publish(int batchSize, CountDownLatch latch, long target) {
+        boolean run = true;
+        Long targetTimestamp = Long.valueOf(target);
+        while (run) {
+            run = false;
+            for (Entry<UUID, Long> entry : channels.entrySet()) {
+                UUID channel = entry.getKey();
+                Long timestamp = entry.getValue();
+                if (!timestamp.equals(targetTimestamp)) {
+                    run |= true;
+                    boolean published = false;
+                    ArrayList<ByteBuffer> events = new ArrayList<ByteBuffer>();
+                    for (int i = 0; i < batchSize; i++) {
+                        events.add(ByteBuffer.wrap(String.format("%s Give me Slack or give me Food or Kill me %s",
+                                                                 channel,
+                                                                 channel).getBytes()));
+                    }
+                    int i = 0;
+                    long nextTimestamp = timestamp + 1;
+                    while (!published && channels.containsKey(channel)) {
                         try {
-                            producer.publish(channel, timestamp, events);
-                        } catch (UnknownChannelException e) {
-                            failedChannels.add(channel);
-                            continue;
-                        } catch (InterruptedException e) {
-                            return;
-                        }
-                        published = true;
-                    } catch (RateLimiteExceededException e) {
-                        log.info(String.format("Rate limit exceeded for %s on %s",
-                                               channel, producer.getId()));
-                        if (i > 10) {
-                            log.info(String.format("Giving up on sending event to %s on %s",
+                            try {
+                                producer.publish(channel, nextTimestamp, events);
+                            } catch (UnknownChannelException e) {
+                                failedChannels.add(channel);
+                                continue;
+                            } catch (InterruptedException e) {
+                                return;
+                            }
+                            published = true;
+                        } catch (RateLimiteExceededException e) {
+                            log.info(String.format("Rate limit exceeded for %s on %s",
                                                    channel, producer.getId()));
-                            return;
-                        }
-                        try {
-                            Thread.sleep(100 * i++);
-                        } catch (InterruptedException e1) {
-                            return;
+                            if (i > 10) {
+                                log.info(String.format("Giving up on sending event to %s on %s",
+                                                       channel,
+                                                       producer.getId()));
+                                return;
+                            }
+                            try {
+                                Thread.sleep(100 * i++);
+                            } catch (InterruptedException e1) {
+                                return;
+                            }
                         }
                     }
+                    entry.setValue(nextTimestamp);
                 }
             }
         }
