@@ -482,7 +482,7 @@ public class ProducerWeaverClusterTest {
         asymmetricallyPartition();
 
         assertTrue("not all publishers completed",
-                   latch.await(60, TimeUnit.SECONDS));
+                   latch.await(120, TimeUnit.SECONDS));
 
         ArrayList<UUID> lostChannels = filterChannelsByProducers(channels,
                                                                  producerRing);
@@ -500,7 +500,7 @@ public class ProducerWeaverClusterTest {
                         Long ts = pair.get(1).getMirrorTimestampFor(c);
                         return target.equals(ts);
                     }
-                }, 60000L, 1000L);
+                }, 120000L, 1000L);
             }
         }
 
