@@ -478,7 +478,7 @@ public class ProducerWeaverClusterTest {
                        clusterMaster.open(channel, 10, TimeUnit.SECONDS));
         }
 
-        int targetCount = BATCH_COUNT * 20;
+        int targetCount = BATCH_COUNT * 10;
         for (Source source : sources) {
             source.publish(BATCH_SIZE, executor, latch, targetCount);
         }

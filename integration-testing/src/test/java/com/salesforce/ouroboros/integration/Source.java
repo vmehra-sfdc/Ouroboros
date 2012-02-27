@@ -100,6 +100,11 @@ public class Source implements EventSource {
                     }
                     int i = 0;
                     long nextTimestamp = timestamp + 1;
+                    try {
+                        Thread.sleep(5);
+                    } catch (InterruptedException e2) {
+                        return;
+                    }
                     while (!published && channels.containsKey(channel)
                            && !shutdown.get()) {
                         try {
