@@ -241,6 +241,7 @@ public class ProducerWeaverClusterTest {
 
     private ArrayList<Source>                             sources;
     private ArrayList<Source>                             majorSources;
+    private ArrayList<Source>                             minorSources;
 
     @Before
     public void startUp() throws Exception {
@@ -300,6 +301,7 @@ public class ProducerWeaverClusterTest {
             i++;
         }
         ArrayList<AnnotationConfigApplicationContext> majorProducerContexts = new ArrayList<AnnotationConfigApplicationContext>();
+        ArrayList<AnnotationConfigApplicationContext> minorProducerContexts = new ArrayList<AnnotationConfigApplicationContext>();
         i = 0;
         for (AnnotationConfigApplicationContext ctxt : producerContexts) {
             nodeId = ctxt.getBean(Identity.class);
@@ -317,6 +319,7 @@ public class ProducerWeaverClusterTest {
             } else {
                 minorProducers.add(coordinator.getProducer());
                 minorViewNodes.add(testNode);
+                minorProducerContexts.add(ctxt);
             }
             i++;
         }
@@ -324,6 +327,7 @@ public class ProducerWeaverClusterTest {
 
         sources = getSources(producerContexts);
         majorSources = getSources(majorProducerContexts);
+        minorSources = getSources(minorProducerContexts);
     }
 
     @After
@@ -480,6 +484,10 @@ public class ProducerWeaverClusterTest {
         }
 
         asymmetricallyPartition();
+
+        for (Source s : minorSources) {
+            s.shutdown();
+        }
 
         assertTrue("not all publishers completed",
                    latch.await(120, TimeUnit.SECONDS));

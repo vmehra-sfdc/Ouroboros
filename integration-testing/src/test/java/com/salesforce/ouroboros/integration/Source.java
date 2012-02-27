@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.api.producer.EventSource;
@@ -46,6 +47,7 @@ public class Source implements EventSource {
     public final ConcurrentHashMap<UUID, Long> channels       = new ConcurrentHashMap<UUID, Long>();
     private Producer                           producer;
     public final ArrayList<UUID>               failedChannels = new ArrayList<UUID>();
+    private AtomicBoolean                      shutdown       = new AtomicBoolean();
 
     @Override
     public void assumePrimary(Map<UUID, Long> newPrimaries) {
@@ -82,7 +84,7 @@ public class Source implements EventSource {
     private void publish(int batchSize, CountDownLatch latch, long target) {
         boolean run = true;
         Long targetTimestamp = Long.valueOf(target);
-        while (run) {
+        while (run && !shutdown.get()) {
             run = false;
             for (Entry<UUID, Long> entry : channels.entrySet()) {
                 UUID channel = entry.getKey();
@@ -98,7 +100,8 @@ public class Source implements EventSource {
                     }
                     int i = 0;
                     long nextTimestamp = timestamp + 1;
-                    while (!published && channels.containsKey(channel)) {
+                    while (!published && channels.containsKey(channel)
+                           && !shutdown.get()) {
                         try {
                             try {
                                 producer.publish(channel, nextTimestamp, events);
@@ -112,7 +115,7 @@ public class Source implements EventSource {
                         } catch (RateLimiteExceededException e) {
                             log.info(String.format("Rate limit exceeded for %s on %s",
                                                    channel, producer.getId()));
-                            if (i > 10) {
+                            if (i > 20) {
                                 log.info(String.format("Giving up on sending event to %s on %s",
                                                        channel,
                                                        producer.getId()));
@@ -140,5 +143,9 @@ public class Source implements EventSource {
         for (UUID channel : deadChannels) {
             channels.remove(channel);
         }
+    }
+
+    public void shutdown() {
+        shutdown.set(true);
     }
 }
