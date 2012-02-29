@@ -57,10 +57,13 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
+import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.spindle.transfer.Sink;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
+import com.salesforce.ouroboros.testUtils.Util;
+import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.Rendezvous;
 import com.salesforce.ouroboros.util.Utils;
 
@@ -169,9 +172,10 @@ public class TestTransfer {
         when(mirrorBundle.getId()).thenReturn(mirrorNode);
 
         Spindle spindle = new Spindle(primaryBundle);
-        Replicator primaryReplicator = new Replicator(primaryBundle,
-                                                      mirrorNode, rendezvous);
-        Replicator mirrorReplicator = new Replicator(mirrorBundle);
+        final Replicator primaryReplicator = new Replicator(primaryBundle,
+                                                            mirrorNode,
+                                                            rendezvous);
+        final Replicator mirrorReplicator = new Replicator(mirrorBundle);
         primaryEventChannel = new EventChannel(Role.PRIMARY, mirrorNode,
                                                channelId, primaryRoot,
                                                maxSegmentSize,
@@ -189,6 +193,14 @@ public class TestTransfer {
 
         spindleHandler.connectTo(replicatorHandler.getLocalAddress(),
                                  primaryReplicator);
+
+        Util.waitFor("Did not connect replicators", new Condition() {
+            @Override
+            public boolean value() {
+                return mirrorReplicator.getState() == ReplicatorFSM.Established
+                       && primaryReplicator.getState() == ReplicatorFSM.Established;
+            }
+        }, 10000, 100);
 
         int batches = 2500;
         int batchSize = 100;
