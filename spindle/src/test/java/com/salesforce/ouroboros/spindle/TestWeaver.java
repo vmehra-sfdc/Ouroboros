@@ -53,6 +53,9 @@ import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
+import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
+import com.salesforce.ouroboros.testUtils.Util;
+import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
 import com.salesforce.ouroboros.util.Utils;
@@ -158,7 +161,8 @@ public class TestWeaver {
         config.addRoot(root);
         Weaver weaver = new Weaver(config);
         weaver.start();
-        Replicator replicator = weaver.openReplicator(mirror, info, rendezvous);
+        final Replicator replicator = weaver.openReplicator(mirror, info,
+                                                            rendezvous);
         weaver.connectReplicators(Arrays.asList(replicator), yellowPages);
         SocketChannel connected = server.accept();
         assertNotNull(connected);
@@ -170,7 +174,14 @@ public class TestWeaver {
         assertEquals(Replicator.MAGIC, buffer.getInt());
         Node handshakeNode = new Node(buffer);
         assertEquals(id, handshakeNode);
-        Thread.sleep(10); // Time for replicator to await at the barrier
+        Util.waitFor("Replicator never entered established state",
+                     new Condition() {
+                         @Override
+                         public boolean value() {
+                             return replicator.getState() == ReplicatorFSM.Established;
+                         }
+                     }, 10000, 100);
+
         verify(rendezvous).meet();
         weaver.terminate();
         connected.close();
