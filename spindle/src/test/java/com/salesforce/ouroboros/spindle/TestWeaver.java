@@ -31,8 +31,6 @@ import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.net.InetSocketAddress;
@@ -44,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.After;
 import org.junit.Before;
@@ -53,7 +52,6 @@ import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
-import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.testUtils.Util;
 import com.salesforce.ouroboros.testUtils.Util.Condition;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
@@ -135,7 +133,14 @@ public class TestWeaver {
 
     @Test
     public void testOpenReplicator() throws Exception {
-        Rendezvous rendezvous = mock(Rendezvous.class);
+        final AtomicBoolean met = new AtomicBoolean();
+        Rendezvous rendezvous = new Rendezvous(1, new Runnable() {
+            @Override
+            public void run() {
+                met.set(true);
+            }
+
+        }, null);
         SocketOptions options = new SocketOptions();
         options.setTimeout(1000);
         ServerSocketChannel server = ServerSocketChannel.open();
@@ -174,15 +179,13 @@ public class TestWeaver {
         assertEquals(Replicator.MAGIC, buffer.getInt());
         Node handshakeNode = new Node(buffer);
         assertEquals(id, handshakeNode);
-        Util.waitFor("Replicator never entered established state",
-                     new Condition() {
-                         @Override
-                         public boolean value() {
-                             return replicator.getState() == ReplicatorFSM.Established;
-                         }
-                     }, 10000, 100);
+        Util.waitFor("Replicator rendezvous never met", new Condition() {
+            @Override
+            public boolean value() {
+                return met.get();
+            }
+        }, 10000, 100);
 
-        verify(rendezvous).meet();
         weaver.terminate();
         connected.close();
         server.close();
