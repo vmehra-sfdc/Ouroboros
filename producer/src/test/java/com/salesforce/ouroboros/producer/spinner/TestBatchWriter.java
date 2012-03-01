@@ -51,6 +51,8 @@ import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterFSM;
+import com.salesforce.ouroboros.testUtils.Util;
+import com.salesforce.ouroboros.testUtils.Util.Condition;
 
 /**
  * 
@@ -78,7 +80,7 @@ public class TestBatchWriter {
 
         SortedMap<BatchIdentity, Batch> pending = new TreeMap<BatchIdentity, Batch>();
 
-        BatchWriter batchWriter = new BatchWriter(100, "test");
+        final BatchWriter batchWriter = new BatchWriter(100, "test");
         assertEquals(BatchWriterFSM.Suspended, batchWriter.getState());
         batchWriter.connect(handler);
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
@@ -118,9 +120,12 @@ public class TestBatchWriter {
         when(outbound.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readBatchHeader).thenAnswer(readBatch);
 
         batchWriter.push(batch, pending);
-        Thread.sleep(1);
-        assertEquals(BatchWriterFSM.WriteBatch, batchWriter.getState());
-
+        Util.waitFor("Never entered the WriteBatch state", new Condition() {
+            @Override
+            public boolean value() {
+                return batchWriter.getState() == BatchWriterFSM.WriteBatch;
+            }
+        }, 2000, 100);
         batchWriter.writeReady();
         assertEquals(1, pending.size());
         assertEquals(batch, pending.get(batch));
