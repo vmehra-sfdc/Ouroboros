@@ -43,12 +43,12 @@ public class Batch extends BatchIdentity {
     /**
      * @param mirror
      * @param channel
-     * @param timestamp
+     * @param sequenceNumber
      * @param events
      */
-    public Batch(Node mirror, UUID channel, long timestamp,
+    public Batch(Node mirror, UUID channel, long sequenceNumber,
                  Collection<ByteBuffer> events) {
-        super(channel, timestamp);
+        super(channel, sequenceNumber);
         assert events != null : "events must not be null";
         int totalSize = 0;
 
@@ -59,7 +59,7 @@ public class Batch extends BatchIdentity {
 
         batch = ByteBuffer.allocate(totalSize);
         header = new BatchHeader(mirror, totalSize, BatchHeader.MAGIC, channel,
-                                 timestamp);
+                                 sequenceNumber);
 
         for (ByteBuffer event : events) {
             event.rewind();
@@ -74,7 +74,7 @@ public class Batch extends BatchIdentity {
      * @return the interval, in milliseconds, between when the batch was
      *         submitted and when it was acknowledged
      */
-    public long interval() {
+    public long getInterval() {
         return interval;
     }
 
@@ -84,7 +84,7 @@ public class Batch extends BatchIdentity {
     @Override
     public String toString() {
         return "Batch [#events=" + batch.capacity() + ", created=" + created
-               + ", channel=" + channel + ", timestamp=" + timestamp + "]";
+               + ", channel=" + channel + ", sequenceNumber=" + sequenceNumber + "]";
     }
 
     /**
@@ -97,7 +97,7 @@ public class Batch extends BatchIdentity {
     /**
      * 
      */
-    public void timestamp() {
+    public void interval() {
         interval = Math.max(1, System.currentTimeMillis() - created);
     }
 

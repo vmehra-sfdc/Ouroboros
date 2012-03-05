@@ -89,7 +89,7 @@ public class TestSpinnerSpindle {
         when(bundle.getId()).thenReturn(toNode);
         Node mirror = new Node(3);
         UUID channel = UUID.randomUUID();
-        long timestamp = System.currentTimeMillis();
+        long sequenceNumber = System.currentTimeMillis();
         long offset = 0;
         EventChannel.AppendSegment appendSegment = new EventChannel.AppendSegment(
                                                                                   segment,
@@ -172,7 +172,7 @@ public class TestSpinnerSpindle {
             eventBuffers.add(ByteBuffer.wrap(event.getBytes()));
         }
 
-        spinner.push(new Batch(mirror, channel, timestamp, eventBuffers));
+        spinner.push(new Batch(mirror, channel, sequenceNumber, eventBuffers));
 
         Util.waitFor("Did not commit event batch", new Util.Condition() {
 

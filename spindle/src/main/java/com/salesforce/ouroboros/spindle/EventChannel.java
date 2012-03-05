@@ -51,9 +51,9 @@ import com.salesforce.ouroboros.spindle.source.Acknowledger;
  * segments, identified by a UUID. Events published to the channel are only
  * appended, and only one thread is ever appending to a channel at any given
  * instant in time. The channels keep track of the offset the last committed
- * event, as well as the offset of the last appended event and the timestamp of
- * that event. The channel is responsible for the logic of maintaining the
- * segments, as well as determining whether events are duplicating events
+ * event, as well as the offset of the last appended event and the sequence
+ * number of that event. The channel is responsible for the logic of maintaining
+ * the segments, as well as determining whether events are duplicating events
  * already in the channel.
  * 
  * @author hhildebrand

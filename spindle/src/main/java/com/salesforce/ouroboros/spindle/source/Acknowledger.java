@@ -70,8 +70,8 @@ public class Acknowledger {
      * @param segment
      * @param size
      */
-    public void acknowledge(UUID channel, long timestamp) {
-        fsm.ack(channel, timestamp);
+    public void acknowledge(UUID channel, long sequenceNumber) {
+        fsm.ack(channel, sequenceNumber);
     }
 
     public void close() {
@@ -161,8 +161,8 @@ public class Acknowledger {
         fsm.setName(fsmName);
     }
 
-    protected void enqueue(UUID channel, long timestamp) {
-        pending.add(new BatchIdentity(channel, timestamp));
+    protected void enqueue(UUID channel, long sequenceNumber) {
+        pending.add(new BatchIdentity(channel, sequenceNumber));
     }
 
     protected boolean hasPending() {

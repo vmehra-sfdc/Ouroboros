@@ -43,13 +43,13 @@ public class TestBatchHeader {
         UUID channel = UUID.randomUUID();
         int batchByteLength = 25;
         int magic = 777;
-        long timestamp = System.currentTimeMillis();
+        long sequenceNumber = System.currentTimeMillis();
         BatchHeader header = new BatchHeader(mirror, batchByteLength, magic,
-                                             channel, timestamp);
+                                             channel, sequenceNumber);
         assertEquals(batchByteLength, header.getBatchByteLength());
         assertEquals(channel, header.getChannel());
         assertEquals(magic, header.getMagic());
-        assertEquals(timestamp, header.getTimestamp());
+        assertEquals(sequenceNumber, header.getTimestamp());
         assertEquals(mirror, header.getProducerMirror());
     }
 }

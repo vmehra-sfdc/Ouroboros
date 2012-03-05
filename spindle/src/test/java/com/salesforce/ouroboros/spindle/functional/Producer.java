@@ -51,7 +51,7 @@ public class Producer implements CommunicationsHandler {
     private SocketChannelHandler handler;
     private final AtomicInteger  batches        = new AtomicInteger();
     private volatile Batch       batch;
-    private final AtomicInteger  timestamp      = new AtomicInteger(0);
+    private final AtomicInteger  sequenceNumber = new AtomicInteger(0);
     private final CountDownLatch latch;
     private final List<UUID>     channelIds;
     private final AtomicInteger  currentChannel = new AtomicInteger();
@@ -166,7 +166,7 @@ public class Producer implements CommunicationsHandler {
         for (int i = 0; i < batchSize; i++) {
             events.add(event);
         }
-        batch = new Batch(producerNode, channelId, timestamp.get(), events);
+        batch = new Batch(producerNode, channelId, sequenceNumber.get(), events);
         batch.header.rewind();
         handler.selectForWrite();
     }

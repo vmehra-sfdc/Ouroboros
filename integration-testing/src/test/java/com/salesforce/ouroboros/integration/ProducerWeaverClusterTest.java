@@ -351,6 +351,15 @@ public class ProducerWeaverClusterTest {
     }
 
     @Test
+    public void testRebalance() throws Exception {
+        bootstrap();
+        asymmetricallyPartition();
+        rebalance();
+        reformPartition();
+        rebalance();
+    }
+
+    @Test
     public void testSimplePublishing() throws Exception {
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
@@ -384,7 +393,7 @@ public class ProducerWeaverClusterTest {
                     new Condition() {
                         @Override
                         public boolean value() {
-                            Long ts = pair.get(1).getMirrorTimestampFor(c);
+                            Long ts = pair.get(1).getMirrorSequenceNumberFor(c);
                             return target.equals(ts);
                         }
                     }, 60000L, 1000L);
@@ -431,7 +440,7 @@ public class ProducerWeaverClusterTest {
                     new Condition() {
                         @Override
                         public boolean value() {
-                            Long ts = pair.get(1).getMirrorTimestampFor(c);
+                            Long ts = pair.get(1).getMirrorSequenceNumberFor(c);
                             return target.equals(ts);
                         }
                     }, 60000L, 1000L);
@@ -454,7 +463,7 @@ public class ProducerWeaverClusterTest {
     }
 
     @Test
-    public void testPublishingDuringPartition() throws Exception {
+    public void testPublishingDuringPartitionAndRebalancing() throws Exception {
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
                                                                                              new ProducerSkipStrategy(),
@@ -470,7 +479,7 @@ public class ProducerWeaverClusterTest {
         }
         ArrayList<UUID> channels = openChannels();
         Executor executor = Executors.newCachedThreadPool();
-        CountDownLatch latch = new CountDownLatch(majorSources.size());
+        CountDownLatch latch = new CountDownLatch(sources.size());
 
         // Open the channels
         for (UUID channel : channels) {
@@ -478,7 +487,7 @@ public class ProducerWeaverClusterTest {
                        clusterMaster.open(channel, 10, TimeUnit.SECONDS));
         }
 
-        int targetCount = BATCH_COUNT * 10;
+        int targetCount = BATCH_COUNT * 15;
         for (Source source : sources) {
             source.publish(BATCH_SIZE, executor, latch, targetCount);
         }
@@ -487,6 +496,13 @@ public class ProducerWeaverClusterTest {
 
         for (Source s : minorSources) {
             s.shutdown();
+        }
+        rebalance();
+        reformPartition();
+        rebalance();
+
+        for (Source source : minorSources) {
+            source.publish(BATCH_SIZE, executor, latch, targetCount);
         }
 
         assertTrue("not all publishers completed",
@@ -505,7 +521,7 @@ public class ProducerWeaverClusterTest {
                                       channel), new Condition() {
                     @Override
                     public boolean value() {
-                        Long ts = pair.get(1).getMirrorTimestampFor(c);
+                        Long ts = pair.get(1).getMirrorSequenceNumberFor(c);
                         return target.equals(ts);
                     }
                 }, 120000L, 1000L);
@@ -737,5 +753,22 @@ public class ProducerWeaverClusterTest {
         }
         channels.removeAll(lostChannels);
         return lostChannels;
+    }
+
+    void rebalance() throws InterruptedException {
+        // Rebalance the open channels across the major partition
+        log.info("Initiating rebalance on majority partition");
+        WeaverCoordinator weaverLeader = majorWeavers.get(majorWeavers.size() - 1);
+        assertTrue(String.format("weaver coordinator is not the leader %s",
+                                 weaverLeader), weaverLeader.isActiveLeader());
+        weaverLeader.initiateRebalance();
+
+        ProducerCoordinator producerLeader = majorProducers.get(majorProducers.size() - 1);
+        assertTrue(String.format("producer coordinator is not the leader %s",
+                                 producerLeader),
+                   producerLeader.isActiveLeader());
+        producerLeader.initiateRebalance();
+
+        assertWeaversStable(majorWeavers);
     }
 }

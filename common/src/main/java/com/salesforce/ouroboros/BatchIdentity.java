@@ -37,25 +37,25 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
     public static final int BYTE_SIZE = 3 * 8;
 
     public final UUID       channel;
-    public final long       timestamp;
+    public final long       sequenceNumber;
 
     public BatchIdentity(ByteBuffer buffer) {
         channel = new UUID(buffer.getLong(), buffer.getLong());
-        timestamp = buffer.getLong();
+        sequenceNumber = buffer.getLong();
     }
 
-    public BatchIdentity(UUID channel, long timestamp) {
+    public BatchIdentity(UUID channel, long sequenceNumber) {
         this.channel = channel;
-        this.timestamp = timestamp;
+        this.sequenceNumber = sequenceNumber;
     }
 
     @Override
     public int compareTo(BatchIdentity bi) {
         int channelComp = channel.compareTo(bi.channel);
         if (channelComp == 0) {
-            if (timestamp == bi.timestamp) {
+            if (sequenceNumber == bi.sequenceNumber) {
                 return 0;
-            } else if (timestamp < bi.timestamp) {
+            } else if (sequenceNumber < bi.sequenceNumber) {
                 return -1;
             }
             return 1;
@@ -82,7 +82,7 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
         } else if (!channel.equals(other.channel)) {
             return false;
         }
-        if (timestamp != other.timestamp) {
+        if (sequenceNumber != other.sequenceNumber) {
             return false;
         }
         return true;
@@ -93,14 +93,14 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
         final int prime = 31;
         int result = 1;
         result = prime * result + (channel == null ? 0 : channel.hashCode());
-        result = prime * result + (int) (timestamp ^ timestamp >>> 32);
+        result = prime * result + (int) (sequenceNumber ^ sequenceNumber >>> 32);
         return result;
     }
 
     public void serializeOn(ByteBuffer buffer) {
         buffer.putLong(channel.getMostSignificantBits());
         buffer.putLong(channel.getLeastSignificantBits());
-        buffer.putLong(timestamp);
+        buffer.putLong(sequenceNumber);
     }
 
     /* (non-Javadoc)
@@ -108,7 +108,7 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
      */
     @Override
     public String toString() {
-        return "BatchIdentity [channel=" + channel + ", timestamp=" + timestamp
+        return "BatchIdentity [channel=" + channel + ", sequenceNumber=" + sequenceNumber
                + "]";
     }
 }

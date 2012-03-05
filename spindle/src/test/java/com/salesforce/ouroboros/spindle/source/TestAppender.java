@@ -92,12 +92,12 @@ public class TestAppender {
         Node mirror = new Node(0x1638);
         int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
-        long timestamp = System.currentTimeMillis();
+        long sequenceNumber = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
         BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
-                                             channel, timestamp);
+                                             channel, sequenceNumber);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,
@@ -178,12 +178,12 @@ public class TestAppender {
         Node mirror = new Node(0x1638);
         int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
-        long timestamp = System.currentTimeMillis();
+        long sequenceNumber = System.currentTimeMillis();
         byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
         BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
-                                             channel, timestamp);
+                                             channel, sequenceNumber);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,

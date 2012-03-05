@@ -72,7 +72,7 @@ public class TestBatchWriter {
         final int[] crc32 = new int[] { Event.crc32(events[0].getBytes()),
                 Event.crc32(events[1].getBytes()),
                 Event.crc32(events[2].getBytes()) };
-        long timestamp = System.currentTimeMillis();
+        long sequenceNumber = System.currentTimeMillis();
         final UUID channel = UUID.randomUUID();
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel outbound = mock(SocketChannel.class);
@@ -85,7 +85,7 @@ public class TestBatchWriter {
         batchWriter.connect(handler);
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
         Node mirror = new Node(0x1638);
-        Batch batch = new Batch(mirror, channel, timestamp,
+        Batch batch = new Batch(mirror, channel, sequenceNumber,
                                 Arrays.asList(payloads));
         Answer<Integer> readBatchHeader = new Answer<Integer>() {
             @Override

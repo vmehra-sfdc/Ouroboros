@@ -69,7 +69,7 @@ public class TestReplicatingAppender {
 
         int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
-        long timestamp = System.currentTimeMillis();
+        long sequenceNumber = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
@@ -79,7 +79,7 @@ public class TestReplicatingAppender {
                                                                  event.totalSize(),
                                                                  magic,
                                                                  channel,
-                                                                 timestamp, 0,
+                                                                 sequenceNumber, 0,
                                                                  0);
         payloadBuffer.clear();
         EventChannel eventChannel = mock(EventChannel.class);
@@ -149,6 +149,6 @@ public class TestReplicatingAppender {
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
         verify(eventChannel).append(header, 0L, segment);
-        verify(acknowledger).acknowledge(channel, timestamp);
+        verify(acknowledger).acknowledge(channel, sequenceNumber);
     }
 }

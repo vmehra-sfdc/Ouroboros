@@ -99,7 +99,7 @@ public class Spinner implements CommunicationsHandler {
     public void acknowledge(BatchIdentity ack) {
         Batch batch = pending.remove(ack);
         if (batch != null) {
-            batch.timestamp();
+            batch.interval();
             producer.acknowledge(batch);
             if (log.isLoggable(Level.FINER)) {
                 log.finer(String.format("Acknowledgement for %s on primary %s",
@@ -164,7 +164,7 @@ public class Spinner implements CommunicationsHandler {
      *            - the Channel
      * @return a SortedMap of all the batch events for the channel that have not
      *         been acknowledged. All pending batches for this channel are
-     *         stored in ascending timestamp order
+     *         stored in ascending sequence number order
      */
     public SortedMap<BatchIdentity, Batch> getPending(UUID channel) {
         return pending.subMap(new BatchIdentity(channel, 0),

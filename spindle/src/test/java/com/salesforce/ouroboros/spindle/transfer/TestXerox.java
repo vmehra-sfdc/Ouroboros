@@ -45,6 +45,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.transfer.XeroxContext.XeroxFSM;
 import com.salesforce.ouroboros.util.Rendezvous;
 
@@ -57,6 +58,7 @@ public class TestXerox {
 
     @Test
     public void testCopy() throws Exception {
+        WeaverCoordinator coordinator = mock(WeaverCoordinator.class);
         Segment segment1 = mock(Segment.class);
         Segment segment2 = mock(Segment.class);
         SocketChannel socket = mock(SocketChannel.class);
@@ -138,7 +140,7 @@ public class TestXerox {
         when(channel.getId()).thenReturn(id);
 
         int transferSize = 1024;
-        Xerox xerox = new Xerox(fromNode, node, transferSize);
+        Xerox xerox = new Xerox(fromNode, node, coordinator, transferSize);
         xerox.setRendezvous(rendezvous);
         xerox.addChannel(channel);
         assertEquals(XeroxFSM.Initial, xerox.getState());

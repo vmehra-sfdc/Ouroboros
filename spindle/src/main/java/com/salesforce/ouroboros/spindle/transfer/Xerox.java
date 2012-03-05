@@ -38,6 +38,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.transfer.XeroxContext.XeroxState;
 import com.salesforce.ouroboros.util.Rendezvous;
 import com.salesforce.ouroboros.util.Utils;
@@ -69,16 +70,19 @@ public class Xerox implements CommunicationsHandler {
     private Deque<Segment>            segments;
     private long                      segmentSize;
     private final long                transferSize;
+    private final WeaverCoordinator   coordinator;
 
-    public Xerox(Node from, Node toNode) {
-        this(from, toNode, DEFAULT_TXFR_SIZE);
+    public Xerox(Node from, Node toNode, WeaverCoordinator coordinator) {
+        this(from, toNode, coordinator, DEFAULT_TXFR_SIZE);
     }
 
-    public Xerox(Node from, Node toNode, int transferSize) {
+    public Xerox(Node from, Node toNode, WeaverCoordinator coordinator,
+                 int transferSize) {
         fsm.setName(String.format("%s->%s", from.processId, toNode.processId));
         this.from = from;
         to = toNode;
         this.transferSize = transferSize;
+        this.coordinator = coordinator;
     }
 
     @Override

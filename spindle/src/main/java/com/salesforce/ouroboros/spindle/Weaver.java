@@ -514,7 +514,8 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     public void rebalance(Map<Node, Xerox> xeroxes, UUID channel,
                           Node originalPrimary, Node originalMirror,
                           Node remappedPrimary, Node remappedMirror,
-                          Collection<Node> activeMembers) {
+                          Collection<Node> activeMembers,
+                          WeaverCoordinator coordinator) {
         EventChannel eventChannel = channels.get(channel);
         assert eventChannel != null : String.format("The event channel to rebalance does not exist: %s",
                                                     channel);
@@ -527,27 +528,27 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                     // Xerox state to the new mirror
                     infoLog("Rebalancing for %s from primary %s to new mirror %s",
                             eventChannel.getId(), self, remappedMirror);
-                    xeroxTo(eventChannel, remappedMirror, xeroxes);
+                    xeroxTo(eventChannel, remappedMirror, xeroxes, coordinator);
                 } else if (self.equals(remappedMirror)) {
                     // Self becomes the new mirror
                     infoLog("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
                             eventChannel.getId(), self, remappedPrimary);
                     eventChannel.rebalanceAsMirror();
-                    xeroxTo(eventChannel, remappedPrimary, xeroxes);
+                    xeroxTo(eventChannel, remappedPrimary, xeroxes, coordinator);
                 } else {
                     // Xerox state to new primary and mirror
                     infoLog("Rebalancing for %s from old primary %s to new primary %s, new mirror %s",
                             eventChannel.getId(), self, remappedPrimary,
                             remappedMirror);
-                    xeroxTo(eventChannel, remappedPrimary, xeroxes);
-                    xeroxTo(eventChannel, remappedMirror, xeroxes);
+                    xeroxTo(eventChannel, remappedPrimary, xeroxes, coordinator);
+                    xeroxTo(eventChannel, remappedMirror, xeroxes, coordinator);
                 }
             } else if (!self.equals(remappedPrimary)) {
                 // mirror is up
                 // Xerox state to the new primary
                 infoLog("Rebalancing for %s from old primary %s to new primary %s",
                         eventChannel.getId(), self, remappedPrimary);
-                xeroxTo(eventChannel, remappedPrimary, xeroxes);
+                xeroxTo(eventChannel, remappedPrimary, xeroxes, coordinator);
                 if (self.equals(remappedMirror)) {
                     eventChannel.rebalanceAsMirror();
                 }
@@ -561,20 +562,20 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                 // Xerox state to the new primary
                 infoLog("Rebalancing for %s from mirror %s to new primary %s",
                         eventChannel.getId(), self, remappedPrimary);
-                xeroxTo(eventChannel, remappedPrimary, xeroxes);
+                xeroxTo(eventChannel, remappedPrimary, xeroxes, coordinator);
             } else if (self.equals(remappedPrimary)) {
                 // Self becomes the new primary
                 infoLog("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
                         eventChannel.getId(), self, remappedMirror);
                 eventChannel.rebalanceAsPrimary(replicators.get(remappedMirror));
-                xeroxTo(eventChannel, remappedMirror, xeroxes);
+                xeroxTo(eventChannel, remappedMirror, xeroxes, coordinator);
             } else {
                 // Xerox state to the new primary and mirror
                 infoLog("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s",
                         eventChannel.getId(), self, remappedPrimary,
                         remappedMirror);
-                xeroxTo(eventChannel, remappedPrimary, xeroxes);
-                xeroxTo(eventChannel, remappedMirror, xeroxes);
+                xeroxTo(eventChannel, remappedPrimary, xeroxes, coordinator);
+                xeroxTo(eventChannel, remappedMirror, xeroxes, coordinator);
             }
         } else if (!self.equals(remappedMirror)
                    && !remappedMirror.equals(originalPrimary)) {
@@ -583,7 +584,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
             // Xerox state to the new mirror
             infoLog("Rebalancing for %s from old mirror %s to new mirror %s",
                     eventChannel.getId(), self, remappedMirror);
-            xeroxTo(eventChannel, remappedMirror, xeroxes);
+            xeroxTo(eventChannel, remappedMirror, xeroxes, coordinator);
         }
     }
 
@@ -692,10 +693,11 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     }
 
     protected void xeroxTo(EventChannel eventChannel, Node node,
-                           Map<Node, Xerox> xeroxes) {
+                           Map<Node, Xerox> xeroxes,
+                           WeaverCoordinator coordinator) {
         Xerox xerox = xeroxes.get(node);
         if (xerox == null) {
-            xerox = new Xerox(self, node);
+            xerox = new Xerox(self, node, coordinator);
             xeroxes.put(node, xerox);
         }
         xerox.addChannel(eventChannel);

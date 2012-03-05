@@ -219,6 +219,9 @@ public class ProducerCoordinator implements Member {
                 }
                 break;
             }
+            case PAUSE_CHANNELS: {
+                break;
+            }
             default: {
                 if (log.isLoggable(Level.WARNING)) {
                     log.warning(String.format("Invalid target %s for channel message: %s",
@@ -321,6 +324,8 @@ public class ProducerCoordinator implements Member {
             case INITIATE_REBALANCE:
             case PREPARE_FOR_REBALANCE:
             case REBALANCE_COMPLETE:
+            case TAKEOVER:
+                return;
             default:
                 throw new IllegalStateException(
                                                 String.format("Unknown rebalance message: %s",

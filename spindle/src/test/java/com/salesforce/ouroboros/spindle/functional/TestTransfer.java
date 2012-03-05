@@ -56,6 +56,7 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
@@ -162,6 +163,7 @@ public class TestTransfer {
         Node producerNode = new Node(0);
         Node primaryNode = new Node(1);
         Node mirrorNode = new Node(2);
+        WeaverCoordinator coordinator = mock(WeaverCoordinator.class);
         Rendezvous rendezvous = mock(Rendezvous.class);
         final Bundle primaryBundle = mock(Bundle.class);
         final Bundle mirrorBundle = mock(Bundle.class);
@@ -273,9 +275,9 @@ public class TestTransfer {
             }
         }).when(xeroxRendezvous).cancel();
 
-        Xerox primaryXerox = new Xerox(primaryNode, primarySinkNode);
+        Xerox primaryXerox = new Xerox(primaryNode, primarySinkNode, coordinator);
         primaryXerox.setRendezvous(xeroxRendezvous);
-        Xerox mirrorXerox = new Xerox(mirrorNode, mirrorSinkNode);
+        Xerox mirrorXerox = new Xerox(mirrorNode, mirrorSinkNode, coordinator);
         mirrorXerox.setRendezvous(xeroxRendezvous);
 
         primaryXerox.addChannel(primaryEventChannel);

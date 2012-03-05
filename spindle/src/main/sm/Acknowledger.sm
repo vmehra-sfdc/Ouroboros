@@ -45,9 +45,9 @@ Entry {
 	processPendingAcks();
 }
 {
-	ack(channel: UUID, timestamp: long)
+	ack(channel: UUID, sequenceNumber: long)
 		WriteBatch{
-			enqueue(channel, timestamp);
+			enqueue(channel, sequenceNumber);
 		}
 
 	waiting
@@ -91,9 +91,9 @@ Entry {
 }
 
 Default {
-	ack(channel: UUID, timestamp: long)
+	ack(channel: UUID, sequenceNumber: long)
 		nil{
-			enqueue(channel, timestamp);
+			enqueue(channel, sequenceNumber);
 		}
 	close
 		Closed{}

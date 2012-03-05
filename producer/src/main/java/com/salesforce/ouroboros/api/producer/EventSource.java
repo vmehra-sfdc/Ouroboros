@@ -42,7 +42,7 @@ public interface EventSource {
      * 
      * @param newPrimaries
      *            - the map between the ID of the channel and the last committed
-     *            event batch timestamp for the channel for
+     *            event batch sequenc number for the channel for
      */
     void assumePrimary(Map<UUID, Long> newPrimaries);
 
@@ -63,11 +63,19 @@ public interface EventSource {
     void opened(UUID channel);
 
     /**
-     * Notification that the list of channels have been lost and cannot be
+     * Notification of the list of channels have been lost and cannot be
      * recovered.
      * 
      * @param deadChannels
      */
     void deactivated(Collection<UUID> deadChannels);
+
+    /**
+     * Notification of the list of channels that the source must pause event
+     * publishing on
+     * 
+     * @param pausedChannels
+     */
+    void pauseChannels(Collection<UUID> pausedChannels);
 
 }

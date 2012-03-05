@@ -776,7 +776,7 @@ public class WeaverCoordinator implements Member {
         for (Entry<UUID, Node[][]> entry : remapped.entrySet()) {
             weaver.rebalance(xeroxes, entry.getKey(), entry.getValue()[0][0],
                              entry.getValue()[0][1], entry.getValue()[1][0],
-                             entry.getValue()[1][1], activeMembers);
+                             entry.getValue()[1][1], activeMembers, this);
         }
 
         if (xeroxes.isEmpty()) {

@@ -163,14 +163,14 @@ public class TestDuplicator {
             }
         }, 1000L, 100L);
         Node mirror = new Node(0x1638);
-        long timestamp = System.currentTimeMillis();
+        long sequenceNumber = System.currentTimeMillis();
         replicator.replicate(new EventEntry(
                                             new ReplicatedBatchHeader(
                                                                       mirror,
                                                                       event.totalSize(),
                                                                       magic,
                                                                       channel,
-                                                                      timestamp,
+                                                                      sequenceNumber,
                                                                       0, 0),
                                             eventChannel, segment,
                                             acknowledger, handler));
@@ -190,7 +190,7 @@ public class TestDuplicator {
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
         verify(eventChannel).commit(0);
-        verify(acknowledger).acknowledge(channel, timestamp);
+        verify(acknowledger).acknowledge(channel, sequenceNumber);
     }
 
     @Test
@@ -218,7 +218,7 @@ public class TestDuplicator {
 
         int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
-        long timestamp = System.currentTimeMillis();
+        long sequenceNumber = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
@@ -228,7 +228,7 @@ public class TestDuplicator {
                                                                       event.totalSize(),
                                                                       magic,
                                                                       channel,
-                                                                      timestamp,
+                                                                      sequenceNumber,
                                                                       0, 0);
 
         event.rewind();
@@ -318,7 +318,7 @@ public class TestDuplicator {
         assertEquals(event.getMagic(), replicatedEvent.getMagic());
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
-        verify(outboundAcknowledger).acknowledge(channel, timestamp);
-        verify(inboundAcknowledger).acknowledge(channel, timestamp);
+        verify(outboundAcknowledger).acknowledge(channel, sequenceNumber);
+        verify(inboundAcknowledger).acknowledge(channel, sequenceNumber);
     }
 }

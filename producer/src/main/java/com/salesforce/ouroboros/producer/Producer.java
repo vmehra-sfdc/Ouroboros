@@ -74,31 +74,31 @@ public class Producer implements Comparable<Producer> {
         private static final long serialVersionUID = 1L;
 
         public final UUID         channel;
-        public final long         timestamp;
+        public final long         sequenceNumber;
 
-        public UpdateState(UUID channel, long timestamp) {
+        public UpdateState(UUID channel, long sequenceNumber) {
             super();
             this.channel = channel;
-            this.timestamp = timestamp;
+            this.sequenceNumber = sequenceNumber;
         }
 
         @Override
         public String toString() {
-            return String.format("%s:%s", channel, timestamp);
+            return String.format("%s:%s", channel, sequenceNumber);
         }
     }
 
     private static class MirrorState {
-        volatile long timestamp;
+        volatile long sequenceNumber;
         Node          primaryProducer;
         Node          mirrorProducer;
         Node          primaryWeaver;
         Node          mirrorWeaver;
 
-        public MirrorState(Node[] producerPair, long timestamp,
+        public MirrorState(Node[] producerPair, long sequenceNumber,
                            Node[] weaverPair) {
             primaryProducer = producerPair[0];
-            this.timestamp = timestamp;
+            this.sequenceNumber = sequenceNumber;
             mirrorProducer = producerPair[1];
             primaryWeaver = weaverPair[0];
             mirrorWeaver = weaverPair[1];
@@ -136,9 +136,9 @@ public class Producer implements Comparable<Producer> {
         boolean failedOver = false;
         Spinner spinner;
 
-        public PrimaryState(Node[] producerPair, long timestamp,
+        public PrimaryState(Node[] producerPair, long sequenceNumber,
                             Spinner spinner, Node[] weaverPair, boolean failover) {
-            super(producerPair, timestamp, weaverPair);
+            super(producerPair, sequenceNumber, weaverPair);
             this.spinner = spinner;
             this.failedOver = failover;
         }
@@ -217,7 +217,7 @@ public class Producer implements Comparable<Producer> {
      */
     public void acknowledge(Batch batch) {
         controller.sample(batch.rate(), System.currentTimeMillis());
-        channelState.get(batch.channel).timestamp = batch.timestamp;
+        channelState.get(batch.channel).sequenceNumber = batch.sequenceNumber;
     }
 
     /**
@@ -230,7 +230,7 @@ public class Producer implements Comparable<Producer> {
     public void acknowledge(BatchIdentity ack) {
         MirrorState mirrorState = mirrors.get(ack.channel);
         if (mirrorState != null) {
-            mirrorState.timestamp = ack.timestamp;
+            mirrorState.sequenceNumber = ack.sequenceNumber;
         } else {
             PrimaryState primaryState = channelState.get(ack.channel);
             log.info(String.format("null mirror state for %s on %s, channel state mirror: %s",
@@ -291,7 +291,7 @@ public class Producer implements Comparable<Producer> {
                 mirrors.put(update.channel,
                             new MirrorState(
                                             producerPair,
-                                            update.timestamp,
+                                            update.sequenceNumber,
                                             getChannelBufferReplicationPair(update.channel)));
             }
         }
@@ -371,7 +371,7 @@ public class Producer implements Comparable<Producer> {
                                            this, channel,
                                            producerPair[0].processId));
                 }
-                newPrimaries.put(channel, entry.getValue().timestamp);
+                newPrimaries.put(channel, entry.getValue().sequenceNumber);
                 mirrored.remove();
                 PrimaryState previous = mapSpinner(channel, producerPair, true);
                 assert previous == null : String.format("Apparently node %s is already primary for %s");
@@ -461,8 +461,8 @@ public class Producer implements Comparable<Producer> {
         return self;
     }
 
-    public Long getMirrorTimestampFor(UUID channel) {
-        return mirrors.get(channel).timestamp;
+    public Long getMirrorSequenceNumberFor(UUID channel) {
+        return mirrors.get(channel).sequenceNumber;
     }
 
     /* (non-Javadoc)
@@ -560,8 +560,8 @@ public class Producer implements Comparable<Producer> {
      * 
      * @param channel
      *            - the id of the event channel
-     * @param timestamp
-     *            - the timestamp for this batch
+     * @param sequenceNumber
+     *            - the sequence number for this batch
      * @param events
      *            - the batch of events to publish to the channel
      * 
@@ -572,7 +572,7 @@ public class Producer implements Comparable<Producer> {
      * @throws InterruptedException
      *             - if the thread is interrupted
      */
-    public void publish(UUID channel, long timestamp,
+    public void publish(UUID channel, long sequenceNumber,
                         Collection<ByteBuffer> events)
                                                       throws RateLimiteExceededException,
                                                       UnknownChannelException,
@@ -591,7 +591,7 @@ public class Producer implements Comparable<Producer> {
                                                                 channel));
             }
             Batch batch = new Batch(state.getMirrorProducer(), channel,
-                                    timestamp, events);
+                                    sequenceNumber, events);
             if (!controller.accept(batch.batchByteSize())) {
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Rate limit exceeded for push to %s",
@@ -638,28 +638,32 @@ public class Producer implements Comparable<Producer> {
                     // Xerox state to the new mirror
                     infoLog("Rebalancing for %s from primary %s to new mirror %s",
                             channel, self, remappedMirror);
-                    remap(channel, state.timestamp, remappedMirror, remapped);
+                    remap(channel, state.sequenceNumber, remappedMirror,
+                          remapped);
                 } else if (self.equals(remappedMirror)) {
                     // Self becomes the new mirror
                     infoLog("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
                             channel, self);
-                    remap(channel, state.timestamp, self, remapped);
-                    remap(channel, state.timestamp, remappedPrimary, remapped);
+                    remap(channel, state.sequenceNumber, self, remapped);
+                    remap(channel, state.sequenceNumber, remappedPrimary,
+                          remapped);
                 } else {
                     // Xerox state to new primary and mirror
                     infoLog("Rebalancing for %s from old primary %s to new primary %s, new mirror %s",
                             channel, self, remappedPrimary, remappedMirror);
-                    remap(channel, state.timestamp, remappedPrimary, remapped);
-                    remap(channel, state.timestamp, remappedMirror, remapped);
+                    remap(channel, state.sequenceNumber, remappedPrimary,
+                          remapped);
+                    remap(channel, state.sequenceNumber, remappedMirror,
+                          remapped);
                 }
             } else if (!self.equals(remappedPrimary)) {
                 // mirror is up
                 // Xerox state to the new primary
                 infoLog("Rebalancing for %s from old primary %s to new primary %s",
                         channel, self, remappedPrimary);
-                remap(channel, state.timestamp, remappedPrimary, remapped);
+                remap(channel, state.sequenceNumber, remappedPrimary, remapped);
                 if (self.equals(remappedMirror)) {
-                    remap(channel, state.timestamp, self, remapped);
+                    remap(channel, state.sequenceNumber, self, remapped);
                 }
             }
         } else if (!activeProducers.contains(originalPrimary)) {
@@ -671,19 +675,19 @@ public class Producer implements Comparable<Producer> {
                 // Xerox state to the new primary
                 infoLog("Rebalancing for %s from mirror %s to new primary %s",
                         channel, self, remappedPrimary);
-                remap(channel, state.timestamp, remappedPrimary, remapped);
+                remap(channel, state.sequenceNumber, remappedPrimary, remapped);
             } else if (self.equals(remappedPrimary)) {
                 // Self becomes the new primary
                 infoLog("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
                         channel, self, remappedMirror);
-                remap(channel, state.timestamp, self, remapped);
-                remap(channel, state.timestamp, remappedMirror, remapped);
+                remap(channel, state.sequenceNumber, self, remapped);
+                remap(channel, state.sequenceNumber, remappedMirror, remapped);
             } else {
                 // Xerox state to the new primary and mirror
                 infoLog("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s",
                         channel, self, remappedPrimary, remappedMirror);
-                remap(channel, state.timestamp, remappedPrimary, remapped);
-                remap(channel, state.timestamp, remappedMirror, remapped);
+                remap(channel, state.sequenceNumber, remappedPrimary, remapped);
+                remap(channel, state.sequenceNumber, remappedMirror, remapped);
             }
         } else if (!self.equals(remappedMirror)
                    && !remappedMirror.equals(originalPrimary)) {
@@ -692,7 +696,7 @@ public class Producer implements Comparable<Producer> {
             // Xerox state to the new mirror
             infoLog("Rebalancing for %s from old mirror %s to new mirror %s",
                     channel, self, remappedMirror);
-            remap(channel, state.timestamp, remappedMirror, remapped);
+            remap(channel, state.sequenceNumber, remappedMirror, remapped);
         }
     }
 
@@ -923,9 +927,9 @@ public class Producer implements Comparable<Producer> {
         return remapped;
     }
 
-    protected void remap(UUID channel, long timestamp, Node node,
+    protected void remap(UUID channel, long sequenceNumber, Node node,
                          HashMap<Node, List<UpdateState>> remapped) {
-        UpdateState update = new UpdateState(channel, timestamp);
+        UpdateState update = new UpdateState(channel, sequenceNumber);
         List<UpdateState> updates = remapped.get(node);
         if (updates == null) {
             updates = new ArrayList<UpdateState>();

@@ -112,20 +112,20 @@ public class TestSpinner {
         Spinner spinner = new Spinner(producer, toNode, 100);
         spinner.connect(handler);
 
-        long timestamp = 100000L;
+        long sequenceNumber = 100000L;
         UUID channel = UUID.randomUUID();
         Node mirror = new Node(0x1638);
         @SuppressWarnings("unchecked")
-        Batch batch1 = new Batch(mirror, channel, timestamp,
+        Batch batch1 = new Batch(mirror, channel, sequenceNumber,
                                  Collections.EMPTY_LIST);
         @SuppressWarnings("unchecked")
-        Batch batch2 = new Batch(mirror, channel, timestamp + 20,
+        Batch batch2 = new Batch(mirror, channel, sequenceNumber + 20,
                                  Collections.EMPTY_LIST);
         @SuppressWarnings("unchecked")
-        Batch batch3 = new Batch(mirror, channel, timestamp + 100,
+        Batch batch3 = new Batch(mirror, channel, sequenceNumber + 100,
                                  Collections.EMPTY_LIST);
         @SuppressWarnings("unchecked")
-        Batch batch4 = new Batch(mirror, channel, timestamp + 140,
+        Batch batch4 = new Batch(mirror, channel, sequenceNumber + 140,
                                  Collections.EMPTY_LIST);
         spinner.push(batch1);
         spinner.push(batch2);
@@ -163,6 +163,6 @@ public class TestSpinner {
         Thread.sleep(10);
         spinner.acknowledge(batch);
         verify(producer).acknowledge(captor.capture());
-        assertTrue(10 <= captor.getValue().interval());
+        assertTrue(10 <= captor.getValue().getInterval());
     }
 }

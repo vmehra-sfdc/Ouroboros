@@ -55,6 +55,7 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.transfer.SinkContext.SinkFSM;
 import com.salesforce.ouroboros.spindle.transfer.XeroxContext.XeroxFSM;
 import com.salesforce.ouroboros.testUtils.Util;
@@ -281,6 +282,7 @@ public class TestSink {
 
     @Test
     public void testXeroxSink() throws Exception {
+        WeaverCoordinator coordinator = mock(WeaverCoordinator.class);
         SocketChannelHandler inboundHandler = mock(SocketChannelHandler.class);
         Bundle inboundBundle = mock(Bundle.class);
         when(inboundBundle.getId()).thenReturn(new Node(0));
@@ -373,7 +375,7 @@ public class TestSink {
         outboundSegment2.force(false);
 
         Rendezvous rendezvous = mock(Rendezvous.class);
-        final Xerox xerox = new Xerox(fromNode, toNode);
+        final Xerox xerox = new Xerox(fromNode, toNode, coordinator);
         xerox.setRendezvous(rendezvous);
         xerox.addChannel(outboundEventChannel);
 

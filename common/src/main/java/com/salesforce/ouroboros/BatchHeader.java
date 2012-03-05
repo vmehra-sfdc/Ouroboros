@@ -42,7 +42,7 @@ import java.util.UUID;
  *       4 byte producer mirror node process id
  *      16 byte channel
  *       4 byte last event offset
- *       8 byte last event timestamp
+ *       8 byte last event sequence number
  * </pre>
  * 
  * @author hhildebrand
@@ -55,8 +55,8 @@ public class BatchHeader {
     protected static final int PRODUCER_MIRROR_OFFSET   = MAGIC_OFFSET + 4;
     protected static final int CH_MSB_OFFSET            = PRODUCER_MIRROR_OFFSET + 4;
     protected static final int CH_LSB_OFFSET            = CH_MSB_OFFSET + 8;
-    protected static final int TIMESTAMP_OFFSET         = CH_LSB_OFFSET + 8;
-    public static final int    HEADER_BYTE_SIZE         = TIMESTAMP_OFFSET + 8;
+    protected static final int SEQUENCE_NUMBER_OFFSET   = CH_LSB_OFFSET + 8;
+    public static final int    HEADER_BYTE_SIZE         = SEQUENCE_NUMBER_OFFSET + 8;
 
     private final ByteBuffer   bytes;
 
@@ -75,9 +75,9 @@ public class BatchHeader {
     }
 
     public BatchHeader(Node mirror, int batchByteLength, int magic,
-                       UUID channel, long timestamp) {
+                       UUID channel, long sequenceNumber) {
         this();
-        append(bytes, mirror, batchByteLength, magic, channel, timestamp);
+        append(bytes, mirror, batchByteLength, magic, channel, sequenceNumber);
     }
 
     @Override
@@ -124,7 +124,7 @@ public class BatchHeader {
     }
 
     public long getTimestamp() {
-        return bytes.getLong(TIMESTAMP_OFFSET);
+        return bytes.getLong(SEQUENCE_NUMBER_OFFSET);
     }
 
     @Override
@@ -157,7 +157,7 @@ public class BatchHeader {
 
     @Override
     public String toString() {
-        return String.format("BatchHeader[magic=%s, timestamp=%s, length=%s, channel=%s]",
+        return String.format("BatchHeader[magic=%s, sequenceNumber=%s, length=%s, channel=%s]",
                              getMagic(), getTimestamp(), getBatchByteLength(),
                              getChannel());
     }
@@ -185,10 +185,10 @@ public class BatchHeader {
      * @param batchByteSize
      * @param magic
      * @param channel
-     * @param timestamp
+     * @param sequenceNumber
      */
     public static void append(ByteBuffer bytes, Node mirror, int batchByteSize,
-                              int magic, UUID channel, long timestamp) {
+                              int magic, UUID channel, long sequenceNumber) {
         int position = bytes.position();
         bytes.putInt(position + BATCH_BYTE_LENGTH_OFFSET, batchByteSize);
         bytes.putInt(position + MAGIC_OFFSET, magic);
@@ -197,7 +197,7 @@ public class BatchHeader {
                       channel.getMostSignificantBits());
         bytes.putLong(position + CH_LSB_OFFSET,
                       channel.getLeastSignificantBits());
-        bytes.putLong(position + TIMESTAMP_OFFSET, timestamp);
+        bytes.putLong(position + SEQUENCE_NUMBER_OFFSET, sequenceNumber);
         bytes.position(position + HEADER_BYTE_SIZE);
     }
 

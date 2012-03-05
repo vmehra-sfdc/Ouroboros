@@ -46,7 +46,7 @@ public enum ChannelMessage implements MemberDispatch {
             switchboard.dispatchToMember(this, sender, arguments, time);
         }
     },
-    PRIMARY_OPENED, MIRROR_OPENED;
+    PRIMARY_OPENED, MIRROR_OPENED, PAUSE_CHANNELS;
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,

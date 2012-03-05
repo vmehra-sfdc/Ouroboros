@@ -78,7 +78,7 @@ public class TestEventChannel {
         Node node = new Node(0);
         Node secondary = new Node(1);
         UUID channel = UUID.randomUUID();
-        int timestamp = 0;
+        int sequenceNumber = 0;
         @SuppressWarnings("unchecked")
         ConcurrentMap<File, Segment> segmentCache = mock(ConcurrentMap.class);
         EventChannel eventChannel = new EventChannel(Role.PRIMARY, secondary,
@@ -92,7 +92,7 @@ public class TestEventChannel {
         // For the first segment, offset and position should track
         for (; offset + eventSize < maxSegmentSize; offset += eventSize) {
             batchHeader = new BatchHeader(node, eventSize, 666, channel,
-                                          timestamp++);
+                                          sequenceNumber++);
             logicalSegment = eventChannel.segmentFor(batchHeader);
             assertNotNull(logicalSegment);
             assertEquals(offset, logicalSegment.offset);
@@ -103,7 +103,7 @@ public class TestEventChannel {
 
         // the next event should trigger a segment rollover
         batchHeader = new BatchHeader(node, eventSize, 666, channel,
-                                      timestamp++);
+                                      sequenceNumber++);
         logicalSegment = eventChannel.segmentFor(batchHeader);
         assertNotNull(logicalSegment);
         assertTrue(offset < logicalSegment.offset);
@@ -118,7 +118,7 @@ public class TestEventChannel {
         // Now track the second rollover segment.
         for (; offset + eventSize < 2 * maxSegmentSize; offset += eventSize) {
             batchHeader = new BatchHeader(node, eventSize, 666, channel,
-                                          timestamp++);
+                                          sequenceNumber++);
             logicalSegment = eventChannel.segmentFor(batchHeader);
             assertNotNull(logicalSegment);
             assertEquals(offset, logicalSegment.offset);
@@ -130,7 +130,7 @@ public class TestEventChannel {
 
         // the next event should trigger another segment rollover
         batchHeader = new BatchHeader(node, eventSize, 666, channel,
-                                      timestamp++);
+                                      sequenceNumber++);
         logicalSegment = eventChannel.segmentFor(batchHeader);
         assertNotNull(logicalSegment);
         assertTrue(offset < logicalSegment.offset);
@@ -145,7 +145,7 @@ public class TestEventChannel {
         // Now track the second rollover segment.
         for (; offset + eventSize < 3 * maxSegmentSize; offset += eventSize) {
             batchHeader = new BatchHeader(node, eventSize, 666, channel,
-                                          timestamp++);
+                                          sequenceNumber++);
             logicalSegment = eventChannel.segmentFor(batchHeader);
             assertNotNull(logicalSegment);
             assertEquals(offset, logicalSegment.offset);

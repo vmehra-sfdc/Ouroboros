@@ -75,12 +75,12 @@ public class TestSpindle {
         Node mirror = new Node(0x1638);
         int magic = BatchHeader.MAGIC;
         final UUID channel = UUID.randomUUID();
-        final long timestamp = System.currentTimeMillis();
+        final long sequenceNumber = System.currentTimeMillis();
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
         final BatchHeader header = new BatchHeader(mirror, event.totalSize(),
-                                                   magic, channel, timestamp);
+                                                   magic, channel, sequenceNumber);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                segment,
@@ -113,7 +113,7 @@ public class TestSpindle {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 BatchIdentity identity = new BatchIdentity(buffer);
                 assertEquals(channel, identity.channel);
-                assertEquals(timestamp, identity.timestamp);
+                assertEquals(sequenceNumber, identity.sequenceNumber);
                 return BatchIdentity.BYTE_SIZE;
             }
         }).when(socketChannel).write(isA(ByteBuffer.class));
@@ -127,7 +127,7 @@ public class TestSpindle {
         assertEquals(SpindleFSM.Established, spindle.getState());
         spindle.readReady();
         verify(handler, new Times(3)).selectForRead();
-        spindle.acknowledger.acknowledge(channel, timestamp);
+        spindle.acknowledger.acknowledge(channel, sequenceNumber);
         verify(segment).transferFrom(socketChannel, 0, event.totalSize());
         spindle.writeReady();
         verify(socketChannel, new Times(2)).write(isA(ByteBuffer.class));

@@ -65,9 +65,9 @@ public class ReplicatedBatchHeader extends BatchHeader {
     }
 
     public ReplicatedBatchHeader(Node mirror, int batchByteLength, int magic,
-                                 UUID channel, long timestamp,
+                                 UUID channel, long sequenceNumber,
                                  long batchOffset, int batchPosition) {
-        super(mirror, batchByteLength, magic, channel, timestamp);
+        super(mirror, batchByteLength, magic, channel, sequenceNumber);
         getBytes().putLong(BATCH_OFFSET_OFFSET, batchOffset);
         getBytes().putInt(BATCH_OFFSET_OFFSET, batchPosition);
     }
@@ -98,7 +98,7 @@ public class ReplicatedBatchHeader extends BatchHeader {
 
     @Override
     public String toString() {
-        return String.format("ReplicatedBatchHeader[magic=%s, timestamp=%s, length=%s, channel=%s offset=%s position=%s]",
+        return String.format("ReplicatedBatchHeader[magic=%s, sequenceNumber=%s, length=%s, channel=%s offset=%s position=%s]",
                              getMagic(), getTimestamp(), getBatchByteLength(),
                              getChannel(), getOffset(), getPosition());
     }

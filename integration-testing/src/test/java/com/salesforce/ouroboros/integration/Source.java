@@ -88,8 +88,8 @@ public class Source implements EventSource {
             run = false;
             for (Entry<UUID, Long> entry : channels.entrySet()) {
                 UUID channel = entry.getKey();
-                Long timestamp = entry.getValue();
-                if (!timestamp.equals(targetTimestamp)) {
+                Long sequenceNumber = entry.getValue();
+                if (!sequenceNumber.equals(targetTimestamp)) {
                     run |= true;
                     boolean published = false;
                     ArrayList<ByteBuffer> events = new ArrayList<ByteBuffer>();
@@ -99,7 +99,7 @@ public class Source implements EventSource {
                                                                  channel).getBytes()));
                     }
                     int i = 0;
-                    long nextTimestamp = timestamp + 1;
+                    long nextTimestamp = sequenceNumber + 1;
                     try {
                         Thread.sleep(5);
                     } catch (InterruptedException e2) {
@@ -152,5 +152,14 @@ public class Source implements EventSource {
 
     public void shutdown() {
         shutdown.set(true);
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.api.producer.EventSource#pauseChannels(java.util.Collection)
+     */
+    @Override
+    public void pauseChannels(Collection<UUID> pausedChannels) {
+        // TODO Auto-generated method stub
+        
     }
 }
