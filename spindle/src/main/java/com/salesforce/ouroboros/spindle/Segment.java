@@ -58,7 +58,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         GatheringByteChannel, ScatteringByteChannel, Cloneable {
 
     private FileChannel      channel;
-    private final File             file;
+    private final File       file;
     private RandomAccessFile raf;
 
     public Segment(File file) throws FileNotFoundException {
@@ -160,6 +160,15 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     public MappedByteBuffer map(MapMode paramMapMode, long paramLong1,
                                 long paramLong2) throws IOException {
         return channel.map(paramMapMode, paramLong1, paramLong2);
+    }
+
+    /**
+     * @throws FileNotFoundException
+     * 
+     */
+    public void open() throws FileNotFoundException {
+        raf = new RandomAccessFile(file, "rw");
+        channel = raf.getChannel();
     }
 
     /**
@@ -357,14 +366,5 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     public long write(ByteBuffer[] paramArrayOfByteBuffer, int paramInt1,
                       int paramInt2) throws IOException {
         return channel.write(paramArrayOfByteBuffer, paramInt1, paramInt2);
-    }
-
-    /**
-     * @throws FileNotFoundException 
-     * 
-     */
-    public void open() throws FileNotFoundException {
-        raf = new RandomAccessFile(file, "rw");
-        channel = raf.getChannel();
     }
 }

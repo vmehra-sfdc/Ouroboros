@@ -12,9 +12,9 @@ import com.fasterxml.uuid.Generators;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.producer.ProducerCoordinator;
 import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.ProducerConfiguration;
+import com.salesforce.ouroboros.producer.ProducerCoordinator;
 
 @Configuration
 public class nodeCfg {

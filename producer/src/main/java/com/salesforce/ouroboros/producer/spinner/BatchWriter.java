@@ -80,33 +80,6 @@ public class BatchWriter {
         consumer.start();
     }
 
-    protected void nextQuantum() {
-        quantum.release();
-    }
-
-    protected Runnable consumerAction() {
-        return new Runnable() {
-
-            @Override
-            public void run() {
-                while (run.get()) {
-                    try {
-                        quantum.acquire();
-                        while (batch == null) {
-                            batch = queued.poll(4, TimeUnit.SECONDS);
-                            if (!run.get()) {
-                                return;
-                            }
-                        }
-                    } catch (InterruptedException e) {
-                        return;
-                    }
-                    fsm.writeBatch();
-                }
-            }
-        };
-    }
-
     public void closing() {
         fsm.close();
     }
@@ -160,6 +133,29 @@ public class BatchWriter {
         batch = null;
     }
 
+    protected Runnable consumerAction() {
+        return new Runnable() {
+
+            @Override
+            public void run() {
+                while (run.get()) {
+                    try {
+                        quantum.acquire();
+                        while (batch == null) {
+                            batch = queued.poll(4, TimeUnit.SECONDS);
+                            if (!run.get()) {
+                                return;
+                            }
+                        }
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                    fsm.writeBatch();
+                }
+            }
+        };
+    }
+
     protected boolean hasNext() {
         batch = queued.poll();
         return batch != null;
@@ -188,6 +184,10 @@ public class BatchWriter {
                 }
             }
         }
+    }
+
+    protected void nextQuantum() {
+        quantum.release();
     }
 
     protected void selectForWrite() {

@@ -113,18 +113,6 @@ public class Node implements Comparable<Node>, Serializable {
         return processId;
     }
 
-    public void serialize(ByteBuffer buffer) {
-        buffer.putInt(processId).putInt(machineId).putInt(rackId).putInt(capacity).putInt(releaseGroup);
-    }
-
-    /* (non-Javadoc)
-     * @see java.lang.Object#toString()
-     */
-    @Override
-    public String toString() {
-        return String.format("Node[%s]", processId);
-    }
-
     public boolean isDown() {
         return down;
     }
@@ -135,5 +123,17 @@ public class Node implements Comparable<Node>, Serializable {
 
     public void markAsUp() {
         down = false;
+    }
+
+    public void serialize(ByteBuffer buffer) {
+        buffer.putInt(processId).putInt(machineId).putInt(rackId).putInt(capacity).putInt(releaseGroup);
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return String.format("Node[%s]", processId);
     }
 }

@@ -235,6 +235,99 @@ public class TestSpindleCluster {
     }
 
     /**
+     * Test that we can still correctly open channels after failover that would
+     * have been mapped to dead nodes. Verify that these channels are correctly
+     * rebalanced.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testOpenAfterFailover() throws Exception {
+
+        bootstrap();
+
+        ArrayList<UUID> channels = openChannels();
+
+        // Construct the hash ring that maps the channels to nodes
+        ConsistentHashFunction<Node> ring = weavers.get(0).createRing();
+        for (Node node : fullPartitionId) {
+            ring.add(node, node.capacity);
+        }
+
+        assertChannelMappings(channels, weavers, ring);
+
+        asymmetricallyPartition();
+
+        // major partition should be stable and active
+        assertPartitionStable(majorPartition);
+        assertPartitionActive(majorPartition);
+
+        // Filter out all the channels with a primary and secondary on the minor partition
+        List<UUID> lostChannels = filterChannels(channels, ring);
+
+        assertFailoverChannelMappings(channels, majorPartitionId, majorWeavers,
+                                      ring);
+
+        validateLostChannels(lostChannels, majorWeavers);
+
+        // Open some more channels
+
+        ArrayList<UUID> moreChannels = openChannels();
+
+        // Rebalance the open channels across the major partition
+        log.info("Initiating rebalance on majority partition");
+        WeaverCoordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
+        assertTrue("coordinator is not the leader",
+                   partitionLeader.isActiveLeader());
+        partitionLeader.initiateRebalance();
+
+        assertPartitionStable(majorPartition);
+
+        reformPartition();
+
+        // Entire partition should be stable
+        assertPartitionStable(coordinators);
+
+        // Only the major partition should be stable
+        assertPartitionActive(majorPartition);
+        assertPartitionInactive(minorPartition);
+
+        ring = weavers.get(0).createRing();
+        for (Node node : majorPartitionId) {
+            ring.add(node, node.capacity);
+        }
+        assertChannelMappings(channels, majorWeavers, ring);
+
+        assertChannelMappings(moreChannels, majorWeavers, ring);
+
+        validateLostChannels(lostChannels, majorWeavers);
+
+        log.info("Activating minor partition");
+        // Now add the minor partition back into the active set
+        ArrayList<Node> minorPartitionNodes = new ArrayList<Node>();
+        for (WeaverCoordinator c : minorPartition) {
+            minorPartitionNodes.add(c.getId());
+        }
+        partitionLeader.initiateRebalance(minorPartitionNodes.toArray(new Node[0]));
+
+        // Entire partition should be stable 
+        assertPartitionStable(coordinators);
+
+        // Entire partition should be active
+        assertPartitionActive(coordinators);
+
+        // Everything should be back to normal
+        ring = weavers.get(0).createRing();
+        for (Node node : fullPartitionId) {
+            ring.add(node, node.capacity);
+        }
+        assertChannelMappings(channels, weavers, ring);
+
+        // validate lost channels aren't mapped on the partition members
+        validateLostChannels(lostChannels, weavers);
+    }
+
+    /**
      * Test the partitioning behavior of the Coordinator. Test that we can
      * asymmetrically partition the coordinators and that the stable partition
      * stablizes. Then test that we can reform the partition and the reformed
@@ -445,99 +538,6 @@ public class TestSpindleCluster {
             ring.add(node, node.capacity);
         }
         assertChannelMappings(channels, majorWeavers, ring);
-
-        validateLostChannels(lostChannels, majorWeavers);
-
-        log.info("Activating minor partition");
-        // Now add the minor partition back into the active set
-        ArrayList<Node> minorPartitionNodes = new ArrayList<Node>();
-        for (WeaverCoordinator c : minorPartition) {
-            minorPartitionNodes.add(c.getId());
-        }
-        partitionLeader.initiateRebalance(minorPartitionNodes.toArray(new Node[0]));
-
-        // Entire partition should be stable 
-        assertPartitionStable(coordinators);
-
-        // Entire partition should be active
-        assertPartitionActive(coordinators);
-
-        // Everything should be back to normal
-        ring = weavers.get(0).createRing();
-        for (Node node : fullPartitionId) {
-            ring.add(node, node.capacity);
-        }
-        assertChannelMappings(channels, weavers, ring);
-
-        // validate lost channels aren't mapped on the partition members
-        validateLostChannels(lostChannels, weavers);
-    }
-
-    /**
-     * Test that we can still correctly open channels after failover that would
-     * have been mapped to dead nodes. Verify that these channels are correctly
-     * rebalanced.
-     * 
-     * @throws Exception
-     */
-    @Test
-    public void testOpenAfterFailover() throws Exception {
-
-        bootstrap();
-
-        ArrayList<UUID> channels = openChannels();
-
-        // Construct the hash ring that maps the channels to nodes
-        ConsistentHashFunction<Node> ring = weavers.get(0).createRing();
-        for (Node node : fullPartitionId) {
-            ring.add(node, node.capacity);
-        }
-
-        assertChannelMappings(channels, weavers, ring);
-
-        asymmetricallyPartition();
-
-        // major partition should be stable and active
-        assertPartitionStable(majorPartition);
-        assertPartitionActive(majorPartition);
-
-        // Filter out all the channels with a primary and secondary on the minor partition
-        List<UUID> lostChannels = filterChannels(channels, ring);
-
-        assertFailoverChannelMappings(channels, majorPartitionId, majorWeavers,
-                                      ring);
-
-        validateLostChannels(lostChannels, majorWeavers);
-
-        // Open some more channels
-
-        ArrayList<UUID> moreChannels = openChannels();
-
-        // Rebalance the open channels across the major partition
-        log.info("Initiating rebalance on majority partition");
-        WeaverCoordinator partitionLeader = majorPartition.get(majorPartition.size() - 1);
-        assertTrue("coordinator is not the leader",
-                   partitionLeader.isActiveLeader());
-        partitionLeader.initiateRebalance();
-
-        assertPartitionStable(majorPartition);
-
-        reformPartition();
-
-        // Entire partition should be stable
-        assertPartitionStable(coordinators);
-
-        // Only the major partition should be stable
-        assertPartitionActive(majorPartition);
-        assertPartitionInactive(minorPartition);
-
-        ring = weavers.get(0).createRing();
-        for (Node node : majorPartitionId) {
-            ring.add(node, node.capacity);
-        }
-        assertChannelMappings(channels, majorWeavers, ring);
-
-        assertChannelMappings(moreChannels, majorWeavers, ring);
 
         validateLostChannels(lostChannels, majorWeavers);
 

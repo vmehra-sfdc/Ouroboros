@@ -144,6 +144,16 @@ public class SwitchboardFunctionalTest {
         }
     }
 
+    private List<AnnotationConfigApplicationContext> createMembers() {
+        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
+        for (Class<?> config : configs) {
+            AnnotationConfigApplicationContext ctxt = new AnnotationConfigApplicationContext(
+                                                                                             config);
+            contexts.add(ctxt);
+        }
+        return contexts;
+    }
+
     protected Class<?>[] getConfigs() {
         return new Class[] { wkMember1.class, wkMember2.class, member.class,
                 member.class, member.class, member.class, member.class,
@@ -155,15 +165,5 @@ public class SwitchboardFunctionalTest {
 
     protected Class<?> getControllerConfig() {
         return GossipControllerCfg.class;
-    }
-
-    private List<AnnotationConfigApplicationContext> createMembers() {
-        ArrayList<AnnotationConfigApplicationContext> contexts = new ArrayList<AnnotationConfigApplicationContext>();
-        for (Class<?> config : configs) {
-            AnnotationConfigApplicationContext ctxt = new AnnotationConfigApplicationContext(
-                                                                                             config);
-            contexts.add(ctxt);
-        }
-        return contexts;
     }
 }

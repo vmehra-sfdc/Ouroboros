@@ -76,13 +76,13 @@ public class RateController implements Controller {
     }
 
     @Override
-    public boolean accept(long currentTime) {
-        return predicate.accept(currentTime);
+    public boolean accept(int cost, long currentTime) {
+        return predicate.accept(cost, currentTime);
     }
 
     @Override
-    public boolean accept(int cost, long currentTime) {
-        return predicate.accept(cost, currentTime);
+    public boolean accept(long currentTime) {
+        return predicate.accept(currentTime);
     }
 
     public double getAdditiveIncrease() {

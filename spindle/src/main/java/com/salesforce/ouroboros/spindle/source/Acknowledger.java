@@ -91,6 +91,17 @@ public class Acknowledger {
         return fsm.getState();
     }
 
+    public void setFsmName(String fsmName) {
+        fsm.setName(fsmName);
+    }
+
+    /**
+     * @param producer
+     */
+    public void setProducer(Node producer) {
+        this.producer = producer;
+    }
+
     public void writeReady() {
         fsm.writeReady();
     }
@@ -98,6 +109,14 @@ public class Acknowledger {
     private void error() {
         inError = true;
         buffer = null;
+    }
+
+    protected void enqueue(UUID channel, long sequenceNumber) {
+        pending.add(new BatchIdentity(channel, sequenceNumber));
+    }
+
+    protected boolean hasPending() {
+        return !pending.isEmpty();
     }
 
     protected boolean inError() {
@@ -155,24 +174,5 @@ public class Acknowledger {
             return false;
         }
         return !buffer.hasRemaining();
-    }
-
-    public void setFsmName(String fsmName) {
-        fsm.setName(fsmName);
-    }
-
-    protected void enqueue(UUID channel, long sequenceNumber) {
-        pending.add(new BatchIdentity(channel, sequenceNumber));
-    }
-
-    protected boolean hasPending() {
-        return !pending.isEmpty();
-    }
-
-    /**
-     * @param producer
-     */
-    public void setProducer(Node producer) {
-        this.producer = producer;
     }
 }

@@ -17,11 +17,6 @@ public class nodeCfg {
     @Autowired
     private Partition partitionManager;
 
-    protected Node memberNode() {
-        return new Node(partitionIdentity.id, partitionIdentity.id,
-                        partitionIdentity.id);
-    }
-
     @Bean
     public Switchboard switchboard() {
         Switchboard switchboard = new Switchboard(
@@ -30,5 +25,10 @@ public class nodeCfg {
                                                   Generators.timeBasedGenerator());
         new M(memberNode(), switchboard);
         return switchboard;
+    }
+
+    protected Node memberNode() {
+        return new Node(partitionIdentity.id, partitionIdentity.id,
+                        partitionIdentity.id);
     }
 }

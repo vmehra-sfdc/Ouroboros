@@ -63,42 +63,11 @@ public class Batch extends BatchIdentity {
 
         for (ByteBuffer event : events) {
             event.rewind();
-            Event.append(BatchHeader.MAGIC, event, batch);
+            EventHeader.append(BatchHeader.MAGIC, event, batch);
         }
 
         assert batch.remaining() == 0;
         batch.rewind();
-    }
-
-    /**
-     * @return the interval, in milliseconds, between when the batch was
-     *         submitted and when it was acknowledged
-     */
-    public long getInterval() {
-        return interval;
-    }
-
-    /* (non-Javadoc)
-     * @see java.lang.Object#toString()
-     */
-    @Override
-    public String toString() {
-        return "Batch [#events=" + batch.capacity() + ", created=" + created
-               + ", channel=" + channel + ", sequenceNumber=" + sequenceNumber + "]";
-    }
-
-    /**
-     * @return the transfer rate in bytes per second of this batch.
-     */
-    public double rate() {
-        return batchByteSize() / interval;
-    }
-
-    /**
-     * 
-     */
-    public void interval() {
-        interval = Math.max(1, System.currentTimeMillis() - created);
     }
 
     /**
@@ -109,11 +78,25 @@ public class Batch extends BatchIdentity {
     }
 
     /**
+     * @return the interval, in milliseconds, between when the batch was
+     *         submitted and when it was acknowledged
+     */
+    public long getInterval() {
+        return interval;
+    }
+
+    /**
      * 
      */
-    public void rewind() {
-        header.rewind();
-        batch.rewind();
+    public void interval() {
+        interval = Math.max(1, System.currentTimeMillis() - created);
+    }
+
+    /**
+     * @return the transfer rate in bytes per second of this batch.
+     */
+    public double rate() {
+        return batchByteSize() / interval;
     }
 
     /**
@@ -121,5 +104,23 @@ public class Batch extends BatchIdentity {
      */
     public void resetMirror(Node node) {
         header.resetMirror(node);
+    }
+
+    /**
+     * 
+     */
+    public void rewind() {
+        header.rewind();
+        batch.rewind();
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "Batch [#events=" + batch.capacity() + ", created=" + created
+               + ", channel=" + channel + ", sequenceNumber=" + sequenceNumber
+               + "]";
     }
 }

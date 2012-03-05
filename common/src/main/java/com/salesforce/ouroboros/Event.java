@@ -111,6 +111,19 @@ public class Event extends EventHeader {
         return crc ^ 0xffffffff;
     }
 
+    /**
+     * @param buffer
+     * @return
+     */
+    public static Event readFrom(ByteBuffer buffer) {
+        int position = buffer.position();
+        ByteBuffer slice = buffer.slice();
+        int totalSize = slice.getInt() + HEADER_BYTE_SIZE;
+        slice.limit(totalSize);
+        buffer.position(position + totalSize);
+        return new Event(slice.asReadOnlyBuffer());
+    }
+
     public static ByteBuffer readFrom(ReadableByteChannel channel)
                                                                   throws IOException {
         ByteBuffer header = ByteBuffer.allocate(HEADER_BYTE_SIZE);
@@ -187,18 +200,5 @@ public class Event extends EventHeader {
      */
     public boolean validate() {
         return getCrc32() == crc32(bytes, HEADER_BYTE_SIZE);
-    }
-
-    /**
-     * @param buffer
-     * @return
-     */
-    public static Event readFrom(ByteBuffer buffer) {
-        int position = buffer.position();
-        ByteBuffer slice = buffer.slice();
-        int totalSize = slice.getInt() + HEADER_BYTE_SIZE;
-        slice.limit(totalSize);
-        buffer.position(position + totalSize);
-        return new Event(slice.asReadOnlyBuffer());
     }
 }

@@ -13,7 +13,7 @@ public class weaver0 extends GossipDiscoveryNode1Cfg {
     @Override
     public int node() {
         if (node == -1) {
-            node  = weaver.id.incrementAndGet();
+            node = weaver.id.incrementAndGet();
         }
         return node;
     }

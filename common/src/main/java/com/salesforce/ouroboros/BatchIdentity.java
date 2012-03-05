@@ -93,7 +93,8 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
         final int prime = 31;
         int result = 1;
         result = prime * result + (channel == null ? 0 : channel.hashCode());
-        result = prime * result + (int) (sequenceNumber ^ sequenceNumber >>> 32);
+        result = prime * result
+                 + (int) (sequenceNumber ^ sequenceNumber >>> 32);
         return result;
     }
 
@@ -108,7 +109,7 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
      */
     @Override
     public String toString() {
-        return "BatchIdentity [channel=" + channel + ", sequenceNumber=" + sequenceNumber
-               + "]";
+        return "BatchIdentity [channel=" + channel + ", sequenceNumber="
+               + sequenceNumber + "]";
     }
 }

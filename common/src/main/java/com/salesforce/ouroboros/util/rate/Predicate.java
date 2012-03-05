@@ -35,14 +35,6 @@ package com.salesforce.ouroboros.util.rate;
 public interface Predicate {
 
     /**
-     * Evaluate the predicate, using the default cost
-     * @param currentTime TODO
-     * 
-     * @return true if the predicated rate is valid, false otherwise
-     */
-    boolean accept(long currentTime);
-
-    /**
      * Evaluate the predicate, using the supplied cost
      * 
      * @param cost
@@ -53,6 +45,16 @@ public interface Predicate {
      *         otherwise
      */
     boolean accept(int cost, long currentTime);
+
+    /**
+     * Evaluate the predicate, using the default cost
+     * 
+     * @param currentTime
+     *            TODO
+     * 
+     * @return true if the predicated rate is valid, false otherwise
+     */
+    boolean accept(long currentTime);
 
     /**
      * Set the target rate of the predicate

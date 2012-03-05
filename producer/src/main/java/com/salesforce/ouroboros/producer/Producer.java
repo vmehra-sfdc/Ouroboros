@@ -140,7 +140,7 @@ public class Producer implements Comparable<Producer> {
                             Spinner spinner, Node[] weaverPair, boolean failover) {
             super(producerPair, sequenceNumber, weaverPair);
             this.spinner = spinner;
-            this.failedOver = failover;
+            failedOver = failover;
         }
 
         public void failedOver() {

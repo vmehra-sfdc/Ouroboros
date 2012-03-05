@@ -50,20 +50,32 @@ public class RingBuffer<T> extends AbstractQueue<T> {
         items = (T[]) new Object[capacity];
     }
 
-    public int size() {
-        return size;
-    }
-
+    /* (non-Javadoc)
+     * @see java.util.AbstractCollection#iterator()
+     */
     @Override
-    public String toString() {
-        final StringBuilder buf = new StringBuilder();
-        buf.append("[ ");
-        for (int i = 0; i < size; i++) {
-            buf.append(items[(i + head) % items.length]);
-            buf.append(", ");
-        }
-        buf.append("]");
-        return buf.toString();
+    public Iterator<T> iterator() {
+        return new Iterator<T>() {
+            int current = 0;
+
+            @Override
+            public boolean hasNext() {
+                return current < size;
+            }
+
+            @Override
+            public T next() {
+                if (current == size) {
+                    throw new NoSuchElementException();
+                }
+                return items[(current++ + head) % items.length];
+            }
+
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
+        };
     }
 
     /* (non-Javadoc)
@@ -106,31 +118,20 @@ public class RingBuffer<T> extends AbstractQueue<T> {
         return item;
     }
 
-    /* (non-Javadoc)
-     * @see java.util.AbstractCollection#iterator()
-     */
     @Override
-    public Iterator<T> iterator() {
-        return new Iterator<T>() {
-            int current = 0;
+    public int size() {
+        return size;
+    }
 
-            @Override
-            public boolean hasNext() {
-                return current < size;
-            }
-
-            @Override
-            public T next() {
-                if (current == size) {
-                    throw new NoSuchElementException();
-                }
-                return items[(current++ + head) % items.length];
-            }
-
-            @Override
-            public void remove() {
-                throw new UnsupportedOperationException();
-            }
-        };
+    @Override
+    public String toString() {
+        final StringBuilder buf = new StringBuilder();
+        buf.append("[ ");
+        for (int i = 0; i < size; i++) {
+            buf.append(items[(i + head) % items.length]);
+            buf.append(", ");
+        }
+        buf.append("]");
+        return buf.toString();
     }
 }

@@ -78,17 +78,17 @@ final public class Utils {
         dir.delete();
     }
 
+    public static boolean isClose(IOException ioe) {
+        return ioe instanceof ClosedChannelException
+               || "Broken pipe".equals(ioe.getMessage())
+               || "Connection reset by peer".equals(ioe.getMessage());
+    }
+
     public static long point(UUID id) {
         return id.getLeastSignificantBits() ^ id.getMostSignificantBits();
     }
 
     public static UUID toUUID(String string) {
         return UUID_GENERATOR.generate(string);
-    }
-
-    public static boolean isClose(IOException ioe) {
-        return (ioe instanceof ClosedChannelException)
-               || "Broken pipe".equals(ioe.getMessage())
-               || "Connection reset by peer".equals(ioe.getMessage());
     }
 }

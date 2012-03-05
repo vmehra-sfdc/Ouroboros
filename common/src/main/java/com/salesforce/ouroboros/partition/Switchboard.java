@@ -582,6 +582,44 @@ public class Switchboard {
         }
     }
 
+    protected void establishView(UUID[] votes) {
+        HashMap<UUID, Integer> tally = new HashMap<UUID, Integer>();
+        for (UUID vote : votes) {
+            Integer count = tally.get(vote);
+            if (count == null) {
+                tally.put(vote, 1);
+            } else {
+                tally.put(vote, count + 1);
+            }
+        }
+        int i = 0;
+        Result[] results = new Result[tally.size()];
+        for (Entry<UUID, Integer> entry : tally.entrySet()) {
+            results[i++] = new Result(entry.getValue(), entry.getKey());
+        }
+        Arrays.sort(results);
+        Result result = results[results.length - 1];
+
+        UUID newViewId = viewIdGenerator.generate();
+
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("View elected: %s on %s new view: %s",
+                                   result.vote, self, newViewId));
+        }
+
+        ringCast(new Message(self, ViewElectionMessage.NEW_VIEW_ID,
+                             new Serializable[] { result.vote, newViewId }));
+    }
+
+    /**
+     * Establish the cannonical view for this partition. The partition members
+     * hold an election to establish which previous view is the "correct" view.
+     */
+    protected void initiateVoting() {
+        ringCast(new Message(self, ViewElectionMessage.VOTE,
+                             (Serializable[]) new UUID[] { viewId }));
+    }
+
     /**
      * @return true if this node is the leader
      */
@@ -674,43 +712,5 @@ public class Switchboard {
         } else {
             fsm.destabilize();
         }
-    }
-
-    /**
-     * Establish the cannonical view for this partition. The partition members
-     * hold an election to establish which previous view is the "correct" view.
-     */
-    protected void initiateVoting() {
-        ringCast(new Message(self, ViewElectionMessage.VOTE,
-                             (Serializable[]) new UUID[] { viewId }));
-    }
-
-    protected void establishView(UUID[] votes) {
-        HashMap<UUID, Integer> tally = new HashMap<UUID, Integer>();
-        for (UUID vote : votes) {
-            Integer count = tally.get(vote);
-            if (count == null) {
-                tally.put(vote, 1);
-            } else {
-                tally.put(vote, count + 1);
-            }
-        }
-        int i = 0;
-        Result[] results = new Result[tally.size()];
-        for (Entry<UUID, Integer> entry : tally.entrySet()) {
-            results[i++] = new Result(entry.getValue(), entry.getKey());
-        }
-        Arrays.sort(results);
-        Result result = results[results.length - 1];
-
-        UUID newViewId = viewIdGenerator.generate();
-
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("View elected: %s on %s new view: %s",
-                                   result.vote, self, newViewId));
-        }
-
-        ringCast(new Message(self, ViewElectionMessage.NEW_VIEW_ID,
-                             new Serializable[] { result.vote, newViewId }));
     }
 }

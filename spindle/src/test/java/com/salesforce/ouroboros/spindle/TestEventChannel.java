@@ -53,6 +53,20 @@ public class TestEventChannel {
 
     private File root;
 
+    @Before
+    public void setUp() throws Exception {
+        root = File.createTempFile("TestEventChannel", ".root");
+        root.delete();
+        root.mkdirs();
+    }
+
+    @After
+    public void teardown() {
+        if (root != null) {
+            Utils.deleteDirectory(root);
+        }
+    }
+
     @Test
     public void testPrefix() {
         assertEquals(0L, EventChannel.prefixFor(666L, 1024L));
@@ -62,13 +76,6 @@ public class TestEventChannel {
         assertEquals(1024 * 11, EventChannel.prefixFor(1024 * 11, 1024L));
         assertEquals(1024 * 10, EventChannel.prefixFor(1024 * 11 - 1, 1024L));
         assertEquals(1024 * 11, EventChannel.prefixFor(1024 * 11 + 15, 1024L));
-    }
-
-    @Before
-    public void setUp() throws Exception {
-        root = File.createTempFile("TestEventChannel", ".root");
-        root.delete();
-        root.mkdirs();
     }
 
     @Test
@@ -153,13 +160,6 @@ public class TestEventChannel {
             assertEquals(maxSegmentSize * 2, logicalSegment.segment.getPrefix());
             eventChannel.append(batchHeader, offset, logicalSegment.segment);
             position += eventSize;
-        }
-    }
-
-    @After
-    public void teardown() {
-        if (root != null) {
-            Utils.deleteDirectory(root);
         }
     }
 }

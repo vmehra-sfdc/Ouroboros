@@ -17,7 +17,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
 public class ClusterMasterCfg extends GossipNodeCfg {
     @Autowired
     private Partition partitionManager;
-    private int                node = -1;
+    private int       node = -1;
 
     @Bean
     public ClusterMaster clusterMaster() {

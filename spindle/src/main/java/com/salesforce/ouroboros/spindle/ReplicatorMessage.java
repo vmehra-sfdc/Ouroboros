@@ -81,12 +81,12 @@ public enum ReplicatorMessage implements MemberDispatch {
             log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
                                       this, switchboard.getMember()));
         }
-        disptach((WeaverCoordinator) switchboard.getMember(), sender, arguments,
-                 time, switchboard);
+        disptach((WeaverCoordinator) switchboard.getMember(), sender,
+                 arguments, time, switchboard);
 
     }
 
-    abstract protected void disptach(WeaverCoordinator coordinator, Node sender,
-                                     Serializable[] arguments, long time,
-                                     Switchboard switchboard);
+    abstract protected void disptach(WeaverCoordinator coordinator,
+                                     Node sender, Serializable[] arguments,
+                                     long time, Switchboard switchboard);
 }

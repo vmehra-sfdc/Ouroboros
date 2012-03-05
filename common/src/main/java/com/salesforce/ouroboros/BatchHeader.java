@@ -58,7 +58,35 @@ public class BatchHeader {
     protected static final int SEQUENCE_NUMBER_OFFSET   = CH_LSB_OFFSET + 8;
     public static final int    HEADER_BYTE_SIZE         = SEQUENCE_NUMBER_OFFSET + 8;
 
-    private final ByteBuffer   bytes;
+    /**
+     * @param bytes
+     * @param mirror
+     * @param batchByteSize
+     * @param magic
+     * @param channel
+     * @param sequenceNumber
+     */
+    public static void append(ByteBuffer bytes, Node mirror, int batchByteSize,
+                              int magic, UUID channel, long sequenceNumber) {
+        int position = bytes.position();
+        bytes.putInt(position + BATCH_BYTE_LENGTH_OFFSET, batchByteSize);
+        bytes.putInt(position + MAGIC_OFFSET, magic);
+        bytes.putInt(position + PRODUCER_MIRROR_OFFSET, mirror.processId);
+        bytes.putLong(position + CH_MSB_OFFSET,
+                      channel.getMostSignificantBits());
+        bytes.putLong(position + CH_LSB_OFFSET,
+                      channel.getLeastSignificantBits());
+        bytes.putLong(position + SEQUENCE_NUMBER_OFFSET, sequenceNumber);
+        bytes.position(position + HEADER_BYTE_SIZE);
+    }
+
+    public static BatchHeader readFrom(ByteBuffer buffer) {
+        ByteBuffer slice = buffer.slice();
+        buffer.position(buffer.position() + HEADER_BYTE_SIZE);
+        return new BatchHeader(slice.asReadOnlyBuffer());
+    }
+
+    private final ByteBuffer bytes;
 
     public BatchHeader() {
         bytes = ByteBuffer.allocateDirect(getHeaderSize());
@@ -66,12 +94,6 @@ public class BatchHeader {
 
     public BatchHeader(ByteBuffer b) {
         bytes = b;
-    }
-
-    public static BatchHeader readFrom(ByteBuffer buffer) {
-        ByteBuffer slice = buffer.slice();
-        buffer.position(buffer.position() + HEADER_BYTE_SIZE);
-        return new BatchHeader(slice.asReadOnlyBuffer());
     }
 
     public BatchHeader(Node mirror, int batchByteLength, int magic,
@@ -148,6 +170,10 @@ public class BatchHeader {
         return channel.read(bytes);
     }
 
+    public void resetMirror(Node mirror) {
+        bytes.putInt(PRODUCER_MIRROR_OFFSET, mirror.processId);
+    }
+
     /**
      * Rewind the byte content of the receiver
      */
@@ -177,31 +203,5 @@ public class BatchHeader {
 
     protected int getHeaderSize() {
         return HEADER_BYTE_SIZE;
-    }
-
-    /**
-     * @param bytes
-     * @param mirror
-     * @param batchByteSize
-     * @param magic
-     * @param channel
-     * @param sequenceNumber
-     */
-    public static void append(ByteBuffer bytes, Node mirror, int batchByteSize,
-                              int magic, UUID channel, long sequenceNumber) {
-        int position = bytes.position();
-        bytes.putInt(position + BATCH_BYTE_LENGTH_OFFSET, batchByteSize);
-        bytes.putInt(position + MAGIC_OFFSET, magic);
-        bytes.putInt(position + PRODUCER_MIRROR_OFFSET, mirror.processId);
-        bytes.putLong(position + CH_MSB_OFFSET,
-                      channel.getMostSignificantBits());
-        bytes.putLong(position + CH_LSB_OFFSET,
-                      channel.getLeastSignificantBits());
-        bytes.putLong(position + SEQUENCE_NUMBER_OFFSET, sequenceNumber);
-        bytes.position(position + HEADER_BYTE_SIZE);
-    }
-
-    public void resetMirror(Node mirror) {
-        bytes.putInt(PRODUCER_MIRROR_OFFSET, mirror.processId);
     }
 }

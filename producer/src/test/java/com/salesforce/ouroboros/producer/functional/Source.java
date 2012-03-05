@@ -17,11 +17,11 @@ public class Source implements EventSource {
     }
 
     @Override
-    public void opened(UUID channel) {
+    public void deactivated(Collection<UUID> deadChannels) {
     }
 
     @Override
-    public void deactivated(Collection<UUID> deadChannels) {
+    public void opened(UUID channel) {
     }
 
     /* (non-Javadoc)
@@ -30,7 +30,7 @@ public class Source implements EventSource {
     @Override
     public void pauseChannels(Collection<UUID> pausedChannels) {
         // TODO Auto-generated method stub
-        
+
     }
 
 }

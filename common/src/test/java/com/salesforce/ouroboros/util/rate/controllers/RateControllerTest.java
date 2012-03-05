@@ -26,8 +26,8 @@ public class RateControllerTest {
 
         long sampleTime = 0L;
         int[] responseTimes = new int[] { 10, 10, 10, 10, 10, 10, 1 };
-        for (int i = 0; i < responseTimes.length; i++) {
-            controller.sample(responseTimes[i], sampleTime);
+        for (int responseTime : responseTimes) {
+            controller.sample(responseTime, sampleTime);
             sampleTime += 10;
         }
         for (int i = 0; i < 25; i++) {

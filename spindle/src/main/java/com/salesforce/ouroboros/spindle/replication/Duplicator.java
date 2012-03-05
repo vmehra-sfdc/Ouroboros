@@ -62,6 +62,17 @@ public final class Duplicator {
         thisNode = node;
     }
 
+    public void closing() {
+        closed.set(true);
+        if (current != null) {
+            current.handler.selectForRead();
+        }
+        for (EventEntry entry : pending) {
+            entry.handler.selectForRead();
+        }
+        pending.clear();
+    }
+
     public void connect(SocketChannelHandler handler) {
         this.handler = handler;
     }
@@ -88,6 +99,13 @@ public final class Duplicator {
         }
     }
 
+    /**
+     * @param format
+     */
+    public void setFsmName(String name) {
+        fsm.setName(name);
+    }
+
     public void writeReady() {
         fsm.writeReady();
     }
@@ -109,15 +127,16 @@ public final class Duplicator {
         handler.close();
     }
 
-    public void closing() {
-        closed.set(true);
-        if (current != null) {
-            current.handler.selectForRead();
-        }
-        for (EventEntry entry : pending) {
-            entry.handler.selectForRead();
-        }
-        pending.clear();
+    /**
+     * @param event
+     */
+    protected void enqueue(EventEntry event) {
+        pending.add(event);
+    }
+
+    protected boolean hasNext() {
+        assert current == null : "Concurrent events are being processed";
+        return pending.peek() != null;
     }
 
     protected boolean inError() {
@@ -218,24 +237,5 @@ public final class Duplicator {
             }
         }
         return written;
-    }
-
-    protected boolean hasNext() {
-        assert current == null : "Concurrent events are being processed";
-        return pending.peek() != null;
-    }
-
-    /**
-     * @param event
-     */
-    protected void enqueue(EventEntry event) {
-        pending.add(event);
-    }
-
-    /**
-     * @param format
-     */
-    public void setFsmName(String name) {
-        fsm.setName(name);
     }
 }

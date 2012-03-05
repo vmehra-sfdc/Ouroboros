@@ -65,14 +65,6 @@ public class RateLimiter implements Predicate {
     }
 
     /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.util.rate.Predicate#accept()
-     */
-    @Override
-    public boolean accept(long currentTime) {
-        return accept(1, currentTime);
-    }
-
-    /* (non-Javadoc)
      * @see com.salesforce.ouroboros.util.rate.Predicate#accept(int)
      */
     @Override
@@ -95,6 +87,14 @@ public class RateLimiter implements Predicate {
         } else {
             return false;
         }
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.util.rate.Predicate#accept()
+     */
+    @Override
+    public boolean accept(long currentTime) {
+        return accept(1, currentTime);
     }
 
     /**

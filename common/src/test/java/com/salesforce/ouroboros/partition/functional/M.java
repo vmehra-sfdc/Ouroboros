@@ -30,6 +30,12 @@ public class M implements Member {
     }
 
     @Override
+    public void becomeInactive() {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
     public void destabilize() {
         stabilized = false;
     }
@@ -66,12 +72,6 @@ public class M implements Member {
     @Override
     public void stabilized() {
         stabilized = true;
-    }
-
-    @Override
-    public void becomeInactive() {
-        // TODO Auto-generated method stub
-
     }
 
 }

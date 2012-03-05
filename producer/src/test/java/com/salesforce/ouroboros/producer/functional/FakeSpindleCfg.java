@@ -9,11 +9,11 @@ import com.hellblazer.jackal.testUtil.gossip.GossipNodeCfg;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
 
-public class FakeSpindleCfg extends GossipNodeCfg { 
+public class FakeSpindleCfg extends GossipNodeCfg {
 
     @Autowired
-    private Partition                  partitionManager;
-    private int                        node = -1;
+    private Partition partitionManager;
+    private int       node = -1;
 
     @Bean
     public Node memberNode() {

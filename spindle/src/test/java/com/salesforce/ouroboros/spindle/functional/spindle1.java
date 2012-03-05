@@ -8,7 +8,7 @@ import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode1Cfg;
 @Configuration
 @Import({ nodeCfg.class })
 public class spindle1 extends GossipDiscoveryNode1Cfg {
-    private int                node = -1;
+    private int node = -1;
 
     @Override
     public int node() {

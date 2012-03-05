@@ -139,6 +139,37 @@ public class TestSink {
     }
 
     @Test
+    public void testReadChannelCount() throws Exception {
+        Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
+        SocketChannel socket = mock(SocketChannel.class);
+        SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        when(handler.getChannel()).thenReturn(socket);
+
+        Sink sink = new Sink(bundle);
+
+        Answer<Integer> readChannelCount = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                buffer.putInt(Xerox.MAGIC);
+                buffer.putInt(666);
+                return 4;
+            }
+        };
+
+        when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readChannelCount);
+
+        assertEquals(SinkFSM.Initial, sink.getState());
+        sink.accept(handler);
+        assertEquals(SinkFSM.ReadChannelCount, sink.getState());
+        sink.readReady();
+        assertEquals(SinkFSM.Suspended, sink.getState());
+
+        verify(socket, new Times(2)).read(isA(ByteBuffer.class));
+    }
+
+    @Test
     public void testReadChannelHeader() throws Exception {
         Bundle bundle = mock(Bundle.class);
         when(bundle.getId()).thenReturn(new Node(0));
@@ -182,37 +213,6 @@ public class TestSink {
 
         verify(socket, new Times(4)).read(isA(ByteBuffer.class));
         verify(bundle).xeroxEventChannel(channelId);
-    }
-
-    @Test
-    public void testReadChannelCount() throws Exception {
-        Bundle bundle = mock(Bundle.class);
-        when(bundle.getId()).thenReturn(new Node(0));
-        SocketChannel socket = mock(SocketChannel.class);
-        SocketChannelHandler handler = mock(SocketChannelHandler.class);
-        when(handler.getChannel()).thenReturn(socket);
-
-        Sink sink = new Sink(bundle);
-
-        Answer<Integer> readChannelCount = new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                buffer.putInt(Xerox.MAGIC);
-                buffer.putInt(666);
-                return 4;
-            }
-        };
-
-        when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readChannelCount);
-
-        assertEquals(SinkFSM.Initial, sink.getState());
-        sink.accept(handler);
-        assertEquals(SinkFSM.ReadChannelCount, sink.getState());
-        sink.readReady();
-        assertEquals(SinkFSM.Suspended, sink.getState());
-
-        verify(socket, new Times(2)).read(isA(ByteBuffer.class));
     }
 
     @Test

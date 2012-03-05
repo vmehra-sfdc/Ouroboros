@@ -80,7 +80,8 @@ public class TestSpindle {
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
         final BatchHeader header = new BatchHeader(mirror, event.totalSize(),
-                                                   magic, channel, sequenceNumber);
+                                                   magic, channel,
+                                                   sequenceNumber);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                segment,

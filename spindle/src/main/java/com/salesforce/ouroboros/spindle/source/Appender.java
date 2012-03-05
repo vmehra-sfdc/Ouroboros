@@ -50,9 +50,11 @@ public class Appender extends AbstractAppender {
         this.acknowledger = acknowledger;
     }
 
-    @Override
-    protected Logger getLogger() {
-        return log;
+    /**
+     * @param fsmName
+     */
+    public void setFsmName(String fsmName) {
+        fsm.setName(fsmName);
     }
 
     @Override
@@ -84,19 +86,17 @@ public class Appender extends AbstractAppender {
     }
 
     @Override
+    protected Logger getLogger() {
+        return log;
+    }
+
+    @Override
     protected AppendSegment getLogicalSegment() throws IOException {
         return eventChannel.segmentFor(batchHeader);
     }
 
     @Override
     protected void markPosition() {
-        startPosition = (int) position;
-    }
-
-    /**
-     * @param fsmName
-     */
-    public void setFsmName(String fsmName) {
-        fsm.setName(fsmName);
+        startPosition = position;
     }
 }

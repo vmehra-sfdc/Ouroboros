@@ -333,6 +333,17 @@ public class ProducerCoordinator implements Member {
         }
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (o == null) {
+            return false;
+        }
+        if (o instanceof ProducerCoordinator) {
+            return self.equals(((ProducerCoordinator) o).self);
+        }
+        return false;
+    }
+
     /**
      * Answer the node represting this coordinator's id
      * 
@@ -340,6 +351,13 @@ public class ProducerCoordinator implements Member {
      */
     public Node getId() {
         return self;
+    }
+
+    /**
+     * @return
+     */
+    public Producer getProducer() {
+        return producer;
     }
 
     /**
@@ -352,6 +370,11 @@ public class ProducerCoordinator implements Member {
         } catch (StateUndefinedException e) {
             return null;
         }
+    }
+
+    @Override
+    public int hashCode() {
+        return self.hashCode();
     }
 
     /**
@@ -674,26 +697,5 @@ public class ProducerCoordinator implements Member {
      */
     protected boolean tallyComplete() {
         return tally.get() == 0;
-    }
-
-    /**
-     * @return
-     */
-    public Producer getProducer() {
-        return producer;
-    }
-
-    public boolean equals(Object o) {
-        if (o == null) {
-            return false;
-        }
-        if (o instanceof ProducerCoordinator) {
-            return self.equals(((ProducerCoordinator) o).self);
-        }
-        return false;
-    }
-
-    public int hashCode() {
-        return self.hashCode();
     }
 }

@@ -63,7 +63,7 @@ public class Producer implements CommunicationsHandler {
                     int batchSize, Node producerNode, Node targetNode) {
         this.channelIds = channelIds;
         this.latch = latch;
-        this.numberOfBatches = batches;
+        numberOfBatches = batches;
         this.batchSize = batchSize;
         this.producerNode = producerNode;
         this.targetNode = targetNode;

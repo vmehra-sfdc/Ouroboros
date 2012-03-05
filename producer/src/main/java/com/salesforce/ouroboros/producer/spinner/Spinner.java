@@ -205,6 +205,10 @@ public class Spinner implements CommunicationsHandler {
         }
     }
 
+    protected void establish() {
+        established = true;
+    }
+
     protected boolean inError() {
         return inError;
     }
@@ -246,9 +250,5 @@ public class Spinner implements CommunicationsHandler {
             return false;
         }
         return !handshake.hasRemaining();
-    }
-
-    protected void establish() {
-        established = true;
     }
 }

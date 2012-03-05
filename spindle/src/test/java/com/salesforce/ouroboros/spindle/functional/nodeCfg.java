@@ -14,9 +14,9 @@ import org.springframework.context.annotation.Configuration;
 import com.fasterxml.uuid.Generators;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverConfigation;
+import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 
 @Configuration
 public class nodeCfg {

@@ -55,20 +55,20 @@ public interface EventSource {
     void closed(UUID channel);
 
     /**
-     * The channel has been opened.
-     * 
-     * @param channel
-     *            the id of the channel
-     */
-    void opened(UUID channel);
-
-    /**
      * Notification of the list of channels have been lost and cannot be
      * recovered.
      * 
      * @param deadChannels
      */
     void deactivated(Collection<UUID> deadChannels);
+
+    /**
+     * The channel has been opened.
+     * 
+     * @param channel
+     *            the id of the channel
+     */
+    void opened(UUID channel);
 
     /**
      * Notification of the list of channels that the source must pause event

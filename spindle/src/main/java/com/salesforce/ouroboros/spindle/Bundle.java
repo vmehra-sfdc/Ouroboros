@@ -41,21 +41,17 @@ import com.salesforce.ouroboros.spindle.source.Acknowledger;
 public interface Bundle {
 
     /**
+     * @param to
+     */
+    void closeAcknowledger(Node to);
+
+    /**
      * The replicator has been closed.
      * 
      * @param replicator
      *            - the replicator
      */
     void closeReplicator(Node partnerId);
-
-    /**
-     * Answer the xeroxed event channel corresponding to the channel id
-     * 
-     * @param channelId
-     *            - the id of the channel
-     * @return the create EventChannel for this id
-     */
-    EventChannel xeroxEventChannel(UUID channelId);
 
     /**
      * Answer the event channel corresponding to the channel id
@@ -96,7 +92,11 @@ public interface Bundle {
     void map(Node partner, Replicator replicator);
 
     /**
-     * @param to
+     * Answer the xeroxed event channel corresponding to the channel id
+     * 
+     * @param channelId
+     *            - the id of the channel
+     * @return the create EventChannel for this id
      */
-    void closeAcknowledger(Node to);
+    EventChannel xeroxEventChannel(UUID channelId);
 }

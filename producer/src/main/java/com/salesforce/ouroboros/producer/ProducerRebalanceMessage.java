@@ -50,6 +50,7 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
 
     },
     TAKEOVER {
+        @Override
         void dispatch(Switchboard switchboard, Node sender,
                       Serializable[] arguments, long time,
                       ProducerCoordinator coordinator) {
@@ -75,7 +76,8 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
     }
 
     void dispatch(Switchboard switchboard, Node sender,
-                  Serializable[] arguments, long time, ProducerCoordinator coordinator) {
+                  Serializable[] arguments, long time,
+                  ProducerCoordinator coordinator) {
         coordinator.dispatch(this, sender, arguments, time, switchboard);
         switchboard.forwardToNextInRing(new Message(sender, this, arguments),
                                         coordinator.getNextProducerMembership());

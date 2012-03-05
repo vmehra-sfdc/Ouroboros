@@ -46,6 +46,21 @@ public class ClusterMaster implements Member {
     public void becomeInactive() {
     }
 
+    public boolean bootstrapSpindles(Node[] spindles, long timeout,
+                                     TimeUnit unit) throws InterruptedException {
+        switchboard.ringCast(new Message(switchboard.getId(),
+                                         BootstrapMessage.BOOTSTRAP_SPINDLES,
+                                         (Serializable) spindles));
+        return acquire(timeout, unit).get();
+    }
+
+    @PreDestroy
+    public void closeChannel() throws IOException {
+        if (socket != null) {
+            socket.close();
+        }
+    }
+
     @Override
     public void destabilize() {
     }
@@ -107,17 +122,15 @@ public class ClusterMaster implements Member {
         return acquire(timeout, unit).get();
     }
 
+    @PostConstruct
+    public void openChannel() throws UnknownHostException, IOException {
+        socket = new ServerSocket(FakeSpindle.PORT, 100,
+                                  InetAddress.getByName("127.0.01"));
+    }
+
     public void prepare() {
         switchboard.ringCast(new Message(switchboard.getId(),
                                          FailoverMessage.PREPARE));
-    }
-
-    public boolean bootstrapSpindles(Node[] spindles, long timeout,
-                                     TimeUnit unit) throws InterruptedException {
-        switchboard.ringCast(new Message(switchboard.getId(),
-                                         BootstrapMessage.BOOTSTRAP_SPINDLES,
-                                         (Serializable) spindles));
-        return acquire(timeout, unit).get();
     }
 
     @Override
@@ -136,18 +149,5 @@ public class ClusterMaster implements Member {
         }, timeout, unit);
         semaphore.acquire();
         return acquired;
-    }
-
-    @PostConstruct
-    public void openChannel() throws UnknownHostException, IOException {
-        socket = new ServerSocket(FakeSpindle.PORT, 100,
-                                  InetAddress.getByName("127.0.01"));
-    }
-
-    @PreDestroy
-    public void closeChannel() throws IOException {
-        if (socket != null) {
-            socket.close();
-        }
     }
 }

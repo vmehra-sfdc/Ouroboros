@@ -306,6 +306,10 @@ public class EventChannel {
         return channel.equals(((EventChannel) o).channel);
     }
 
+    public void failMirror() {
+        replicator = null;
+    }
+
     public void failOver() {
         failedOver = true;
         role = Role.PRIMARY;
@@ -361,20 +365,6 @@ public class EventChannel {
             }
         }
         return segments;
-    }
-
-    private File[] getSegmentFiles() {
-        File[] segmentFiles = channel.listFiles(SEGMENT_FILTER);
-        if (segmentFiles == null) {
-            return new File[0];
-        }
-        Arrays.sort(segmentFiles, new Comparator<File>() {
-            @Override
-            public int compare(File o1, File o2) {
-                return o2.getName().compareTo(o1.getName());
-            }
-        });
-        return segmentFiles;
     }
 
     @Override
@@ -452,11 +442,6 @@ public class EventChannel {
         return getSegment(offset, position, segment);
     }
 
-    private AppendSegment getSegment(long offset, int position, File segment)
-                                                                             throws IOException {
-        return new AppendSegment(getCachedSegment(segment), offset, position);
-    }
-
     private Segment getCachedSegment(File segment) throws FileNotFoundException {
         Segment newSegment = new Segment(segment);
         Segment currentSegment = segmentCache.putIfAbsent(segment, newSegment);
@@ -467,7 +452,22 @@ public class EventChannel {
         return currentSegment;
     }
 
-    public void failMirror() {
-        replicator = null;
+    private AppendSegment getSegment(long offset, int position, File segment)
+                                                                             throws IOException {
+        return new AppendSegment(getCachedSegment(segment), offset, position);
+    }
+
+    private File[] getSegmentFiles() {
+        File[] segmentFiles = channel.listFiles(SEGMENT_FILTER);
+        if (segmentFiles == null) {
+            return new File[0];
+        }
+        Arrays.sort(segmentFiles, new Comparator<File>() {
+            @Override
+            public int compare(File o1, File o2) {
+                return o2.getName().compareTo(o1.getName());
+            }
+        });
+        return segmentFiles;
     }
 }

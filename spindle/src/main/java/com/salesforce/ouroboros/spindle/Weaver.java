@@ -56,8 +56,8 @@ import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.spindle.transfer.Sink;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
 import com.salesforce.ouroboros.spindle.util.ConcurrentLinkedHashMap;
-import com.salesforce.ouroboros.spindle.util.EvictionListener;
 import com.salesforce.ouroboros.spindle.util.ConcurrentLinkedHashMap.Builder;
+import com.salesforce.ouroboros.spindle.util.EvictionListener;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Rendezvous;
 

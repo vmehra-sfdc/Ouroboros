@@ -158,6 +158,20 @@ public class Sink implements CommunicationsHandler {
         return false;
     }
 
+    protected void getChannelCount() {
+        buffer.clear();
+        buffer.limit(CHANNEL_COUNT_HEADER_SIZE);
+        if (readChannelCount()) {
+            fsm.finished();
+        } else {
+            if (error) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
+        }
+    }
+
     protected boolean inError() {
         return error;
     }
@@ -201,6 +215,51 @@ public class Sink implements CommunicationsHandler {
                 handler.selectForRead();
             }
         }
+    }
+
+    protected boolean readChannelCount() {
+        try {
+            if (handler.getChannel().read(buffer) < 0) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine("Closing channel");
+                }
+                error = true;
+                return false;
+            }
+        } catch (ClosedChannelException e) {
+            if (log.isLoggable(Level.FINE)) {
+                log.fine("Closing channel");
+            }
+            error = true;
+            return false;
+        } catch (IOException e) {
+            error = true;
+            if (log.isLoggable(Level.WARNING)) {
+                log.log(Level.WARNING,
+                        String.format("Error reading handshake on %s",
+                                      bundle.getId()), e);
+            }
+            return false;
+        }
+        if (!buffer.hasRemaining()) {
+            buffer.flip();
+            int magic = buffer.getInt();
+            if (MAGIC != magic) {
+                error = true;
+                if (log.isLoggable(Level.WARNING)) {
+                    log.warning(String.format("Invalid handshake magic value %s on %s",
+                                              magic, bundle.getId()));
+                }
+                return false;
+            }
+            channelCount = buffer.getInt();
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Expecting %s channels on %s",
+                                       channelCount, bundle.getId()));
+            }
+            return true;
+        }
+        return false;
     }
 
     protected boolean readChannelHeader() {
@@ -334,63 +393,8 @@ public class Sink implements CommunicationsHandler {
         handler.selectForRead();
     }
 
-    protected void getChannelCount() {
-        buffer.clear();
-        buffer.limit(CHANNEL_COUNT_HEADER_SIZE);
-        if (readChannelCount()) {
-            fsm.finished();
-        } else {
-            if (error) {
-                fsm.close();
-            } else {
-                handler.selectForRead();
-            }
-        }
-    }
-
-    protected boolean readChannelCount() {
-        try {
-            if (handler.getChannel().read(buffer) < 0) {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
-                }
-                error = true;
-                return false;
-            }
-        } catch (ClosedChannelException e) {
-            if (log.isLoggable(Level.FINE)) {
-                log.fine("Closing channel");
-            }
-            error = true;
-            return false;
-        } catch (IOException e) {
-            error = true;
-            if (log.isLoggable(Level.WARNING)) {
-                log.log(Level.WARNING,
-                        String.format("Error reading handshake on %s",
-                                      bundle.getId()), e);
-            }
-            return false;
-        }
-        if (!buffer.hasRemaining()) {
-            buffer.flip();
-            int magic = buffer.getInt();
-            if (MAGIC != magic) {
-                error = true;
-                if (log.isLoggable(Level.WARNING)) {
-                    log.warning(String.format("Invalid handshake magic value %s on %s",
-                                              magic, bundle.getId()));
-                }
-                return false;
-            }
-            channelCount = buffer.getInt();
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Expecting %s channels on %s",
-                                       channelCount, bundle.getId()));
-            }
-            return true;
-        }
-        return false;
+    protected void selectForWrite() {
+        handler.selectForWrite();
     }
 
     protected void sendAck() {
@@ -439,9 +443,5 @@ public class Sink implements CommunicationsHandler {
             return false;
         }
         return !buffer.hasRemaining();
-    }
-
-    protected void selectForWrite() {
-        handler.selectForWrite();
     }
 }
