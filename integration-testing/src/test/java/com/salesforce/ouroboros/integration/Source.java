@@ -30,28 +30,43 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
+import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
 import com.salesforce.ouroboros.api.producer.UnknownChannelException;
 import com.salesforce.ouroboros.producer.Producer;
 
 public class Source implements EventSource {
-    private static final Logger                log            = Logger.getLogger(Source.class.getCanonicalName());
-    public final ConcurrentHashMap<UUID, Long> channels       = new ConcurrentHashMap<UUID, Long>();
+    private static final Logger                log                   = Logger.getLogger(Source.class.getCanonicalName());
+    public final ConcurrentHashMap<UUID, Long> channels              = new ConcurrentHashMap<UUID, Long>();
     private Producer                           producer;
-    public final ArrayList<UUID>               failedChannels = new ArrayList<UUID>();
-    private AtomicBoolean                      shutdown       = new AtomicBoolean();
+    public final Set<UUID>                     failedChannels        = new ConcurrentSkipListSet<UUID>();
+    private final Set<UUID>                    pausedChannels        = new ConcurrentSkipListSet<UUID>();
+    public final Set<UUID>                     relinquishedPrimaries = new ConcurrentSkipListSet<UUID>();
+    private AtomicBoolean                      shutdown              = new AtomicBoolean();
 
     @Override
     public void assumePrimary(Map<UUID, Long> newPrimaries) {
+        System.out.println(String.format("Assuming primary for %s on %s",
+                                         newPrimaries.keySet(),
+                                         producer.getId()));
         channels.putAll(newPrimaries);
+        for (UUID channel : newPrimaries.keySet()) {
+            failedChannels.remove(channel);
+        }
+        if (shutdown.get()) {
+            System.out.println(String.format("Channel rebalance, dead source %s : %s",
+                                             getId(), newPrimaries.keySet()));
+        }
     }
 
     @Override
@@ -73,10 +88,14 @@ public class Source implements EventSource {
 
     public void publish(final int batchSize, Executor executor,
                         final CountDownLatch latch, final long targetTimestamp) {
+        shutdown.set(false);
         executor.execute(new Runnable() {
             @Override
             public void run() {
                 publish(batchSize, latch, targetTimestamp);
+                System.out.println(String.format("Stopping publishing on %s",
+                                                 producer.getId()));
+                shutdown.set(true);
             }
         });
     }
@@ -105,12 +124,16 @@ public class Source implements EventSource {
                     } catch (InterruptedException e2) {
                         return;
                     }
+                    boolean failed = false;
                     while (!published && channels.containsKey(channel)
-                           && !shutdown.get()) {
+                           && !shutdown.get()
+                           && !pausedChannels.contains(channel)) {
                         try {
                             try {
                                 producer.publish(channel, nextTimestamp, events);
                             } catch (UnknownChannelException e) {
+                                failed = true;
+                                channels.remove(channel);
                                 failedChannels.add(channel);
                                 continue;
                             } catch (InterruptedException e) {
@@ -133,10 +156,13 @@ public class Source implements EventSource {
                             }
                         }
                     }
-                    entry.setValue(nextTimestamp);
+                    if (!failed) {
+                        entry.setValue(nextTimestamp);
+                    }
                 }
             }
         }
+        failedChannels.removeAll(relinquishedPrimaries);
         latch.countDown();
     }
 
@@ -158,8 +184,29 @@ public class Source implements EventSource {
      * @see com.salesforce.ouroboros.api.producer.EventSource#pauseChannels(java.util.Collection)
      */
     @Override
-    public void pauseChannels(Collection<UUID> pausedChannels) {
-        // TODO Auto-generated method stub
-        
+    public void pause(Collection<UUID> channels) {
+        pausedChannels.addAll(channels);
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.api.producer.EventSource#resume(java.util.Collection)
+     */
+    @Override
+    public void resume(Collection<UUID> channels) {
+        pausedChannels.removeAll(channels);
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.api.producer.EventSource#relinquishPrimary(java.util.UUID)
+     */
+    @Override
+    public void relinquishPrimary(Collection<UUID> channels) {
+        System.out.println(String.format("Relinquishing primary for %s on %s",
+                                         channels, producer.getId()));
+        relinquishedPrimaries.addAll(channels);
+    }
+
+    public Node getId() {
+        return producer.getId();
     }
 }

@@ -31,6 +31,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
@@ -61,9 +62,12 @@ public class TestXerox {
         WeaverCoordinator coordinator = mock(WeaverCoordinator.class);
         Segment segment1 = mock(Segment.class);
         Segment segment2 = mock(Segment.class);
-        SocketChannel socket = mock(SocketChannel.class);
+        Socket socket = mock(Socket.class);
+        when(socket.getSendBufferSize()).thenReturn(1024);
+        SocketChannel socketChannel = mock(SocketChannel.class);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
-        when(handler.getChannel()).thenReturn(socket);
+        when(handler.getChannel()).thenReturn(socketChannel);
+        when(socketChannel.socket()).thenReturn(socket);
         Node fromNode = new Node(0, 0, 0);
         Node node = new Node(0x1639, 0x1640, 0x1641);
         Rendezvous rendezvous = mock(Rendezvous.class);
@@ -126,12 +130,12 @@ public class TestXerox {
                 return Sink.ACK_HEADER_SIZE;
             }
         };
-        when(socket.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(writeChannelCount).thenReturn(0).thenAnswer(writeChannelHeader).thenReturn(0).thenAnswer(writeSegmentHeader1).thenReturn(0).thenAnswer(writeSegmentHeader2).thenReturn(0);
-        when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readAck);
-        when(segment1.transferTo(0L, 1024L, socket)).thenReturn(1024L);
-        when(segment1.transferTo(1024L, 1024L, socket)).thenReturn(1024L);
-        when(segment2.transferTo(0L, 1024L, socket)).thenReturn(512L);
-        when(segment2.transferTo(512L, 1024L, socket)).thenReturn(512L);
+        when(socketChannel.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(writeChannelCount).thenReturn(0).thenAnswer(writeChannelHeader).thenReturn(0).thenAnswer(writeSegmentHeader1).thenReturn(0).thenAnswer(writeSegmentHeader2).thenReturn(0);
+        when(socketChannel.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readAck);
+        when(segment1.transferTo(0L, 1024L, socketChannel)).thenReturn(1024L);
+        when(segment1.transferTo(1024L, 1024L, socketChannel)).thenReturn(1024L);
+        when(segment2.transferTo(0L, 1024L, socketChannel)).thenReturn(512L);
+        when(segment2.transferTo(512L, 1024L, socketChannel)).thenReturn(512L);
         when(segment1.getPrefix()).thenReturn(prefix1);
         when(segment2.getPrefix()).thenReturn(prefix2);
         when(segment1.size()).thenReturn(size1);
@@ -139,8 +143,7 @@ public class TestXerox {
         when(channel.getSegmentStack()).thenReturn(segments);
         when(channel.getId()).thenReturn(id);
 
-        int transferSize = 1024;
-        Xerox xerox = new Xerox(fromNode, node, coordinator, transferSize);
+        Xerox xerox = new Xerox(fromNode, node, coordinator);
         xerox.setRendezvous(rendezvous);
         xerox.addChannel(channel);
         assertEquals(XeroxFSM.Initial, xerox.getState());

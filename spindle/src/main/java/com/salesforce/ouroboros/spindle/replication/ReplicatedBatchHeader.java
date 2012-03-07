@@ -81,7 +81,7 @@ public class ReplicatedBatchHeader extends BatchHeader {
             ReplicatedBatchHeader b = (ReplicatedBatchHeader) o;
             return b.getMagic() == getMagic()
                    && b.getBatchByteLength() == getBatchByteLength()
-                   && b.getTimestamp() == b.getTimestamp()
+                   && b.getSequenceNumber() == b.getSequenceNumber()
                    && b.getOffset() == getOffset()
                    && b.getChannel().equals(getChannel());
         }
@@ -99,7 +99,7 @@ public class ReplicatedBatchHeader extends BatchHeader {
     @Override
     public String toString() {
         return String.format("ReplicatedBatchHeader[magic=%s, sequenceNumber=%s, length=%s, channel=%s offset=%s position=%s]",
-                             getMagic(), getTimestamp(), getBatchByteLength(),
+                             getMagic(), getSequenceNumber(), getBatchByteLength(),
                              getChannel(), getOffset(), getPosition());
     }
 

@@ -30,10 +30,12 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedSet;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
@@ -80,7 +82,8 @@ public class WeaverCoordinator implements Member {
     private final SortedSet<Node>               inactiveMembers = new ConcurrentSkipListSet<Node>();
     private Node[]                              joiningMembers  = new Node[0];
     private final SortedSet<Node>               nextMembership  = new ConcurrentSkipListSet<Node>();
-    private Rendezvous                          rendezvous;
+    private Rendezvous                          pauseRendezvous;
+    private Rendezvous                          rebalanceRendezvous;
     private final Node                          self;
     private final Switchboard                   switchboard;
     private final AtomicInteger                 tally           = new AtomicInteger();
@@ -170,6 +173,18 @@ public class WeaverCoordinator implements Member {
             case PRIMARY_OPENED:
                 break;
             case MIRROR_OPENED:
+                break;
+            case PAUSE_CHANNELS:
+                if (self.equals(sender)) {
+                    try {
+                        pauseRendezvous.meet(arguments.length);
+                    } catch (BrokenBarrierException e) {
+                        if (log.isLoggable(Level.WARNING)) {
+                            log.warning(String.format("Channel pause rendezvous has been broken on: %s",
+                                                      self));
+                        }
+                    }
+                }
                 break;
             default: {
                 if (log.isLoggable(Level.WARNING)) {
@@ -499,9 +514,13 @@ public class WeaverCoordinator implements Member {
     }
 
     protected void cleanUp() {
-        if (rendezvous != null) {
-            rendezvous.cancel();
-            rendezvous = null;
+        if (rebalanceRendezvous != null) {
+            rebalanceRendezvous.cancel();
+            rebalanceRendezvous = null;
+        }
+        if (pauseRendezvous != null) {
+            pauseRendezvous.cancel();
+            pauseRendezvous = null;
         }
         weaver.setNextRing(null);
         tally.set(0);
@@ -596,12 +615,12 @@ public class WeaverCoordinator implements Member {
      * Open the replicators to the the new members.
      */
     protected void establishReplicators() {
-        rendezvous = null;
+        rebalanceRendezvous = null;
 
         Runnable rendezvousAction = new Runnable() {
             @Override
             public void run() {
-                rendezvous = null;
+                rebalanceRendezvous = null;
                 if (log.isLoggable(Level.FINE)) {
                     log.fine(String.format("Replicators established on %s",
                                            self));
@@ -634,7 +653,7 @@ public class WeaverCoordinator implements Member {
         Runnable cancellationAction = new Runnable() {
             @Override
             public void run() {
-                rendezvous = null;
+                rebalanceRendezvous = null;
                 if (log.isLoggable(Level.INFO)) {
                     log.info(String.format("Replicator establishment cancelled on %s",
                                            self));
@@ -651,14 +670,15 @@ public class WeaverCoordinator implements Member {
             log.finer(String.format("Establishment of replicators initiated on %s",
                                     self));
         }
-        rendezvous = new Rendezvous(contacts.size(), rendezvousAction,
-                                    cancellationAction);
+        rebalanceRendezvous = new Rendezvous(contacts.size(), rendezvousAction,
+                                             cancellationAction);
         for (Node member : contacts) {
             replicators.add(weaver.openReplicator(member,
                                                   yellowPages.get(member),
-                                                  rendezvous));
+                                                  rebalanceRendezvous));
         }
-        rendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT, timer);
+        rebalanceRendezvous.scheduleCancellation(DEFAULT_TIMEOUT, TIMEOUT_UNIT,
+                                                 timer);
         weaver.connectReplicators(replicators, yellowPages);
     }
 
@@ -773,19 +793,47 @@ public class WeaverCoordinator implements Member {
             log.info(String.format("Establishment of replicators initiated on %s",
                                    self));
         }
+
+        ArrayList<UUID> paused = new ArrayList<UUID>(remapped.size());
+
         for (Entry<UUID, Node[][]> entry : remapped.entrySet()) {
             weaver.rebalance(xeroxes, entry.getKey(), entry.getValue()[0][0],
                              entry.getValue()[0][1], entry.getValue()[1][0],
                              entry.getValue()[1][1], activeMembers, this);
+            paused.add(entry.getKey());
         }
 
         if (xeroxes.isEmpty()) {
             rendezvousAction.run();
+            return;
         }
 
-        rendezvous = new Rendezvous(xeroxes.size(), rendezvousAction,
-                                    cancellationAction);
-        weaver.connectXeroxes(xeroxes, yellowPages, rendezvous);
+        rebalanceRendezvous = new Rendezvous(xeroxes.size(), rendezvousAction,
+                                             cancellationAction);
+
+        Runnable pauseAction = new Runnable() {
+            @Override
+            public void run() {
+                pauseRendezvous = null;
+                log.info(String.format("Connecting xeroxes on: %s", self));
+                weaver.connectXeroxes(xeroxes, yellowPages, rebalanceRendezvous);
+            }
+        };
+
+        pauseRendezvous = new Rendezvous(paused.size(), pauseAction,
+                                         cancellationAction);
+
+        int delta = 20;
+        for (int i = 0; i < paused.size();) {
+            List<UUID> packet = paused.subList(i,
+                                               Math.min(i + delta,
+                                                        paused.size()));
+            i += delta;
+            switchboard.ringCast(new Message(
+                                             self,
+                                             ChannelMessage.PAUSE_CHANNELS,
+                                             packet.toArray(new Serializable[packet.size()])));
+        }
     }
 
     /**
@@ -816,7 +864,7 @@ public class WeaverCoordinator implements Member {
     }
 
     protected void rebalancePrepared() {
-        rendezvous = null;
+        rebalanceRendezvous = null;
         switchboard.ringCast(new Message(
                                          self,
                                          WeaverRebalanceMessage.INITIATE_REBALANCE));
@@ -875,7 +923,7 @@ public class WeaverCoordinator implements Member {
      * @return the current rendenzvous of the coordinator
      */
     Rendezvous getRendezvous() {
-        return rendezvous;
+        return rebalanceRendezvous;
     }
 
     /**

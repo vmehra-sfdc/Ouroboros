@@ -661,8 +661,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
 
     private void infoLog(String logString, Object... args) {
         if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Rebalancing for %s from primary %s to new mirror %s",
-                                   args));
+            log.info(String.format(logString, args));
         }
     }
 

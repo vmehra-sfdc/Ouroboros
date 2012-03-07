@@ -71,11 +71,24 @@ public interface EventSource {
     void opened(UUID channel);
 
     /**
-     * Notification of the list of channels that the source must pause event
-     * publishing on
+     * Notification of the list of channels to pause event publishing
      * 
      * @param pausedChannels
      */
-    void pauseChannels(Collection<UUID> pausedChannels);
+    void pause(Collection<UUID> pausedChannels);
+
+    /**
+     * Notification that the list of channels should be resumed.
+     * 
+     * @param pausedChannels
+     */
+    void resume(Collection<UUID> pausedChannels);
+
+    /**
+     * Notification that the receiver is no longer the primary for the channels
+     * 
+     * @param channels
+     */
+    void relinquishPrimary(Collection<UUID> channels);
 
 }

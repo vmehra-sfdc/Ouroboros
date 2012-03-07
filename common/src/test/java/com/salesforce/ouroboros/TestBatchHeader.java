@@ -49,7 +49,7 @@ public class TestBatchHeader {
         assertEquals(batchByteLength, header.getBatchByteLength());
         assertEquals(channel, header.getChannel());
         assertEquals(magic, header.getMagic());
-        assertEquals(sequenceNumber, header.getTimestamp());
+        assertEquals(sequenceNumber, header.getSequenceNumber());
         assertEquals(mirror, header.getProducerMirror());
     }
 }

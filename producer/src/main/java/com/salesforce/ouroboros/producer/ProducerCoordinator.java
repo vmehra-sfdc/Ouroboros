@@ -65,7 +65,7 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  */
 public class ProducerCoordinator implements Member {
     private static enum Pending {
-        PENDING, PRIMARY_OPENED, MIRROR_OPENED
+        MIRROR_OPENED, PENDING, PRIMARY_OPENED
     };
 
     private final static Logger                 log                    = Logger.getLogger(ProducerCoordinator.class.getCanonicalName());
@@ -79,13 +79,13 @@ public class ProducerCoordinator implements Member {
     private final SortedSet<Node>               inactiveWeavers        = new ConcurrentSkipListSet<Node>();
     private Node[]                              joiningProducers       = new Node[0];
     private final SortedSet<Node>               nextProducerMembership = new ConcurrentSkipListSet<Node>();
+    private final ConcurrentMap<UUID, Pending>  pendingChannels        = new ConcurrentHashMap<UUID, ProducerCoordinator.Pending>();
     private final Producer                      producer;
+    private final List<UpdateState>             rebalanceUpdates       = new ArrayList<Producer.UpdateState>();
     private final Node                          self;
     private final Switchboard                   switchboard;
-    private final ConcurrentMap<UUID, Pending>  pendingChannels        = new ConcurrentHashMap<UUID, ProducerCoordinator.Pending>();
-    private final Map<Node, ContactInformation> yellowPages            = new ConcurrentHashMap<Node, ContactInformation>();
     private final AtomicInteger                 tally                  = new AtomicInteger();
-    private final List<UpdateState>             rebalanceUpdates       = new ArrayList<Producer.UpdateState>();
+    private final Map<Node, ContactInformation> yellowPages            = new ConcurrentHashMap<Node, ContactInformation>();
 
     public ProducerCoordinator(Switchboard switchboard, Producer producer)
                                                                           throws IOException {
@@ -220,6 +220,11 @@ public class ProducerCoordinator implements Member {
                 break;
             }
             case PAUSE_CHANNELS: {
+                ArrayList<UUID> channels = new ArrayList<UUID>(arguments.length);
+                for (Serializable s : arguments) {
+                    channels.add((UUID) s);
+                }
+                producer.pause(channels);
                 break;
             }
             default: {
@@ -325,6 +330,7 @@ public class ProducerCoordinator implements Member {
             case PREPARE_FOR_REBALANCE:
             case REBALANCE_COMPLETE:
             case TAKEOVER:
+                producer.resumePausedChannels();
                 return;
             default:
                 throw new IllegalStateException(
@@ -473,10 +479,12 @@ public class ProducerCoordinator implements Member {
     private void calculateNextProducerRing() {
         ConsistentHashFunction<Node> newRing = producer.createRing();
         for (Node node : activeProducers) {
-            newRing.add(node, node.capacity);
+            Node clone = node.clone();
+            newRing.add(clone, clone.capacity);
         }
         for (Node node : joiningProducers) {
-            newRing.add(node, node.capacity);
+            Node clone = node.clone();
+            newRing.add(clone, clone.capacity);
         }
         producer.setNextProducerRing(newRing);
     }
@@ -494,6 +502,7 @@ public class ProducerCoordinator implements Member {
         nextProducerMembership.clear();
         tally.set(0);
         rebalanceUpdates.clear();
+        producer.cleanUp();
     }
 
     /**

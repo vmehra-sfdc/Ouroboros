@@ -38,7 +38,7 @@ import java.util.SortedSet;
  * @author hhildebrand
  * 
  */
-public class Node implements Comparable<Node>, Serializable {
+public class Node implements Comparable<Node>, Serializable, Cloneable {
 
     public static final int   BYTE_LENGTH      = 4 + 4 + 4 + 4 + 4;
     private static final long serialVersionUID = 1L;
@@ -135,5 +135,16 @@ public class Node implements Comparable<Node>, Serializable {
     @Override
     public String toString() {
         return String.format("Node[%s]", processId);
+    }
+
+    public Node clone() {
+        Node clone;
+        try {
+            clone = (Node) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new IllegalStateException();
+        }
+        clone.down = false;
+        return clone;
     }
 }

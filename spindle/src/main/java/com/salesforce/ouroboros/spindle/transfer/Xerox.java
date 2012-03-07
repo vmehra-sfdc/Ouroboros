@@ -26,6 +26,7 @@
 package com.salesforce.ouroboros.spindle.transfer;
 
 import java.io.IOException;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.LinkedList;
@@ -51,37 +52,30 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class Xerox implements CommunicationsHandler {
 
-    public static final int           BUFFER_SIZE       = 8 + 8 + 8;
-    public static final int           MAGIC             = 0x1638;
-    private static final int          DEFAULT_TXFR_SIZE = 16 * 1024;
-    private static final Logger       log               = Logger.getLogger(Xerox.class.getCanonicalName());
+    public static final int           BUFFER_SIZE = 8 + 8 + 8;
+    public static final int           MAGIC       = 0x1638;
+    private static final Logger       log         = Logger.getLogger(Xerox.class.getCanonicalName());
 
-    private final ByteBuffer          buffer            = ByteBuffer.allocate(BUFFER_SIZE);
-    private final Deque<EventChannel> channels          = new LinkedList<EventChannel>();
+    private final ByteBuffer          buffer      = ByteBuffer.allocate(BUFFER_SIZE);
+    private final Deque<EventChannel> channels    = new LinkedList<EventChannel>();
     private EventChannel              currentChannel;
     private Segment                   currentSegment;
-    private final XeroxContext        fsm               = new XeroxContext(this);
+    private final XeroxContext        fsm         = new XeroxContext(this);
     private SocketChannelHandler      handler;
-    private boolean                   inError           = false;
+    private boolean                   inError     = false;
     private final Node                to;
     private final Node                from;
     private long                      position;
     private Rendezvous                rendezvous;
     private Deque<Segment>            segments;
     private long                      segmentSize;
-    private final long                transferSize;
+    private long                      transferSize;
     private final WeaverCoordinator   coordinator;
 
     public Xerox(Node from, Node toNode, WeaverCoordinator coordinator) {
-        this(from, toNode, coordinator, DEFAULT_TXFR_SIZE);
-    }
-
-    public Xerox(Node from, Node toNode, WeaverCoordinator coordinator,
-                 int transferSize) {
         fsm.setName(String.format("%s->%s", from.processId, toNode.processId));
         this.from = from;
         to = toNode;
-        this.transferSize = transferSize;
         this.coordinator = coordinator;
     }
 
@@ -105,6 +99,14 @@ public class Xerox implements CommunicationsHandler {
     @Override
     public void connect(SocketChannelHandler h) {
         handler = h;
+        try {
+            transferSize = handler.getChannel().socket().getSendBufferSize();
+        } catch (SocketException e) {
+            transferSize = 16 * 1024;
+            log.warning(String.format("Cannot retrieve send buffer size from: %s in %s",
+                                      handler.getChannel().socket(),
+                                      fsm.getName()));
+        }
         fsm.connect();
     }
 

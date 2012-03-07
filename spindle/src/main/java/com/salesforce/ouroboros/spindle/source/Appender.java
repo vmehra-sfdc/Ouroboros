@@ -99,4 +99,20 @@ public class Appender extends AbstractAppender {
     protected void markPosition() {
         startPosition = position;
     }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.source.AbstractAppender#drain()
+     */
+    @Override
+    protected void drain() {
+        acknowledger.acknowledge(batchHeader.getChannel(),
+                                 batchHeader.getSequenceNumber());
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Acknowledging replication of duplicate %s:%s on %s",
+                                   batchHeader.getChannel(),
+                                   batchHeader.getSequenceNumber(),
+                                   bundle.getId()));
+        }
+        super.drain();
+    }
 }

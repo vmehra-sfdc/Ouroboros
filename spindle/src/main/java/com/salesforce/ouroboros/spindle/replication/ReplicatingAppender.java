@@ -81,7 +81,7 @@ public class ReplicatingAppender extends AbstractAppender {
                                     batchHeader, bundle.getId()));
         }
         acknowledger.acknowledge(batchHeader.getChannel(),
-                                 batchHeader.getTimestamp());
+                                 batchHeader.getSequenceNumber());
     }
 
     @Override
@@ -104,5 +104,30 @@ public class ReplicatingAppender extends AbstractAppender {
     @Override
     protected void ready() {
         handler.selectForRead();
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.source.AbstractAppender#duplicatedBatch()
+     */
+    @Override
+    protected void drain() {
+        Node node = batchHeader.getProducerMirror();
+        Acknowledger acknowledger = bundle.getAcknowledger(node);
+        if (acknowledger == null) {
+            if (node.processId != NullNode.INSTANCE.processId) {
+                log.warning(String.format("Could not find an acknowledger for %s",
+                                          node));
+            }
+            return;
+        }
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Acknowledging replication of duplicate %s:%s on %s",
+                                   batchHeader.getChannel(),
+                                   batchHeader.getSequenceNumber(),
+                                   bundle.getId()));
+        }
+        acknowledger.acknowledge(batchHeader.getChannel(),
+                                 batchHeader.getSequenceNumber());
+        super.drain();
     }
 }

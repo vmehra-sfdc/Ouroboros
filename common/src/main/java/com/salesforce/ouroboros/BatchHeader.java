@@ -109,7 +109,7 @@ public class BatchHeader {
             return b.getMagic() == getMagic()
                    && b.getProducerMirror().equals(getProducerMirror())
                    && b.getBatchByteLength() == getBatchByteLength()
-                   && b.getTimestamp() == b.getTimestamp()
+                   && b.getSequenceNumber() == b.getSequenceNumber()
                    && b.getChannel().equals(getChannel());
         }
         return false;
@@ -145,7 +145,7 @@ public class BatchHeader {
         return new Node(bytes.getInt(PRODUCER_MIRROR_OFFSET));
     }
 
-    public long getTimestamp() {
+    public long getSequenceNumber() {
         return bytes.getLong(SEQUENCE_NUMBER_OFFSET);
     }
 
@@ -184,7 +184,7 @@ public class BatchHeader {
     @Override
     public String toString() {
         return String.format("BatchHeader[magic=%s, sequenceNumber=%s, length=%s, channel=%s]",
-                             getMagic(), getTimestamp(), getBatchByteLength(),
+                             getMagic(), getSequenceNumber(), getBatchByteLength(),
                              getChannel());
     }
 

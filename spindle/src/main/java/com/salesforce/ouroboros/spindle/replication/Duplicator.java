@@ -193,7 +193,7 @@ public final class Duplicator {
                                             current.header, fsm.getName()));
                 }
                 current.acknowledger.acknowledge(current.header.getChannel(),
-                                                 current.header.getTimestamp());
+                                                 current.header.getSequenceNumber());
                 current = null;
                 return true;
             }

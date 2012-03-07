@@ -238,7 +238,7 @@ public class EventChannel {
     public void append(BatchHeader batchHeader, long offset, Segment segment)
                                                                              throws IOException {
         nextOffset = offset + batchHeader.getBatchByteLength();
-        lastTimestamp = batchHeader.getTimestamp();
+        lastTimestamp = batchHeader.getSequenceNumber();
     }
 
     /**
@@ -381,7 +381,7 @@ public class EventChannel {
      * @return true if the header represents a duplicate series of events.
      */
     public boolean isDuplicate(BatchHeader batchHeader) {
-        return batchHeader.getTimestamp() < lastTimestamp;
+        return batchHeader.getSequenceNumber() < lastTimestamp;
     }
 
     public boolean isMirror() {
