@@ -567,7 +567,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                 // Self becomes the new primary
                 infoLog("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
                         eventChannel.getId(), self, remappedMirror);
-                eventChannel.rebalanceAsPrimary(replicators.get(remappedMirror));
+                eventChannel.rebalanceAsPrimary(remappedMirror,
+                                                replicators.get(remappedMirror),
+                                                self);
                 xeroxTo(eventChannel, remappedMirror, xeroxes, coordinator);
             } else {
                 // Xerox state to the new primary and mirror
@@ -696,7 +698,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                            WeaverCoordinator coordinator) {
         Xerox xerox = xeroxes.get(node);
         if (xerox == null) {
-            xerox = new Xerox(self, node, coordinator);
+            xerox = new Xerox(self, node);
             xeroxes.put(node, xerox);
         }
         xerox.addChannel(eventChannel);

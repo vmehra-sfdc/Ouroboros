@@ -192,7 +192,7 @@ public class EventChannel {
     private volatile long                      lastTimestamp;
     private final long                         maxSegmentSize;
     private volatile long                      nextOffset;
-    private final Node                         partner;
+    private volatile Node                      partner;
     private volatile Replicator                replicator;
     private Role                               role;
     private final ConcurrentMap<File, Segment> segmentCache;
@@ -251,10 +251,16 @@ public class EventChannel {
      * @throws IOException
      */
     public void append(ReplicatedBatchHeader batchHeader, Segment segment,
-                       Acknowledger acknowledger, SocketChannelHandler handler)
-                                                                               throws IOException {
+                       Acknowledger acknowledger, SocketChannelHandler handler,
+                       Acknowledger mirrorAcknowledger) throws IOException {
         append(batchHeader, batchHeader.getOffset(), segment);
         if (replicator == null) {
+            acknowledger.acknowledge(batchHeader.getChannel(),
+                                     batchHeader.getSequenceNumber());
+            if (mirrorAcknowledger != null) {
+                mirrorAcknowledger.acknowledge(batchHeader.getChannel(),
+                                               batchHeader.getSequenceNumber());
+            }
             handler.selectForRead();
         } else {
             replicator.replicate(new EventEntry(batchHeader, this, segment,
@@ -398,7 +404,12 @@ public class EventChannel {
         replicator = null;
     }
 
-    public void rebalanceAsPrimary(Replicator replicator) {
+    public void rebalanceAsPrimary(Node partner, Replicator replicator,
+                                   Node self) {
+        assert partner != null;
+        this.partner = partner;
+        assert replicator != null : String.format("Replicator to %s does not exist on %s",
+                                                  partner, self);
         failedOver = false;
         role = Role.PRIMARY;
         this.replicator = replicator;

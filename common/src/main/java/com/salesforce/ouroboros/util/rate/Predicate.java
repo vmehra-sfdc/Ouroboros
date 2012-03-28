@@ -50,7 +50,7 @@ public interface Predicate {
      * Evaluate the predicate, using the default cost
      * 
      * @param currentTime
-     *            TODO
+     *            - the current time to use for the request
      * 
      * @return true if the predicated rate is valid, false otherwise
      */

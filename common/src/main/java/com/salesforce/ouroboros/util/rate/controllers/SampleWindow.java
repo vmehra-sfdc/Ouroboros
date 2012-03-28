@@ -62,6 +62,15 @@ public class SampleWindow extends Window {
         return window;
     }
 
+    /**
+     * Reset the state of the receiver
+     */
+    @Override
+    public void reset() {
+        super.reset();
+        sorted.reset();
+    }
+
     public void sample(double sample) {
         sorted.add(sample);
         if (count == samples.length) {

@@ -275,10 +275,9 @@ public class TestTransfer {
             }
         }).when(xeroxRendezvous).cancel();
 
-        Xerox primaryXerox = new Xerox(primaryNode, primarySinkNode,
-                                       coordinator);
+        Xerox primaryXerox = new Xerox(primaryNode, primarySinkNode);
         primaryXerox.setRendezvous(xeroxRendezvous);
-        Xerox mirrorXerox = new Xerox(mirrorNode, mirrorSinkNode, coordinator);
+        Xerox mirrorXerox = new Xerox(mirrorNode, mirrorSinkNode);
         mirrorXerox.setRendezvous(xeroxRendezvous);
 
         primaryXerox.addChannel(primaryEventChannel);

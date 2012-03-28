@@ -57,15 +57,10 @@ public class Source implements EventSource {
     @Override
     public void assumePrimary(Map<UUID, Long> newPrimaries) {
         System.out.println(String.format("Assuming primary for %s on %s",
-                                         newPrimaries.keySet(),
-                                         producer.getId()));
+                                         newPrimaries, producer.getId()));
         channels.putAll(newPrimaries);
         for (UUID channel : newPrimaries.keySet()) {
             failedChannels.remove(channel);
-        }
-        if (shutdown.get()) {
-            System.out.println(String.format("Channel rebalance, dead source %s : %s",
-                                             getId(), newPrimaries.keySet()));
         }
     }
 

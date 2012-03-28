@@ -19,7 +19,7 @@ public class RateControllerTest {
     public void testRateController() {
         Predicate predicate = mock(Predicate.class);
         RateController controller = new RateController(predicate, 0.01, 1, 10,
-                                                       1);
+                                                       1, 0.9);
         controller.setTarget(1);
 
         controller.setSampleRate(0);

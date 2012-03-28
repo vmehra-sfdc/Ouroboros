@@ -375,7 +375,7 @@ public class TestSink {
         outboundSegment2.force(false);
 
         Rendezvous rendezvous = mock(Rendezvous.class);
-        final Xerox xerox = new Xerox(fromNode, toNode, coordinator);
+        final Xerox xerox = new Xerox(fromNode, toNode);
         xerox.setRendezvous(rendezvous);
         xerox.addChannel(outboundEventChannel);
 

@@ -51,12 +51,10 @@ public class ProducerConfiguration {
     private SkipStrategy<Node>  skipStrategy                 = new DefaultSkipStrategy();
     private ExecutorService     spinners                     = Executors.newCachedThreadPool(new LabeledThreadFactory(
                                                                                                                       "Spinner"));
-
     private final SocketOptions spinnerSocketOptions         = new SocketOptions();
-
     private double              targetBandwidth              = 1000000.0;
-
     private int                 tokenLimit                   = 2000000;
+    private double              targetPercentile             = 0.9;
 
     /**
      * @return the maximumBandwidth
@@ -144,6 +142,13 @@ public class ProducerConfiguration {
     }
 
     /**
+     * @return the targetPercentile
+     */
+    public double getTargetPercentile() {
+        return targetPercentile;
+    }
+
+    /**
      * @return the tokenLimit
      */
     public int getTokenLimit() {
@@ -228,6 +233,14 @@ public class ProducerConfiguration {
      */
     public void setTargetBandwidth(double targetBandwidth) {
         this.targetBandwidth = targetBandwidth;
+    }
+
+    /**
+     * @param targetPercentile
+     *            the targetPercentile to set
+     */
+    public void setTargetPercentile(double targetPercentile) {
+        this.targetPercentile = targetPercentile;
     }
 
     /**

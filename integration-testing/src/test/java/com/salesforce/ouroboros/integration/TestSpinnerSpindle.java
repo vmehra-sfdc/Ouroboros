@@ -107,7 +107,8 @@ public class TestSpinnerSpindle {
             }
         }).when(eventChannel).append(isA(ReplicatedBatchHeader.class),
                                      eq(segment), isA(Acknowledger.class),
-                                     isA(SocketChannelHandler.class));
+                                     isA(SocketChannelHandler.class),
+                                     (Acknowledger) eq(null));
 
         final ArrayList<Spindle> spindles = new ArrayList<Spindle>();
 

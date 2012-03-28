@@ -463,7 +463,7 @@ public class ProducerWeaverClusterTest {
         }
     }
 
-    //@Test
+    @Test
     public void testPublishingDuringPartitionAndRebalancing() throws Exception {
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
@@ -488,7 +488,7 @@ public class ProducerWeaverClusterTest {
                        clusterMaster.open(channel, 10, TimeUnit.SECONDS));
         }
 
-        int targetCount = BATCH_COUNT * 15;
+        int targetCount = BATCH_COUNT * 20;
         for (Source source : sources) {
             source.publish(BATCH_SIZE, executor, latch, targetCount);
         }
@@ -507,7 +507,7 @@ public class ProducerWeaverClusterTest {
         }
 
         assertTrue("not all publishers completed",
-                   latch.await(120, TimeUnit.SECONDS));
+                   latch.await(160, TimeUnit.SECONDS));
 
         ArrayList<UUID> lostChannels = filterChannelsByProducers(channels,
                                                                  producerRing);
@@ -518,16 +518,22 @@ public class ProducerWeaverClusterTest {
             final UUID c = channel;
             final List<Producer> pair = producerRing.hash(point(channel), 2);
             if (!lostChannels.contains(c)) {
-                waitFor(String.format("Did not receive all acks for %s on %s : %s",
-                                      channel, pair.get(1),
-                                      pair.get(1).getMirrorSequenceNumberFor(c)),
-                        new Condition() {
-                            @Override
-                            public boolean value() {
-                                Long ts = pair.get(1).getMirrorSequenceNumberFor(c);
-                                return target.equals(ts);
-                            }
-                        }, 20000L, 1000L);
+                waitFor(new Object() {
+                    public String toString() {
+                        return String.format("Did not receive all acks for %s on %s : %s, primary: %s acks: %s",
+                                             c,
+                                             pair.get(1),
+                                             pair.get(1).getMirrorSequenceNumberFor(c),
+                                             pair.get(0),
+                                             pair.get(0).getPrimarySequenceNumberFor(c));
+                    }
+                }, new Condition() {
+                    @Override
+                    public boolean value() {
+                        Long ts = pair.get(1).getMirrorSequenceNumberFor(c);
+                        return target.equals(ts);
+                    }
+                }, 120000L, 1000L);
             }
         }
 
@@ -535,8 +541,6 @@ public class ProducerWeaverClusterTest {
             if (!source.failedChannels.isEmpty()) {
                 for (UUID channel : source.failedChannels) {
                     if (!lostChannels.contains(channel)) {
-                        System.out.println(String.format("relinquished: %s",
-                                                         source.relinquishedPrimaries));
                         fail(String.format("Failed to publish on node %s channel %s ",
                                            source.getId(), channel));
                     }
@@ -769,14 +773,13 @@ public class ProducerWeaverClusterTest {
         assertTrue(String.format("weaver coordinator is not the leader %s",
                                  weaverLeader), weaverLeader.isActiveLeader());
         weaverLeader.initiateRebalance();
+        assertWeaversStable(majorWeavers);
 
         ProducerCoordinator producerLeader = majorProducers.get(majorProducers.size() - 1);
         assertTrue(String.format("producer coordinator is not the leader %s",
                                  producerLeader),
                    producerLeader.isActiveLeader());
         producerLeader.initiateRebalance();
-
-        assertWeaversStable(majorWeavers);
         assertProducersStable(majorProducers);
     }
 }

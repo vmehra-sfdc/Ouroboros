@@ -143,7 +143,7 @@ public class TestXerox {
         when(channel.getSegmentStack()).thenReturn(segments);
         when(channel.getId()).thenReturn(id);
 
-        Xerox xerox = new Xerox(fromNode, node, coordinator);
+        Xerox xerox = new Xerox(fromNode, node);
         xerox.setRendezvous(rendezvous);
         xerox.addChannel(channel);
         assertEquals(XeroxFSM.Initial, xerox.getState());

@@ -30,6 +30,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.NullNode;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
@@ -64,7 +66,18 @@ public class Appender extends AbstractAppender {
                                                                            batchHeader,
                                                                            offset,
                                                                            startPosition);
-            eventChannel.append(batchHeader2, segment, acknowledger, handler);
+            Node producerMirror = batchHeader.getProducerMirror();
+            Acknowledger mirrorAcknowledger = null;
+            if (producerMirror.processId != NullNode.INSTANCE.processId) {
+                mirrorAcknowledger = bundle.getAcknowledger(producerMirror);
+                if (mirrorAcknowledger == null) {
+                    log.warning(String.format("mirror acknowledger to %s for %s is missing on %s",
+                                              producerMirror, batchHeader,
+                                              bundle.getId()));
+                }
+            }
+            eventChannel.append(batchHeader2, segment, acknowledger, handler,
+                                mirrorAcknowledger);
         } catch (IOException e) {
             if (log.isLoggable(Level.SEVERE)) {
                 log.log(Level.SEVERE,
@@ -107,11 +120,27 @@ public class Appender extends AbstractAppender {
     protected void drain() {
         acknowledger.acknowledge(batchHeader.getChannel(),
                                  batchHeader.getSequenceNumber());
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Acknowledging replication of duplicate %s:%s on %s",
-                                   batchHeader.getChannel(),
-                                   batchHeader.getSequenceNumber(),
-                                   bundle.getId()));
+        if (log.isLoggable(Level.FINER)) {
+            log.finer(String.format("Acknowledging replication of duplicate %s:%s on %s",
+                                    batchHeader.getChannel(),
+                                    batchHeader.getSequenceNumber(),
+                                    bundle.getId()));
+        }
+        Acknowledger mirrorAcknowledger = bundle.getAcknowledger(batchHeader.getProducerMirror());
+        if (mirrorAcknowledger == null) {
+            if (batchHeader.getProducerMirror().processId != NullNode.INSTANCE.processId) {
+                log.warning(String.format("Could not find an acknowledger for %s",
+                                          batchHeader.getProducerMirror()));
+            }
+        } else {
+            mirrorAcknowledger.acknowledge(batchHeader.getChannel(),
+                                           batchHeader.getSequenceNumber());
+            if (log.isLoggable(Level.FINER)) {
+                log.finer(String.format("Acknowledging mirror replication of duplicate %s:%s on %s",
+                                        batchHeader.getChannel(),
+                                        batchHeader.getSequenceNumber(),
+                                        bundle.getId()));
+            }
         }
         super.drain();
     }

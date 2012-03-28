@@ -194,7 +194,8 @@ public class Producer implements Comparable<Producer> {
                                         configuration.getMinimumBandwidth(),
                                         configuration.getMaximumEventRate(),
                                         configuration.getSampleWindowSize(),
-                                        configuration.getSampleFrequency());
+                                        configuration.getSampleFrequency(),
+                                        configuration.getTargetPercentile());
         this.self = self;
         this.source = source;
         spinnerHandler = new ChannelHandler(
@@ -221,7 +222,15 @@ public class Producer implements Comparable<Producer> {
      */
     public void acknowledge(Batch batch) {
         controller.sample(batch.rate(), System.currentTimeMillis());
-        channelState.get(batch.channel).sequenceNumber = batch.sequenceNumber;
+        PrimaryState primaryState = channelState.get(batch.channel);
+        if (primaryState == null) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("No primary state for %s on %s", batch,
+                                       self));
+            }
+        } else {
+            primaryState.sequenceNumber = batch.sequenceNumber;
+        }
     }
 
     /**
@@ -247,6 +256,11 @@ public class Producer implements Comparable<Producer> {
 
     public void activate() {
         openPublishingGate();
+    }
+
+    public void cleanUp() {
+        resumePausedChannels();
+        relinquishedMirrors = relinquishedPrimaries = null;
     }
 
     public void closed(UUID channel) {
@@ -483,6 +497,10 @@ public class Producer implements Comparable<Producer> {
         return self;
     }
 
+    public Long getPrimarySequenceNumberFor(UUID channel) {
+        return channelState.get(channel).sequenceNumber;
+    }
+
     public Long getMirrorSequenceNumberFor(UUID channel) {
         return mirrors.get(channel).sequenceNumber;
     }
@@ -501,6 +519,7 @@ public class Producer implements Comparable<Producer> {
         mirrors.clear();
         spinners.clear();
         spinnerHandler.closeOpenHandlers();
+        controller.reset();
     }
 
     /**
@@ -567,7 +586,7 @@ public class Producer implements Comparable<Producer> {
                 log.info(String.format("Channel %s opened on mirror %s",
                                        channel, this));
             }
-        } else {
+        } else if (self.equals(pair[0])) {
             mapSpinner(channel, pair, false, -1L);
             source.opened(channel);
             if (log.isLoggable(Level.INFO)) {
@@ -575,6 +594,17 @@ public class Producer implements Comparable<Producer> {
                                        channel, this));
             }
         }
+    }
+
+    /**
+     * @param channels
+     * @return
+     */
+    public void pause(List<UUID> channels) {
+        HashSet<UUID> hosted = new HashSet<UUID>(channelState.keySet());
+        hosted.retainAll(channels);
+        source.pause(hosted);
+        pausedChannels.addAll(hosted);
     }
 
     /**
@@ -600,13 +630,13 @@ public class Producer implements Comparable<Producer> {
                                                       UnknownChannelException,
                                                       InterruptedException {
         publishGate.await();
-        if (pausedChannels.contains(channel)) {
-            throw new IllegalArgumentException(
-                                               String.format("Publishing to paused channel: %s on: %s",
-                                                             channel, self));
-        }
         publishingThreads.incrementAndGet();
         try {
+            if (pausedChannels.contains(channel)) {
+                throw new IllegalArgumentException(
+                                                   String.format("Publishing to paused channel: %s on: %s",
+                                                                 channel, self));
+            }
             PrimaryState state = channelState.get(channel);
             if (state == null) {
                 if (log.isLoggable(Level.INFO)) {
@@ -665,22 +695,28 @@ public class Producer implements Comparable<Producer> {
                 if (self.equals(remappedPrimary)) {
                     // if self is still the primary
                     // Xerox state to the new mirror
-                    infoLog("Rebalancing for %s from primary %s to new mirror %s",
-                            channel, self, remappedMirror);
+                    Object[] args = { channel, self, remappedMirror };
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Rebalancing for %s from primary %s to new mirror %s", args));
+                    }
                     remap(channel, state.sequenceNumber, remappedMirror,
                           remapped);
                 } else if (self.equals(remappedMirror)) {
                     // Self becomes the new mirror
-                    infoLog("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
-                            channel, self);
+                    Object[] args = { channel, self, remappedPrimary };
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Rebalancing for %s, %s becoming mirror from primary, new primary %s", args));
+                    }
                     remap(channel, state.sequenceNumber, self, remapped);
                     remap(channel, state.sequenceNumber, remappedPrimary,
                           remapped);
                     relinquishedPrimaries.add(channel);
                 } else {
                     // Xerox state to new primary and mirror
-                    infoLog("Rebalancing for %s from old primary %s to new primary %s, new mirror %s",
-                            channel, self, remappedPrimary, remappedMirror);
+                    Object[] args = { channel, self, remappedPrimary, remappedMirror };
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Rebalancing for %s from old primary %s to new primary %s, new mirror %s", args));
+                    }
                     remap(channel, state.sequenceNumber, remappedPrimary,
                           remapped);
                     remap(channel, state.sequenceNumber, remappedMirror,
@@ -690,10 +726,16 @@ public class Producer implements Comparable<Producer> {
             } else if (!self.equals(remappedPrimary)) {
                 // mirror is up
                 // Xerox state to the new primary
-                infoLog("Rebalancing for %s from old primary %s to new primary %s",
-                        channel, self, remappedPrimary);
+                Object[] args = { channel, self, remappedPrimary };
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Rebalancing for %s from old primary %s to new primary %s", args));
+                }
                 remap(channel, state.sequenceNumber, remappedPrimary, remapped);
                 if (self.equals(remappedMirror)) {
+                    Object[] args1 = { channel, self };
+                    if (log.isLoggable(Level.INFO)) {
+                        log.info(String.format("Rebalancing for %s, %s becoming mirror from primary", args1));
+                    }
                     remap(channel, state.sequenceNumber, self, remapped);
                 }
                 relinquishedPrimaries.add(channel);
@@ -705,20 +747,26 @@ public class Producer implements Comparable<Producer> {
             if (self.equals(remappedMirror)) {
                 // Self is still the mirror
                 // Xerox state to the new primary
-                infoLog("Rebalancing for %s from mirror %s to new primary %s",
-                        channel, self, remappedPrimary);
+                Object[] args = { channel, self, remappedPrimary };
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Rebalancing for %s from mirror %s to new primary %s", args));
+                }
                 remap(channel, state.sequenceNumber, remappedPrimary, remapped);
             } else if (self.equals(remappedPrimary)) {
                 // Self becomes the new primary
-                infoLog("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
-                        channel, self, remappedMirror);
+                Object[] args = { channel, self, remappedMirror };
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Rebalancing for %s, %s becoming primary from mirror, new mirror %s", args));
+                }
                 remap(channel, state.sequenceNumber, self, remapped);
                 remap(channel, state.sequenceNumber, remappedMirror, remapped);
                 relinquishedMirrors.add(channel);
             } else {
                 // Xerox state to the new primary and mirror
-                infoLog("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s",
-                        channel, self, remappedPrimary, remappedMirror);
+                Object[] args = { channel, self, remappedPrimary, remappedMirror };
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s", args));
+                }
                 remap(channel, state.sequenceNumber, remappedPrimary, remapped);
                 remap(channel, state.sequenceNumber, remappedMirror, remapped);
                 relinquishedMirrors.add(channel);
@@ -726,10 +774,12 @@ public class Producer implements Comparable<Producer> {
         } else if (!self.equals(remappedMirror)
                    && !remappedMirror.equals(originalPrimary)) {
             assert self.equals(originalMirror);
+            Object[] args = { channel, self, remappedMirror };
             // primary is up
             // Xerox state to the new mirror
-            infoLog("Rebalancing for %s from old mirror %s to new mirror %s",
-                    channel, self, remappedMirror);
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Rebalancing for %s from old mirror %s to new mirror %s", args));
+            }
             remap(channel, state.sequenceNumber, remappedMirror, remapped);
             relinquishedMirrors.add(channel);
         }
@@ -787,6 +837,11 @@ public class Producer implements Comparable<Producer> {
         spinners.remove(to);
     }
 
+    public void resumePausedChannels() {
+        source.resume(pausedChannels);
+        pausedChannels = new HashSet<UUID>();
+    }
+
     public void setNextProducerRing(ConsistentHashFunction<Node> newRing) {
         nextProducerRing = newRing;
     }
@@ -812,56 +867,6 @@ public class Producer implements Comparable<Producer> {
         return String.format("Producer[%s]", self.processId);
     }
 
-    private void infoLog(String logString, Object... args) {
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format(logString, args));
-        }
-    }
-
-    private PrimaryState mapSpinner(UUID channel, Node[] producerPair,
-                                    boolean failover, long sequenceNumber) {
-        Node[] channelPair = getChannelBufferReplicationPair(channel);
-        Spinner spinner = spinners.get(channelPair[0]);
-        if (spinner == null) {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Primary node %s for channel %s is down, mapping mirror %s on %s",
-                                       channelPair[0], channel, channelPair[1],
-                                       this));
-            }
-            spinner = spinners.get(channelPair[1]);
-            if (spinner == null) {
-                if (log.isLoggable(Level.SEVERE)) {
-                    log.severe(String.format("Mirror %s for channel %s is down on %s",
-                                             channelPair[0], channel, this));
-                }
-                return null;
-            } else {
-                if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Mapping channel %s to mirror %s on %s",
-                                           channel, channelPair[1], this));
-                }
-                return channelState.putIfAbsent(channel,
-                                                new PrimaryState(
-                                                                 producerPair,
-                                                                 sequenceNumber,
-                                                                 spinner,
-                                                                 channelPair,
-                                                                 failover));
-            }
-        } else {
-            if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Mapping channel %s to primary %s on %s",
-                                       channel, channelPair[0], this));
-            }
-            return channelState.putIfAbsent(channel,
-                                            new PrimaryState(producerPair,
-                                                             sequenceNumber,
-                                                             spinner,
-                                                             channelPair,
-                                                             failover));
-        }
-    }
-
     protected void closePublishingGate() throws InterruptedException {
         publishGate.close();
         // Wait until all publishing threads are finished
@@ -876,6 +881,13 @@ public class Producer implements Comparable<Producer> {
     protected void createSpinners(Collection<Node> weavers,
                                   Map<Node, ContactInformation> yellowPages) {
         for (Node n : weavers) {
+            if (spinners.containsKey(n)) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.fine(String.format("Attempting to create a spinner to %s which already exists on %s",
+                                           n, self));
+                }
+                break;
+            }
             ContactInformation info = yellowPages.get(n);
             assert info != null : String.format("Did not find any connection information for node %s",
                                                 n);
@@ -925,6 +937,50 @@ public class Producer implements Comparable<Producer> {
                                                        producerRing.size());
         List<Node> pair = producerRing.hash(point(channel), 2);
         return new Node[] { pair.get(0), pair.get(1) };
+    }
+
+    protected PrimaryState mapSpinner(UUID channel, Node[] producerPair,
+                                      boolean failover, long sequenceNumber) {
+        Node[] channelPair = getChannelBufferReplicationPair(channel);
+        Spinner spinner = spinners.get(channelPair[0]);
+        if (spinner == null) {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Primary node %s for channel %s is down, mapping mirror %s on %s",
+                                       channelPair[0], channel, channelPair[1],
+                                       this));
+            }
+            spinner = spinners.get(channelPair[1]);
+            if (spinner == null) {
+                if (log.isLoggable(Level.SEVERE)) {
+                    log.severe(String.format("Mirror %s for channel %s is down on %s",
+                                             channelPair[0], channel, this));
+                }
+                return null;
+            } else {
+                if (log.isLoggable(Level.INFO)) {
+                    log.info(String.format("Mapping channel %s to mirror %s on %s",
+                                           channel, channelPair[1], this));
+                }
+                return channelState.putIfAbsent(channel,
+                                                new PrimaryState(
+                                                                 producerPair,
+                                                                 sequenceNumber,
+                                                                 spinner,
+                                                                 channelPair,
+                                                                 failover));
+            }
+        } else {
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Mapping channel %s to primary %s on %s",
+                                       channel, channelPair[0], this));
+            }
+            return channelState.putIfAbsent(channel,
+                                            new PrimaryState(producerPair,
+                                                             sequenceNumber,
+                                                             spinner,
+                                                             channelPair,
+                                                             failover));
+        }
     }
 
     protected void openPublishingGate() {
@@ -979,26 +1035,5 @@ public class Producer implements Comparable<Producer> {
 
     protected void setProducerRing(ConsistentHashFunction<Node> newRing) {
         producerRing = newRing;
-    }
-
-    /**
-     * @param channels
-     * @return
-     */
-    public void pause(List<UUID> channels) {
-        HashSet<UUID> hosted = new HashSet<UUID>(channelState.keySet());
-        hosted.retainAll(channels);
-        source.pause(hosted);
-        pausedChannels.addAll(hosted);
-    }
-
-    public void resumePausedChannels() {
-        source.resume(pausedChannels);
-        pausedChannels = new HashSet<UUID>();
-    }
-
-    public void cleanUp() {
-        resumePausedChannels();
-        relinquishedMirrors = relinquishedPrimaries = null;
     }
 }

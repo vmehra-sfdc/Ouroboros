@@ -55,24 +55,26 @@ public class RateController implements Controller {
     private volatile double     smoothConstant         = 0.7;
     private volatile double     target;
     private final SampleWindow  window;
+    private final double        targetPercentile;
 
     public RateController(Predicate predicate) {
-        this(predicate, 1000, 1);
+        this(predicate, 1000, 1, 0.9);
     }
 
     public RateController(Predicate predicate, double minimumRate,
                           double maximumRate, int windowSize,
-                          int sampleFrequency) {
-        this(predicate, windowSize, sampleFrequency);
+                          int sampleFrequency, double targetPercentile) {
+        this(predicate, windowSize, sampleFrequency, targetPercentile);
         minimum = minimumRate;
         maximum = maximumRate;
     }
 
     public RateController(Predicate predicate, int windowSize,
-                          int sampleFrequency) {
+                          int sampleFrequency, double targetPercentile) {
         window = new SampleWindow(windowSize);
         this.predicate = predicate;
         this.sampleFrequency = sampleFrequency;
+        this.targetPercentile = targetPercentile;
     }
 
     @Override
@@ -155,11 +157,11 @@ public class RateController implements Controller {
             }
             window.sample(sample);
             lastSampled = currentTime;
-            double ninetieth = window.getPercentile(0.9);
+            double data = window.getPercentile(targetPercentile);
 
-            if (ninetieth < lowWaterMark * target) {
+            if (data < lowWaterMark * target) {
                 increaseRate();
-            } else if (ninetieth > highWaterMark * target) {
+            } else if (data > highWaterMark * target) {
                 decreaseRate();
             }
         } finally {
@@ -200,9 +202,9 @@ public class RateController implements Controller {
     }
 
     @Override
-    public void setTarget(double targetResponseTime) {
-        target = targetResponseTime;
-        predicate.setTargetRate(targetResponseTime);
+    public void setTarget(double targetRate) {
+        target = targetRate;
+        predicate.setTargetRate(targetRate);
     }
 
     protected void decreaseRate() {
@@ -223,5 +225,13 @@ public class RateController implements Controller {
             }
             predicate.setTargetRate(target);
         }
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.util.rate.Controller#reset()
+     */
+    @Override
+    public void reset() {
+        window.reset();
     }
 }

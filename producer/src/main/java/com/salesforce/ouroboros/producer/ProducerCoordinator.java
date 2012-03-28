@@ -77,6 +77,7 @@ public class ProducerCoordinator implements Member {
                                                                                                         this);
     private final SortedSet<Node>               inactiveMembers        = new ConcurrentSkipListSet<Node>();
     private final SortedSet<Node>               inactiveWeavers        = new ConcurrentSkipListSet<Node>();
+    private final SortedSet<Node>               joiningWeavers         = new ConcurrentSkipListSet<Node>();
     private Node[]                              joiningProducers       = new Node[0];
     private final SortedSet<Node>               nextProducerMembership = new ConcurrentSkipListSet<Node>();
     private final ConcurrentMap<UUID, Pending>  pendingChannels        = new ConcurrentHashMap<UUID, ProducerCoordinator.Pending>();
@@ -326,12 +327,31 @@ public class ProducerCoordinator implements Member {
     public void dispatch(WeaverRebalanceMessage type, Node sender,
                          Serializable[] arguments, long time) {
         switch (type) {
-            case INITIATE_REBALANCE:
-            case PREPARE_FOR_REBALANCE:
-            case REBALANCE_COMPLETE:
-            case TAKEOVER:
+            case PREPARE_FOR_REBALANCE: {
+                for (Node n : (Node[]) arguments[0]) {
+                    joiningWeavers.add(n);
+                }
+                break;
+            }
+            case REBALANCE_COMPLETE: {
+                ConsistentHashFunction<Node> ring = producer.createRing();
+                for (Node node : joiningWeavers) {
+                    inactiveWeavers.remove(node);
+                    activeWeavers.add(node);
+                }
+                for (Node node: activeWeavers) { 
+                    ring.add(node, node.capacity);
+                }
+                producer.createSpinners(joiningWeavers, yellowPages);
+                producer.remapWeavers(ring);
                 producer.resumePausedChannels();
-                return;
+                joiningWeavers.clear();
+                break;
+            }
+            case INITIATE_REBALANCE:
+                break;
+            case TAKEOVER:
+                break;
             default:
                 throw new IllegalStateException(
                                                 String.format("Unknown rebalance message: %s",
@@ -498,6 +518,7 @@ public class ProducerCoordinator implements Member {
      */
     protected void cleanUp() {
         joiningProducers = new Node[0];
+        joiningWeavers.clear();
         pendingChannels.clear();
         nextProducerMembership.clear();
         tally.set(0);

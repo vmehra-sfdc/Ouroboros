@@ -85,10 +85,15 @@ public interface Controller {
     int getWindow();
 
     /**
-     * Set the target response time, in milliseconds
+     * Set the target rate
      * 
      * @param target
      */
     void setTarget(double target);
+
+    /**
+     * Reset the stae of the controller
+     */
+    void reset();
 
 }

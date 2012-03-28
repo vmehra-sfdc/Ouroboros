@@ -120,6 +120,17 @@ public class Util {
         return method;
     }
 
+    public static void waitFor(Object error, Condition condition, long timeout,
+                               long interval) throws InterruptedException {
+        long target = System.currentTimeMillis() + timeout;
+        while (!condition.value()) {
+            if (target < System.currentTimeMillis()) {
+                fail(error.toString());
+            }
+            Thread.sleep(interval);
+        }
+    }
+
     public static void waitFor(String reason, Condition condition,
                                long timeout, long interval)
                                                            throws InterruptedException {
