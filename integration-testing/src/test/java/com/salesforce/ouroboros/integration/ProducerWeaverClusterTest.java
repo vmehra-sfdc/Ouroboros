@@ -463,7 +463,7 @@ public class ProducerWeaverClusterTest {
         }
     }
 
-    @Test
+    //@Test
     public void testPublishingDuringPartitionAndRebalancing() throws Exception {
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
