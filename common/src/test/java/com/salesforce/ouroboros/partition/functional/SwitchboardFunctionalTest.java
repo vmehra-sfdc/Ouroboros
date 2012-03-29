@@ -156,11 +156,7 @@ public class SwitchboardFunctionalTest {
 
     protected Class<?>[] getConfigs() {
         return new Class[] { wkMember1.class, wkMember2.class, member.class,
-                member.class, member.class, member.class, member.class,
-                member.class, member.class, member.class, member.class,
-                member.class, member.class, member.class, member.class,
-                member.class, member.class, member.class, member.class,
-                member.class };
+                member.class, member.class };
     }
 
     protected Class<?> getControllerConfig() {

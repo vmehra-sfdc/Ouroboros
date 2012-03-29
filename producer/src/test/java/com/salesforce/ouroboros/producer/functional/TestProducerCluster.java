@@ -71,9 +71,7 @@ public class TestProducerCluster {
     private ClusterMaster                            clusterMaster;
     private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs = new Class[] {
-            weaver0.class, weaver.class, weaver.class, weaver.class,
-            weaver.class, weaver.class, weaver.class, weaver.class,
-            weaver.class, weaver2.class                     };
+            weaver0.class, weaver.class, weaver2.class                     };
     private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<ProducerCoordinator>                coordinators;

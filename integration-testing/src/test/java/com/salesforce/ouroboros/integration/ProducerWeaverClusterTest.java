@@ -463,7 +463,7 @@ public class ProducerWeaverClusterTest {
         }
     }
 
-    //@Test
+    @Test
     public void testPublishingDuringPartitionAndRebalancing() throws Exception {
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
@@ -488,7 +488,7 @@ public class ProducerWeaverClusterTest {
                        clusterMaster.open(channel, 10, TimeUnit.SECONDS));
         }
 
-        int targetCount = BATCH_COUNT * 20;
+        int targetCount = BATCH_COUNT * 5;
         for (Source source : sources) {
             source.publish(BATCH_SIZE, executor, latch, targetCount);
         }
@@ -714,8 +714,7 @@ public class ProducerWeaverClusterTest {
     }
 
     Class<?>[] weaverConfigurations() {
-        return new Class<?>[] { weaver1.class, weaver.class, weaver.class,
-                weaver.class, weaver.class, weaver2.class };
+        return new Class<?>[] { weaver1.class, weaver.class, weaver2.class };
     }
 
     ArrayList<UUID> openChannels() throws InterruptedException {
