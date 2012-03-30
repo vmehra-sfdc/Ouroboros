@@ -85,7 +85,7 @@ import com.salesforce.ouroboros.util.MersenneTwister;
 public class ProducerWeaverClusterTest {
     private static final int BATCH_SIZE    = 10;
     private static final int BATCH_COUNT   = 200;
-    private static final int CHANNEL_COUNT = 50;
+    private static final int CHANNEL_COUNT = 30;
 
     @Configuration
     static class master extends ClusterNodeCfg {
@@ -371,13 +371,7 @@ public class ProducerWeaverClusterTest {
         }
         List<UUID> channels = openChannels();
         Executor executor = Executors.newCachedThreadPool();
-        CountDownLatch latch = new CountDownLatch(sources.size());
-
-        // Open the channels
-        for (UUID channel : channels) {
-            assertTrue(String.format("Channel not opened: %s", channel),
-                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
-        }
+        CountDownLatch latch = new CountDownLatch(sources.size()); 
 
         for (Source source : sources) {
             source.publish(BATCH_SIZE, executor, latch, BATCH_COUNT);
@@ -419,12 +413,6 @@ public class ProducerWeaverClusterTest {
         ArrayList<UUID> channels = openChannels();
         Executor executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(sources.size());
-
-        // Open the channels
-        for (UUID channel : channels) {
-            assertTrue(String.format("Channel not opened: %s", channel),
-                       clusterMaster.open(channel, 10, TimeUnit.SECONDS));
-        }
 
         for (Source source : sources) {
             source.publish(BATCH_SIZE, executor, latch, BATCH_COUNT);
@@ -481,12 +469,6 @@ public class ProducerWeaverClusterTest {
         ArrayList<UUID> channels = openChannels();
         Executor executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(sources.size());
-
-        // Open the channels
-        for (UUID channel : channels) {
-            assertTrue(String.format("Channel not opened: %s", channel),
-                       clusterMaster.open(channel, 10, TimeUnit.SECONDS));
-        }
 
         int targetCount = BATCH_COUNT * 5;
         for (Source source : sources) {

@@ -137,7 +137,7 @@ abstract public class AbstractAppender {
         if (eventChannel == null) {
             getLogger().warning(String.format("No existing event channel for: %s on %s",
                                               batchHeader, fsm.getName()));
-            fsm.close();
+            fsm.drain();
             return;
         }
         AppendSegment logicalSegment;

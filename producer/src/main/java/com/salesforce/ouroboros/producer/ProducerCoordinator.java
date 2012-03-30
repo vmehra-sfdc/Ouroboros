@@ -160,7 +160,10 @@ public class ProducerCoordinator implements Member {
         switch (type) {
             case OPEN: {
                 UUID channel = (UUID) arguments[0];
-                if (producer.isResponsibleFor(channel)) {
+                if (producer.isActingFor(channel)) {
+                    log.warning(String.format("Duplicate OPEN message for %s from %s on %s",
+                                              channel, sender, self));
+                } else if (producer.isResponsibleFor(channel)) {
                     pendingChannels.put(channel, Pending.PENDING);
                 }
                 break;
@@ -170,7 +173,10 @@ public class ProducerCoordinator implements Member {
             }
             case PRIMARY_OPENED: {
                 UUID channel = (UUID) arguments[0];
-                if (producer.isResponsibleFor(channel)) {
+                if (producer.isActingFor(channel)) {
+                    log.warning(String.format("Duplicate PRIMARY_OPENED message for %s from %s on %s",
+                                              channel, sender, self));
+                } else if (producer.isResponsibleFor(channel)) {
                     Pending state = pendingChannels.get(channel);
                     assert state != null : String.format("No pending state for %s on: %s",
                                                          channel, self);
@@ -196,7 +202,10 @@ public class ProducerCoordinator implements Member {
             }
             case MIRROR_OPENED: {
                 UUID channel = (UUID) arguments[0];
-                if (producer.isResponsibleFor(channel)) {
+                if (producer.isActingFor(channel)) {
+                    log.warning(String.format("Duplicate MIRROR_OPENED message for %s from %s on %s",
+                                              channel, sender, self));
+                } else if (producer.isResponsibleFor(channel)) {
                     Pending state = pendingChannels.get(channel);
                     assert state != null : String.format("No pending state for %s on: %s",
                                                          channel, self);
@@ -339,7 +348,7 @@ public class ProducerCoordinator implements Member {
                     inactiveWeavers.remove(node);
                     activeWeavers.add(node);
                 }
-                for (Node node: activeWeavers) { 
+                for (Node node : activeWeavers) {
                     ring.add(node, node.capacity);
                 }
                 producer.createSpinners(joiningWeavers, yellowPages);

@@ -539,6 +539,10 @@ public class Producer implements Comparable<Producer> {
     public boolean isActingPrimaryFor(UUID channel) {
         return channelState.containsKey(channel);
     }
+    
+    public boolean isActingFor(UUID channel) {
+        return mirrors.containsKey(channel) || channelState.containsKey(channel);
+    }
 
     /**
      * 
@@ -577,6 +581,7 @@ public class Producer implements Comparable<Producer> {
     public void opened(UUID channel) {
         Node[] pair = getProducerReplicationPair(channel);
         if (self.equals(pair[1])) {
+            
             mirrors.put(channel,
                         new MirrorState(
                                         pair,
