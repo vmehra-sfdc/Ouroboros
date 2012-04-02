@@ -248,6 +248,12 @@ public class BatchWriter {
         if (batch.batch.hasRemaining()) {
             return false;
         }
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Batch sequence %s for %s transmitted %s, producer mirror: %s",
+                                   batch.header.getSequenceNumber(),
+                                   batch.header.getChannel(), fsm.getName(),
+                                   batch.header.getProducerMirror()));
+        }
         batch = null;
         return true;
     }

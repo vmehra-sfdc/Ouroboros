@@ -230,6 +230,11 @@ public class Producer implements Comparable<Producer> {
             }
         } else {
             primaryState.sequenceNumber = batch.sequenceNumber;
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Primary ack of sequence %s for %s on %s",
+                                       batch.sequenceNumber, batch.channel,
+                                       self));
+            }
         }
     }
 
@@ -244,6 +249,10 @@ public class Producer implements Comparable<Producer> {
         MirrorState mirrorState = mirrors.get(ack.channel);
         if (mirrorState != null) {
             mirrorState.sequenceNumber = ack.sequenceNumber;
+            if (log.isLoggable(Level.INFO)) {
+                log.info(String.format("Mirror ack of sequence %s for %s on %s",
+                                       ack.sequenceNumber, ack.channel, self));
+            }
         } else {
             PrimaryState primaryState = channelState.get(ack.channel);
             log.info(String.format("null mirror state for %s on %s, channel state mirror: %s",
@@ -539,9 +548,10 @@ public class Producer implements Comparable<Producer> {
     public boolean isActingPrimaryFor(UUID channel) {
         return channelState.containsKey(channel);
     }
-    
+
     public boolean isActingFor(UUID channel) {
-        return mirrors.containsKey(channel) || channelState.containsKey(channel);
+        return mirrors.containsKey(channel)
+               || channelState.containsKey(channel);
     }
 
     /**
@@ -581,7 +591,7 @@ public class Producer implements Comparable<Producer> {
     public void opened(UUID channel) {
         Node[] pair = getProducerReplicationPair(channel);
         if (self.equals(pair[1])) {
-            
+
             mirrors.put(channel,
                         new MirrorState(
                                         pair,
@@ -702,7 +712,8 @@ public class Producer implements Comparable<Producer> {
                     // Xerox state to the new mirror
                     Object[] args = { channel, self, remappedMirror };
                     if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Rebalancing for %s from primary %s to new mirror %s", args));
+                        log.info(String.format("Rebalancing for %s from primary %s to new mirror %s",
+                                               args));
                     }
                     remap(channel, state.sequenceNumber, remappedMirror,
                           remapped);
@@ -710,7 +721,8 @@ public class Producer implements Comparable<Producer> {
                     // Self becomes the new mirror
                     Object[] args = { channel, self, remappedPrimary };
                     if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Rebalancing for %s, %s becoming mirror from primary, new primary %s", args));
+                        log.info(String.format("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
+                                               args));
                     }
                     remap(channel, state.sequenceNumber, self, remapped);
                     remap(channel, state.sequenceNumber, remappedPrimary,
@@ -718,9 +730,11 @@ public class Producer implements Comparable<Producer> {
                     relinquishedPrimaries.add(channel);
                 } else {
                     // Xerox state to new primary and mirror
-                    Object[] args = { channel, self, remappedPrimary, remappedMirror };
+                    Object[] args = { channel, self, remappedPrimary,
+                            remappedMirror };
                     if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Rebalancing for %s from old primary %s to new primary %s, new mirror %s", args));
+                        log.info(String.format("Rebalancing for %s from old primary %s to new primary %s, new mirror %s",
+                                               args));
                     }
                     remap(channel, state.sequenceNumber, remappedPrimary,
                           remapped);
@@ -733,13 +747,15 @@ public class Producer implements Comparable<Producer> {
                 // Xerox state to the new primary
                 Object[] args = { channel, self, remappedPrimary };
                 if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Rebalancing for %s from old primary %s to new primary %s", args));
+                    log.info(String.format("Rebalancing for %s from old primary %s to new primary %s",
+                                           args));
                 }
                 remap(channel, state.sequenceNumber, remappedPrimary, remapped);
                 if (self.equals(remappedMirror)) {
                     Object[] args1 = { channel, self };
                     if (log.isLoggable(Level.INFO)) {
-                        log.info(String.format("Rebalancing for %s, %s becoming mirror from primary", args1));
+                        log.info(String.format("Rebalancing for %s, %s becoming mirror from primary",
+                                               args1));
                     }
                     remap(channel, state.sequenceNumber, self, remapped);
                 }
@@ -754,23 +770,27 @@ public class Producer implements Comparable<Producer> {
                 // Xerox state to the new primary
                 Object[] args = { channel, self, remappedPrimary };
                 if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Rebalancing for %s from mirror %s to new primary %s", args));
+                    log.info(String.format("Rebalancing for %s from mirror %s to new primary %s",
+                                           args));
                 }
                 remap(channel, state.sequenceNumber, remappedPrimary, remapped);
             } else if (self.equals(remappedPrimary)) {
                 // Self becomes the new primary
                 Object[] args = { channel, self, remappedMirror };
                 if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Rebalancing for %s, %s becoming primary from mirror, new mirror %s", args));
+                    log.info(String.format("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
+                                           args));
                 }
                 remap(channel, state.sequenceNumber, self, remapped);
                 remap(channel, state.sequenceNumber, remappedMirror, remapped);
                 relinquishedMirrors.add(channel);
             } else {
                 // Xerox state to the new primary and mirror
-                Object[] args = { channel, self, remappedPrimary, remappedMirror };
+                Object[] args = { channel, self, remappedPrimary,
+                        remappedMirror };
                 if (log.isLoggable(Level.INFO)) {
-                    log.info(String.format("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s", args));
+                    log.info(String.format("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s",
+                                           args));
                 }
                 remap(channel, state.sequenceNumber, remappedPrimary, remapped);
                 remap(channel, state.sequenceNumber, remappedMirror, remapped);
@@ -783,7 +803,8 @@ public class Producer implements Comparable<Producer> {
             // primary is up
             // Xerox state to the new mirror
             if (log.isLoggable(Level.INFO)) {
-                log.info(String.format("Rebalancing for %s from old mirror %s to new mirror %s", args));
+                log.info(String.format("Rebalancing for %s from old mirror %s to new mirror %s",
+                                       args));
             }
             remap(channel, state.sequenceNumber, remappedMirror, remapped);
             relinquishedMirrors.add(channel);

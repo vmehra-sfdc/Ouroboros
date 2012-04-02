@@ -367,4 +367,18 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
                       int paramInt2) throws IOException {
         return channel.write(paramArrayOfByteBuffer, paramInt1, paramInt2);
     }
+
+    /**
+     * @return
+     */
+    public Object getFile() {
+        return file;
+    }
+
+    /**
+     * @return
+     */
+    public Object getSegmentName() {
+        return file.getName().substring(0, file.getName().indexOf('.'));
+    }
 }

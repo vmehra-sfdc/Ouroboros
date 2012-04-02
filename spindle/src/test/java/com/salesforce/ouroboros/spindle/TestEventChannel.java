@@ -88,8 +88,8 @@ public class TestEventChannel {
         int sequenceNumber = 0;
         @SuppressWarnings("unchecked")
         ConcurrentMap<File, Segment> segmentCache = mock(ConcurrentMap.class);
-        EventChannel eventChannel = new EventChannel(Role.PRIMARY, secondary,
-                                                     channel, root,
+        EventChannel eventChannel = new EventChannel(node, Role.PRIMARY,
+                                                     secondary, channel, root,
                                                      maxSegmentSize, null,
                                                      segmentCache);
         long offset = 0;

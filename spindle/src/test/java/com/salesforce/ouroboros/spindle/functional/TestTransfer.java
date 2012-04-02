@@ -176,14 +176,14 @@ public class TestTransfer {
                                                             mirrorNode,
                                                             rendezvous);
         final Replicator mirrorReplicator = new Replicator(mirrorBundle);
-        primaryEventChannel = new EventChannel(Role.PRIMARY, mirrorNode,
-                                               channelId, primaryRoot,
-                                               maxSegmentSize,
+        primaryEventChannel = new EventChannel(primaryNode, Role.PRIMARY,
+                                               mirrorNode, channelId,
+                                               primaryRoot, maxSegmentSize,
                                                primaryReplicator, segmentCache);
 
-        mirrorEventChannel = new EventChannel(Role.MIRROR, primaryNode,
-                                              channelId, mirrorRoot,
-                                              maxSegmentSize, null,
+        mirrorEventChannel = new EventChannel(mirrorNode, Role.MIRROR,
+                                              primaryNode, channelId,
+                                              mirrorRoot, maxSegmentSize, null,
                                               segmentCache);
 
         when(primaryBundle.eventChannelFor(channelId)).thenReturn(primaryEventChannel);
@@ -240,15 +240,17 @@ public class TestTransfer {
         Sink primarySink = new Sink(primarySinkBundle);
         Sink mirrorSink = new Sink(mirrorSinkBundle);
 
-        primarySinkEventChannel = new EventChannel(Role.PRIMARY,
+        primarySinkEventChannel = new EventChannel(primarySinkNode,
+                                                   Role.PRIMARY,
                                                    mirrorSinkNode, channelId,
                                                    primarySinkRoot,
                                                    maxSegmentSize,
                                                    primaryReplicator,
                                                    segmentCache);
 
-        mirrorSinkEventChannel = new EventChannel(Role.MIRROR, primarySinkNode,
-                                                  channelId, mirrorSinkRoot,
+        mirrorSinkEventChannel = new EventChannel(mirrorSinkNode, Role.MIRROR,
+                                                  primarySinkNode, channelId,
+                                                  mirrorSinkRoot,
                                                   maxSegmentSize, null,
                                                   segmentCache);
 

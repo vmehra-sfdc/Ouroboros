@@ -443,10 +443,10 @@ public class Weaver implements Bundle, Comparable<Weaver> {
             log.info(String.format(" %s is the mirror for the new subscription %s",
                                    self, channel));
         }
-        channels.put(channel, new EventChannel(Role.MIRROR, primary, channel,
-                                               roots.hash(point(channel)),
-                                               maxSegmentSize, null,
-                                               segmentCache));
+        channels.put(channel, new EventChannel(self, Role.MIRROR, primary,
+                                               channel,
+                                               roots.hash(point(channel)), maxSegmentSize,
+                                               null, segmentCache));
     }
 
     /**
@@ -470,10 +470,10 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         if (mirror != null) {
             replicator = replicators.get(mirror);
         }
-        channels.put(channel, new EventChannel(Role.PRIMARY, mirror, channel,
-                                               roots.hash(point(channel)),
-                                               maxSegmentSize, replicator,
-                                               segmentCache));
+        channels.put(channel, new EventChannel(self, Role.PRIMARY, mirror,
+                                               channel,
+                                               roots.hash(point(channel)), maxSegmentSize,
+                                               replicator, segmentCache));
     }
 
     /**
@@ -647,13 +647,17 @@ public class Weaver implements Bundle, Comparable<Weaver> {
             Replicator replicator = replicators.get(pair.get(0));
             assert replicator == null : String.format("Replicator for %s is null on %s",
                                                       channel, self);
-            ec = new EventChannel(Role.PRIMARY, pair.get(1), channel,
-                                  roots.hash(point(channel)), maxSegmentSize,
-                                  replicator, segmentCache);
+            ec = new EventChannel(self, Role.PRIMARY, pair.get(1),
+                                  channel, roots.hash(point(channel)),
+                                  maxSegmentSize, replicator, segmentCache);
+        } else if (self.equals(pair.get(1))) {
+            ec = new EventChannel(self, Role.MIRROR, pair.get(0),
+                                  channel, roots.hash(point(channel)),
+                                  maxSegmentSize, null, segmentCache);
         } else {
-            ec = new EventChannel(Role.MIRROR, pair.get(0), channel,
-                                  roots.hash(point(channel)), maxSegmentSize,
-                                  null, segmentCache);
+            throw new IllegalStateException(
+                                            String.format("%s is neither mirror nor primary for %, cannot xerox",
+                                                          self, channel));
         }
         EventChannel previous = channels.put(channel, ec);
         assert previous == null : String.format("Xeroxed event channel %s is currently hosted on %s",

@@ -102,7 +102,6 @@ public class EventChannel {
     }
 
     public static final String          SEGMENT_SUFFIX = ".segment";
-
     private static final Logger         log            = Logger.getLogger(Weaver.class.getCanonicalName());
     private static final FilenameFilter SEGMENT_FILTER = new FilenameFilter() {
                                                            @Override
@@ -196,14 +195,17 @@ public class EventChannel {
     private volatile Replicator                replicator;
     private Role                               role;
     private final ConcurrentMap<File, Segment> segmentCache;
+    private final Node                         self;
 
-    public EventChannel(Role role, Node partnerId, final UUID channelId,
-                        final File root, final long maxSegmentSize,
-                        final Replicator replicator,
+    public EventChannel(Node self, Role role, Node partnerId,
+                        final UUID channelId, final File root,
+                        final long maxSegmentSize, final Replicator replicator,
                         ConcurrentMap<File, Segment> segmentCache) {
+        assert self != null : "this node must not be null";
         assert root != null : "Root directory must not be null";
         assert channelId != null : "Channel id must not be null";
 
+        this.self = self;
         this.role = role;
         partner = partnerId;
         id = channelId;
@@ -239,6 +241,11 @@ public class EventChannel {
                                                                              throws IOException {
         nextOffset = offset + batchHeader.getBatchByteLength();
         lastTimestamp = batchHeader.getSequenceNumber();
+        if (log.isLoggable(Level.INFO)) {
+            log.info(String.format("Committing append of batch sequence # %s at offset %s for channel %s, segment %s on %s",
+                                   batchHeader.getSequenceNumber(), offset, id,
+                                   segment.getSegmentName(), self));
+        }
     }
 
     /**
