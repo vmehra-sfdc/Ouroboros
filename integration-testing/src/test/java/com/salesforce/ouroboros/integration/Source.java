@@ -161,7 +161,7 @@ public class Source implements EventSource {
                     int i = 0;
                     long nextTimestamp = sequenceNumber + 1;
                     try {
-                        Thread.sleep(10);
+                        Thread.sleep(1);
                     } catch (InterruptedException e2) {
                         return;
                     }
