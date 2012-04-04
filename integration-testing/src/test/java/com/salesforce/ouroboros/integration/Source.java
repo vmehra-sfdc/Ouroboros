@@ -37,7 +37,9 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.api.producer.EventSource;
@@ -46,7 +48,7 @@ import com.salesforce.ouroboros.api.producer.UnknownChannelException;
 import com.salesforce.ouroboros.producer.Producer;
 
 public class Source implements EventSource {
-    private static final Logger                log                   = Logger.getLogger(Source.class.getCanonicalName());
+    private static final Logger                log                   = LoggerFactory.getLogger(Source.class.getCanonicalName());
     public final ConcurrentHashMap<UUID, Long> channels              = new ConcurrentHashMap<UUID, Long>();
     private Producer                           producer;
     public final Set<UUID>                     failedChannels        = new ConcurrentSkipListSet<UUID>();
@@ -69,16 +71,31 @@ public class Source implements EventSource {
         channels.remove(channel);
     }
 
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.api.producer.EventSource#deadChannels(java.util.List)
+     */
+    @Override
+    public void deactivated(Collection<UUID> deadChannels) {
+        for (UUID channel : deadChannels) {
+            channels.remove(channel);
+        }
+    }
+
+    public Node getId() {
+        return producer.getId();
+    }
+
     @Override
     public void opened(UUID channel) {
         channels.put(channel, 0L);
     }
 
-    /**
-     * @param producer
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.api.producer.EventSource#pauseChannels(java.util.Collection)
      */
-    public void setProducer(Producer producer) {
-        this.producer = producer;
+    @Override
+    public void pause(Collection<UUID> channels) {
+        pausedChannels.addAll(channels);
     }
 
     public void publish(final int batchSize, Executor executor,
@@ -93,6 +110,35 @@ public class Source implements EventSource {
                 shutdown.set(true);
             }
         });
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.api.producer.EventSource#relinquishPrimary(java.util.UUID)
+     */
+    @Override
+    public void relinquishPrimary(Collection<UUID> channels) {
+        System.out.println(String.format("Relinquishing primary for %s on %s",
+                                         channels, producer.getId()));
+        relinquishedPrimaries.addAll(channels);
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.api.producer.EventSource#resume(java.util.Collection)
+     */
+    @Override
+    public void resume(Collection<UUID> channels) {
+        pausedChannels.removeAll(channels);
+    }
+
+    /**
+     * @param producer
+     */
+    public void setProducer(Producer producer) {
+        this.producer = producer;
+    }
+
+    public void shutdown() {
+        shutdown.set(true);
     }
 
     private void publish(int batchSize, CountDownLatch latch, long target) {
@@ -159,49 +205,5 @@ public class Source implements EventSource {
         }
         failedChannels.removeAll(relinquishedPrimaries);
         latch.countDown();
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.api.producer.EventSource#deadChannels(java.util.List)
-     */
-    @Override
-    public void deactivated(Collection<UUID> deadChannels) {
-        for (UUID channel : deadChannels) {
-            channels.remove(channel);
-        }
-    }
-
-    public void shutdown() {
-        shutdown.set(true);
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.api.producer.EventSource#pauseChannels(java.util.Collection)
-     */
-    @Override
-    public void pause(Collection<UUID> channels) {
-        pausedChannels.addAll(channels);
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.api.producer.EventSource#resume(java.util.Collection)
-     */
-    @Override
-    public void resume(Collection<UUID> channels) {
-        pausedChannels.removeAll(channels);
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.api.producer.EventSource#relinquishPrimary(java.util.UUID)
-     */
-    @Override
-    public void relinquishPrimary(Collection<UUID> channels) {
-        System.out.println(String.format("Relinquishing primary for %s on %s",
-                                         channels, producer.getId()));
-        relinquishedPrimaries.addAll(channels);
-    }
-
-    public Node getId() {
-        return producer.getId();
     }
 }

@@ -76,6 +76,18 @@ public class Node implements Comparable<Node>, Serializable, Cloneable {
     }
 
     @Override
+    public Node clone() {
+        Node clone;
+        try {
+            clone = (Node) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new IllegalStateException();
+        }
+        clone.down = false;
+        return clone;
+    }
+
+    @Override
     public int compareTo(Node node) {
         if (processId < node.processId) {
             return -1;
@@ -135,16 +147,5 @@ public class Node implements Comparable<Node>, Serializable, Cloneable {
     @Override
     public String toString() {
         return String.format("Node[%s]", processId);
-    }
-
-    public Node clone() {
-        Node clone;
-        try {
-            clone = (Node) super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new IllegalStateException();
-        }
-        clone.down = false;
-        return clone;
     }
 }

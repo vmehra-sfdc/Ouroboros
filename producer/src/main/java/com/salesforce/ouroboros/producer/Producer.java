@@ -42,11 +42,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.ChannelHandler;
 import com.salesforce.ouroboros.Batch;
@@ -163,7 +164,7 @@ public class Producer implements Comparable<Producer> {
         }
     }
 
-    private static final Logger                     log               = Logger.getLogger(Producer.class.getCanonicalName());
+    private static final Logger                     log               = LoggerFactory.getLogger(Producer.class.getCanonicalName());
 
     private final ConcurrentMap<UUID, PrimaryState> channelState      = new ConcurrentHashMap<UUID, PrimaryState>();
     private final Controller                        controller;
@@ -224,13 +225,13 @@ public class Producer implements Comparable<Producer> {
         controller.sample(batch.rate(), System.currentTimeMillis());
         PrimaryState primaryState = channelState.get(batch.channel);
         if (primaryState == null) {
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("No primary state for %s on %s", batch,
                                        self));
             }
         } else {
             primaryState.sequenceNumber = batch.sequenceNumber;
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("Primary ack of sequence %s for %s on %s",
                                        batch.sequenceNumber, batch.channel,
                                        self));
@@ -249,7 +250,7 @@ public class Producer implements Comparable<Producer> {
         MirrorState mirrorState = mirrors.get(ack.channel);
         if (mirrorState != null) {
             mirrorState.sequenceNumber = ack.sequenceNumber;
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("Mirror ack of sequence %s for %s on %s",
                                        ack.sequenceNumber, ack.channel, self));
             }
@@ -316,7 +317,7 @@ public class Producer implements Comparable<Producer> {
             Node[] producerPair = nextProducerRing.hash(point(update.channel),
                                                         2).toArray(new Node[2]);
             if (isPrimaryFor(update.channel)) {
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("%s assuming primary for %s", self,
                                            update));
                 }
@@ -324,7 +325,7 @@ public class Producer implements Comparable<Producer> {
                            update.sequenceNumber);
                 newPrimaries.put(update.channel, update.sequenceNumber);
             } else {
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("%s assuming mirror for %s", self,
                                            update));
                 }
@@ -408,7 +409,7 @@ public class Producer implements Comparable<Producer> {
             UUID channel = entry.getKey();
             Node[] producerPair = entry.getValue().getOldProducerMapping();
             if (deadMembers.contains(producerPair[0])) {
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("%s is assuming primary role for channel %s from Producer[%s]",
                                            this, channel,
                                            producerPair[0].processId));
@@ -432,10 +433,10 @@ public class Producer implements Comparable<Producer> {
             if (deadMembers.contains(pair[0])) {
                 Spinner newPrimary = spinners.get(pair[1]);
                 if (newPrimary == null) {
-                    if (log.isLoggable(Level.WARNING)) {
-                        log.warning(String.format("Both the primary %s and the secondary %s channelbuffers for %s have failed on %s",
-                                                  pair[0], pair[1],
-                                                  entry.getKey(), self));
+                    if (log.isWarnEnabled()) {
+                        log.warn(String.format("Both the primary %s and the secondary %s channelbuffers for %s have failed on %s",
+                                               pair[0], pair[1],
+                                               entry.getKey(), self));
                     }
                     deadChannels.add(entry.getKey());
                     channelState.remove(entry.getKey());
@@ -451,7 +452,7 @@ public class Producer implements Comparable<Producer> {
                                 break;
                             } catch (RateLimiteExceededException e) {
                                 int sleepMs = 100 * i;
-                                if (log.isLoggable(Level.INFO)) {
+                                if (log.isInfoEnabled()) {
                                     log.info(String.format("Rate limit exceeded sending queued events to new primary for %s, sleeping %s milliseconds on %s",
                                                            entry.getKey(),
                                                            sleepMs, self));
@@ -460,9 +461,8 @@ public class Producer implements Comparable<Producer> {
                             }
                         }
                         if (!delivered) {
-                            log.severe(String.format("Unable to failover queued batch %s on %s for %s due to rate limiting",
-                                                     batch, self,
-                                                     entry.getKey()));
+                            log.error(String.format("Unable to failover queued batch %s on %s for %s due to rate limiting",
+                                                    batch, self, entry.getKey()));
                         }
                     }
                     failedPrimary.spinner = newPrimary;
@@ -506,12 +506,12 @@ public class Producer implements Comparable<Producer> {
         return self;
     }
 
-    public Long getPrimarySequenceNumberFor(UUID channel) {
-        return channelState.get(channel).sequenceNumber;
-    }
-
     public Long getMirrorSequenceNumberFor(UUID channel) {
         return mirrors.get(channel).sequenceNumber;
+    }
+
+    public Long getPrimarySequenceNumberFor(UUID channel) {
+        return channelState.get(channel).sequenceNumber;
     }
 
     /* (non-Javadoc)
@@ -531,6 +531,11 @@ public class Producer implements Comparable<Producer> {
         controller.reset();
     }
 
+    public boolean isActingFor(UUID channel) {
+        return mirrors.containsKey(channel)
+               || channelState.containsKey(channel);
+    }
+
     /**
      * 
      * @param channel
@@ -547,11 +552,6 @@ public class Producer implements Comparable<Producer> {
      */
     public boolean isActingPrimaryFor(UUID channel) {
         return channelState.containsKey(channel);
-    }
-
-    public boolean isActingFor(UUID channel) {
-        return mirrors.containsKey(channel)
-               || channelState.containsKey(channel);
     }
 
     /**
@@ -597,14 +597,14 @@ public class Producer implements Comparable<Producer> {
                                         pair,
                                         0L,
                                         getChannelBufferReplicationPair(channel)));
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("Channel %s opened on mirror %s",
                                        channel, this));
             }
         } else if (self.equals(pair[0])) {
             mapSpinner(channel, pair, false, -1L);
             source.opened(channel);
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("Channel %s opened on primary %s",
                                        channel, this));
             }
@@ -654,7 +654,7 @@ public class Producer implements Comparable<Producer> {
             }
             PrimaryState state = channelState.get(channel);
             if (state == null) {
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Push to channel %s that does not exist on %s",
                                            channel, self));
                 }
@@ -665,7 +665,7 @@ public class Producer implements Comparable<Producer> {
             Batch batch = new Batch(state.getMirrorProducer(), channel,
                                     sequenceNumber, events);
             if (!controller.accept(batch.batchByteSize())) {
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Rate limit exceeded for push to %s on: %s",
                                            channel, self));
                 }
@@ -711,7 +711,7 @@ public class Producer implements Comparable<Producer> {
                     // if self is still the primary
                     // Xerox state to the new mirror
                     Object[] args = { channel, self, remappedMirror };
-                    if (log.isLoggable(Level.INFO)) {
+                    if (log.isInfoEnabled()) {
                         log.info(String.format("Rebalancing for %s from primary %s to new mirror %s",
                                                args));
                     }
@@ -720,7 +720,7 @@ public class Producer implements Comparable<Producer> {
                 } else if (self.equals(remappedMirror)) {
                     // Self becomes the new mirror
                     Object[] args = { channel, self, remappedPrimary };
-                    if (log.isLoggable(Level.INFO)) {
+                    if (log.isInfoEnabled()) {
                         log.info(String.format("Rebalancing for %s, %s becoming mirror from primary, new primary %s",
                                                args));
                     }
@@ -732,7 +732,7 @@ public class Producer implements Comparable<Producer> {
                     // Xerox state to new primary and mirror
                     Object[] args = { channel, self, remappedPrimary,
                             remappedMirror };
-                    if (log.isLoggable(Level.INFO)) {
+                    if (log.isInfoEnabled()) {
                         log.info(String.format("Rebalancing for %s from old primary %s to new primary %s, new mirror %s",
                                                args));
                     }
@@ -746,14 +746,14 @@ public class Producer implements Comparable<Producer> {
                 // mirror is up
                 // Xerox state to the new primary
                 Object[] args = { channel, self, remappedPrimary };
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Rebalancing for %s from old primary %s to new primary %s",
                                            args));
                 }
                 remap(channel, state.sequenceNumber, remappedPrimary, remapped);
                 if (self.equals(remappedMirror)) {
                     Object[] args1 = { channel, self };
-                    if (log.isLoggable(Level.INFO)) {
+                    if (log.isInfoEnabled()) {
                         log.info(String.format("Rebalancing for %s, %s becoming mirror from primary",
                                                args1));
                     }
@@ -769,7 +769,7 @@ public class Producer implements Comparable<Producer> {
                 // Self is still the mirror
                 // Xerox state to the new primary
                 Object[] args = { channel, self, remappedPrimary };
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Rebalancing for %s from mirror %s to new primary %s",
                                            args));
                 }
@@ -777,7 +777,7 @@ public class Producer implements Comparable<Producer> {
             } else if (self.equals(remappedPrimary)) {
                 // Self becomes the new primary
                 Object[] args = { channel, self, remappedMirror };
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Rebalancing for %s, %s becoming primary from mirror, new mirror %s",
                                            args));
                 }
@@ -788,7 +788,7 @@ public class Producer implements Comparable<Producer> {
                 // Xerox state to the new primary and mirror
                 Object[] args = { channel, self, remappedPrimary,
                         remappedMirror };
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Rebalancing for %s from old mirror %s to new primary %s, new mirror %s",
                                            args));
                 }
@@ -802,7 +802,7 @@ public class Producer implements Comparable<Producer> {
             Object[] args = { channel, self, remappedMirror };
             // primary is up
             // Xerox state to the new mirror
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("Rebalancing for %s from old mirror %s to new mirror %s",
                                        args));
             }
@@ -834,7 +834,7 @@ public class Producer implements Comparable<Producer> {
                             break;
                         } catch (RateLimiteExceededException e) {
                             int sleepMs = 100 * i;
-                            if (log.isLoggable(Level.INFO)) {
+                            if (log.isInfoEnabled()) {
                                 log.info(String.format("Rate limit exceeded sending queued events to new primary for %s, sleeping %s milliseconds on %s",
                                                        mapping.getKey(),
                                                        sleepMs, self));
@@ -847,8 +847,8 @@ public class Producer implements Comparable<Producer> {
                         }
                     }
                     if (!delivered) {
-                        log.severe(String.format("Unable to remap queued events on %s for %s due to rate limiting",
-                                                 self, mapping.getKey()));
+                        log.error(String.format("Unable to remap queued events on %s for %s due to rate limiting",
+                                                self, mapping.getKey()));
                     }
                 }
             }
@@ -908,9 +908,9 @@ public class Producer implements Comparable<Producer> {
                                   Map<Node, ContactInformation> yellowPages) {
         for (Node n : weavers) {
             if (spinners.containsKey(n)) {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine(String.format("Attempting to create a spinner to %s which already exists on %s",
-                                           n, self));
+                if (log.isTraceEnabled()) {
+                    log.trace(String.format("Attempting to create a spinner to %s which already exists on %s",
+                                            n, self));
                 }
                 break;
             }
@@ -918,17 +918,16 @@ public class Producer implements Comparable<Producer> {
             assert info != null : String.format("Did not find any connection information for node %s",
                                                 n);
             Spinner spinner = new Spinner(this, n, maxQueueLength);
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("Connecting spinner to %s on %s address %s",
                                        n, self, info.spindle));
             }
             try {
                 spinnerHandler.connectTo(info.spindle, spinner);
             } catch (IOException e) {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.log(Level.WARNING,
-                            String.format("Cannot connect to spindle on node %s at address %s",
-                                          n, info.spindle), e);
+                if (log.isWarnEnabled()) {
+                    log.warn(String.format("Cannot connect to spindle on node %s at address %s",
+                                           n, info.spindle), e);
                 }
             }
             spinners.put(n, spinner);
@@ -970,20 +969,18 @@ public class Producer implements Comparable<Producer> {
         Node[] channelPair = getChannelBufferReplicationPair(channel);
         Spinner spinner = spinners.get(channelPair[0]);
         if (spinner == null) {
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("Primary node %s for channel %s is down, mapping mirror %s on %s",
                                        channelPair[0], channel, channelPair[1],
                                        this));
             }
             spinner = spinners.get(channelPair[1]);
             if (spinner == null) {
-                if (log.isLoggable(Level.SEVERE)) {
-                    log.severe(String.format("Mirror %s for channel %s is down on %s",
-                                             channelPair[0], channel, this));
-                }
+                log.error(String.format("Mirror %s for channel %s is down on %s",
+                                        channelPair[0], channel, this));
                 return null;
             } else {
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Mapping channel %s to mirror %s on %s",
                                            channel, channelPair[1], this));
                 }
@@ -996,7 +993,7 @@ public class Producer implements Comparable<Producer> {
                                                                  failover));
             }
         } else {
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("Mapping channel %s to primary %s on %s",
                                        channel, channelPair[0], this));
             }

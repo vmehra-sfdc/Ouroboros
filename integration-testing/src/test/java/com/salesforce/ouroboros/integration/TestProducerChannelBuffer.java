@@ -34,11 +34,12 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Logger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
@@ -65,10 +66,19 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class TestProducerChannelBuffer {
-    private static AtomicInteger id = new AtomicInteger(-1);
+    @Configuration
+    @Import(WeaverCfg.class)
+    static class cbConfig extends GossipDiscoveryNode2Cfg {
 
-    public static void reset() {
-        id.set(-1);
+        private int node = -1;
+
+        @Override
+        public int node() {
+            if (node == -1) {
+                node = id.incrementAndGet();
+            }
+            return node;
+        }
     }
 
     @Configuration
@@ -77,6 +87,7 @@ public class TestProducerChannelBuffer {
 
         private int node = -1;
 
+        @Override
         public int node() {
             if (node == -1) {
                 node = id.incrementAndGet();
@@ -85,23 +96,16 @@ public class TestProducerChannelBuffer {
         }
     }
 
-    @Configuration
-    @Import(WeaverCfg.class)
-    static class cbConfig extends GossipDiscoveryNode2Cfg {
+    private static AtomicInteger id  = new AtomicInteger(-1);
 
-        private int node = -1;
+    private static final Logger  log = LoggerFactory.getLogger(TestProducerChannelBuffer.class.getCanonicalName());
 
-        public int node() {
-            if (node == -1) {
-                node = id.incrementAndGet();
-            }
-            return node;
-        }
-    }
-
-    private static final Logger        log = Logger.getLogger(TestProducerChannelBuffer.class.getCanonicalName());
     static {
         GossipTestCfg.setTestPorts(24120, 24140);
+    }
+
+    public static void reset() {
+        id.set(-1);
     }
 
     TestController                     controller;

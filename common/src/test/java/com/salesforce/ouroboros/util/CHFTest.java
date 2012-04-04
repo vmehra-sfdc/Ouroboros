@@ -9,14 +9,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Random;
-import java.util.logging.Logger;
 
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.salesforce.ouroboros.util.ConsistentHashFunction.SkipStrategy;
 
 public class CHFTest {
-    private static final Logger log = Logger.getLogger(ConsistentHashFunction.class.getCanonicalName());
+    private static final Logger log = LoggerFactory.getLogger(ConsistentHashFunction.class.getCanonicalName());
 
     @Test
     public void testAdd() {
@@ -169,8 +170,8 @@ public class CHFTest {
             List<String> chances = chf.hash(sample,
                                             Math.min(chf.getBuckets().size(),
                                                      r.nextInt(3) + 2));
-            log.finest("Chances for " + sample + " are " + chances + " out of "
-                       + chf.getBuckets());
+            log.trace("Chances for " + sample + " are " + chances + " out of "
+                      + chf.getBuckets());
             for (String chance : chances) {
                 assertEquals(chf.hash(sample) + " != " + chance,
                              chf.hash(sample), chance);
@@ -235,19 +236,19 @@ public class CHFTest {
 
             int removals = Math.min(r.nextInt(5), bucket.size() - 1);
             for (int k = 0; k < removals; k++) {
-                log.finest(String.format("Removing %d/%d\n", k, removals));
+                log.trace(String.format("Removing %d/%d\n", k, removals));
                 String x = bucket.remove(r.nextInt(bucket.size()));
                 chf.remove(x);
             }
             int additions = r.nextInt(5);
             for (int k = 0; k < additions; k++) {
-                log.finest(String.format("Adding %d/%d\n", k, additions));
+                log.trace(String.format("Adding %d/%d\n", k, additions));
                 String x = Integer.toString(new Object().hashCode());
                 bucket.add(x);
                 chf.add(x, 1);
             }
             if (bucket.size() == 0) {
-                log.finest(String.format("Adding out of emergency"));
+                log.trace(String.format("Adding out of emergency"));
                 String x = Integer.toString(new Object().hashCode());
                 bucket.add(x);
                 chf.add(x, 1);

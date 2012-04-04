@@ -38,11 +38,12 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
@@ -91,7 +92,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         }
     }
 
-    private static final Logger                          log               = Logger.getLogger(Weaver.class.getCanonicalName());
+    private static final Logger                          log               = LoggerFactory.getLogger(Weaver.class.getCanonicalName());
     private static final String                          WEAVER_REPLICATOR = "Weaver Replicator";
     private static final String                          WEAVER_SPINDLE    = "Weaver Spindle";
     private static final String                          WEAVER_XEROX      = "Weaver Xerox";
@@ -124,10 +125,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                 try {
                     segment.close();
                 } catch (IOException e) {
-                    log.log(Level.FINEST,
-                            String.format("Error closing %s" + segment), e);
+                    log.trace(String.format("Error closing %s" + segment), e);
                 }
-                log.fine(String.format("%s evicted on %s", segment, self));
+                log.trace(String.format("%s evicted on %s", segment, self));
             }
         });
         segmentCache = builder.build();
@@ -218,7 +218,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
             EventChannel channel = entry.getValue();
             if (channel != null) {
                 if (!pair[0].equals(self) && !pair[1].equals(self)) {
-                    if (log.isLoggable(Level.INFO)) {
+                    if (log.isInfoEnabled()) {
                         log.info(String.format("Rebalancing, closing channel %s on %s",
                                                channelId, self));
                     }
@@ -254,10 +254,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
             try {
                 replicator.connect(yellowPages, replicationHandler);
             } catch (IOException e) {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.log(Level.WARNING,
-                            String.format("Error connecting originating replicator from %s to %s",
-                                          self, replicator.getPartner()), e);
+                if (log.isWarnEnabled()) {
+                    log.warn(String.format("Error connecting originating replicator from %s to %s",
+                                           self, replicator.getPartner()), e);
                 }
             }
         }
@@ -280,10 +279,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                 xeroxHandler.connectTo(yellowPages.get(entry.getKey()).xerox,
                                        xerox);
             } catch (IOException e) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.log(Level.INFO,
-                            String.format("Error connecting xerox from %s to %s",
-                                          self, entry.getKey()), e);
+                if (log.isInfoEnabled()) {
+                    log.info(String.format("Error connecting xerox from %s to %s",
+                                           self, entry.getKey()), e);
                 }
                 rendezvous.cancel();
                 return;
@@ -323,7 +321,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
      */
     public void failover(Collection<Node> deadMembers) {
         for (Node node : deadMembers) {
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("Removing %s from the partition on %s",
                                        node, self));
             }
@@ -340,7 +338,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                 assert channel.isMirror() : String.format("%s thinks it is the primary for % when it should be the mirror",
                                                           self, channel.getId());
                 // This node is now the primary for the channel, xerox state to the new mirror
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("%s assuming primary role for: %s, old primary: %s",
                                            self, channelId,
                                            channel.getPartnerId()));
@@ -439,14 +437,14 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         if (channels.get(channel) != null) {
             return;
         }
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format(" %s is the mirror for the new subscription %s",
                                    self, channel));
         }
-        channels.put(channel, new EventChannel(self, Role.MIRROR, primary,
-                                               channel,
-                                               roots.hash(point(channel)), maxSegmentSize,
-                                               null, segmentCache));
+        channels.put(channel,
+                     new EventChannel(self, Role.MIRROR, primary, channel,
+                                      roots.hash(point(channel)),
+                                      maxSegmentSize, null, segmentCache));
     }
 
     /**
@@ -462,7 +460,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
             return;
         }
         // This node is the primary for the event channel
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("%s is the primary for the new subscription %s",
                                    self, channel));
         }
@@ -470,10 +468,10 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         if (mirror != null) {
             replicator = replicators.get(mirror);
         }
-        channels.put(channel, new EventChannel(self, Role.PRIMARY, mirror,
-                                               channel,
-                                               roots.hash(point(channel)), maxSegmentSize,
-                                               replicator, segmentCache));
+        channels.put(channel,
+                     new EventChannel(self, Role.PRIMARY, mirror, channel,
+                                      roots.hash(point(channel)),
+                                      maxSegmentSize, replicator, segmentCache));
     }
 
     /**
@@ -636,9 +634,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
 
     @Override
     public EventChannel xeroxEventChannel(UUID channel) {
-        if (log.isLoggable(Level.FINE)) {
-            log.fine(String.format("%s created a new channel for %s", self,
-                                   channel));
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("%s created a new channel for %s", self,
+                                    channel));
         }
 
         List<Node> pair = nextRing.hash(point(channel), 2);
@@ -647,13 +645,13 @@ public class Weaver implements Bundle, Comparable<Weaver> {
             Replicator replicator = replicators.get(pair.get(0));
             assert replicator == null : String.format("Replicator for %s is null on %s",
                                                       channel, self);
-            ec = new EventChannel(self, Role.PRIMARY, pair.get(1),
-                                  channel, roots.hash(point(channel)),
-                                  maxSegmentSize, replicator, segmentCache);
+            ec = new EventChannel(self, Role.PRIMARY, pair.get(1), channel,
+                                  roots.hash(point(channel)), maxSegmentSize,
+                                  replicator, segmentCache);
         } else if (self.equals(pair.get(1))) {
-            ec = new EventChannel(self, Role.MIRROR, pair.get(0),
-                                  channel, roots.hash(point(channel)),
-                                  maxSegmentSize, null, segmentCache);
+            ec = new EventChannel(self, Role.MIRROR, pair.get(0), channel,
+                                  roots.hash(point(channel)), maxSegmentSize,
+                                  null, segmentCache);
         } else {
             throw new IllegalStateException(
                                             String.format("%s is neither mirror nor primary for %, cannot xerox",
@@ -666,7 +664,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     }
 
     private void infoLog(String logString, Object... args) {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format(logString, args));
         }
     }

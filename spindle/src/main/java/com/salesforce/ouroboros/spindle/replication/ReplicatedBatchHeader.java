@@ -99,8 +99,9 @@ public class ReplicatedBatchHeader extends BatchHeader {
     @Override
     public String toString() {
         return String.format("ReplicatedBatchHeader[magic=%s, sequenceNumber=%s, length=%s, channel=%s offset=%s position=%s]",
-                             getMagic(), getSequenceNumber(), getBatchByteLength(),
-                             getChannel(), getOffset(), getPosition());
+                             getMagic(), getSequenceNumber(),
+                             getBatchByteLength(), getChannel(), getOffset(),
+                             getPosition());
     }
 
     /* (non-Javadoc)

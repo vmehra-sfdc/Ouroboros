@@ -26,7 +26,9 @@
 package com.salesforce.ouroboros.producer;
 
 import java.io.Serializable;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.MemberDispatch;
@@ -60,14 +62,14 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
         }
     };
 
-    private static final Logger log = Logger.getLogger(ProducerRebalanceMessage.class.getCanonicalName());
+    private static final Logger log = LoggerFactory.getLogger(ProducerRebalanceMessage.class.getCanonicalName());
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
         if (!(switchboard.getMember() instanceof ProducerCoordinator)) {
-            log.warning(String.format("ReplicatorMessage %s must be targeted at producer coordinator, not %s",
-                                      this, switchboard.getMember()));
+            log.warn(String.format("ReplicatorMessage %s must be targeted at producer coordinator, not %s",
+                                   this, switchboard.getMember()));
             return;
         }
         ProducerCoordinator coordinator = (ProducerCoordinator) switchboard.getMember();

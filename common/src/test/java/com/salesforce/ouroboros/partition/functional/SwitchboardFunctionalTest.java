@@ -33,11 +33,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -55,7 +56,7 @@ import com.salesforce.ouroboros.testUtils.Util.Condition;
  * 
  */
 public class SwitchboardFunctionalTest {
-    private static final Logger              log     = Logger.getLogger(SwitchboardFunctionalTest.class.getCanonicalName());
+    private static final Logger              log     = LoggerFactory.getLogger(SwitchboardFunctionalTest.class.getCanonicalName());
 
     final Class<?>[]                         configs = getConfigs();
     TestController                           controller;

@@ -13,9 +13,9 @@ import org.springframework.context.annotation.Configuration;
 import com.fasterxml.uuid.Generators;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.producer.ProducerCoordinator;
 import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.ProducerConfiguration;
+import com.salesforce.ouroboros.producer.ProducerCoordinator;
 
 @Configuration
 public class ProducerCfg {
@@ -27,19 +27,10 @@ public class ProducerCfg {
 
     @Bean
     @Autowired
-    public ProducerCoordinator coordinator(Switchboard switchboard, Producer producer)
-                                                                              throws IOException {
+    public ProducerCoordinator coordinator(Switchboard switchboard,
+                                           Producer producer)
+                                                             throws IOException {
         return new ProducerCoordinator(switchboard, producer);
-    }
-
-    @Bean
-    @Autowired
-    public Switchboard switchboard(Node memberNode, Partition partitionManager) {
-        Switchboard switchboard = new Switchboard(
-                                                  memberNode,
-                                                  partitionManager,
-                                                  Generators.timeBasedGenerator());
-        return switchboard;
     }
 
     @Bean
@@ -60,5 +51,15 @@ public class ProducerCfg {
     @Bean
     public Source source() {
         return new Source();
+    }
+
+    @Bean
+    @Autowired
+    public Switchboard switchboard(Node memberNode, Partition partitionManager) {
+        Switchboard switchboard = new Switchboard(
+                                                  memberNode,
+                                                  partitionManager,
+                                                  Generators.timeBasedGenerator());
+        return switchboard;
     }
 }

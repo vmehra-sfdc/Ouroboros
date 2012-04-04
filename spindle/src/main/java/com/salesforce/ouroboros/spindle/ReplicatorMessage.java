@@ -26,7 +26,9 @@
 package com.salesforce.ouroboros.spindle;
 
 import java.io.Serializable;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.MemberDispatch;
@@ -72,14 +74,14 @@ public enum ReplicatorMessage implements MemberDispatch {
         }
     };
 
-    private final static Logger log = Logger.getLogger(ReplicatorMessage.class.getCanonicalName());
+    private final static Logger log = LoggerFactory.getLogger(ReplicatorMessage.class.getCanonicalName());
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
         if (!(switchboard.getMember() instanceof WeaverCoordinator)) {
-            log.warning(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
-                                      this, switchboard.getMember()));
+            log.warn(String.format("ReplicatorMessage %s must be targeted at weaver coordinator, not %s",
+                                   this, switchboard.getMember()));
         }
         disptach((WeaverCoordinator) switchboard.getMember(), sender,
                  arguments, time, switchboard);

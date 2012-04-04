@@ -41,8 +41,9 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import statemap.StateUndefinedException;
 
@@ -71,7 +72,7 @@ import com.salesforce.ouroboros.util.Rendezvous;
  */
 public class WeaverCoordinator implements Member {
 
-    private final static Logger                 log             = Logger.getLogger(WeaverCoordinator.class.getCanonicalName());
+    private final static Logger                 log             = LoggerFactory.getLogger(WeaverCoordinator.class.getCanonicalName());
     static final int                            DEFAULT_TIMEOUT = 5;
     static final TimeUnit                       TIMEOUT_UNIT    = TimeUnit.MINUTES;
 
@@ -114,7 +115,7 @@ public class WeaverCoordinator implements Member {
 
     @Override
     public void becomeInactive() {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Spindle %s is now inactivated", self));
         }
         active = false;
@@ -145,7 +146,7 @@ public class WeaverCoordinator implements Member {
             case BOOTSTRAP_PRODUCERS:
                 break;
             case BOOTSTRAP_SPINDLES:
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Bootstrapping spindles on %s", self));
                 }
                 bootstrap((Node[]) arguments[0]);
@@ -179,17 +180,17 @@ public class WeaverCoordinator implements Member {
                     try {
                         pauseRendezvous.meet(arguments.length);
                     } catch (BrokenBarrierException e) {
-                        if (log.isLoggable(Level.WARNING)) {
-                            log.warning(String.format("Channel pause rendezvous has been broken on: %s",
-                                                      self));
+                        if (log.isWarnEnabled()) {
+                            log.warn(String.format("Channel pause rendezvous has been broken on: %s",
+                                                   self));
                         }
                     }
                 }
                 break;
             default: {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.warning(String.format("Invalid target %s for channel message: %s",
-                                              self, type));
+                if (log.isWarnEnabled()) {
+                    log.warn(String.format("Invalid target %s for channel message: %s",
+                                           self, type));
                 }
             }
         }
@@ -549,7 +550,7 @@ public class WeaverCoordinator implements Member {
     }
 
     protected void coordinateBootstrap() {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Coordinating bootstrap on %s", self));
         }
         tally.set(nextMembership.size());
@@ -559,7 +560,7 @@ public class WeaverCoordinator implements Member {
     }
 
     protected void coordinateFailover() {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Coordinating weaver failover on %s", self));
         }
         switchboard.ringCast(new Message(self, FailoverMessage.PREPARE),
@@ -571,7 +572,7 @@ public class WeaverCoordinator implements Member {
      * of the system by including the new members.
      */
     protected void coordinateRebalance() {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Coordinating rebalancing on %s", self));
         }
         tally.set(nextMembership.size());
@@ -587,7 +588,7 @@ public class WeaverCoordinator implements Member {
      * group
      */
     protected void coordinateReplicators() {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Coordinating establishment of the replicators on %s",
                                    self));
         }
@@ -621,9 +622,9 @@ public class WeaverCoordinator implements Member {
             @Override
             public void run() {
                 rebalanceRendezvous = null;
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine(String.format("Replicators established on %s",
-                                           self));
+                if (log.isTraceEnabled()) {
+                    log.trace(String.format("Replicators established on %s",
+                                            self));
                 }
                 if (isActiveLeader()) {
                     tally.decrementAndGet();
@@ -654,7 +655,7 @@ public class WeaverCoordinator implements Member {
             @Override
             public void run() {
                 rebalanceRendezvous = null;
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Replicator establishment cancelled on %s",
                                            self));
                 }
@@ -666,8 +667,8 @@ public class WeaverCoordinator implements Member {
                 fsm.replicatorsEstablishmentCancelled();
             }
         };
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Establishment of replicators initiated on %s",
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Establishment of replicators initiated on %s",
                                     self));
         }
         rebalanceRendezvous = new Rendezvous(contacts.size(), rendezvousAction,
@@ -706,8 +707,8 @@ public class WeaverCoordinator implements Member {
         inactiveMembers.removeAll(deadMembers);
         nextMembership.clear();
         nextMembership.addAll(activeMembers);
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Filtered membership on %s, active = %s, inactive = %s",
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Filtered membership on %s, active = %s, inactive = %s",
                                     self, activeMembers, inactiveMembers));
         }
     }
@@ -760,7 +761,7 @@ public class WeaverCoordinator implements Member {
         Runnable rendezvousAction = new Runnable() {
             @Override
             public void run() {
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Weavers rebalanced on %s", self));
                 }
                 for (Xerox xerox : xeroxes.values()) {
@@ -778,10 +779,8 @@ public class WeaverCoordinator implements Member {
         Runnable cancellationAction = new Runnable() {
             @Override
             public void run() {
-                if (log.isLoggable(Level.SEVERE)) {
-                    log.severe(String.format("Weaver rebalancing cancelled on %s",
-                                             self));
-                }
+                log.error(String.format("Weaver rebalancing cancelled on %s",
+                                        self));
                 for (Xerox xerox : xeroxes.values()) {
                     xerox.close();
                 }
@@ -789,7 +788,7 @@ public class WeaverCoordinator implements Member {
             }
         };
 
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Establishment of replicators initiated on %s",
                                    self));
         }
@@ -877,7 +876,7 @@ public class WeaverCoordinator implements Member {
      * @param member
      */
     protected void replicatorsEstablished(Node member) {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Replicators reported established on %s (coordinator %s)",
                                    member, self));
         }

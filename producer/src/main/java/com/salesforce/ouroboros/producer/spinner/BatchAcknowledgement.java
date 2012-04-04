@@ -27,8 +27,9 @@ package com.salesforce.ouroboros.producer.spinner;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchIdentity;
@@ -42,7 +43,7 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class BatchAcknowledgement {
-    private final static Logger               log       = Logger.getLogger(BatchAcknowledgement.class.getCanonicalName());
+    private final static Logger               log       = LoggerFactory.getLogger(BatchAcknowledgement.class.getCanonicalName());
 
     private final ByteBuffer                  ackBuffer = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
     private final BatchAcknowledgementContext fsm       = new BatchAcknowledgementContext(
@@ -82,7 +83,7 @@ public class BatchAcknowledgement {
     private boolean readAcknowledgement() {
         try {
             if (handler.getChannel().read(ackBuffer) < 0) {
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info("closing channel");
                 }
                 inError = true;
@@ -90,8 +91,8 @@ public class BatchAcknowledgement {
             }
         } catch (IOException e) {
             if (!Utils.isClose(e)) {
-                if (log.isLoggable(Level.INFO)) {
-                    log.log(Level.INFO, "Closing batch acknowlegement");
+                if (log.isInfoEnabled()) {
+                    log.info("Closing batch acknowlegement");
                 }
             }
             inError = true;

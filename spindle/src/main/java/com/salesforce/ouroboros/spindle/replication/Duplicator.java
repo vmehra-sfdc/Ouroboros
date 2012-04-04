@@ -29,8 +29,9 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
@@ -46,7 +47,7 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public final class Duplicator {
 
-    static final Logger             log     = Logger.getLogger(Duplicator.class.getCanonicalName());
+    static final Logger             log     = LoggerFactory.getLogger(Duplicator.class.getCanonicalName());
 
     private EventEntry              current;
     private final DuplicatorContext fsm     = new DuplicatorContext(this);
@@ -91,9 +92,9 @@ public final class Duplicator {
         if (closed.get()) {
             event.handler.selectForRead();
         } else {
-            if (log.isLoggable(Level.FINE)) {
-                log.fine(String.format("Replicating event %s on %s", event,
-                                       fsm.getName()));
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Replicating event %s on %s", event,
+                                        fsm.getName()));
             }
             fsm.replicate(event);
         }
@@ -115,8 +116,8 @@ public final class Duplicator {
                                                        handler.getChannel());
         remaining -= written;
         position += written;
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Writing batch %s, position=%s, written=%s, to %s on %s",
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Writing batch %s, position=%s, written=%s, to %s on %s",
                                     current.header, position, written,
                                     current.segment, thisNode));
         }
@@ -161,9 +162,9 @@ public final class Duplicator {
 
     protected void processHeader() {
         current = pending.remove();
-        if (log.isLoggable(Level.FINEST)) {
-            log.finest(String.format("Processing %s on %s", current.header,
-                                     fsm.getName()));
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Processing %s on %s", current.header,
+                                    fsm.getName()));
         }
         current.handler.selectForRead();
         remaining = current.header.getBatchByteLength();
@@ -188,8 +189,8 @@ public final class Duplicator {
         try {
             if (transferTo()) {
                 current.eventChannel.commit(current.header.getOffset());
-                if (log.isLoggable(Level.FINER)) {
-                    log.finer(String.format("Acknowledging replication of %s, on %s",
+                if (log.isTraceEnabled()) {
+                    log.trace(String.format("Acknowledging replication of %s, on %s",
                                             current.header, fsm.getName()));
                 }
                 current.acknowledger.acknowledge(current.header.getChannel(),
@@ -200,12 +201,10 @@ public final class Duplicator {
         } catch (IOException e) {
             inError = true;
             if (Utils.isClose(e)) {
-                log.log(Level.INFO,
-                        String.format("closing duplicator: %s", fsm.getName()));
+                log.info(String.format("closing duplicator: %s", fsm.getName()));
             } else {
-                log.log(Level.WARNING,
-                        String.format("Unable to replicate payload for %s from: %s",
-                                      current.header, current.segment), e);
+                log.warn(String.format("Unable to replicate payload for %s from: %s",
+                                       current.header, current.segment), e);
             }
         }
         return false;
@@ -219,20 +218,18 @@ public final class Duplicator {
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {
-                log.log(Level.INFO,
-                        String.format("closing duplicator: %s", fsm.getName()));
+                log.info(String.format("closing duplicator: %s", fsm.getName()));
             } else {
-                log.log(Level.WARNING,
-                        String.format("Unable to write batch header: %s",
-                                      current.header), e);
+                log.warn(String.format("Unable to write batch header: %s",
+                                       current.header), e);
             }
             inError = true;
             return false;
         }
         boolean written = !current.header.hasRemaining();
         if (written) {
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("written header %s on %s",
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("written header %s on %s",
                                         current.header, fsm.getName()));
             }
         }

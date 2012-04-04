@@ -34,21 +34,21 @@ public class Source implements EventSource {
     }
 
     /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.api.producer.EventSource#resume(java.util.Collection)
-     */
-    @Override
-    public void resume(Collection<UUID> pausedChannels) {
-        // TODO Auto-generated method stub
-        
-    }
-
-    /* (non-Javadoc)
      * @see com.salesforce.ouroboros.api.producer.EventSource#relinquishPrimary(java.util.Collection)
      */
     @Override
     public void relinquishPrimary(Collection<UUID> channels) {
         // TODO Auto-generated method stub
-        
+
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.api.producer.EventSource#resume(java.util.Collection)
+     */
+    @Override
+    public void resume(Collection<UUID> pausedChannels) {
+        // TODO Auto-generated method stub
+
     }
 
 }

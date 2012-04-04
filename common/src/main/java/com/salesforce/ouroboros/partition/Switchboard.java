@@ -42,12 +42,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.smartfrog.services.anubis.partition.Partition;
 import org.smartfrog.services.anubis.partition.PartitionNotification;
 import org.smartfrog.services.anubis.partition.comms.MessageConnection;
@@ -151,19 +151,18 @@ public class Switchboard {
                             try {
                                 processMessage((Message) obj, sender, time);
                             } catch (TransitionUndefinedException e) {
-                                if (log.isLoggable(Level.WARNING)) {
-                                    log.log(Level.WARNING,
-                                            String.format("Transition error processing message: %s from: %s on %s",
-                                                          obj, sender,
-                                                          self.processId), e);
+                                if (log.isWarnEnabled()) {
+                                    log.warn(String.format("Transition error processing message: %s from: %s on %s",
+                                                           obj, sender,
+                                                           self.processId), e);
                                 }
                             }
                         }
                     });
                 } catch (RejectedExecutionException e) {
-                    if (log.isLoggable(Level.FINEST)) {
-                        log.finest(String.format("rejecting message %s due to shutdown on %s",
-                                                 obj, self));
+                    if (log.isTraceEnabled()) {
+                        log.trace(String.format("rejecting message %s due to shutdown on %s",
+                                                obj, self));
                     }
                 }
             }
@@ -175,7 +174,7 @@ public class Switchboard {
         }
     }
 
-    private static final Logger         log             = Logger.getLogger(Switchboard.class.getCanonicalName());
+    private static final Logger         log             = LoggerFactory.getLogger(Switchboard.class.getCanonicalName());
 
     private final ArrayList<Node>       deadMembers     = new ArrayList<Node>();
     private final SwitchboardContext    fsm             = new SwitchboardContext(
@@ -212,9 +211,8 @@ public class Switchboard {
                 daemon.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
                     @Override
                     public void uncaughtException(Thread t, Throwable e) {
-                        log.log(Level.SEVERE,
-                                String.format("Uncaught exception on message processing thread on %s",
-                                              self), e);
+                        log.error(String.format("Uncaught exception on message processing thread on %s",
+                                                self), e);
                     }
                 });
                 return daemon;
@@ -267,21 +265,21 @@ public class Switchboard {
                          Serializable[] arguments, long time) {
         switch (type) {
             case DISCOVERY_COMPLETE:
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine(String.format("Discovery complete on %s", self));
+                if (log.isTraceEnabled()) {
+                    log.trace(String.format("Discovery complete on %s", self));
                 }
                 fsm.discoveryComplete();
                 break;
             case ADVERTISE_NOOP:
-                if (log.isLoggable(Level.FINER)) {
-                    log.finer(String.format("Discovery of noop node %s = %s",
+                if (log.isTraceEnabled()) {
+                    log.trace(String.format("Discovery of noop node %s = %s",
                                             self, type));
                 }
                 discover(sender);
                 break;
             default:
-                if (log.isLoggable(Level.FINER)) {
-                    log.finer(String.format("Discovery of node %s = %s", self,
+                if (log.isTraceEnabled()) {
+                    log.trace(String.format("Discovery of node %s = %s", self,
                                             type));
                 }
                 discover(sender);
@@ -350,9 +348,9 @@ public class Switchboard {
      */
     public void forwardToNextInRing(Message message) {
         if (self.equals(message.sender)) {
-            if (log.isLoggable(Level.FINEST)) {
-                log.finest(String.format("Ring cast of %s complete on %s",
-                                         message, self));
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Ring cast of %s complete on %s",
+                                        message, self));
             }
             return;
         }
@@ -370,9 +368,9 @@ public class Switchboard {
      */
     public void forwardToNextInRing(Message message, SortedSet<Node> ring) {
         if (ring.isEmpty() || self.equals(message.sender)) {
-            if (log.isLoggable(Level.FINEST)) {
-                log.finest(String.format("Ring cast of %s complete on %s",
-                                         message, self));
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Ring cast of %s complete on %s",
+                                        message, self));
             }
             return;
         }
@@ -431,9 +429,9 @@ public class Switchboard {
         assert message != null : "Message must not be null";
         int neighbor = view.rightNeighborOf(self.processId);
         if (neighbor == -1) {
-            if (log.isLoggable(Level.FINEST)) {
-                log.finest(String.format("Ring does not have right neighbor of %s",
-                                         self));
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Ring does not have right neighbor of %s",
+                                        self));
             }
             send(message, self);
         } else {
@@ -454,9 +452,9 @@ public class Switchboard {
         assert ring != null : "Ring must not be null";
 
         if (ring.size() <= 1) {
-            if (log.isLoggable(Level.FINEST)) {
-                log.finest(String.format("Ring does not have right neighbor of %s",
-                                         self));
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Ring does not have right neighbor of %s",
+                                        self));
             }
             send(message, self);
         } else {
@@ -497,9 +495,9 @@ public class Switchboard {
         } catch (InterruptedException e) {
             return;
         }
-        if (log.isLoggable(Level.FINEST)) {
-            log.finest(String.format("Processing inbound %s on: %s", message,
-                                     self));
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Processing inbound %s on: %s", message,
+                                    self));
         }
         message.type.dispatch(Switchboard.this, message.sender,
                               message.arguments, time);
@@ -515,15 +513,15 @@ public class Switchboard {
      */
     private void send(final Message msg, final int node) {
         if (!stable.get()) {
-            if (log.isLoggable(Level.INFO)) {
+            if (log.isInfoEnabled()) {
                 log.info(String.format("Partition is unstable, not sending message %s to %s",
                                        msg, node));
             }
             return;
         }
         if (node == self.processId) {
-            if (log.isLoggable(Level.FINEST)) {
-                log.finest(String.format("Sending %s to self", msg));
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Sending %s to self", msg));
             }
             try {
                 try {
@@ -535,28 +533,28 @@ public class Switchboard {
                         }
                     });
                 } catch (RejectedExecutionException e) {
-                    if (log.isLoggable(Level.FINEST)) {
-                        log.finest(String.format("rejecting message %s due to shutdown on %s",
-                                                 msg, self));
+                    if (log.isTraceEnabled()) {
+                        log.trace(String.format("rejecting message %s due to shutdown on %s",
+                                                msg, self));
                     }
                 }
             } catch (RejectedExecutionException e) {
-                if (log.isLoggable(Level.FINEST)) {
-                    log.finest(String.format("rejecting message %s due to shutdown on %s",
-                                             msg, self));
+                if (log.isTraceEnabled()) {
+                    log.trace(String.format("rejecting message %s due to shutdown on %s",
+                                            msg, self));
                 }
             }
             return;
         }
         MessageConnection connection = partition.connect(node);
         if (connection == null) {
-            if (log.isLoggable(Level.WARNING)) {
-                log.warning(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
-                                          msg, node, self));
+            if (log.isWarnEnabled()) {
+                log.warn(String.format("Unable to send %s to %s from %s as the partition cannot create a connection",
+                                       msg, node, self));
             }
         } else {
-            if (log.isLoggable(Level.FINEST)) {
-                log.finest(String.format("Sending %s to %s", msg, node));
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Sending %s to %s", msg, node));
             }
             connection.sendObject(msg);
         }
@@ -577,7 +575,7 @@ public class Switchboard {
         members.clear();
         member.destabilize();
 
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Destabilizing partition on: %s", self));
         }
     }
@@ -602,7 +600,7 @@ public class Switchboard {
 
         UUID newViewId = viewIdGenerator.generate();
 
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("View elected: %s on %s new view: %s",
                                    result.vote, self, newViewId));
         }
@@ -638,7 +636,7 @@ public class Switchboard {
     protected void stabilize(View v, int leader) {
         previousView = view;
         view = v.toBitSet().clone();
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Stabilizing partition on: %s, view: %s, leader: %s",
                                    self, view, leader));
         }
@@ -653,14 +651,13 @@ public class Switchboard {
     }
 
     protected void stabilized() {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Partition stable and discovery complete on %s",
                                    self));
         }
-        if (log.isLoggable(Level.FINEST)) {
-            log.finest(String.format("members = %s, new members = %s, dead members = %s on %s",
-                                     members, getNewMembers(), deadMembers,
-                                     self));
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("members = %s, new members = %s, dead members = %s on %s",
+                                    members, getNewMembers(), deadMembers, self));
         }
         member.stabilized();
     }
@@ -681,13 +678,13 @@ public class Switchboard {
                                                                sender, self);
         if (members.add(sender) && leader
             && members.size() == view.cardinality()) {
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("All members discovered on %s", self));
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("All members discovered on %s", self));
             }
             ringCast(new Message(self, DiscoveryMessage.DISCOVERY_COMPLETE));
         } else {
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("member %s discovered on %s", sender,
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("member %s discovered on %s", sender,
                                         self));
             }
         }

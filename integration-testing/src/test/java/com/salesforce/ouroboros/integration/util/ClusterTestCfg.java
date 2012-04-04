@@ -37,13 +37,6 @@ public class ClusterTestCfg {
     private static int testPort3;
     private static int testPort4;
 
-    public static void setTestPorts(int port1, int port2, int port3, int port4) {
-        testPort1 = port1;
-        testPort2 = port2;
-        testPort3 = port3;
-        testPort4 = port4;
-    }
-
     public static int getTestPort1() {
         return testPort1;
     }
@@ -65,6 +58,13 @@ public class ClusterTestCfg {
         testPort2++;
         testPort3++;
         testPort4++;
+    }
+
+    public static void setTestPorts(int port1, int port2, int port3, int port4) {
+        testPort1 = port1;
+        testPort2 = port2;
+        testPort3 = port3;
+        testPort4 = port4;
     }
 
     @Bean(name = "seedHosts")

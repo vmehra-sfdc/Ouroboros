@@ -26,8 +26,9 @@
 package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Node;
@@ -42,7 +43,7 @@ import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
  * 
  */
 public class Appender extends AbstractAppender {
-    private final static Logger log = Logger.getLogger(Appender.class.getCanonicalName());
+    private final static Logger log = LoggerFactory.getLogger(Appender.class.getCanonicalName());
 
     private final Acknowledger  acknowledger;
     private volatile int        startPosition;
@@ -71,31 +72,60 @@ public class Appender extends AbstractAppender {
             if (producerMirror.processId != NullNode.INSTANCE.processId) {
                 mirrorAcknowledger = bundle.getAcknowledger(producerMirror);
                 if (mirrorAcknowledger == null) {
-                    log.warning(String.format("mirror acknowledger to %s for %s is missing on %s",
-                                              producerMirror, batchHeader,
-                                              bundle.getId()));
+                    log.warn(String.format("mirror acknowledger to %s for %s is missing on %s",
+                                           producerMirror, batchHeader,
+                                           bundle.getId()));
                 }
             }
             eventChannel.append(batchHeader2, segment, acknowledger, handler,
                                 mirrorAcknowledger);
         } catch (IOException e) {
-            if (log.isLoggable(Level.SEVERE)) {
-                log.log(Level.SEVERE,
-                        String.format("Unable to append to %s for %s at %s on %s",
-                                      segment, batchHeader, offset,
-                                      bundle.getId()));
-            }
+            log.error(String.format("Unable to append to %s for %s at %s on %s",
+                                    segment, batchHeader, offset,
+                                    bundle.getId()));
             close();
         }
-        if (log.isLoggable(Level.FINER)) {
-            log.fine(String.format("Committed %s on %s ", batchHeader,
-                                   bundle.getId()));
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Committed %s on %s ", batchHeader,
+                                    bundle.getId()));
         }
     }
 
     @Override
     protected BatchHeader createBatchHeader() {
         return new BatchHeader();
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.source.AbstractAppender#drain()
+     */
+    @Override
+    protected void drain() {
+        acknowledger.acknowledge(batchHeader.getChannel(),
+                                 batchHeader.getSequenceNumber());
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Acknowledging replication of duplicate %s:%s on %s",
+                                    batchHeader.getChannel(),
+                                    batchHeader.getSequenceNumber(),
+                                    bundle.getId()));
+        }
+        Acknowledger mirrorAcknowledger = bundle.getAcknowledger(batchHeader.getProducerMirror());
+        if (mirrorAcknowledger == null) {
+            if (batchHeader.getProducerMirror().processId != NullNode.INSTANCE.processId) {
+                log.warn(String.format("Could not find an acknowledger for %s",
+                                       batchHeader.getProducerMirror()));
+            }
+        } else {
+            mirrorAcknowledger.acknowledge(batchHeader.getChannel(),
+                                           batchHeader.getSequenceNumber());
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Acknowledging mirror replication of duplicate %s:%s on %s",
+                                        batchHeader.getChannel(),
+                                        batchHeader.getSequenceNumber(),
+                                        bundle.getId()));
+            }
+        }
+        super.drain();
     }
 
     @Override
@@ -111,37 +141,5 @@ public class Appender extends AbstractAppender {
     @Override
     protected void markPosition() {
         startPosition = position;
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.spindle.source.AbstractAppender#drain()
-     */
-    @Override
-    protected void drain() {
-        acknowledger.acknowledge(batchHeader.getChannel(),
-                                 batchHeader.getSequenceNumber());
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Acknowledging replication of duplicate %s:%s on %s",
-                                    batchHeader.getChannel(),
-                                    batchHeader.getSequenceNumber(),
-                                    bundle.getId()));
-        }
-        Acknowledger mirrorAcknowledger = bundle.getAcknowledger(batchHeader.getProducerMirror());
-        if (mirrorAcknowledger == null) {
-            if (batchHeader.getProducerMirror().processId != NullNode.INSTANCE.processId) {
-                log.warning(String.format("Could not find an acknowledger for %s",
-                                          batchHeader.getProducerMirror()));
-            }
-        } else {
-            mirrorAcknowledger.acknowledge(batchHeader.getChannel(),
-                                           batchHeader.getSequenceNumber());
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Acknowledging mirror replication of duplicate %s:%s on %s",
-                                        batchHeader.getChannel(),
-                                        batchHeader.getSequenceNumber(),
-                                        bundle.getId()));
-            }
-        }
-        super.drain();
     }
 }

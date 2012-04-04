@@ -39,9 +39,9 @@ import org.springframework.context.annotation.Configuration;
 import com.fasterxml.uuid.Generators;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverConfigation;
+import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 
 /**
  * 
@@ -53,8 +53,23 @@ public class WeaverCfg {
 
     @Bean
     public WeaverCoordinator coordinator(Switchboard switchboard, Weaver weaver)
-                                                                          throws IOException {
+                                                                                throws IOException {
         return new WeaverCoordinator(timer(), switchboard, weaver);
+    }
+
+    @Bean
+    @Autowired
+    public Node memberNode(Identity partitionIdentity) {
+        return new Node(partitionIdentity.id);
+    }
+
+    @Bean
+    public File rootDirectory() throws IOException {
+        File directory = File.createTempFile("prod-CB", ".root");
+        directory.delete();
+        directory.mkdirs();
+        directory.deleteOnExit();
+        return directory;
     }
 
     @Bean
@@ -64,12 +79,6 @@ public class WeaverCfg {
                                                   partitionManager,
                                                   Generators.timeBasedGenerator());
         return switchboard;
-    }
-
-    @Bean
-    @Autowired
-    public Node memberNode(Identity partitionIdentity) {
-        return new Node(partitionIdentity.id);
     }
 
     @Bean
@@ -92,14 +101,5 @@ public class WeaverCfg {
         weaverConfigation.setId(memberNode);
         weaverConfigation.addRoot(directory);
         return weaverConfigation;
-    }
-
-    @Bean
-    public File rootDirectory() throws IOException {
-        File directory = File.createTempFile("prod-CB", ".root");
-        directory.delete();
-        directory.mkdirs();
-        directory.deleteOnExit();
-        return directory;
     }
 }

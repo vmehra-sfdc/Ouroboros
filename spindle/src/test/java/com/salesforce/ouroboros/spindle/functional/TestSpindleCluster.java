@@ -41,11 +41,12 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.BitView;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -76,7 +77,7 @@ public class TestSpindleCluster {
     private static final Node                        PRODUCER_NODE = new Node(
                                                                               666);
 
-    static final Logger                              log           = Logger.getLogger(TestSpindleCluster.class.getCanonicalName());
+    static final Logger                              log           = LoggerFactory.getLogger(TestSpindleCluster.class.getCanonicalName());
 
     static {
         GossipTestCfg.setTestPorts(24506, 24320);
@@ -466,8 +467,8 @@ public class TestSpindleCluster {
                                              new SocketOptions(),
                                              Executors.newCachedThreadPool());
         producerHandler.start();
-        int batches = 1250;
-        int batchSize = 10;
+        int batches = 200;
+        int batchSize = 200;
         bootstrap();
 
         ArrayList<UUID> channels = openChannels();
@@ -613,7 +614,7 @@ public class TestSpindleCluster {
     private ArrayList<UUID> openChannels() throws InterruptedException {
         log.info("Creating some channels");
 
-        int numOfChannels = 50;
+        int numOfChannels = 25;
         ArrayList<UUID> channels = new ArrayList<UUID>();
         for (int i = 0; i < numOfChannels; i++) {
             UUID channel = new UUID(twister.nextLong(), twister.nextLong());

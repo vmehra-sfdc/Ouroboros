@@ -33,8 +33,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Batch;
@@ -52,7 +53,7 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class BatchWriter {
 
-    private static final Logger        log     = Logger.getLogger(BatchWriter.class.getCanonicalName());
+    private static final Logger        log     = LoggerFactory.getLogger(BatchWriter.class.getCanonicalName());
     private final BatchWriterContext   fsm     = new BatchWriterContext(this);
     private SocketChannelHandler       handler;
     private boolean                    inError = false;
@@ -72,8 +73,7 @@ public class BatchWriter {
         consumer.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
-                log.log(Level.WARNING,
-                        String.format("Uncaught exception on %s", t), e);
+                log.warn(String.format("Uncaught exception on %s", t), e);
             }
         });
         consumer.setDaemon(true);
@@ -198,22 +198,20 @@ public class BatchWriter {
         if (batch.header.hasRemaining()) {
             try {
                 if (batch.header.write(handler.getChannel()) < 0) {
-                    if (log.isLoggable(Level.FINE)) {
-                        log.fine("Closing channel");
+                    if (log.isTraceEnabled()) {
+                        log.trace("Closing channel");
                     }
                     inError = true;
                     return false;
                 }
             } catch (IOException e) {
                 if (Utils.isClose(e)) {
-                    log.log(Level.INFO,
-                            String.format("closing batch writer %s ",
-                                          fsm.getName()));
+                    log.info(String.format("closing batch writer %s ",
+                                           fsm.getName()));
                 } else {
-                    if (log.isLoggable(Level.WARNING)) {
-                        log.log(Level.WARNING,
-                                String.format("Unable to write event batch payload %s",
-                                              handler.getChannel()), e);
+                    if (log.isWarnEnabled()) {
+                        log.warn(String.format("Unable to write event batch payload %s",
+                                               handler.getChannel()), e);
                     }
                 }
                 inError = true;
@@ -225,21 +223,20 @@ public class BatchWriter {
         }
         try {
             if (handler.getChannel().write(batch.batch) < 0) {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                if (log.isTraceEnabled()) {
+                    log.trace("Closing channel");
                 }
                 inError = true;
                 return false;
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {
-                log.log(Level.INFO,
-                        String.format("closing batch writer %s ", fsm.getName()));
+                log.info(String.format("closing batch writer %s ",
+                                       fsm.getName()));
             } else {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.log(Level.WARNING,
-                            String.format("Unable to write event batch payload %s",
-                                          handler.getChannel()), e);
+                if (log.isWarnEnabled()) {
+                    log.warn(String.format("Unable to write event batch payload %s",
+                                           handler.getChannel()), e);
                 }
             }
             inError = true;
@@ -248,7 +245,7 @@ public class BatchWriter {
         if (batch.batch.hasRemaining()) {
             return false;
         }
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Batch sequence %s for %s transmitted %s, producer mirror: %s",
                                    batch.header.getSequenceNumber(),
                                    batch.header.getChannel(), fsm.getName(),

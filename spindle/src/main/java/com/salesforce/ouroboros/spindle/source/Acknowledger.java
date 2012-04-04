@@ -30,8 +30,9 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
@@ -48,7 +49,7 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class Acknowledger {
 
-    static final Logger                log     = Logger.getLogger(Acknowledger.class.getCanonicalName());
+    static final Logger                log     = LoggerFactory.getLogger(Acknowledger.class.getCanonicalName());
 
     private ByteBuffer                 buffer;
     private final AcknowledgerContext  fsm     = new AcknowledgerContext(this);
@@ -155,20 +156,19 @@ public class Acknowledger {
     protected boolean writeBuffer() {
         try {
             if (handler.getChannel().write(buffer) < 0) {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                if (log.isTraceEnabled()) {
+                    log.trace("Closing channel");
                 }
                 inError = true;
                 return false;
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {
-                log.log(Level.INFO,
-                        String.format("closing acknowledger %s ", fsm.getName()));
+                log.info(String.format("closing acknowledger %s ",
+                                       fsm.getName()));
             } else {
-                log.log(Level.WARNING,
-                        String.format("Unable to write batch commit acknowledgement %s",
-                                      fsm.getName()), e);
+                log.warn(String.format("Unable to write batch commit acknowledgement %s",
+                                       fsm.getName()), e);
             }
             error();
             return false;

@@ -184,8 +184,8 @@ public class BatchHeader {
     @Override
     public String toString() {
         return String.format("BatchHeader[magic=%s, sequenceNumber=%s, length=%s, channel=%s]",
-                             getMagic(), getSequenceNumber(), getBatchByteLength(),
-                             getChannel());
+                             getMagic(), getSequenceNumber(),
+                             getBatchByteLength(), getChannel());
     }
 
     /**

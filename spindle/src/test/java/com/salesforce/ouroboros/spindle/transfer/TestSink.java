@@ -282,7 +282,7 @@ public class TestSink {
 
     @Test
     public void testXeroxSink() throws Exception {
-        WeaverCoordinator coordinator = mock(WeaverCoordinator.class);
+        mock(WeaverCoordinator.class);
         SocketChannelHandler inboundHandler = mock(SocketChannelHandler.class);
         Bundle inboundBundle = mock(Bundle.class);
         when(inboundBundle.getId()).thenReturn(new Node(0));

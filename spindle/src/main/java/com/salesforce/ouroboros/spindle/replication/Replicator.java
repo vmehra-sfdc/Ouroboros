@@ -29,8 +29,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
@@ -70,7 +71,7 @@ public class Replicator implements CommunicationsHandler {
     public static final int         HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
 
     public static final int         MAGIC          = 0x1638;
-    private static final Logger     log            = Logger.getLogger(Replicator.class.getCanonicalName());
+    private static final Logger     log            = LoggerFactory.getLogger(Replicator.class.getCanonicalName());
 
     private ReplicatingAppender     appender;
     private final Bundle            bundle;
@@ -123,9 +124,9 @@ public class Replicator implements CommunicationsHandler {
         ContactInformation contactInformation = yellowPages.get(partner);
         assert contactInformation != null : String.format("Contact information for %s is missing",
                                                           partner);
-        if (log.isLoggable(Level.FINE)) {
-            log.fine(String.format("Initiating replication connection from %s to new weaver %s",
-                                   bundle.getId(), partner));
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Initiating replication connection from %s to new weaver %s",
+                                    bundle.getId(), partner));
         }
         handler.connectTo(contactInformation.replication, this);
     }
@@ -134,8 +135,8 @@ public class Replicator implements CommunicationsHandler {
     public void connect(SocketChannelHandler handler) {
         assert this.handler == null && appender != null : "This replicator does not originate connections";
         this.handler = handler;
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Starting handshake from %s to %s",
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Starting handshake from %s to %s",
                                     bundle.getId(), partner));
         }
         fsm.initiateHandshake();
@@ -181,9 +182,8 @@ public class Replicator implements CommunicationsHandler {
             try {
                 rendezvous.meet();
             } catch (BrokenBarrierException e) {
-                log.log(Level.WARNING,
-                        String.format("Replication rendezvous has been previously cancelled on %s",
-                                      bundle.getId()), e);
+                log.warn(String.format("Replication rendezvous has been previously cancelled on %s",
+                                       bundle.getId()), e);
                 handler.close();
                 return;
             }
@@ -222,21 +222,19 @@ public class Replicator implements CommunicationsHandler {
     protected boolean readHandshake() {
         try {
             if (handler.getChannel().read(handshake) < 0) {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                if (log.isTraceEnabled()) {
+                    log.trace("Closing channel");
                 }
                 inError = true;
                 return false;
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {
-                log.log(Level.INFO,
-                        String.format("closing replicator %s>%s",
-                                      bundle.getId(), partner));
+                log.info(String.format("closing replicator %s>%s",
+                                       bundle.getId(), partner));
             } else {
-                log.log(Level.WARNING,
-                        String.format("unable to read handshake on %s",
-                                      handler.getChannel()), e);
+                log.warn(String.format("unable to read handshake on %s",
+                                       handler.getChannel()), e);
             }
             inError = true;
             return false;
@@ -247,14 +245,14 @@ public class Replicator implements CommunicationsHandler {
         handshake.flip();
         int magic = handshake.getInt();
         if (MAGIC != magic) {
-            log.warning(String.format("Protocol validation error, invalid magic from: %s, received: %s",
-                                      handler.getChannel(), magic));
+            log.warn(String.format("Protocol validation error, invalid magic from: %s, received: %s",
+                                   handler.getChannel(), magic));
             inError = true;
             return false;
         }
         partner = new Node(handshake);
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Inbound handshake completed on %s, partner: %s",
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Inbound handshake completed on %s, partner: %s",
                                     bundle.getId(), partner));
         }
         bundle.map(partner, this);
@@ -274,21 +272,19 @@ public class Replicator implements CommunicationsHandler {
     protected boolean writeHandshake() {
         try {
             if (handler.getChannel().write(handshake) < 0) {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                if (log.isTraceEnabled()) {
+                    log.trace("Closing channel");
                 }
                 inError = true;
                 return false;
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {
-                log.log(Level.INFO,
-                        String.format("closing replicator %s>%s",
-                                      bundle.getId(), partner));
+                log.info(String.format("closing replicator %s>%s",
+                                       bundle.getId(), partner));
             } else {
-                log.log(Level.WARNING,
-                        String.format("Unable to write handshake from: %s",
-                                      handler.getChannel()), e);
+                log.warn(String.format("Unable to write handshake from: %s",
+                                       handler.getChannel()), e);
             }
             inError = true;
             return false;

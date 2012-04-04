@@ -32,8 +32,9 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // RELEASE-STATUS: DIST
 
@@ -183,7 +184,7 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
     }
 
     private static int                    DEFAULT_REPLICAS = 200;
-    private static final Logger           log              = Logger.getLogger(ConsistentHashFunction.class.getCanonicalName());
+    private static final Logger           log              = LoggerFactory.getLogger(ConsistentHashFunction.class.getCanonicalName());
 
     /** Each bucket is replicated this number of times. */
     public final int                      replicaePerBucket;
@@ -256,15 +257,15 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
             if ((o = replicae.get(point)) != null) {
                 if (o != bucket) { // o == bucket should happen with very low probability.
                     if (o instanceof SortedSet) {
-                        if (log.isLoggable(Level.FINEST)) {
-                            log.finest(String.format("Adding bucket %s to the conflict set",
-                                                     bucket));
+                        if (log.isTraceEnabled()) {
+                            log.trace(String.format("Adding bucket %s to the conflict set",
+                                                    bucket));
                         }
                         ((SortedSet<T>) o).add(bucket);
                     } else {
-                        if (log.isLoggable(Level.FINEST)) {
-                            log.finest(String.format("Creating conflict set for buckets %s and %s",
-                                                     o, bucket));
+                        if (log.isTraceEnabled()) {
+                            log.trace(String.format("Creating conflict set for buckets %s and %s",
+                                                    o, bucket));
                         }
                         conflictSet = new TreeSet<T>();
                         conflictSet.add((T) o);
@@ -471,9 +472,9 @@ public final class ConsistentHashFunction<T extends Comparable<? super T>>
 
             o = replicae.remove(point);
             if (o instanceof SortedSet) {
-                if (log.isLoggable(Level.FINEST)) {
-                    log.finest(String.format("Removing %s from conflict set...",
-                                             point));
+                if (log.isTraceEnabled()) {
+                    log.trace(String.format("Removing %s from conflict set...",
+                                            point));
                 }
                 conflictSet = (SortedSet<T>) o;
                 conflictSet.remove(bucket);

@@ -85,15 +85,15 @@ public interface Controller {
     int getWindow();
 
     /**
+     * Reset the stae of the controller
+     */
+    void reset();
+
+    /**
      * Set the target rate
      * 
      * @param target
      */
     void setTarget(double target);
-
-    /**
-     * Reset the stae of the controller
-     */
-    void reset();
 
 }

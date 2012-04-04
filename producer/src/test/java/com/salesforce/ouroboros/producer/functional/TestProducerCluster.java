@@ -37,11 +37,12 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.BitView;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -66,12 +67,12 @@ import com.salesforce.ouroboros.util.MersenneTwister;
  */
 public class TestProducerCluster {
 
-    static final Logger                              log     = Logger.getLogger(TestProducerCluster.class.getCanonicalName());
+    static final Logger                              log     = LoggerFactory.getLogger(TestProducerCluster.class.getCanonicalName());
 
     private ClusterMaster                            clusterMaster;
     private AnnotationConfigApplicationContext       clusterMasterContext;
     private final Class<?>[]                         configs = new Class[] {
-            weaver0.class, weaver.class, weaver2.class                     };
+            weaver0.class, weaver.class, weaver2.class      };
     private TestController                           controller;
     private AnnotationConfigApplicationContext       controllerContext;
     private List<ProducerCoordinator>                coordinators;

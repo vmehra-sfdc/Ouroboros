@@ -31,8 +31,9 @@ import java.util.NavigableMap;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
@@ -54,7 +55,7 @@ public class Spinner implements CommunicationsHandler {
 
     public static final int                          HANDSHAKE_BYTE_SIZE = Node.BYTE_LENGTH + 4;
     public static final int                          MAGIC               = 0x1638;
-    private final static Logger                      log                 = Logger.getLogger(Spinner.class.getCanonicalName());
+    private final static Logger                      log                 = LoggerFactory.getLogger(Spinner.class.getCanonicalName());
 
     private final BatchAcknowledgement               ack;
     private boolean                                  established         = false;
@@ -101,14 +102,14 @@ public class Spinner implements CommunicationsHandler {
         if (batch != null) {
             batch.interval();
             producer.acknowledge(batch);
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Acknowledgement for %s on primary %s",
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Acknowledgement for %s on primary %s",
                                         ack, producer.getId()));
             }
         } else {
             producer.acknowledge(ack);
-            if (log.isLoggable(Level.FINER)) {
-                log.finer(String.format("Acknowledgement for %s on mirror %s [%s]",
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Acknowledgement for %s on mirror %s [%s]",
                                         ack, producer.getId(), fsm.getName()));
             }
         }
@@ -232,18 +233,17 @@ public class Spinner implements CommunicationsHandler {
     protected boolean writeHandshake() {
         try {
             if (handler.getChannel().write(handshake) < 0) {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                if (log.isTraceEnabled()) {
+                    log.trace("Closing channel");
                 }
                 inError = true;
                 return false;
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {
-                log.log(Level.INFO,
-                        String.format("closing spinner %s ", fsm.getName()));
+                log.info(String.format("closing spinner %s ", fsm.getName()));
             } else {
-                log.log(Level.WARNING, "Unable to write handshake", e);
+                log.warn("Unable to write handshake", e);
             }
             inError = true;
             handshake = null;

@@ -139,6 +139,14 @@ public class RateController implements Controller {
         return window.getWindow();
     }
 
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.util.rate.Controller#reset()
+     */
+    @Override
+    public void reset() {
+        window.reset();
+    }
+
     @Override
     public void sample(double sample, long currentTime) {
         // Only sample every N batches
@@ -225,13 +233,5 @@ public class RateController implements Controller {
             }
             predicate.setTargetRate(target);
         }
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.util.rate.Controller#reset()
-     */
-    @Override
-    public void reset() {
-        window.reset();
     }
 }

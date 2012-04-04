@@ -146,6 +146,35 @@ public class Rendezvous {
     }
 
     /**
+     * @param n
+     * @throws BrokenBarrierException
+     */
+    public void meet(int n) throws BrokenBarrierException {
+        boolean run = false;
+        synchronized (mutex) {
+            if (count == 0) {
+                throw new IllegalStateException("All parties have rendezvoused");
+            }
+            if (cancelled) {
+                throw new BrokenBarrierException();
+            }
+            count -= n;
+            if (count == 0) {
+                if (scheduled != null) {
+                    scheduled.cancel(true);
+                }
+                scheduled = null;
+                run = true;
+            }
+        }
+        if (run) {
+            if (action != null) {
+                action.run();
+            }
+        }
+    }
+
+    /**
      * Schedule a cancellation of the rendezvous. The scehduled cancellation is
      * tracked and maintained by the receiver.
      * 
@@ -174,35 +203,6 @@ public class Rendezvous {
                     cancel();
                 }
             }, timeout, unit);
-        }
-    }
-
-    /**
-     * @param n
-     * @throws BrokenBarrierException 
-     */
-    public void meet(int n) throws BrokenBarrierException {
-        boolean run = false;
-        synchronized (mutex) {
-            if (count == 0) {
-                throw new IllegalStateException("All parties have rendezvoused");
-            }
-            if (cancelled) {
-                throw new BrokenBarrierException();
-            }
-            count -= n;
-            if (count == 0) {
-                if (scheduled != null) {
-                    scheduled.cancel(true);
-                }
-                scheduled = null;
-                run = true;
-            }
-        }
-        if (run) {
-            if (action != null) {
-                action.run();
-            }
         }
     }
 }

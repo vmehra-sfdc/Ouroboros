@@ -59,7 +59,7 @@ public class TestXerox {
 
     @Test
     public void testCopy() throws Exception {
-        WeaverCoordinator coordinator = mock(WeaverCoordinator.class);
+        mock(WeaverCoordinator.class);
         Segment segment1 = mock(Segment.class);
         Segment segment2 = mock(Segment.class);
         Socket socket = mock(Socket.class);

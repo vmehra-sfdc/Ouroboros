@@ -97,6 +97,13 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         channel.force(paramBoolean);
     }
 
+    /**
+     * @return
+     */
+    public Object getFile() {
+        return file;
+    }
+
     public long getPrefix() {
         String name = file.getName();
         int index = name.indexOf(EventChannel.SEGMENT_SUFFIX);
@@ -106,6 +113,13 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
                                                           file.getAbsolutePath()));
         }
         return Long.parseLong(name.substring(0, index), 16);
+    }
+
+    /**
+     * @return
+     */
+    public Object getSegmentName() {
+        return file.getName().substring(0, file.getName().indexOf('.'));
     }
 
     /**
@@ -366,19 +380,5 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     public long write(ByteBuffer[] paramArrayOfByteBuffer, int paramInt1,
                       int paramInt2) throws IOException {
         return channel.write(paramArrayOfByteBuffer, paramInt1, paramInt2);
-    }
-
-    /**
-     * @return
-     */
-    public Object getFile() {
-        return file;
-    }
-
-    /**
-     * @return
-     */
-    public Object getSegmentName() {
-        return file.getName().substring(0, file.getName().indexOf('.'));
     }
 }

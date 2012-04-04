@@ -27,8 +27,8 @@ package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
@@ -93,21 +93,19 @@ abstract public class AbstractAppender {
                                            remaining);
         } catch (IOException e) {
             if (Utils.isClose(e)) {
-                getLogger().log(Level.INFO,
-                                String.format("closing appender %s ",
-                                              fsm.getName()));
+                getLogger().info(String.format("closing appender %s ",
+                                               fsm.getName()));
             } else {
-                getLogger().log(Level.SEVERE,
-                                String.format("Exception during append on %s",
-                                              fsm.getName()), e);
+                getLogger().error(String.format("Exception during append on %s",
+                                                fsm.getName()), e);
             }
             error();
             return false;
         }
         position += written;
         remaining -= written;
-        if (getLogger().isLoggable(Level.FINER)) {
-            getLogger().finer(String.format("Appending, offset=%s, position=%s, remaining=%s, written=%s on %s",
+        if (getLogger().isTraceEnabled()) {
+            getLogger().trace(String.format("Appending, offset=%s, position=%s, remaining=%s, written=%s on %s",
                                             offset, position, remaining,
                                             written, fsm.getName()));
         }
@@ -115,10 +113,9 @@ abstract public class AbstractAppender {
             try {
                 segment.position(position);
             } catch (IOException e) {
-                getLogger().log(Level.SEVERE,
-                                String.format("Cannot determine position on channel %s segment: %s on %s",
-                                              eventChannel, segment,
-                                              fsm.getName()), e);
+                getLogger().error(String.format("Cannot determine position on channel %s segment: %s on %s",
+                                                eventChannel, segment,
+                                                fsm.getName()), e);
                 error();
                 return false;
             }
@@ -135,8 +132,8 @@ abstract public class AbstractAppender {
 
     protected void beginAppend() {
         if (eventChannel == null) {
-            getLogger().warning(String.format("No existing event channel for: %s on %s",
-                                              batchHeader, fsm.getName()));
+            getLogger().warn(String.format("No existing event channel for: %s on %s",
+                                           batchHeader, fsm.getName()));
             fsm.drain();
             return;
         }
@@ -144,9 +141,8 @@ abstract public class AbstractAppender {
         try {
             logicalSegment = getLogicalSegment();
         } catch (IOException e) {
-            getLogger().log(Level.WARNING,
-                            String.format("Cannot retrieve segment, shutting down appender %s",
-                                          fsm.getName()), e);
+            getLogger().warn(String.format("Cannot retrieve segment, shutting down appender %s",
+                                           fsm.getName()), e);
             error();
             return;
         }
@@ -156,13 +152,13 @@ abstract public class AbstractAppender {
         markPosition();
         remaining = batchHeader.getBatchByteLength();
         if (eventChannel.isDuplicate(batchHeader)) {
-            getLogger().warning(String.format("Duplicate event batch %s received on %s",
-                                              batchHeader, fsm.getName()));
+            getLogger().warn(String.format("Duplicate event batch %s received on %s",
+                                           batchHeader, fsm.getName()));
             fsm.drain();
             return;
         }
-        if (getLogger().isLoggable(Level.FINER)) {
-            getLogger().finer(String.format("Beginning append of %s, offset=%s, position=%s, remaining=%s on %s",
+        if (getLogger().isTraceEnabled()) {
+            getLogger().trace(String.format("Beginning append of %s, offset=%s, position=%s, remaining=%s on %s",
                                             segment, offset, position,
                                             remaining, fsm.getName()));
         }
@@ -185,21 +181,19 @@ abstract public class AbstractAppender {
         long read;
         try {
             if ((read = handler.getChannel().read(devNull)) < 0) {
-                if (getLogger().isLoggable(Level.FINE)) {
-                    getLogger().fine("Closing channel");
+                if (getLogger().isTraceEnabled()) {
+                    getLogger().trace("Closing channel");
                 }
                 inError = true;
                 return false;
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {
-                getLogger().log(Level.INFO,
-                                String.format("closing appender %s ",
-                                              fsm.getName()));
+                getLogger().info(String.format("closing appender %s ",
+                                               fsm.getName()));
             } else {
-                getLogger().log(Level.SEVERE,
-                                String.format("Exception during append on %s",
-                                              fsm.getName()), e);
+                getLogger().error(String.format("Exception during append on %s",
+                                                fsm.getName()), e);
             }
             error();
             return false;
@@ -267,26 +261,24 @@ abstract public class AbstractAppender {
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {
-                getLogger().log(Level.INFO,
-                                String.format("closing appender %s ",
-                                              fsm.getName()));
+                getLogger().info(String.format("closing appender %s ",
+                                               fsm.getName()));
             } else {
-                getLogger().log(Level.SEVERE,
-                                String.format("Exception during batch header read on %s",
-                                              fsm.getName()), e);
+                getLogger().error(String.format("Exception during batch header read on %s",
+                                                fsm.getName()), e);
             }
             error();
             return false;
         }
         if (!batchHeader.hasRemaining()) {
-            if (getLogger().isLoggable(Level.FINER)) {
-                getLogger().finer(String.format("Batch header read, header=%s on %s",
+            if (getLogger().isTraceEnabled()) {
+                getLogger().trace(String.format("Batch header read, header=%s on %s",
                                                 batchHeader, fsm.getName()));
             }
             if (batchHeader.getMagic() != BatchHeader.MAGIC) {
-                getLogger().severe(String.format("Received invalid magic %s in header %s on %s",
-                                                 batchHeader.getMagic(),
-                                                 batchHeader, fsm.getName()));
+                getLogger().error(String.format("Received invalid magic %s in header %s on %s",
+                                                batchHeader.getMagic(),
+                                                batchHeader, fsm.getName()));
                 error();
                 return false;
             }

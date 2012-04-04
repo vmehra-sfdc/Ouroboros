@@ -26,8 +26,9 @@
 package com.salesforce.ouroboros.spindle.replication;
 
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Node;
@@ -45,7 +46,7 @@ import com.salesforce.ouroboros.spindle.source.Acknowledger;
  */
 public class ReplicatingAppender extends AbstractAppender {
 
-    private static final Logger log = Logger.getLogger(ReplicatingAppender.class.getCanonicalName());
+    private static final Logger log = LoggerFactory.getLogger(ReplicatingAppender.class.getCanonicalName());
 
     public ReplicatingAppender(final Bundle bundle) {
         super(bundle);
@@ -59,11 +60,8 @@ public class ReplicatingAppender extends AbstractAppender {
         try {
             eventChannel.append(batchHeader, offset, segment);
         } catch (IOException e) {
-            if (log.isLoggable(Level.SEVERE)) {
-                log.log(Level.SEVERE,
-                        String.format("Unable to append %s to segment on %s",
-                                      batchHeader, segment, bundle.getId()));
-            }
+            log.error(String.format("Unable to append %s to segment on %s",
+                                    batchHeader, segment, bundle.getId()));
             close();
             return;
         }
@@ -71,13 +69,13 @@ public class ReplicatingAppender extends AbstractAppender {
         Acknowledger acknowledger = bundle.getAcknowledger(node);
         if (acknowledger == null) {
             if (node.processId != NullNode.INSTANCE.processId) {
-                log.warning(String.format("Could not find an acknowledger for %s",
-                                          node));
+                log.warn(String.format("Could not find an acknowledger for %s",
+                                       node));
             }
             return;
         }
-        if (log.isLoggable(Level.FINER)) {
-            log.finer(String.format("Acknowledging replication of %s on %s",
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Acknowledging replication of %s on %s",
                                     batchHeader, bundle.getId()));
         }
         acknowledger.acknowledge(batchHeader.getChannel(),
@@ -87,6 +85,31 @@ public class ReplicatingAppender extends AbstractAppender {
     @Override
     protected BatchHeader createBatchHeader() {
         return new ReplicatedBatchHeader();
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.source.AbstractAppender#duplicatedBatch()
+     */
+    @Override
+    protected void drain() {
+        Node node = batchHeader.getProducerMirror();
+        Acknowledger acknowledger = bundle.getAcknowledger(node);
+        if (acknowledger == null) {
+            if (node.processId != NullNode.INSTANCE.processId) {
+                log.warn(String.format("Could not find an acknowledger for %s",
+                                       node));
+            }
+            return;
+        }
+        if (log.isInfoEnabled()) {
+            log.info(String.format("Acknowledging replication of duplicate %s:%s on %s",
+                                   batchHeader.getChannel(),
+                                   batchHeader.getSequenceNumber(),
+                                   bundle.getId()));
+        }
+        acknowledger.acknowledge(batchHeader.getChannel(),
+                                 batchHeader.getSequenceNumber());
+        super.drain();
     }
 
     @Override
@@ -104,30 +127,5 @@ public class ReplicatingAppender extends AbstractAppender {
     @Override
     protected void ready() {
         handler.selectForRead();
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.spindle.source.AbstractAppender#duplicatedBatch()
-     */
-    @Override
-    protected void drain() {
-        Node node = batchHeader.getProducerMirror();
-        Acknowledger acknowledger = bundle.getAcknowledger(node);
-        if (acknowledger == null) {
-            if (node.processId != NullNode.INSTANCE.processId) {
-                log.warning(String.format("Could not find an acknowledger for %s",
-                                          node));
-            }
-            return;
-        }
-        if (log.isLoggable(Level.INFO)) {
-            log.info(String.format("Acknowledging replication of duplicate %s:%s on %s",
-                                   batchHeader.getChannel(),
-                                   batchHeader.getSequenceNumber(),
-                                   bundle.getId()));
-        }
-        acknowledger.acknowledge(batchHeader.getChannel(),
-                                 batchHeader.getSequenceNumber());
-        super.drain();
     }
 }

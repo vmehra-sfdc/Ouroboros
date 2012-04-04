@@ -27,8 +27,9 @@ package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
@@ -49,7 +50,7 @@ public class Spindle implements CommunicationsHandler {
 
     public static final Integer  HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
     public final static int      MAGIC          = 0x1638;
-    private final static Logger  log            = Logger.getLogger(Spindle.class.getCanonicalName());
+    private final static Logger  log            = LoggerFactory.getLogger(Spindle.class.getCanonicalName());
 
     private final Bundle         bundle;
     private final SpindleContext fsm            = new SpindleContext(this);
@@ -116,7 +117,7 @@ public class Spindle implements CommunicationsHandler {
         int magic = handshake.getInt();
         if (magic != MAGIC) {
             inError = true;
-            log.warning(String.format("Invalid handshake magic: %s", magic));
+            log.warn(String.format("Invalid handshake magic: %s", magic));
             handshake = null;
             close();
             return;
@@ -130,7 +131,7 @@ public class Spindle implements CommunicationsHandler {
                                               bundle.getId().processId));
         acknowledger.setProducer(producer);
         bundle.map(producer, acknowledger);
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Established on %s for %s", bundle.getId(),
                                    producer));
         }
@@ -157,8 +158,8 @@ public class Spindle implements CommunicationsHandler {
     protected boolean readHandshake() {
         try {
             if (handler.getChannel().read(handshake) < 0) {
-                if (log.isLoggable(Level.FINE)) {
-                    log.fine("Closing channel");
+                if (log.isTraceEnabled()) {
+                    log.trace("Closing channel");
                 }
                 inError = true;
                 return false;
@@ -166,11 +167,9 @@ public class Spindle implements CommunicationsHandler {
         } catch (IOException e) {
             inError = true;
             if (Utils.isClose(e)) {
-                log.log(Level.INFO,
-                        String.format("closing Spindle %s ", fsm.getName()));
+                log.info(String.format("closing Spindle %s ", fsm.getName()));
             } else {
-                log.log(Level.WARNING,
-                        String.format("Error reading handshake"), e);
+                log.warn(String.format("Error reading handshake"), e);
             }
             return false;
         }

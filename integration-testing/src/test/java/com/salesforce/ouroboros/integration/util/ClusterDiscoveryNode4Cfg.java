@@ -35,7 +35,6 @@ import com.hellblazer.jackal.testUtil.TestNodeCfg;
 abstract public class ClusterDiscoveryNode4Cfg extends TestNodeCfg {
     @Bean(name = "gossipEndpoint")
     public InetSocketAddress gossipEndpoint() {
-        return new InetSocketAddress("127.0.0.1",
-                                     ClusterTestCfg.getTestPort4());
+        return new InetSocketAddress("127.0.0.1", ClusterTestCfg.getTestPort4());
     }
 }

@@ -38,8 +38,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import statemap.StateUndefinedException;
 
@@ -68,7 +69,7 @@ public class ProducerCoordinator implements Member {
         MIRROR_OPENED, PENDING, PRIMARY_OPENED
     };
 
-    private final static Logger                 log                    = Logger.getLogger(ProducerCoordinator.class.getCanonicalName());
+    private final static Logger                 log                    = LoggerFactory.getLogger(ProducerCoordinator.class.getCanonicalName());
 
     private boolean                             active                 = false;
     private final SortedSet<Node>               activeProducers        = new ConcurrentSkipListSet<Node>();
@@ -121,7 +122,7 @@ public class ProducerCoordinator implements Member {
         Node[] nodes = (Node[]) arguments[0];
         switch (type) {
             case BOOTSTRAP_PRODUCERS: {
-                if (log.isLoggable(Level.INFO)) {
+                if (log.isInfoEnabled()) {
                     log.info(String.format("Bootstrapping producers on: %s",
                                            self));
                 }
@@ -161,8 +162,8 @@ public class ProducerCoordinator implements Member {
             case OPEN: {
                 UUID channel = (UUID) arguments[0];
                 if (producer.isActingFor(channel)) {
-                    log.warning(String.format("Duplicate OPEN message for %s from %s on %s",
-                                              channel, sender, self));
+                    log.warn(String.format("Duplicate OPEN message for %s from %s on %s",
+                                           channel, sender, self));
                 } else if (producer.isResponsibleFor(channel)) {
                     pendingChannels.put(channel, Pending.PENDING);
                 }
@@ -174,8 +175,8 @@ public class ProducerCoordinator implements Member {
             case PRIMARY_OPENED: {
                 UUID channel = (UUID) arguments[0];
                 if (producer.isActingFor(channel)) {
-                    log.warning(String.format("Duplicate PRIMARY_OPENED message for %s from %s on %s",
-                                              channel, sender, self));
+                    log.warn(String.format("Duplicate PRIMARY_OPENED message for %s from %s on %s",
+                                           channel, sender, self));
                 } else if (producer.isResponsibleFor(channel)) {
                     Pending state = pendingChannels.get(channel);
                     assert state != null : String.format("No pending state for %s on: %s",
@@ -185,8 +186,8 @@ public class ProducerCoordinator implements Member {
                             pendingChannels.put(channel, Pending.PRIMARY_OPENED);
                             break;
                         case PRIMARY_OPENED:
-                            log.severe(String.format("%s already believes that the channel %s has been opened by the primary",
-                                                     self, channel));
+                            log.error(String.format("%s already believes that the channel %s has been opened by the primary",
+                                                    self, channel));
                             break;
                         case MIRROR_OPENED:
                             pendingChannels.remove(channel);
@@ -203,8 +204,8 @@ public class ProducerCoordinator implements Member {
             case MIRROR_OPENED: {
                 UUID channel = (UUID) arguments[0];
                 if (producer.isActingFor(channel)) {
-                    log.warning(String.format("Duplicate MIRROR_OPENED message for %s from %s on %s",
-                                              channel, sender, self));
+                    log.warn(String.format("Duplicate MIRROR_OPENED message for %s from %s on %s",
+                                           channel, sender, self));
                 } else if (producer.isResponsibleFor(channel)) {
                     Pending state = pendingChannels.get(channel);
                     assert state != null : String.format("No pending state for %s on: %s",
@@ -218,8 +219,8 @@ public class ProducerCoordinator implements Member {
                             producer.opened(channel);
                             break;
                         case MIRROR_OPENED:
-                            log.severe(String.format("%s already believes that the channel %s has been opened by the mirror",
-                                                     self, channel));
+                            log.error(String.format("%s already believes that the channel %s has been opened by the mirror",
+                                                    self, channel));
                             break;
                         default:
                             throw new IllegalStateException(
@@ -238,9 +239,9 @@ public class ProducerCoordinator implements Member {
                 break;
             }
             default: {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.warning(String.format("Invalid target %s for channel message: %s",
-                                              self, type));
+                if (log.isWarnEnabled()) {
+                    log.warn(String.format("Invalid target %s for channel message: %s",
+                                           self, type));
                 }
             }
         }
@@ -282,9 +283,8 @@ public class ProducerCoordinator implements Member {
                 }
                 break;
             default: {
-                if (log.isLoggable(Level.WARNING)) {
-                    log.warning(String.format("Invalid failover message: %s",
-                                              type));
+                if (log.isWarnEnabled()) {
+                    log.warn(String.format("Invalid failover message: %s", type));
                 }
             }
         }
@@ -539,7 +539,7 @@ public class ProducerCoordinator implements Member {
      * Coordinate the bootstrapping of the producer process group.
      */
     protected void coordinateBootstrap() {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Coordinating producer bootstrap on %s",
                                    self));
         }
@@ -553,7 +553,7 @@ public class ProducerCoordinator implements Member {
      * of the system by including the new members.
      */
     protected void coordinateRebalance() {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Coordinating rebalancing on %s", self));
         }
         tally.set(nextProducerMembership.size());
@@ -582,7 +582,7 @@ public class ProducerCoordinator implements Member {
      * process is serving as the mirror
      */
     protected void failover() {
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Initiating failover on %s", self));
         }
         try {

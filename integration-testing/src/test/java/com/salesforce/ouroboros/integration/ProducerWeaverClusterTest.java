@@ -39,11 +39,12 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Logger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.smartfrog.services.anubis.partition.Partition;
 import org.smartfrog.services.anubis.partition.util.Identity;
 import org.smartfrog.services.anubis.partition.views.BitView;
@@ -83,10 +84,6 @@ import com.salesforce.ouroboros.util.MersenneTwister;
  * 
  */
 public class ProducerWeaverClusterTest {
-    private static final int BATCH_SIZE    = 10;
-    private static final int BATCH_COUNT   = 200;
-    private static final int CHANNEL_COUNT = 25;
-
     @Configuration
     static class master extends ClusterNodeCfg {
 
@@ -209,9 +206,15 @@ public class ProducerWeaverClusterTest {
         }
     }
 
-    private static AtomicInteger id  = new AtomicInteger(-1);
+    private static final int     BATCH_SIZE    = 10;
 
-    private static Logger        log = Logger.getLogger(ProducerWeaverClusterTest.class.getCanonicalName());
+    private static final int     BATCH_COUNT   = 200;
+
+    private static final int     CHANNEL_COUNT = 25;
+
+    private static AtomicInteger id            = new AtomicInteger(-1);
+
+    private static Logger        log           = LoggerFactory.getLogger(ProducerWeaverClusterTest.class);
 
     static {
         ClusterTestCfg.setTestPorts(24020, 24040, 24060, 24080);
@@ -290,7 +293,7 @@ public class ProducerWeaverClusterTest {
             nodeId = ctxt.getBean(Identity.class);
             testNode = (TestNode) controller.getNode(nodeId);
             weaverNodes.add(ctxt.getBean(Node.class));
-            if (i < (weaverContexts.size() / 2) + 1) {
+            if (i < weaverContexts.size() / 2 + 1) {
                 majorView.add(nodeId);
                 fullView.add(nodeId);
                 majorViewNodes.add(testNode);
@@ -310,7 +313,7 @@ public class ProducerWeaverClusterTest {
             producerNodes.add(ctxt.getBean(Node.class));
             ProducerCoordinator coordinator = ctxt.getBean(ProducerCoordinator.class);
             producers.add(coordinator);
-            if (i < (producerContexts.size() / 2) + 1) {
+            if (i < producerContexts.size() / 2 + 1) {
                 nodeId = ctxt.getBean(Identity.class);
                 majorView.add(nodeId);
                 fullView.add(nodeId);
@@ -349,50 +352,6 @@ public class ProducerWeaverClusterTest {
         bootstrap();
         asymmetricallyPartition();
         reformPartition();
-    }
-
-    @Test
-    public void testRebalance() throws Exception {
-        bootstrap();
-        asymmetricallyPartition();
-        rebalance();
-        reformPartition();
-        rebalance();
-    }
-
-    @Test
-    public void testSimplePublishing() throws Exception {
-        bootstrap();
-        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
-                                                                                             new ProducerSkipStrategy(),
-                                                                                             producers.get(0).getProducer().createRing().replicaePerBucket);
-        for (ProducerCoordinator producer : producers) {
-            producerRing.add(producer.getProducer(), producer.getId().capacity);
-        }
-        List<UUID> channels = openChannels();
-        Executor executor = Executors.newCachedThreadPool();
-        CountDownLatch latch = new CountDownLatch(sources.size()); 
-
-        for (Source source : sources) {
-            source.publish(BATCH_SIZE, executor, latch, BATCH_COUNT);
-        }
-
-        assertTrue("not all publishers completed",
-                   latch.await(60, TimeUnit.SECONDS));
-
-        final Long target = Long.valueOf(BATCH_COUNT);
-        for (UUID channel : channels) {
-            final UUID c = channel;
-            final List<Producer> pair = producerRing.hash(point(channel), 2);
-            waitFor(String.format("Did not receive all acks for %s", channel),
-                    new Condition() {
-                        @Override
-                        public boolean value() {
-                            Long ts = pair.get(1).getMirrorSequenceNumberFor(c);
-                            return target.equals(ts);
-                        }
-                    }, 60000L, 1000L);
-        }
     }
 
     @Test
@@ -501,6 +460,7 @@ public class ProducerWeaverClusterTest {
             final List<Producer> pair = producerRing.hash(point(channel), 2);
             if (!lostChannels.contains(c)) {
                 waitFor(new Object() {
+                    @Override
                     public String toString() {
                         return String.format("Did not receive all acks for %s on %s : %s, primary: %s acks: %s",
                                              c,
@@ -528,6 +488,50 @@ public class ProducerWeaverClusterTest {
                     }
                 }
             }
+        }
+    }
+
+    @Test
+    public void testRebalance() throws Exception {
+        bootstrap();
+        asymmetricallyPartition();
+        rebalance();
+        reformPartition();
+        rebalance();
+    }
+
+    @Test
+    public void testSimplePublishing() throws Exception {
+        bootstrap();
+        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
+                                                                                             new ProducerSkipStrategy(),
+                                                                                             producers.get(0).getProducer().createRing().replicaePerBucket);
+        for (ProducerCoordinator producer : producers) {
+            producerRing.add(producer.getProducer(), producer.getId().capacity);
+        }
+        List<UUID> channels = openChannels();
+        Executor executor = Executors.newCachedThreadPool();
+        CountDownLatch latch = new CountDownLatch(sources.size());
+
+        for (Source source : sources) {
+            source.publish(BATCH_SIZE, executor, latch, BATCH_COUNT);
+        }
+
+        assertTrue("not all publishers completed",
+                   latch.await(60, TimeUnit.SECONDS));
+
+        final Long target = Long.valueOf(BATCH_COUNT);
+        for (UUID channel : channels) {
+            final UUID c = channel;
+            final List<Producer> pair = producerRing.hash(point(channel), 2);
+            waitFor(String.format("Did not receive all acks for %s", channel),
+                    new Condition() {
+                        @Override
+                        public boolean value() {
+                            Long ts = pair.get(1).getMirrorSequenceNumberFor(c);
+                            return target.equals(ts);
+                        }
+                    }, 60000L, 1000L);
         }
     }
 
@@ -658,6 +662,38 @@ public class ProducerWeaverClusterTest {
         return contexts;
     }
 
+    ArrayList<UUID> filterChannelsByProducers(ArrayList<UUID> channels,
+                                              ConsistentHashFunction<Producer> ring) {
+        ArrayList<UUID> lostChannels = new ArrayList<UUID>();
+        for (UUID channel : channels) {
+            if (minorProducers.containsAll(ring.hash(point(channel), 2))) {
+                lostChannels.add(channel);
+            }
+        }
+        channels.removeAll(lostChannels);
+        return lostChannels;
+    }
+
+    ArrayList<UUID> filterChannelsByWeavers(ArrayList<UUID> channels,
+                                            ConsistentHashFunction<Weaver> ring) {
+        ArrayList<UUID> lostChannels = new ArrayList<UUID>();
+        for (UUID channel : channels) {
+            if (minorWeavers.containsAll(ring.hash(point(channel), 2))) {
+                lostChannels.add(channel);
+            }
+        }
+        channels.removeAll(lostChannels);
+        return lostChannels;
+    }
+
+    ArrayList<Source> getSources(List<AnnotationConfigApplicationContext> contexts) {
+        ArrayList<Source> sources = new ArrayList<Source>();
+        for (BeanFactory f : contexts) {
+            sources.add(f.getBean(Source.class));
+        }
+        return sources;
+    }
+
     CountDownLatch latch(List<TestNode> group) {
         CountDownLatch latch = new CountDownLatch(group.size());
         for (TestNode member : group) {
@@ -667,9 +703,42 @@ public class ProducerWeaverClusterTest {
         return latch;
     }
 
+    ArrayList<UUID> openChannels() throws InterruptedException {
+        log.info("Creating some channels");
+
+        int numOfChannels = CHANNEL_COUNT;
+        ArrayList<UUID> channels = new ArrayList<UUID>();
+        for (int i = 0; i < numOfChannels; i++) {
+            UUID channel = new UUID(twister.nextLong(), twister.nextLong());
+            channels.add(channel);
+            log.info(String.format("Opening channel: %s", channel));
+            assertTrue(String.format("Channel %s did not successfully open",
+                                     channel),
+                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
+        }
+        return channels;
+    }
+
     Class<?>[] producerConfigurations() {
         return new Class<?>[] { producer1.class, producer.class,
                 producer.class, producer.class, producer.class, producer2.class };
+    }
+
+    void rebalance() throws InterruptedException {
+        // Rebalance the open channels across the major partition
+        log.info("Initiating rebalance on majority partition");
+        WeaverCoordinator weaverLeader = majorWeavers.get(majorWeavers.size() - 1);
+        assertTrue(String.format("weaver coordinator is not the leader %s",
+                                 weaverLeader), weaverLeader.isActiveLeader());
+        weaverLeader.initiateRebalance();
+        assertWeaversStable(majorWeavers);
+
+        ProducerCoordinator producerLeader = majorProducers.get(majorProducers.size() - 1);
+        assertTrue(String.format("producer coordinator is not the leader %s",
+                                 producerLeader),
+                   producerLeader.isActiveLeader());
+        producerLeader.initiateRebalance();
+        assertProducersStable(majorProducers);
     }
 
     void reformPartition() throws InterruptedException {
@@ -697,70 +766,5 @@ public class ProducerWeaverClusterTest {
 
     Class<?>[] weaverConfigurations() {
         return new Class<?>[] { weaver1.class, weaver.class, weaver2.class };
-    }
-
-    ArrayList<UUID> openChannels() throws InterruptedException {
-        log.info("Creating some channels");
-
-        int numOfChannels = CHANNEL_COUNT;
-        ArrayList<UUID> channels = new ArrayList<UUID>();
-        for (int i = 0; i < numOfChannels; i++) {
-            UUID channel = new UUID(twister.nextLong(), twister.nextLong());
-            channels.add(channel);
-            log.info(String.format("Opening channel: %s", channel));
-            assertTrue(String.format("Channel %s did not successfully open",
-                                     channel),
-                       clusterMaster.open(channel, 60, TimeUnit.SECONDS));
-        }
-        return channels;
-    }
-
-    ArrayList<Source> getSources(List<AnnotationConfigApplicationContext> contexts) {
-        ArrayList<Source> sources = new ArrayList<Source>();
-        for (BeanFactory f : contexts) {
-            sources.add(f.getBean(Source.class));
-        }
-        return sources;
-    }
-
-    ArrayList<UUID> filterChannelsByWeavers(ArrayList<UUID> channels,
-                                            ConsistentHashFunction<Weaver> ring) {
-        ArrayList<UUID> lostChannels = new ArrayList<UUID>();
-        for (UUID channel : channels) {
-            if (minorWeavers.containsAll(ring.hash(point(channel), 2))) {
-                lostChannels.add(channel);
-            }
-        }
-        channels.removeAll(lostChannels);
-        return lostChannels;
-    }
-
-    ArrayList<UUID> filterChannelsByProducers(ArrayList<UUID> channels,
-                                              ConsistentHashFunction<Producer> ring) {
-        ArrayList<UUID> lostChannels = new ArrayList<UUID>();
-        for (UUID channel : channels) {
-            if (minorProducers.containsAll(ring.hash(point(channel), 2))) {
-                lostChannels.add(channel);
-            }
-        }
-        channels.removeAll(lostChannels);
-        return lostChannels;
-    }
-
-    void rebalance() throws InterruptedException {
-        // Rebalance the open channels across the major partition
-        log.info("Initiating rebalance on majority partition");
-        WeaverCoordinator weaverLeader = majorWeavers.get(majorWeavers.size() - 1);
-        assertTrue(String.format("weaver coordinator is not the leader %s",
-                                 weaverLeader), weaverLeader.isActiveLeader());
-        weaverLeader.initiateRebalance();
-        assertWeaversStable(majorWeavers);
-
-        ProducerCoordinator producerLeader = majorProducers.get(majorProducers.size() - 1);
-        assertTrue(String.format("producer coordinator is not the leader %s",
-                                 producerLeader),
-                   producerLeader.isActiveLeader());
-        producerLeader.initiateRebalance();
-        assertProducersStable(majorProducers);
     }
 }

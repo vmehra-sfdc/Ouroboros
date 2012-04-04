@@ -146,7 +146,8 @@ public class TestAppender {
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).append(isA(ReplicatedBatchHeader.class),
                                     eq(writeSegment), isA(Acknowledger.class),
-                                    isA(SocketChannelHandler.class), (Acknowledger) eq(null));
+                                    isA(SocketChannelHandler.class),
+                                    (Acknowledger) eq(null));
         verify(eventChannel).segmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
     }

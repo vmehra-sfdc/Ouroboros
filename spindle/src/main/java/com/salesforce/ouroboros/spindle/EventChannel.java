@@ -35,8 +35,9 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
@@ -102,7 +103,7 @@ public class EventChannel {
     }
 
     public static final String          SEGMENT_SUFFIX = ".segment";
-    private static final Logger         log            = Logger.getLogger(Weaver.class.getCanonicalName());
+    private static final Logger         log            = LoggerFactory.getLogger(Weaver.class.getCanonicalName());
     private static final FilenameFilter SEGMENT_FILTER = new FilenameFilter() {
                                                            @Override
                                                            public boolean accept(File dir,
@@ -113,7 +114,7 @@ public class EventChannel {
 
     public static void deleteDirectory(File directory) {
         if (directory == null) {
-            log.warning(String.format("Attempt to delete a null directory"));
+            log.warn(String.format("Attempt to delete a null directory"));
             return;
         }
         File[] list = directory.listFiles();
@@ -122,14 +123,14 @@ public class EventChannel {
                 if (n.isDirectory()) {
                     deleteDirectory(n);
                 } else if (!n.delete()) {
-                    log.warning(String.format("Channel cannot delete: %s",
-                                              n.getAbsolutePath()));
+                    log.warn(String.format("Channel cannot delete: %s",
+                                           n.getAbsolutePath()));
                 }
             }
         }
         if (!directory.delete()) {
-            log.warning(String.format("Channel cannot delete: %s",
-                                      directory.getAbsolutePath()));
+            log.warn(String.format("Channel cannot delete: %s",
+                                   directory.getAbsolutePath()));
         }
 
     }
@@ -221,7 +222,7 @@ public class EventChannel {
             if (!channel.exists() && channel.isDirectory()) {
                 String msg = String.format("Unable to create channel directory for channel: %s",
                                            channel);
-                log.severe(msg);
+                log.error(msg);
                 throw new IllegalStateException(msg);
             }
         }
@@ -241,7 +242,7 @@ public class EventChannel {
                                                                              throws IOException {
         nextOffset = offset + batchHeader.getBatchByteLength();
         lastTimestamp = batchHeader.getSequenceNumber();
-        if (log.isLoggable(Level.INFO)) {
+        if (log.isInfoEnabled()) {
             log.info(String.format("Committing append of batch sequence # %s at offset %s for channel %s, segment %s on %s",
                                    batchHeader.getSequenceNumber(), offset, id,
                                    segment.getSegmentName(), self));
@@ -287,14 +288,14 @@ public class EventChannel {
                 try {
                     segment.close();
                 } catch (IOException e) {
-                    log.finest(String.format("Error closing %s", segment));
+                    log.trace(String.format("Error closing %s", segment));
                 }
             }
         }
         deleteDirectory(channel);
-        if (log.isLoggable(Level.FINE)) {
-            log.fine(String.format("Deleted channel root directory: %s",
-                                   channel));
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Deleted channel root directory: %s",
+                                    channel));
         }
     }
 
@@ -373,7 +374,7 @@ public class EventChannel {
             } catch (FileNotFoundException e) {
                 String msg = String.format("Cannot find segment file: %s",
                                            segmentFile);
-                log.log(Level.SEVERE, msg, e);
+                log.error(msg, e);
                 throw new IllegalStateException(msg, e);
             }
         }
