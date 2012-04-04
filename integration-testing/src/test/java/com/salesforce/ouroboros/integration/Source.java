@@ -191,7 +191,7 @@ public class Source implements EventSource {
                                 return;
                             }
                             try {
-                                Thread.sleep(1000 * i++);
+                                Thread.sleep(100 * i++);
                             } catch (InterruptedException e1) {
                                 return;
                             }
