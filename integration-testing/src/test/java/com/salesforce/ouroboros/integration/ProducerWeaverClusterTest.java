@@ -412,6 +412,7 @@ public class ProducerWeaverClusterTest {
 
     @Test
     public void testPublishingDuringPartitionAndRebalancing() throws Exception {
+        System.out.println("************");
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
                                                                                              new ProducerSkipStrategy(),
