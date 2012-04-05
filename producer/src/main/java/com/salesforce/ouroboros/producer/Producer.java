@@ -232,7 +232,7 @@ public class Producer implements Comparable<Producer> {
         } else {
             primaryState.sequenceNumber = batch.sequenceNumber;
             if (log.isInfoEnabled()) {
-                log.info(String.format("Primary ack of sequence %s for %s on %s",
+                log.info(String.format("pACK %s,%s,%s",
                                        batch.sequenceNumber, batch.channel,
                                        self));
             }
@@ -251,7 +251,7 @@ public class Producer implements Comparable<Producer> {
         if (mirrorState != null) {
             mirrorState.sequenceNumber = ack.sequenceNumber;
             if (log.isInfoEnabled()) {
-                log.info(String.format("Mirror ack of sequence %s for %s on %s",
+                log.info(String.format("mACK %s,%s,%s",
                                        ack.sequenceNumber, ack.channel, self));
             }
         } else {

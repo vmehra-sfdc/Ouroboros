@@ -246,7 +246,7 @@ public class BatchWriter {
             return false;
         }
         if (log.isInfoEnabled()) {
-            log.info(String.format("Batch sequence %s for %s transmitted %s, producer mirror: %s",
+            log.info(String.format("Pushed %s,%s,%s,%s",
                                    batch.header.getSequenceNumber(),
                                    batch.header.getChannel(), fsm.getName(),
                                    batch.header.getProducerMirror()));

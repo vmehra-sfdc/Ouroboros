@@ -243,7 +243,7 @@ public class EventChannel {
         nextOffset = offset + batchHeader.getBatchByteLength();
         lastTimestamp = batchHeader.getSequenceNumber();
         if (log.isInfoEnabled()) {
-            log.info(String.format("Committing append of batch sequence # %s at offset %s for channel %s, segment %s on %s",
+            log.info(String.format("Append %s,%s,%s,%s,%s",
                                    batchHeader.getSequenceNumber(), offset, id,
                                    segment.getSegmentName(), self));
         }
