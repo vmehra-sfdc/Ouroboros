@@ -81,6 +81,7 @@
 		<module>spindle</module>
 		<module>producer</module>
 		<module>integration-testing</module>
+		<module>consumer</module>
 	</modules>
 
 	<repositories>
