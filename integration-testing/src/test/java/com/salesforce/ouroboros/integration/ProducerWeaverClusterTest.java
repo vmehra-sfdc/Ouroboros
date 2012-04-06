@@ -208,7 +208,7 @@ public class ProducerWeaverClusterTest {
 
     private static final int     BATCH_SIZE    = 10;
 
-    private static final int     BATCH_COUNT   = 200;
+    private static final int     BATCH_COUNT   = 100;
 
     private static final int     CHANNEL_COUNT = 25;
 
