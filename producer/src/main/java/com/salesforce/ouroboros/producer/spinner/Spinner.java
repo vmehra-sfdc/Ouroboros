@@ -100,7 +100,7 @@ public class Spinner implements CommunicationsHandler {
     public void acknowledge(BatchIdentity ack) {
         Batch batch = pending.remove(ack);
         if (batch != null) {
-            batch.interval();
+            batch.markInterval();
             producer.acknowledge(batch);
             if (log.isTraceEnabled()) {
                 log.trace(String.format("Acknowledgement for %s on primary %s",

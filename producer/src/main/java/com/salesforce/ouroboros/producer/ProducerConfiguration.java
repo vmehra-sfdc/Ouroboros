@@ -63,13 +63,6 @@ public class ProducerConfiguration {
         return maximumBandwidth;
     }
 
-    /**
-     * @return the maximumEventRate
-     */
-    public double getMaximumEventRate() {
-        return maximumBandwidth;
-    }
-
     public int getMaxQueueLength() {
         return maxQueueLength;
     }

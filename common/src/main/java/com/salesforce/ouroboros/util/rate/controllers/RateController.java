@@ -28,18 +28,23 @@ package com.salesforce.ouroboros.util.rate.controllers;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.salesforce.ouroboros.util.rate.Controller;
 import com.salesforce.ouroboros.util.rate.Predicate;
 
 /**
  * 
  * An implementation of ResponseTimeController that uses a direct adjustment of
- * queue thresholds based on the error in the 90th percentile response time.
+ * queue thresholds based on the error in the target percentile (e.g. 90%, etc).
  * 
  * @author hhildebrand
  * 
  */
 public class RateController implements Controller {
+    private static Logger       log                    = LoggerFactory.getLogger(RateController.class);
+
     private volatile double     additiveIncrease       = 0.5;
     private volatile double     highWaterMark          = 1.2D;
     private volatile long       lastSampled            = 0;
@@ -222,6 +227,13 @@ public class RateController implements Controller {
                 target = minimum;
             }
             predicate.setTargetRate(target);
+            if (log.isInfoEnabled()) {
+                log.info(String.format("Target rate decreased to %s", target));
+            }
+        } else {
+            if (log.isInfoEnabled()) {
+                log.info(String.format("Target rate already at minimum"));
+            }
         }
     }
 
@@ -232,6 +244,13 @@ public class RateController implements Controller {
                 target = maximum;
             }
             predicate.setTargetRate(target);
+            if (log.isInfoEnabled()) {
+                log.info(String.format("Target rate increased to %s", target));
+            }
+        } else {
+            if (log.isInfoEnabled()) {
+                log.info(String.format("Target rate already at maximum"));
+            }
         }
     }
 }

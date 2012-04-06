@@ -25,6 +25,9 @@
  */
 package com.salesforce.ouroboros.util.rate.controllers;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.salesforce.ouroboros.util.rate.Predicate;
 
 /**
@@ -35,11 +38,13 @@ import com.salesforce.ouroboros.util.rate.Predicate;
  * 
  */
 public class RateLimiter implements Predicate {
-    private double     currentTokens;
-    private long       last;
-    private int        maxTokens;
-    private final long minimumRegenerationTime;
-    private double     regenerationTime;
+    private static final Logger log = LoggerFactory.getLogger(RateLimiter.class);
+
+    private double              currentTokens;
+    private long                last;
+    private int                 maxTokens;
+    private final long          minimumRegenerationTime;
+    private double              regenerationTime;
 
     /**
      * @param targetRate
@@ -129,6 +134,9 @@ public class RateLimiter implements Predicate {
         regenerationTime = 1.0 / targetRate * 1.0e3;
         if (regenerationTime < 1) {
             regenerationTime = 1;
+        }
+        if (log.isInfoEnabled()) {
+            log.info(String.format("New regeneration time set to %s ms", regenerationTime));
         }
     }
 }

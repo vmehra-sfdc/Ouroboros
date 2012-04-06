@@ -193,7 +193,7 @@ public class Producer implements Comparable<Producer> {
                                                         configuration.getTokenLimit(),
                                                         configuration.getMinimumTokenRegenerationTime()),
                                         configuration.getMinimumBandwidth(),
-                                        configuration.getMaximumEventRate(),
+                                        configuration.getMaximumBandwidth(),
                                         configuration.getSampleWindowSize(),
                                         configuration.getSampleFrequency(),
                                         configuration.getTargetPercentile());
@@ -232,9 +232,9 @@ public class Producer implements Comparable<Producer> {
         } else {
             primaryState.sequenceNumber = batch.sequenceNumber;
             if (log.isInfoEnabled()) {
-                log.info(String.format("pACK %s,%s,%s",
+                log.info(String.format("pACK %s,%s,%s,%s",
                                        batch.sequenceNumber, batch.channel,
-                                       self));
+                                       self, batch.rate()));
             }
         }
     }
@@ -251,8 +251,8 @@ public class Producer implements Comparable<Producer> {
         if (mirrorState != null) {
             mirrorState.sequenceNumber = ack.sequenceNumber;
             if (log.isInfoEnabled()) {
-                log.info(String.format("mACK %s,%s,%s",
-                                       ack.sequenceNumber, ack.channel, self));
+                log.info(String.format("mACK %s,%s,%s", ack.sequenceNumber,
+                                       ack.channel, self));
             }
         } else {
             PrimaryState primaryState = channelState.get(ack.channel);

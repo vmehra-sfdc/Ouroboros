@@ -35,10 +35,14 @@ import java.util.UUID;
  * 
  */
 public class Batch extends BatchIdentity {
+    /**
+     * 
+     */
+    private static final double ONE_BILLION = 1000000000D;
     public final BatchHeader header;
     public final ByteBuffer  batch;
-    private final long       created = System.currentTimeMillis();
-    private long             interval;
+    private final long       created  = System.nanoTime();
+    private long             interval = -1;
 
     /**
      * @param mirror
@@ -88,15 +92,17 @@ public class Batch extends BatchIdentity {
     /**
      * 
      */
-    public void interval() {
-        interval = Math.max(1, System.currentTimeMillis() - created);
+    public void markInterval() {
+        if (interval < 0) {
+            interval = Math.max(1, System.nanoTime() - created);
+        }
     }
 
     /**
      * @return the transfer rate in bytes per second of this batch.
      */
     public double rate() {
-        return batchByteSize() / interval;
+        return batchByteSize()* ONE_BILLION / interval;
     }
 
     /**
