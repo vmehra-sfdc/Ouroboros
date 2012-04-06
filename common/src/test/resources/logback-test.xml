@@ -8,6 +8,8 @@
       <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %msg%n</pattern>
     </encoder>
   </appender>
+  
+  <logger name="org.springframework" level="WARN"/>
 
   <root level="info">
     <appender-ref ref="STDERR" />

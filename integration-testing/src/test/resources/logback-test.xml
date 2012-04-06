@@ -21,6 +21,8 @@
 		</encoder>
 	</appender>
 
+	<logger name="org.springframework" level="WARN" />
+
 	<root>
 		<level value="info" />
 		<appender-ref ref="FILE" />
