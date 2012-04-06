@@ -1,0 +1,33 @@
+digraph Consumer {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_ConsumerFSM {
+
+        label="ConsumerFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "ConsumerFSM::Unstable"
+            [label="{Unstable}"];
+
+        "ConsumerFSM::Stable"
+            [label="{Stable}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "ConsumerFSM::Stable" -> "ConsumerFSM::Unstable"
+            [label="destabilize/\l"];
+
+        "%start" -> "ConsumerFSM::Unstable"
+    }
+
+}

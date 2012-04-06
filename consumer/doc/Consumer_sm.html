@@ -1,0 +1,85 @@
+<html>
+  <head>
+    <title>Consumer</title>
+  </head>
+
+  <body>
+    <table align=center border=3 cellspacing=2 cellpadding=2>
+      <caption align="top">
+        ConsumerFSM Finite State Machine
+      </caption>
+      <tr>
+        <th rowspan=2>
+          State
+        </th>
+        <th colspan=2>
+          Actions
+        </th>
+        <th colspan=3>
+          Transition
+        </th>
+      </tr>
+      <tr>
+        <th>
+          Entry
+        </th>
+        <th>
+         Exit
+        </th>
+        <th>
+          destabilize
+        </th>
+        <th>
+          stabilized
+          <br>
+          (View,
+          <br>
+          int)
+        </th>
+        <th>
+          <b>Default</b>
+        </th>
+      </tr>
+      <tr>
+        <td>
+          Unstable
+        </td>
+        <td>
+          <pre>
+destabilizePartition();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Unstable
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Stable
+        </td>
+        <td>
+          <pre>
+stabilized();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
