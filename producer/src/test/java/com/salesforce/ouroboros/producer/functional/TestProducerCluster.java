@@ -49,6 +49,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 
 import com.hellblazer.jackal.testUtil.TestController;
 import com.hellblazer.jackal.testUtil.TestNode;
+import com.hellblazer.jackal.testUtil.TestNodeCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
 import com.salesforce.ouroboros.Node;
@@ -102,6 +103,7 @@ public class TestProducerCluster {
 
     @Before
     public void startUp() throws Exception {
+        TestNodeCfg.nextMagic();
         FakeSpindle.PORT++;
         GossipTestCfg.incrementPorts();
         weaver.reset();

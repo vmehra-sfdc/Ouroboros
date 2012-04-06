@@ -47,6 +47,7 @@ import org.springframework.context.annotation.Import;
 
 import com.hellblazer.jackal.testUtil.TestController;
 import com.hellblazer.jackal.testUtil.TestNode;
+import com.hellblazer.jackal.testUtil.TestNodeCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode1Cfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode2Cfg;
@@ -117,6 +118,7 @@ public class TestProducerChannelBuffer {
 
     @Before
     public void starUp() throws Exception {
+        TestNodeCfg.nextMagic();
         GossipTestCfg.incrementPorts();
         log.info("Setting up initial partition");
         initialLatch = new CountDownLatch(2);

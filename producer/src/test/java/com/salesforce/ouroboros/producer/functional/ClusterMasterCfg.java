@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.uuid.Generators;
+import com.hellblazer.jackal.testUtil.TestNodeCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipNodeCfg;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -26,11 +27,7 @@ public class ClusterMasterCfg extends GossipNodeCfg {
 
     @Override
     public int getMagic() {
-        try {
-            return Identity.getMagicFromLocalIpAddress();
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
+        return TestNodeCfg.getMagicValue();
     }
 
     @Bean

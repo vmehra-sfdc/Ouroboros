@@ -44,6 +44,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 
 import com.hellblazer.jackal.testUtil.TestController;
 import com.hellblazer.jackal.testUtil.TestNode;
+import com.hellblazer.jackal.testUtil.TestNodeCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
 import com.salesforce.ouroboros.partition.Switchboard;
@@ -71,6 +72,7 @@ public class SwitchboardFunctionalTest {
 
     @Before
     public void setUp() throws Exception {
+        TestNodeCfg.nextMagic();
         GossipTestCfg.incrementPorts();
         member.reset();
         log.info("Setting up initial partition");

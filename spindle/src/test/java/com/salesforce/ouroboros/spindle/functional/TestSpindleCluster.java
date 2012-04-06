@@ -53,6 +53,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 
 import com.hellblazer.jackal.testUtil.TestController;
 import com.hellblazer.jackal.testUtil.TestNode;
+import com.hellblazer.jackal.testUtil.TestNodeCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
 import com.hellblazer.pinkie.ChannelHandler;
@@ -111,6 +112,7 @@ public class TestSpindleCluster {
 
     @Before
     public void startUp() throws Exception {
+        TestNodeCfg.nextMagic();
         GossipTestCfg.incrementPorts();
         spindle.reset();
         log.info("Setting up initial partition");
