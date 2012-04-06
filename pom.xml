@@ -80,8 +80,8 @@
 		<module>common</module>
 		<module>spindle</module>
 		<module>producer</module>
-		<module>integration-testing</module>
 		<module>consumer</module>
+		<module>integration-testing</module>
 	</modules>
 
 	<repositories>
