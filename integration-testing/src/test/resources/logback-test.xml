@@ -10,7 +10,7 @@
 	</appender>
 
 	<appender name="FILE" class="ch.qos.logback.core.FileAppender">
-		<file>target/suppressed.log</file>
+		<file>${project.build.testOutputDirectory}/suppressed.log</file>
 		<append>true</append>
 
 		<!-- encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder 
