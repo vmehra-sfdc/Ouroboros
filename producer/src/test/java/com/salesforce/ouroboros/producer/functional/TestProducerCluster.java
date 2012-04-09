@@ -323,6 +323,7 @@ public class TestProducerCluster {
 
         // Open the channels
         for (UUID channel : channels) {
+            log.info(String.format("Opening channel %s", channel));
             assertTrue("Channel OPEN message not received",
                        clusterMaster.open(channel, 60, TimeUnit.SECONDS));
         }

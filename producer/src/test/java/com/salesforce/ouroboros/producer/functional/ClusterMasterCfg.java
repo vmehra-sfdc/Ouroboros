@@ -1,9 +1,6 @@
 package com.salesforce.ouroboros.producer.functional;
 
-import java.io.IOException;
-
 import org.smartfrog.services.anubis.partition.Partition;
-import org.smartfrog.services.anubis.partition.util.Identity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
