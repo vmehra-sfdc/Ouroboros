@@ -376,6 +376,7 @@ public class ProducerWeaverClusterTest {
 
         for (Source source : sources) {
             source.publish(BATCH_SIZE, latch, BATCH_COUNT);
+            source.rebalanced();
         }
 
         assertTrue("not all publishers completed",
@@ -416,6 +417,7 @@ public class ProducerWeaverClusterTest {
 
         for (Source source : sources) {
             source.publish(BATCH_SIZE, latch, BATCH_COUNT);
+            source.rebalanced();
         }
 
         assertTrue("not all publishers completed",
@@ -484,9 +486,11 @@ public class ProducerWeaverClusterTest {
         rebalance();
 
         for (Source source : sources) {
-            if (source.isShutdown()) {
-                source.publish(BATCH_SIZE, latch, targetCount);
-            }
+            source.rebalanced();
+        }
+
+        for (Source source : minorSources) {
+            source.publish(BATCH_SIZE, latch, targetCount);
         }
 
         assertTrue("not all publishers completed",

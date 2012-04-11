@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -60,6 +61,7 @@ public class Source implements EventSource {
     private final ScheduledExecutorService         executor;
     private final ConcurrentHashMap<UUID, Integer> retries               = new ConcurrentHashMap<UUID, Integer>();
     private volatile CountDownLatch                latch;
+    private final AtomicBoolean                    rebalanced            = new AtomicBoolean();
 
     /**
      * @param executor
@@ -116,6 +118,9 @@ public class Source implements EventSource {
 
     public void publish(final int batchSize, final CountDownLatch latch,
                         final long targetTimestamp) {
+        for (Entry<UUID, Integer> entry : retries.entrySet()) {
+            entry.setValue(0);
+        }
         this.latch = latch;
         shutdown.set(false);
         log.info(String.format("Starting publishing on %s", producer.getId()));
@@ -182,9 +187,18 @@ public class Source implements EventSource {
             return;
         }
         if (tasks.size() == 0) {
-            log.info(String.format("no tasks to publish on %s ",
+            if (rebalanced.get()) {
+                shutdown();
+                return;
+            }
+            log.info(String.format("currently no event to publish on %s ",
                                    producer.getId()));
-            shutdown();
+            executor.schedule(new Runnable() {
+                @Override
+                public void run() {
+                    _publish(batchSize, target);
+                }
+            }, 2, TimeUnit.SECONDS);
             return;
         }
         tasks.add(new Runnable() {
@@ -241,11 +255,20 @@ public class Source implements EventSource {
                     shutdown();
                 } else {
                     retries.put(channel, retryCount + 1);
+                    try {
+                        Thread.sleep((retryCount + 1) * 100);
+                    } catch (InterruptedException e1) {
+                        return;
+                    }
                 }
             }
         }
         if (!tasks.isEmpty()) {
             executor.execute(tasks.removeFirst());
         }
+    }
+
+    public void rebalanced() {
+        rebalanced.set(true);
     }
 }
