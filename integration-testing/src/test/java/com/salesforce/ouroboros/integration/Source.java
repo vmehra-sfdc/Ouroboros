@@ -28,6 +28,8 @@ package com.salesforce.ouroboros.integration;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Deque;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -35,7 +37,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -48,27 +50,39 @@ import com.salesforce.ouroboros.api.producer.UnknownChannelException;
 import com.salesforce.ouroboros.producer.Producer;
 
 public class Source implements EventSource {
-    private static final Logger                log                   = LoggerFactory.getLogger(Source.class.getCanonicalName());
-    public final ConcurrentHashMap<UUID, Long> channels              = new ConcurrentHashMap<UUID, Long>();
-    private Producer                           producer;
-    public final Set<UUID>                     failedChannels        = new ConcurrentSkipListSet<UUID>();
-    private final Set<UUID>                    pausedChannels        = new ConcurrentSkipListSet<UUID>();
-    public final Set<UUID>                     relinquishedPrimaries = new ConcurrentSkipListSet<UUID>();
-    private AtomicBoolean                      shutdown              = new AtomicBoolean();
+    private static final Logger                    log                   = LoggerFactory.getLogger(Source.class.getCanonicalName());
+    public final ConcurrentHashMap<UUID, Long>     channels              = new ConcurrentHashMap<UUID, Long>();
+    private Producer                               producer;
+    public final Set<UUID>                         failedChannels        = new ConcurrentSkipListSet<UUID>();
+    private final Set<UUID>                        pausedChannels        = new ConcurrentSkipListSet<UUID>();
+    public final Set<UUID>                         relinquishedPrimaries = new ConcurrentSkipListSet<UUID>();
+    private final AtomicBoolean                    shutdown              = new AtomicBoolean();
+    private final ScheduledExecutorService         executor;
+    private final ConcurrentHashMap<UUID, Integer> retries               = new ConcurrentHashMap<UUID, Integer>();
+    private volatile CountDownLatch                latch;
+
+    /**
+     * @param executor
+     */
+    public Source(ScheduledExecutorService executor) {
+        this.executor = executor;
+    }
 
     @Override
     public void assumePrimary(Map<UUID, Long> newPrimaries) {
-        System.out.println(String.format("Assuming primary for %s on %s",
-                                         newPrimaries, producer.getId()));
+        log.info(String.format("Assuming primary for %s on %s, shutdown: %s",
+                               newPrimaries, producer.getId(), shutdown.get()));
         channels.putAll(newPrimaries);
         for (UUID channel : newPrimaries.keySet()) {
             failedChannels.remove(channel);
+            retries.put(channel, 0);
         }
     }
 
     @Override
     public void closed(UUID channel) {
         channels.remove(channel);
+        retries.remove(channel);
     }
 
     /* (non-Javadoc)
@@ -78,6 +92,7 @@ public class Source implements EventSource {
     public void deactivated(Collection<UUID> deadChannels) {
         for (UUID channel : deadChannels) {
             channels.remove(channel);
+            retries.remove(channel);
         }
     }
 
@@ -88,6 +103,7 @@ public class Source implements EventSource {
     @Override
     public void opened(UUID channel) {
         channels.put(channel, 0L);
+        retries.put(channel, 0);
     }
 
     /* (non-Javadoc)
@@ -98,16 +114,15 @@ public class Source implements EventSource {
         pausedChannels.addAll(channels);
     }
 
-    public void publish(final int batchSize, Executor executor,
-                        final CountDownLatch latch, final long targetTimestamp) {
+    public void publish(final int batchSize, final CountDownLatch latch,
+                        final long targetTimestamp) {
+        this.latch = latch;
         shutdown.set(false);
+        log.info(String.format("Starting publishing on %s", producer.getId()));
         executor.execute(new Runnable() {
             @Override
             public void run() {
-                publish(batchSize, latch, targetTimestamp);
-                System.out.println(String.format("Stopping publishing on %s",
-                                                 producer.getId()));
-                shutdown.set(true);
+                _publish(batchSize, targetTimestamp);
             }
         });
     }
@@ -117,8 +132,8 @@ public class Source implements EventSource {
      */
     @Override
     public void relinquishPrimary(Collection<UUID> channels) {
-        System.out.println(String.format("Relinquishing primary for %s on %s",
-                                         channels, producer.getId()));
+        log.info(String.format("Relinquishing primary for %s on %s", channels,
+                               producer.getId()));
         relinquishedPrimaries.addAll(channels);
     }
 
@@ -137,73 +152,100 @@ public class Source implements EventSource {
         this.producer = producer;
     }
 
-    public void shutdown() {
-        shutdown.set(true);
+    public boolean isShutdown() {
+        return shutdown.get();
     }
 
-    private void publish(int batchSize, CountDownLatch latch, long target) {
-        boolean run = true;
+    public void shutdown() {
+        if (shutdown.compareAndSet(false, true)) {
+            log.info(String.format("Stopping publishing on %s",
+                                   producer.getId()),
+                     new Exception("**Stopping**"));
+            failedChannels.removeAll(relinquishedPrimaries);
+            latch.countDown();
+        }
+    }
+
+    private void _publish(final int batchSize, final long target) {
         Long targetTimestamp = Long.valueOf(target);
-        while (run && !shutdown.get()) {
-            run = false;
-            for (Entry<UUID, Long> entry : channels.entrySet()) {
-                UUID channel = entry.getKey();
-                Long sequenceNumber = entry.getValue();
-                if (!sequenceNumber.equals(targetTimestamp)) {
-                    run |= true;
-                    boolean published = false;
-                    ArrayList<ByteBuffer> events = new ArrayList<ByteBuffer>();
-                    for (int i = 0; i < batchSize; i++) {
-                        events.add(ByteBuffer.wrap(String.format("%s Give me Slack or give me Food or Kill me %s",
-                                                                 channel,
-                                                                 channel).getBytes()));
-                    }
-                    int i = 0;
-                    long nextTimestamp = sequenceNumber + 1;
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e2) {
-                        return;
-                    }
-                    boolean failed = false;
-                    while (!published && channels.containsKey(channel)
-                           && !shutdown.get()
-                           && !pausedChannels.contains(channel)) {
-                        try {
-                            try {
-                                producer.publish(channel, nextTimestamp, events);
-                            } catch (UnknownChannelException e) {
-                                failed = true;
-                                channels.remove(channel);
-                                failedChannels.add(channel);
-                                continue;
-                            } catch (InterruptedException e) {
-                                return;
-                            }
-                            published = true;
-                        } catch (RateLimiteExceededException e) {
-                            log.info(String.format("Rate limit exceeded for %s on %s",
-                                                   channel, producer.getId()));
-                            if (i > 20) {
-                                log.info(String.format("Giving up on sending event to %s on %s",
-                                                       channel,
-                                                       producer.getId()));
-                                return;
-                            }
-                            try {
-                                Thread.sleep(100 * i++);
-                            } catch (InterruptedException e1) {
-                                return;
-                            }
-                        }
-                    }
-                    if (!failed) {
-                        entry.setValue(nextTimestamp);
-                    }
+        Deque<Runnable> tasks = new LinkedList<Runnable>();
+
+        for (Entry<UUID, Long> entry : channels.entrySet()) {
+            if (!entry.getValue().equals(targetTimestamp)) {
+                tasks.add(publishBatch(tasks, batchSize, entry, entry.getKey(),
+                                       entry.getValue() + 1));
+            }
+        }
+        if (shutdown.get()) {
+            log.info(String.format("Aborting publishing on %s as we are already shutdown",
+                                   producer.getId()));
+            return;
+        }
+        if (tasks.size() == 0) {
+            log.info(String.format("no tasks to publish on %s ",
+                                   producer.getId()));
+            shutdown();
+            return;
+        }
+        tasks.add(new Runnable() {
+            @Override
+            public void run() {
+                _publish(batchSize, target);
+            }
+        });
+        executor.execute(tasks.removeFirst());
+    }
+
+    private Runnable publishBatch(final Deque<Runnable> tasks, int batchSize,
+                                  final Entry<UUID, Long> entry,
+                                  final UUID channel, final Long sequenceNumber) {
+        final ArrayList<ByteBuffer> events = new ArrayList<ByteBuffer>();
+        for (int i = 0; i < batchSize; i++) {
+            events.add(ByteBuffer.wrap(String.format("%s Give me Slack or give me Food or Kill me %s",
+                                                     channel, channel).getBytes()));
+        }
+        return new Runnable() {
+            public void run() {
+                publishBatch(tasks, entry, channel, events, sequenceNumber + 1);
+
+            }
+        };
+    }
+
+    private void publishBatch(Deque<Runnable> tasks, Entry<UUID, Long> entry,
+                              UUID channel, ArrayList<ByteBuffer> events,
+                              long nextTimestamp) {
+        if (shutdown.get()) {
+            return;
+        }
+        if (channels.containsKey(channel) && !pausedChannels.contains(channel)
+            && !entry.getValue().equals(Long.valueOf(nextTimestamp))) {
+            Integer retryCount = retries.get(channel);
+            try {
+                try {
+                    producer.publish(channel, nextTimestamp, events);
+                    entry.setValue(nextTimestamp);
+                    retries.put(channel, 0);
+                } catch (UnknownChannelException e) {
+                    channels.remove(channel);
+                    failedChannels.add(channel);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            } catch (RateLimiteExceededException e) {
+                log.info(String.format("Rate limit exceeded for %s on %s",
+                                       channel, producer.getId()));
+                if (retryCount > 20) {
+                    log.info(String.format("Giving up on sending event to %s on %s",
+                                           channel, producer.getId()));
+                    shutdown();
+                } else {
+                    retries.put(channel, retryCount + 1);
                 }
             }
         }
-        failedChannels.removeAll(relinquishedPrimaries);
-        latch.countDown();
+        if (!tasks.isEmpty()) {
+            executor.execute(tasks.removeFirst());
+        }
     }
 }

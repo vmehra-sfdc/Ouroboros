@@ -32,11 +32,10 @@ import static junit.framework.Assert.assertTrue;
 import static junit.framework.Assert.fail;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -355,6 +354,49 @@ public class ProducerWeaverClusterTest {
     }
 
     @Test
+    public void testRebalance() throws Exception {
+        bootstrap();
+        asymmetricallyPartition();
+        rebalance();
+        reformPartition();
+        rebalance();
+    }
+
+    @Test
+    public void testSimplePublishing() throws Exception {
+        bootstrap();
+        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
+                                                                                             new ProducerSkipStrategy(),
+                                                                                             producers.get(0).getProducer().createRing().replicaePerBucket);
+        for (ProducerCoordinator producer : producers) {
+            producerRing.add(producer.getProducer(), producer.getId().capacity);
+        }
+        List<UUID> channels = openChannels();
+        CountDownLatch latch = new CountDownLatch(sources.size());
+
+        for (Source source : sources) {
+            source.publish(BATCH_SIZE, latch, BATCH_COUNT);
+        }
+
+        assertTrue("not all publishers completed",
+                   latch.await(60, TimeUnit.SECONDS));
+
+        final Long target = Long.valueOf(BATCH_COUNT);
+        for (UUID channel : channels) {
+            final UUID c = channel;
+            final List<Producer> pair = producerRing.hash(point(channel), 2);
+            waitFor(String.format("Did not receive all acks for %s", channel),
+                    new Condition() {
+                        @Override
+                        public boolean value() {
+                            Long ts = pair.get(1).getMirrorSequenceNumberFor(c);
+                            return target.equals(ts);
+                        }
+                    }, 60000L, 1000L);
+        }
+    }
+
+    @Test
     public void testPublishingAfterPartition() throws Exception {
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
@@ -370,11 +412,10 @@ public class ProducerWeaverClusterTest {
             weaverRing.add(weaver.getWeaver(), weaver.getId().capacity);
         }
         ArrayList<UUID> channels = openChannels();
-        Executor executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(sources.size());
 
         for (Source source : sources) {
-            source.publish(BATCH_SIZE, executor, latch, BATCH_COUNT);
+            source.publish(BATCH_SIZE, latch, BATCH_COUNT);
         }
 
         assertTrue("not all publishers completed",
@@ -399,7 +440,7 @@ public class ProducerWeaverClusterTest {
 
         latch = new CountDownLatch(majorSources.size());
         for (Source source : majorSources) {
-            source.publish(BATCH_SIZE, executor, latch, 2 * BATCH_COUNT);
+            source.publish(BATCH_SIZE, latch, 2 * BATCH_COUNT);
         }
 
         assertTrue("not all publishers completed",
@@ -426,12 +467,11 @@ public class ProducerWeaverClusterTest {
             weaverRing.add(weaver.getWeaver(), weaver.getId().capacity);
         }
         ArrayList<UUID> channels = openChannels();
-        Executor executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(sources.size());
 
         int targetCount = BATCH_COUNT * 5;
         for (Source source : sources) {
-            source.publish(BATCH_SIZE, executor, latch, targetCount);
+            source.publish(BATCH_SIZE, latch, targetCount);
         }
 
         asymmetricallyPartition();
@@ -443,8 +483,10 @@ public class ProducerWeaverClusterTest {
         reformPartition();
         rebalance();
 
-        for (Source source : minorSources) {
-            source.publish(BATCH_SIZE, executor, latch, targetCount);
+        for (Source source : sources) {
+            if (source.isShutdown()) {
+                source.publish(BATCH_SIZE, latch, targetCount);
+            }
         }
 
         assertTrue("not all publishers completed",
@@ -462,7 +504,8 @@ public class ProducerWeaverClusterTest {
                 waitFor(new Object() {
                     @Override
                     public String toString() {
-                        return String.format("Did not receive all acks for %s on %s : %s, primary: %s acks: %s",
+                        return String.format("%s: Did not receive all acks for %s on %s : %s, primary: %s acks: %s",
+                                             new Date(),
                                              c,
                                              pair.get(1),
                                              pair.get(1).getMirrorSequenceNumberFor(c),
@@ -488,50 +531,6 @@ public class ProducerWeaverClusterTest {
                     }
                 }
             }
-        }
-    }
-
-    @Test
-    public void testRebalance() throws Exception {
-        bootstrap();
-        asymmetricallyPartition();
-        rebalance();
-        reformPartition();
-        rebalance();
-    }
-
-    @Test
-    public void testSimplePublishing() throws Exception {
-        bootstrap();
-        ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
-                                                                                             new ProducerSkipStrategy(),
-                                                                                             producers.get(0).getProducer().createRing().replicaePerBucket);
-        for (ProducerCoordinator producer : producers) {
-            producerRing.add(producer.getProducer(), producer.getId().capacity);
-        }
-        List<UUID> channels = openChannels();
-        Executor executor = Executors.newCachedThreadPool();
-        CountDownLatch latch = new CountDownLatch(sources.size());
-
-        for (Source source : sources) {
-            source.publish(BATCH_SIZE, executor, latch, BATCH_COUNT);
-        }
-
-        assertTrue("not all publishers completed",
-                   latch.await(60, TimeUnit.SECONDS));
-
-        final Long target = Long.valueOf(BATCH_COUNT);
-        for (UUID channel : channels) {
-            final UUID c = channel;
-            final List<Producer> pair = producerRing.hash(point(channel), 2);
-            waitFor(String.format("Did not receive all acks for %s", channel),
-                    new Condition() {
-                        @Override
-                        public boolean value() {
-                            Long ts = pair.get(1).getMirrorSequenceNumberFor(c);
-                            return target.equals(ts);
-                        }
-                    }, 60000L, 1000L);
         }
     }
 
