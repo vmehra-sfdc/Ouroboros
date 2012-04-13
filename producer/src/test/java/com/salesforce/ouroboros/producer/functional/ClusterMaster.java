@@ -6,11 +6,10 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.UnknownHostException;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -26,9 +25,9 @@ import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 
 public class ClusterMaster implements Member {
-    Semaphore                      semaphore = new Semaphore(0);
+    CountDownLatch                 latch;
     final Switchboard              switchboard;
-    final ScheduledExecutorService timer     = Executors.newSingleThreadScheduledExecutor();
+    final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor();
     private ServerSocket           socket;
 
     public ClusterMaster(Switchboard switchboard) {
@@ -48,10 +47,11 @@ public class ClusterMaster implements Member {
 
     public boolean bootstrapSpindles(Node[] spindles, long timeout,
                                      TimeUnit unit) throws InterruptedException {
+        latch = new CountDownLatch(1);
         switchboard.ringCast(new Message(switchboard.getId(),
                                          BootstrapMessage.BOOTSTRAP_SPINDLES,
                                          (Serializable) spindles));
-        return acquire(timeout, unit).get();
+        return latch.await(timeout, unit);
     }
 
     @PreDestroy
@@ -70,7 +70,7 @@ public class ClusterMaster implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case BOOTSTRAP_SPINDLES:
-                semaphore.release();
+                latch.countDown();
                 break;
             default:
                 break;
@@ -83,7 +83,7 @@ public class ClusterMaster implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case MIRROR_OPENED:
-                semaphore.release();
+                latch.countDown();
             default:
         }
     }
@@ -110,6 +110,7 @@ public class ClusterMaster implements Member {
 
     public boolean open(UUID channel, long timeout, TimeUnit unit)
                                                                   throws InterruptedException {
+        latch = new CountDownLatch(1);
         switchboard.ringCast(new Message(switchboard.getId(),
                                          ChannelMessage.OPEN,
                                          new Serializable[] { channel }));
@@ -119,7 +120,7 @@ public class ClusterMaster implements Member {
         switchboard.ringCast(new Message(switchboard.getId(),
                                          ChannelMessage.MIRROR_OPENED,
                                          new Serializable[] { channel }));
-        return acquire(timeout, unit).get();
+        return latch.await(timeout, unit);
     }
 
     @PostConstruct
@@ -135,19 +136,5 @@ public class ClusterMaster implements Member {
 
     @Override
     public void stabilized() {
-    }
-
-    private AtomicBoolean acquire(long timeout, TimeUnit unit)
-                                                              throws InterruptedException {
-        final AtomicBoolean acquired = new AtomicBoolean(true);
-        timer.schedule(new Runnable() {
-            @Override
-            public void run() {
-                acquired.set(false);
-                semaphore.release();
-            }
-        }, timeout, unit);
-        semaphore.acquire();
-        return acquired;
     }
 }
