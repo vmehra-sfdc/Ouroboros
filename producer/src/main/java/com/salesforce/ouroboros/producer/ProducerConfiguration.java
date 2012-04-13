@@ -49,7 +49,7 @@ public class ProducerConfiguration {
     private int                 sampleFrequency              = 10;
     private int                 sampleWindowSize             = 1000;
     private SkipStrategy<Node>  skipStrategy                 = new DefaultSkipStrategy();
-    private ExecutorService     spinners                     = Executors.newFixedThreadPool(3,
+    private ExecutorService     spinners                     = Executors.newFixedThreadPool(5,
                                                                                             new LabeledThreadFactory(
                                                                                                                      "Spinner"));
     private final SocketOptions spinnerSocketOptions         = new SocketOptions();

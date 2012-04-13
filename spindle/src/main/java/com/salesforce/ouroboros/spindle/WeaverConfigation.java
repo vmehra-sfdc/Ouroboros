@@ -80,7 +80,7 @@ public class WeaverConfigation {
                                                                                              0);
     private int                       replicationQueueSize           = DEFAULT_REPLICATION_QUEUE_SIZE;
     private final SocketOptions       replicationSocketOptions       = new SocketOptions();
-    private ExecutorService           replicators                    = Executors.newFixedThreadPool(3,
+    private ExecutorService           replicators                    = Executors.newFixedThreadPool(5,
                                                                                                     new LabeledThreadFactory(
                                                                                                                              REPLICATOR));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
@@ -90,7 +90,7 @@ public class WeaverConfigation {
     private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
-    private ExecutorService           spindles                       = Executors.newFixedThreadPool(3,
+    private ExecutorService           spindles                       = Executors.newFixedThreadPool(5,
                                                                                                     new LabeledThreadFactory(
                                                                                                                              SPINDLE));
 
