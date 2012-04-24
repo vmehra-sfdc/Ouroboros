@@ -67,14 +67,18 @@ public class WeaverConfigation {
     private static final String       SPINDLE                        = "spindle";
     private static final String       XEROX                          = "xerox";
 
+    private int                       appendSegmentConcurrencyLevel  = 16;
     private Node                      id;
-    private int                       initialSegmentCapacity         = 16;
-    private int                       maximumSegmentCapacity         = 4096;
+    private int                       initialAppendSegmentCapacity   = 16;
+    private int                       initialReadSegmentCapacity     = 16;
+    private int                       maximumAppendSegmentCapacity   = 4096;
+    private int                       maximumReadSegmentCapacity     = 4096;
     private long                      maxSegmentSize                 = DEFAULT_MAX_SEGMENTSIZE;
     private int                       numberOfReplicas               = 200;
     private int                       numberOfRootReplicas           = 200;
     private long                      partitionTimeout               = DEFAULT_PARTITION_TIMEOUT;
     private TimeUnit                  partitionTimeoutUnit           = DEFAULT_PARTITION_TIMEOUT_UNIT;
+    private int                       readSegmentConcurrencyLevel    = 16;
     private InetSocketAddress         replicationAddress             = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
@@ -85,7 +89,6 @@ public class WeaverConfigation {
                                                                                                                              REPLICATOR));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
     private SkipStrategy<File>        rootSkipStrategy               = new NoSkipStrategy<File>();
-    private int                       segmentConcurrencyLevel        = 16;
     private SkipStrategy<Node>        skipStrategy                   = new DefaultSkipStrategy();
     private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
                                                                                              "127.0.0.1",
@@ -113,6 +116,13 @@ public class WeaverConfigation {
     }
 
     /**
+     * @return the appendSegmentConcurrencyLevel
+     */
+    public int getAppendSegmentConcurrencyLevel() {
+        return appendSegmentConcurrencyLevel;
+    }
+
+    /**
      * @return the id
      */
     public Node getId() {
@@ -120,17 +130,31 @@ public class WeaverConfigation {
     }
 
     /**
-     * @return the initialSegmentCapacity
+     * @return the initialAppendSegmentCapacity
      */
-    public int getInitialSegmentCapacity() {
-        return initialSegmentCapacity;
+    public int getInitialAppendSegmentCapacity() {
+        return initialAppendSegmentCapacity;
     }
 
     /**
-     * @return the maximumSegmentCapacity
+     * @return the initialReadSegmentCapacity
      */
-    public int getMaximumSegmentCapacity() {
-        return maximumSegmentCapacity;
+    public int getInitialReadSegmentCapacity() {
+        return initialReadSegmentCapacity;
+    }
+
+    /**
+     * @return the maximumAppendSegmentCapacity
+     */
+    public int getMaximumAppendSegmentCapacity() {
+        return maximumAppendSegmentCapacity;
+    }
+
+    /**
+     * @return the maximumReadSegmentCapacity
+     */
+    public int getMaximumReadSegmentCapacity() {
+        return maximumReadSegmentCapacity;
     }
 
     /**
@@ -166,6 +190,13 @@ public class WeaverConfigation {
      */
     public TimeUnit getPartitionTimeoutUnit() {
         return partitionTimeoutUnit;
+    }
+
+    /**
+     * @return the readSegmentConcurrencyLevel
+     */
+    public int getReadSegmentConcurrencyLevel() {
+        return readSegmentConcurrencyLevel;
     }
 
     /**
@@ -208,13 +239,6 @@ public class WeaverConfigation {
      */
     public SkipStrategy<File> getRootSkipStrategy() {
         return rootSkipStrategy;
-    }
-
-    /**
-     * @return the segmentConcurrencyLevel
-     */
-    public int getSegmentConcurrencyLevel() {
-        return segmentConcurrencyLevel;
     }
 
     /**
@@ -274,6 +298,14 @@ public class WeaverConfigation {
     }
 
     /**
+     * @param segmentConcurrencyLevel
+     *            the segmentConcurrencyLevel to set
+     */
+    public void setAppendSegmentConcurrencyLevel(int segmentConcurrencyLevel) {
+        appendSegmentConcurrencyLevel = segmentConcurrencyLevel;
+    }
+
+    /**
      * @param id
      *            the id to set
      */
@@ -285,16 +317,32 @@ public class WeaverConfigation {
      * @param initialSegmentCapacity
      *            the initialSegmentCapacity to set
      */
-    public void setInitialSegmentCapacity(int initialSegmentCapacity) {
-        this.initialSegmentCapacity = initialSegmentCapacity;
+    public void setInitialAppendSegmentCapacity(int initialSegmentCapacity) {
+        initialAppendSegmentCapacity = initialSegmentCapacity;
+    }
+
+    /**
+     * @param initialReadSegmentCapacity
+     *            the initialReadSegmentCapacity to set
+     */
+    public void setInitialReadSegmentCapacity(int initialReadSegmentCapacity) {
+        this.initialReadSegmentCapacity = initialReadSegmentCapacity;
     }
 
     /**
      * @param maximumSegmentCapacity
      *            the maximumSegmentCapacity to set
      */
-    public void setMaximumSegmentCapacity(int maximumSegmentCapacity) {
-        this.maximumSegmentCapacity = maximumSegmentCapacity;
+    public void setMaximumAppendSegmentCapacity(int maximumSegmentCapacity) {
+        maximumAppendSegmentCapacity = maximumSegmentCapacity;
+    }
+
+    /**
+     * @param maximumReadSegmentCapacity
+     *            the maximumReadSegmentCapacity to set
+     */
+    public void setMaximumReadSegmentCapacity(int maximumReadSegmentCapacity) {
+        this.maximumReadSegmentCapacity = maximumReadSegmentCapacity;
     }
 
     /**
@@ -338,6 +386,14 @@ public class WeaverConfigation {
     }
 
     /**
+     * @param readSegmentConcurrencyLevel
+     *            the readSegmentConcurrencyLevel to set
+     */
+    public void setReadSegmentConcurrencyLevel(int readSegmentConcurrencyLevel) {
+        this.readSegmentConcurrencyLevel = readSegmentConcurrencyLevel;
+    }
+
+    /**
      * @param replicationAddress
      *            the replicationAddress to set
      */
@@ -367,14 +423,6 @@ public class WeaverConfigation {
      */
     public void setRootSkipStrategy(SkipStrategy<File> rootSkipStrategy) {
         this.rootSkipStrategy = rootSkipStrategy;
-    }
-
-    /**
-     * @param segmentConcurrencyLevel
-     *            the segmentConcurrencyLevel to set
-     */
-    public void setSegmentConcurrencyLevel(int segmentConcurrencyLevel) {
-        this.segmentConcurrencyLevel = segmentConcurrencyLevel;
     }
 
     /**

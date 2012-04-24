@@ -64,7 +64,7 @@ public class TestReplicatingAppender {
         File tmpFile = File.createTempFile("inbound-replication", ".tst");
         tmpFile.deleteOnExit();
         Segment segment = new Segment(tmpFile);
-        segment.open();
+        segment.openForAppend();
         Acknowledger acknowledger = mock(Acknowledger.class);
 
         int magic = BatchHeader.MAGIC;
@@ -87,10 +87,12 @@ public class TestReplicatingAppender {
         when(bundle.getId()).thenReturn(new Node(0));
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(bundle.getAcknowledger(mirror)).thenReturn(acknowledger);
-        when(eventChannel.segmentFor(header.getOffset(), header.getPosition())).thenReturn(new AppendSegment(
-                                                                                                             segment,
-                                                                                                             0,
-                                                                                                             0));
+        when(
+             eventChannel.appendSegmentFor(header.getOffset(),
+                                           header.getPosition())).thenReturn(new AppendSegment(
+                                                                                               segment,
+                                                                                               0,
+                                                                                               0));
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
         final ReplicatingAppender replicator = new ReplicatingAppender(bundle);
@@ -142,7 +144,7 @@ public class TestReplicatingAppender {
         assertEquals(AbstractAppenderFSM.Ready, replicator.getState());
 
         segment = new Segment(tmpFile);
-        segment.open();
+        segment.openForRead();
         Event replicatedEvent = new Event(segment);
         assertEquals(event.size(), replicatedEvent.size());
         assertEquals(event.getMagic(), replicatedEvent.getMagic());

@@ -91,7 +91,7 @@ public class TestEventChannel {
         EventChannel eventChannel = new EventChannel(node, Role.PRIMARY,
                                                      secondary, channel, root,
                                                      maxSegmentSize, null,
-                                                     segmentCache);
+                                                     segmentCache, segmentCache);
         long offset = 0;
         BatchHeader batchHeader;
         AppendSegment logicalSegment;
@@ -100,7 +100,7 @@ public class TestEventChannel {
         for (; offset + eventSize < maxSegmentSize; offset += eventSize) {
             batchHeader = new BatchHeader(node, eventSize, 666, channel,
                                           sequenceNumber++);
-            logicalSegment = eventChannel.segmentFor(batchHeader);
+            logicalSegment = eventChannel.appendSegmentFor(batchHeader);
             assertNotNull(logicalSegment);
             assertEquals(offset, logicalSegment.offset);
             assertEquals(offset, logicalSegment.position);
@@ -111,7 +111,7 @@ public class TestEventChannel {
         // the next event should trigger a segment rollover
         batchHeader = new BatchHeader(node, eventSize, 666, channel,
                                       sequenceNumber++);
-        logicalSegment = eventChannel.segmentFor(batchHeader);
+        logicalSegment = eventChannel.appendSegmentFor(batchHeader);
         assertNotNull(logicalSegment);
         assertTrue(offset < logicalSegment.offset);
         assertEquals(0, logicalSegment.position);
@@ -126,7 +126,7 @@ public class TestEventChannel {
         for (; offset + eventSize < 2 * maxSegmentSize; offset += eventSize) {
             batchHeader = new BatchHeader(node, eventSize, 666, channel,
                                           sequenceNumber++);
-            logicalSegment = eventChannel.segmentFor(batchHeader);
+            logicalSegment = eventChannel.appendSegmentFor(batchHeader);
             assertNotNull(logicalSegment);
             assertEquals(offset, logicalSegment.offset);
             assertEquals(position, logicalSegment.position);
@@ -138,7 +138,7 @@ public class TestEventChannel {
         // the next event should trigger another segment rollover
         batchHeader = new BatchHeader(node, eventSize, 666, channel,
                                       sequenceNumber++);
-        logicalSegment = eventChannel.segmentFor(batchHeader);
+        logicalSegment = eventChannel.appendSegmentFor(batchHeader);
         assertNotNull(logicalSegment);
         assertTrue(offset < logicalSegment.offset);
         assertEquals(0, logicalSegment.position);
@@ -153,7 +153,7 @@ public class TestEventChannel {
         for (; offset + eventSize < 3 * maxSegmentSize; offset += eventSize) {
             batchHeader = new BatchHeader(node, eventSize, 666, channel,
                                           sequenceNumber++);
-            logicalSegment = eventChannel.segmentFor(batchHeader);
+            logicalSegment = eventChannel.appendSegmentFor(batchHeader);
             assertNotNull(logicalSegment);
             assertEquals(offset, logicalSegment.offset);
             assertEquals(position, logicalSegment.position);

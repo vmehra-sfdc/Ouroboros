@@ -25,10 +25,14 @@
  */
 package com.salesforce.ouroboros.spindle;
 
+import static java.nio.file.StandardOpenOption.APPEND;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.READ;
+import static java.nio.file.StandardOpenOption.WRITE;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.ByteChannel;
@@ -57,9 +61,8 @@ import java.nio.channels.WritableByteChannel;
 public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         GatheringByteChannel, ScatteringByteChannel, Cloneable {
 
-    private FileChannel      channel;
-    private final File       file;
-    private RandomAccessFile raf;
+    private FileChannel channel;
+    private final File  file;
 
     public Segment(File file) throws FileNotFoundException {
         this.file = file;
@@ -72,7 +75,6 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     @Override
     public void close() throws IOException {
         channel.close();
-        raf.close();
     }
 
     /**
@@ -100,7 +102,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     /**
      * @return
      */
-    public Object getFile() {
+    public File getFile() {
         return file;
     }
 
@@ -177,12 +179,19 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     }
 
     /**
-     * @throws FileNotFoundException
+     * @throws IOException
      * 
      */
-    public void open() throws FileNotFoundException {
-        raf = new RandomAccessFile(file, "rw");
-        channel = raf.getChannel();
+    public void openForAppend() throws IOException {
+        channel = FileChannel.open(file.toPath(), CREATE, WRITE, APPEND);
+    }
+
+    /**
+     * @throws IOException
+     * 
+     */
+    public void openForRead() throws IOException {
+        channel = FileChannel.open(file.toPath(), READ);
     }
 
     /**

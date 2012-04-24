@@ -83,7 +83,7 @@ public class TestSpindle {
                                                    magic, channel,
                                                    sequenceNumber);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
-        when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
+        when(eventChannel.appendSegmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                segment,
                                                                                0,
                                                                                0));

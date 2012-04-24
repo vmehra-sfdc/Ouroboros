@@ -26,7 +26,6 @@
 package com.salesforce.ouroboros.spindle;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.Arrays;
@@ -195,13 +194,15 @@ public class EventChannel {
     private volatile Node                      partner;
     private volatile Replicator                replicator;
     private Role                               role;
-    private final ConcurrentMap<File, Segment> segmentCache;
+    private final ConcurrentMap<File, Segment> appendSegmentCache;
+    private final ConcurrentMap<File, Segment> readSegmentCache;
     private final Node                         self;
 
     public EventChannel(Node self, Role role, Node partnerId,
                         final UUID channelId, final File root,
                         final long maxSegmentSize, final Replicator replicator,
-                        ConcurrentMap<File, Segment> segmentCache) {
+                        ConcurrentMap<File, Segment> appendSegmentCache,
+                        ConcurrentMap<File, Segment> readSegmentCache) {
         assert self != null : "this node must not be null";
         assert root != null : "Root directory must not be null";
         assert channelId != null : "Channel id must not be null";
@@ -227,7 +228,8 @@ public class EventChannel {
             }
         }
         this.replicator = replicator;
-        this.segmentCache = segmentCache;
+        this.appendSegmentCache = appendSegmentCache;
+        this.readSegmentCache = readSegmentCache;
     }
 
     /**
@@ -271,7 +273,10 @@ public class EventChannel {
             }
             handler.selectForRead();
         } else {
-            replicator.replicate(new EventEntry(batchHeader, this, segment,
+            replicator.replicate(new EventEntry(
+                                                batchHeader,
+                                                this,
+                                                getCachedReadSegment(segment.getFile()),
                                                 acknowledger, handler));
         }
     }
@@ -283,7 +288,7 @@ public class EventChannel {
         log.info(String.format("Closing channel %s on %s, root directory: %s",
                                id, producerId, channel));
         for (File segmentFile : getSegmentFiles()) {
-            Segment segment = segmentCache.remove(segmentFile);
+            Segment segment = appendSegmentCache.remove(segmentFile);
             if (segment != null) {
                 try {
                     segment.close();
@@ -370,8 +375,8 @@ public class EventChannel {
         Deque<Segment> segments = new LinkedList<Segment>();
         for (File segmentFile : segmentFiles) {
             try {
-                segments.push(getCachedSegment(segmentFile));
-            } catch (FileNotFoundException e) {
+                segments.push(getCachedReadSegment(segmentFile));
+            } catch (IOException e) {
                 String msg = String.format("Cannot find segment file: %s",
                                            segmentFile);
                 log.error(msg, e);
@@ -423,13 +428,14 @@ public class EventChannel {
         this.replicator = replicator;
     }
 
-    public AppendSegment segmentFor(BatchHeader batchHeader) throws IOException {
+    public AppendSegment appendSegmentFor(BatchHeader batchHeader)
+                                                                  throws IOException {
         AppendSegmentName logicalSegment = mappedSegmentFor(nextOffset,
                                                             batchHeader.getBatchByteLength(),
                                                             maxSegmentSize);
         File segmentFile = new File(channel, logicalSegment.segment);
-        return getSegment(logicalSegment.offset, logicalSegment.position,
-                          segmentFile);
+        return getAppendSegment(logicalSegment.offset, logicalSegment.position,
+                                segmentFile);
     }
 
     /**
@@ -440,10 +446,10 @@ public class EventChannel {
      * @return the segment for the event
      * @throws IOException
      */
-    public AppendSegment segmentFor(long offset) throws IOException {
+    public AppendSegment appendSegmentFor(long offset) throws IOException {
         File segment = new File(channel, segmentName(prefixFor(offset,
                                                                maxSegmentSize)));
-        return getSegment(offset, -1, segment);
+        return getAppendSegment(offset, -1, segment);
     }
 
     /**
@@ -454,26 +460,39 @@ public class EventChannel {
      * @return the segment for the event
      * @throws IOException
      */
-    public AppendSegment segmentFor(long offset, int position)
-                                                              throws IOException {
+    public AppendSegment appendSegmentFor(long offset, int position)
+                                                                    throws IOException {
         File segment = new File(channel, segmentName(prefixFor(offset,
                                                                maxSegmentSize)));
-        return getSegment(offset, position, segment);
+        return getAppendSegment(offset, position, segment);
     }
 
-    private Segment getCachedSegment(File segment) throws FileNotFoundException {
+    private Segment getCachedReadSegment(File segment) throws IOException {
         Segment newSegment = new Segment(segment);
-        Segment currentSegment = segmentCache.putIfAbsent(segment, newSegment);
+        Segment currentSegment = readSegmentCache.putIfAbsent(segment,
+                                                              newSegment);
         if (currentSegment == null) {
             currentSegment = newSegment;
-            currentSegment.open();
+            currentSegment.openForRead();
         }
         return currentSegment;
     }
 
-    private AppendSegment getSegment(long offset, int position, File segment)
-                                                                             throws IOException {
-        return new AppendSegment(getCachedSegment(segment), offset, position);
+    private Segment getCachedAppendSegment(File segment) throws IOException {
+        Segment newSegment = new Segment(segment);
+        Segment currentSegment = appendSegmentCache.putIfAbsent(segment,
+                                                                newSegment);
+        if (currentSegment == null) {
+            currentSegment = newSegment;
+            currentSegment.openForAppend();
+        }
+        return currentSegment;
+    }
+
+    private AppendSegment getAppendSegment(long offset, int position,
+                                           File segment) throws IOException {
+        return new AppendSegment(getCachedAppendSegment(segment), offset,
+                                 position);
     }
 
     private File[] getSegmentFiles() {

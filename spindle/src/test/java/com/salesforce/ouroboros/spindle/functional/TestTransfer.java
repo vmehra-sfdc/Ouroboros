@@ -179,12 +179,13 @@ public class TestTransfer {
         primaryEventChannel = new EventChannel(primaryNode, Role.PRIMARY,
                                                mirrorNode, channelId,
                                                primaryRoot, maxSegmentSize,
-                                               primaryReplicator, segmentCache);
+                                               primaryReplicator, segmentCache,
+                                               segmentCache);
 
         mirrorEventChannel = new EventChannel(mirrorNode, Role.MIRROR,
                                               primaryNode, channelId,
                                               mirrorRoot, maxSegmentSize, null,
-                                              segmentCache);
+                                              segmentCache, segmentCache);
 
         when(primaryBundle.eventChannelFor(channelId)).thenReturn(primaryEventChannel);
         when(mirrorBundle.eventChannelFor(channelId)).thenReturn(mirrorEventChannel);
@@ -246,13 +247,13 @@ public class TestTransfer {
                                                    primarySinkRoot,
                                                    maxSegmentSize,
                                                    primaryReplicator,
-                                                   segmentCache);
+                                                   segmentCache, segmentCache);
 
         mirrorSinkEventChannel = new EventChannel(mirrorSinkNode, Role.MIRROR,
                                                   primarySinkNode, channelId,
                                                   mirrorSinkRoot,
                                                   maxSegmentSize, null,
-                                                  segmentCache);
+                                                  segmentCache, segmentCache);
 
         when(primarySinkBundle.xeroxEventChannel(channelId)).thenReturn(primarySinkEventChannel);
         when(mirrorSinkBundle.xeroxEventChannel(channelId)).thenReturn(mirrorSinkEventChannel);

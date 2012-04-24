@@ -357,7 +357,7 @@ public class Sink implements CommunicationsHandler {
             }
             long offset = buffer.getLong();
             try {
-                current = channel.segmentFor(offset).segment;
+                current = channel.appendSegmentFor(offset).segment;
             } catch (IOException e) {
                 log.warn(String.format("Cannot retrieve segment, shutting down sink %s",
                                        fsm.getName()), e);

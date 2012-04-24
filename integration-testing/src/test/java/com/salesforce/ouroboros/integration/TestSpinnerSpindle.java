@@ -83,7 +83,7 @@ public class TestSpinnerSpindle {
         segmentFile.deleteOnExit();
         EventChannel eventChannel = mock(EventChannel.class);
         Segment segment = new Segment(segmentFile);
-        segment.open();
+        segment.openForAppend();
         final Bundle bundle = mock(Bundle.class);
         Node toNode = new Node(0);
         when(bundle.getId()).thenReturn(toNode);
@@ -98,7 +98,7 @@ public class TestSpinnerSpindle {
 
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.isDuplicate(isA(BatchHeader.class))).thenReturn(false);
-        when(eventChannel.segmentFor(isA(BatchHeader.class))).thenReturn(appendSegment);
+        when(eventChannel.appendSegmentFor(isA(BatchHeader.class))).thenReturn(appendSegment);
         doAnswer(new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
@@ -183,6 +183,9 @@ public class TestSpinnerSpindle {
             }
         }, 4000, 100);
 
+        segment.force(false);
+        segment.close();
+        segment.openForRead();
         segment.position(0);
 
         Event event;

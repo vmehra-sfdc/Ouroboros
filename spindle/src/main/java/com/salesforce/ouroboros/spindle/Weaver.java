@@ -56,7 +56,6 @@ import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.spindle.transfer.Sink;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
-import com.salesforce.ouroboros.spindle.util.ConcurrentLinkedHashMap;
 import com.salesforce.ouroboros.spindle.util.ConcurrentLinkedHashMap.Builder;
 import com.salesforce.ouroboros.spindle.util.EvictionListener;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
@@ -92,45 +91,33 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         }
     }
 
-    private static final Logger                          log               = LoggerFactory.getLogger(Weaver.class.getCanonicalName());
-    private static final String                          WEAVER_REPLICATOR = "Weaver Replicator";
-    private static final String                          WEAVER_SPINDLE    = "Weaver Spindle";
-    private static final String                          WEAVER_XEROX      = "Weaver Xerox";
-    static final int                                     HANDSHAKE_SIZE    = Node.BYTE_LENGTH + 4;
-    static final int                                     MAGIC             = 0x1638;
+    private static final Logger                     log               = LoggerFactory.getLogger(Weaver.class.getCanonicalName());
+    private static final String                     WEAVER_REPLICATOR = "Weaver Replicator";
+    private static final String                     WEAVER_SPINDLE    = "Weaver Spindle";
+    private static final String                     WEAVER_XEROX      = "Weaver Xerox";
+    static final int                                HANDSHAKE_SIZE    = Node.BYTE_LENGTH + 4;
+    static final int                                MAGIC             = 0x1638;
 
-    private final ConcurrentMap<Node, Acknowledger>      acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
-    private final ConcurrentMap<UUID, EventChannel>      channels          = new ConcurrentHashMap<UUID, EventChannel>();
-    private final ContactInformation                     contactInfo;
-    private final long                                   maxSegmentSize;
-    private ConsistentHashFunction<Node>                 nextRing;
-    private final ServerSocketChannelHandler             replicationHandler;
-    private final ConcurrentMap<Node, Replicator>        replicators       = new ConcurrentHashMap<Node, Replicator>();
-    private final ConsistentHashFunction<File>           roots;
-    private final ConcurrentLinkedHashMap<File, Segment> segmentCache;
-    private final Node                                   self;
-    private final ServerSocketChannelHandler             spindleHandler;
-    private ConsistentHashFunction<Node>                 weaverRing;
-    private final ServerSocketChannelHandler             xeroxHandler;
+    private final ConcurrentMap<Node, Acknowledger> acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
+    private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
+    private final ContactInformation                contactInfo;
+    private final long                              maxSegmentSize;
+    private ConsistentHashFunction<Node>            nextRing;
+    private final ServerSocketChannelHandler        replicationHandler;
+    private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
+    private final ConsistentHashFunction<File>      roots;
+    private final ConcurrentMap<File, Segment>      appendSegmentCache;
+    private final ConcurrentMap<File, Segment>      readSegmentCache;
+    private final Node                              self;
+    private final ServerSocketChannelHandler        spindleHandler;
+    private ConsistentHashFunction<Node>            weaverRing;
+    private final ServerSocketChannelHandler        xeroxHandler;
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
         Builder<File, Segment> builder = new Builder<File, Segment>();
-        builder.initialCapacity(configuration.getInitialSegmentCapacity());
-        builder.concurrencyLevel(configuration.getSegmentConcurrencyLevel());
-        builder.maximumWeightedCapacity(configuration.getMaximumSegmentCapacity());
-        builder.listener(new EvictionListener<File, Segment>() {
-            @Override
-            public void onEviction(File file, Segment segment) {
-                try {
-                    segment.close();
-                } catch (IOException e) {
-                    log.trace(String.format("Error closing %s" + segment), e);
-                }
-                log.trace(String.format("%s evicted on %s", segment, self));
-            }
-        });
-        segmentCache = builder.build();
+        appendSegmentCache = createAppendSegmentCache(configuration, builder);
+        readSegmentCache = createReadSegmentCache(configuration, builder);
         self = configuration.getId();
         roots = new ConsistentHashFunction<File>(
                                                  configuration.getRootSkipStrategy(),
@@ -176,6 +163,44 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         weaverRing = new ConsistentHashFunction<Node>(
                                                       configuration.getSkipStrategy(),
                                                       configuration.getNumberOfReplicas());
+    }
+
+    private ConcurrentMap<File, Segment> createAppendSegmentCache(WeaverConfigation configuration,
+                                                                  Builder<File, Segment> builder) {
+        builder.initialCapacity(configuration.getInitialAppendSegmentCapacity());
+        builder.concurrencyLevel(configuration.getAppendSegmentConcurrencyLevel());
+        builder.maximumWeightedCapacity(configuration.getMaximumAppendSegmentCapacity());
+        builder.listener(new EvictionListener<File, Segment>() {
+            @Override
+            public void onEviction(File file, Segment segment) {
+                try {
+                    segment.close();
+                } catch (IOException e) {
+                    log.trace(String.format("Error closing %s" + segment), e);
+                }
+                log.trace(String.format("%s evicted on %s", segment, self));
+            }
+        });
+        return builder.build();
+    }
+
+    private ConcurrentMap<File, Segment> createReadSegmentCache(WeaverConfigation configuration,
+                                                                Builder<File, Segment> builder) {
+        builder.initialCapacity(configuration.getInitialReadSegmentCapacity());
+        builder.concurrencyLevel(configuration.getReadSegmentConcurrencyLevel());
+        builder.maximumWeightedCapacity(configuration.getMaximumReadSegmentCapacity());
+        builder.listener(new EvictionListener<File, Segment>() {
+            @Override
+            public void onEviction(File file, Segment segment) {
+                try {
+                    segment.close();
+                } catch (IOException e) {
+                    log.trace(String.format("Error closing %s" + segment), e);
+                }
+                log.trace(String.format("%s evicted on %s", segment, self));
+            }
+        });
+        return builder.build();
     }
 
     public void bootstrap(Node[] bootsrappingMembers) {
@@ -444,7 +469,8 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         channels.put(channel,
                      new EventChannel(self, Role.MIRROR, primary, channel,
                                       roots.hash(point(channel)),
-                                      maxSegmentSize, null, segmentCache));
+                                      maxSegmentSize, null, appendSegmentCache,
+                                      readSegmentCache));
     }
 
     /**
@@ -471,7 +497,8 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         channels.put(channel,
                      new EventChannel(self, Role.PRIMARY, mirror, channel,
                                       roots.hash(point(channel)),
-                                      maxSegmentSize, replicator, segmentCache));
+                                      maxSegmentSize, replicator,
+                                      appendSegmentCache, readSegmentCache));
     }
 
     /**
@@ -647,11 +674,12 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                                                       channel, self);
             ec = new EventChannel(self, Role.PRIMARY, pair.get(1), channel,
                                   roots.hash(point(channel)), maxSegmentSize,
-                                  replicator, segmentCache);
+                                  replicator, appendSegmentCache,
+                                  readSegmentCache);
         } else if (self.equals(pair.get(1))) {
             ec = new EventChannel(self, Role.MIRROR, pair.get(0), channel,
                                   roots.hash(point(channel)), maxSegmentSize,
-                                  null, segmentCache);
+                                  null, appendSegmentCache, readSegmentCache);
         } else {
             throw new IllegalStateException(
                                             String.format("%s is neither mirror nor primary for %, cannot xerox",

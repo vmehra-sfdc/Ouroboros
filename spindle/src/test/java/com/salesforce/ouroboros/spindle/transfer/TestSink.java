@@ -118,8 +118,10 @@ public class TestSink {
         };
 
         when(bundle.xeroxEventChannel(channelId)).thenReturn(channel);
-        when(channel.segmentFor(prefix)).thenReturn(new AppendSegment(segment,
-                                                                      0, 0));
+        when(channel.appendSegmentFor(prefix)).thenReturn(new AppendSegment(
+                                                                            segment,
+                                                                            0,
+                                                                            0));
         when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readChannelCount).thenAnswer(channelHeaderRead).thenReturn(0).thenAnswer(segmentHeaderRead).thenReturn(0);
         when(segment.transferFrom(socket, 0, bytesLeft)).thenReturn(12L);
         when(segment.transferFrom(socket, 12, bytesLeft - 12)).thenReturn(bytesLeft - 12);
@@ -264,8 +266,10 @@ public class TestSink {
             }
         };
         when(bundle.xeroxEventChannel(channelId)).thenReturn(channel);
-        when(channel.segmentFor(prefix)).thenReturn(new AppendSegment(segment,
-                                                                      0, 0));
+        when(channel.appendSegmentFor(prefix)).thenReturn(new AppendSegment(
+                                                                            segment,
+                                                                            0,
+                                                                            0));
         when(socket.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readChannelCount).thenAnswer(channelHeaderRead).thenReturn(0).thenAnswer(segmentHeaderRead).thenReturn(0);
 
         sink.accept(handler);
@@ -276,7 +280,7 @@ public class TestSink {
         assertEquals(SinkFSM.CopySegment, sink.getState());
 
         verify(socket, new Times(5)).read(isA(ByteBuffer.class));
-        verify(channel).segmentFor(prefix);
+        verify(channel).appendSegmentFor(prefix);
 
     }
 
@@ -296,13 +300,13 @@ public class TestSink {
         inboundTmpFile1.delete();
         inboundTmpFile1.deleteOnExit();
         Segment inboundSegment1 = new Segment(inboundTmpFile1);
-        inboundSegment1.open();
+        inboundSegment1.openForAppend();
 
         File inboundTmpFile2 = File.createTempFile("sink2", ".tst");
         inboundTmpFile2.delete();
         inboundTmpFile2.deleteOnExit();
         Segment inboundSegment2 = new Segment(inboundTmpFile2);
-        inboundSegment2.open();
+        inboundSegment2.openForAppend();
 
         EventChannel outboundEventChannel = mock(EventChannel.class);
         SocketChannelHandler outboundHandler = mock(SocketChannelHandler.class);
@@ -312,14 +316,14 @@ public class TestSink {
         tmpOutboundFile1.delete();
         tmpOutboundFile1.deleteOnExit();
         Segment outboundSegment1 = new Segment(tmpOutboundFile1);
-        outboundSegment1.open();
+        outboundSegment1.openForAppend();
 
         File tmpOutboundFile2 = new File(Long.toHexString(prefix2)
                                          + EventChannel.SEGMENT_SUFFIX);
         tmpOutboundFile2.delete();
         tmpOutboundFile2.deleteOnExit();
         Segment outboundSegment2 = new Segment(tmpOutboundFile2);
-        outboundSegment2.open();
+        outboundSegment2.openForAppend();
         LinkedList<Segment> segments = new LinkedList<Segment>(
                                                                Arrays.asList(outboundSegment1,
                                                                              outboundSegment2));
@@ -349,14 +353,14 @@ public class TestSink {
         when(outboundHandler.getChannel()).thenReturn(outbound);
 
         when(inboundBundle.xeroxEventChannel(channelId)).thenReturn(inboundEventChannel);
-        when(inboundEventChannel.segmentFor(prefix1)).thenReturn(new AppendSegment(
-                                                                                   inboundSegment1,
-                                                                                   0,
-                                                                                   0));
-        when(inboundEventChannel.segmentFor(prefix2)).thenReturn(new AppendSegment(
-                                                                                   inboundSegment2,
-                                                                                   0,
-                                                                                   0));
+        when(inboundEventChannel.appendSegmentFor(prefix1)).thenReturn(new AppendSegment(
+                                                                                         inboundSegment1,
+                                                                                         0,
+                                                                                         0));
+        when(inboundEventChannel.appendSegmentFor(prefix2)).thenReturn(new AppendSegment(
+                                                                                         inboundSegment2,
+                                                                                         0,
+                                                                                         0));
         when(outboundEventChannel.getId()).thenReturn(channelId);
         when(outboundEventChannel.getSegmentStack()).thenReturn(segments);
 
@@ -366,6 +370,8 @@ public class TestSink {
         event1.rewind();
         event1.write(outboundSegment1);
         outboundSegment1.force(false);
+        outboundSegment1.close();
+        outboundSegment1.openForRead();
 
         Event event2 = new Event(
                                  666,
@@ -373,6 +379,8 @@ public class TestSink {
         event2.rewind();
         event2.write(outboundSegment2);
         outboundSegment2.force(false);
+        outboundSegment2.close();
+        outboundSegment2.openForRead();
 
         Rendezvous rendezvous = mock(Rendezvous.class);
         final Xerox xerox = new Xerox(fromNode, toNode);
@@ -431,9 +439,9 @@ public class TestSink {
         inboundSegment2.close();
 
         inboundSegment1 = new Segment(inboundTmpFile1);
-        inboundSegment1.open();
+        inboundSegment1.openForRead();
         inboundSegment2 = new Segment(inboundTmpFile2);
-        inboundSegment2.open();
+        inboundSegment2.openForRead();
 
         Event testEvent = new Event(inboundSegment1);
         assertEquals(event1.getCrc32(), testEvent.getCrc32());

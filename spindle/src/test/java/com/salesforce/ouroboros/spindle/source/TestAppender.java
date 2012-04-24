@@ -74,7 +74,7 @@ public class TestAppender {
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        writeSegment.open();
+        writeSegment.openForAppend();
         final Appender appender = new Appender(bundle, acknowledger);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
@@ -99,7 +99,7 @@ public class TestAppender {
         BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
                                              channel, sequenceNumber);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
-        when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
+        when(eventChannel.appendSegmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,
                                                                                0,
                                                                                0));
@@ -148,7 +148,7 @@ public class TestAppender {
                                     eq(writeSegment), isA(Acknowledger.class),
                                     isA(SocketChannelHandler.class),
                                     (Acknowledger) eq(null));
-        verify(eventChannel).segmentFor(eq(header));
+        verify(eventChannel).appendSegmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
     }
 
@@ -186,7 +186,7 @@ public class TestAppender {
         BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
                                              channel, sequenceNumber);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
-        when(eventChannel.segmentFor(eq(header))).thenReturn(new AppendSegment(
+        when(eventChannel.appendSegmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                writeSegment,
                                                                                0,
                                                                                0));
@@ -220,7 +220,7 @@ public class TestAppender {
         assertEquals(0L, tmpFile.length());
         verify(handler, new Times(3)).selectForRead();
         verify(bundle).eventChannelFor(channel);
-        verify(eventChannel).segmentFor(eq(header));
+        verify(eventChannel).appendSegmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
     };
 }

@@ -112,7 +112,7 @@ public class TestDuplicator {
         File tmpFile = File.createTempFile("outbound-replication", ".tst");
         tmpFile.deleteOnExit();
         Segment segment = new Segment(tmpFile);
-        segment.open();
+        segment.openForAppend();
         Bundle bundle = mock(Bundle.class);
         Acknowledger acknowledger = mock(Acknowledger.class);
 
@@ -127,6 +127,8 @@ public class TestDuplicator {
         event.write(segment);
         segment.write(payloadBuffer);
         segment.force(false);
+        segment.close();
+        segment.openForRead();
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
@@ -200,7 +202,7 @@ public class TestDuplicator {
         File inboundTmpFile = File.createTempFile("inbound-replication", ".tst");
         inboundTmpFile.deleteOnExit();
         Segment inboundSegment = new Segment(inboundTmpFile);
-        inboundSegment.open();
+        inboundSegment.openForAppend();
         EventChannel inboundEventChannel = mock(EventChannel.class);
         Bundle inboundBundle = mock(Bundle.class);
         when(inboundBundle.getId()).thenReturn(new Node(0));
@@ -214,7 +216,7 @@ public class TestDuplicator {
         File tmpOutboundFile = File.createTempFile("outbound", ".tst");
         tmpOutboundFile.deleteOnExit();
         Segment outboundSegment = new Segment(tmpOutboundFile);
-        outboundSegment.open();
+        outboundSegment.openForAppend();
 
         int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
@@ -234,14 +236,16 @@ public class TestDuplicator {
         event.rewind();
         event.write(outboundSegment);
         outboundSegment.force(false);
+        outboundSegment.close();
+        outboundSegment.openForRead();
         long offset = 0L;
 
         when(inboundBundle.eventChannelFor(channel)).thenReturn(inboundEventChannel);
         when(inboundBundle.getAcknowledger(mirror)).thenReturn(inboundAcknowledger);
-        when(inboundEventChannel.segmentFor(offset, 0)).thenReturn(new AppendSegment(
-                                                                                     inboundSegment,
-                                                                                     0,
-                                                                                     0));
+        when(inboundEventChannel.appendSegmentFor(offset, 0)).thenReturn(new AppendSegment(
+                                                                                           inboundSegment,
+                                                                                           0,
+                                                                                           0));
 
         final Duplicator outboundDuplicator = new Duplicator(new Node(0));
         assertEquals(DuplicatorFSM.Waiting, outboundDuplicator.getState());
@@ -311,7 +315,7 @@ public class TestDuplicator {
         outboundSegment.close();
 
         Segment segment = new Segment(inboundTmpFile);
-        segment.open();
+        segment.openForRead();
         assertTrue("Nothing written to inbound segment", segment.size() > 0);
         Event replicatedEvent = new Event(segment);
         assertEquals(event.size(), replicatedEvent.size());
