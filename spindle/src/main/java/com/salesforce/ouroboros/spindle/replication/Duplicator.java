@@ -255,5 +255,8 @@ public final class Duplicator {
                            EventChannel eventChannel, Segment segment,
                            Acknowledger acknowledger,
                            SocketChannelHandler sourceHandler) {
+        EventEntry entry = new EventEntry();
+        entry.set(header, eventChannel, segment, acknowledger, sourceHandler);
+        pending.add(entry);
     }
 }

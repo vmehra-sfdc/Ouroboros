@@ -86,7 +86,7 @@ public class EventEntry {
         this.acknowledger = acknowledger;
     }
 
-    public void setEntry(ReplicatedBatchHeader header,
+    public void set(ReplicatedBatchHeader header,
                          EventChannel eventChannel, Segment segment,
                          Acknowledger acknowledger, SocketChannelHandler handler) {
         setHeader(header);
