@@ -37,20 +37,95 @@ import com.salesforce.ouroboros.spindle.source.Acknowledger;
  * 
  */
 public class EventEntry {
-    public final Acknowledger          acknowledger;
-    public final EventChannel          eventChannel;
-    public final ReplicatedBatchHeader header;
-    public final Segment               segment;
-    public final SocketChannelHandler  handler;
+    private Acknowledger          acknowledger;
+    private EventChannel          eventChannel;
+    private SocketChannelHandler  handler;
+    private ReplicatedBatchHeader header;
+    private Segment               segment;
 
-    public EventEntry(ReplicatedBatchHeader header, EventChannel eventChannel,
-                      Segment segment, Acknowledger acknowledger,
-                      SocketChannelHandler handler) {
-        this.header = header;
-        this.eventChannel = eventChannel;
-        this.segment = segment;
+    /**
+     * @return the acknowledger
+     */
+    public Acknowledger getAcknowledger() {
+        return acknowledger;
+    }
+
+    /**
+     * @return the eventChannel
+     */
+    public EventChannel getEventChannel() {
+        return eventChannel;
+    }
+
+    /**
+     * @return the handler
+     */
+    public SocketChannelHandler getHandler() {
+        return handler;
+    }
+
+    /**
+     * @return the header
+     */
+    public ReplicatedBatchHeader getHeader() {
+        return header;
+    }
+
+    /**
+     * @return the segment
+     */
+    public Segment getSegment() {
+        return segment;
+    }
+
+    /**
+     * @param acknowledger
+     *            the acknowledger to set
+     */
+    public void setAcknowledger(Acknowledger acknowledger) {
         this.acknowledger = acknowledger;
+    }
+
+    public void setEntry(ReplicatedBatchHeader header,
+                         EventChannel eventChannel, Segment segment,
+                         Acknowledger acknowledger, SocketChannelHandler handler) {
+        setHeader(header);
+        setEventChannel(eventChannel);
+        setSegment(segment);
+        setAcknowledger(acknowledger);
+        setHandler(handler);
+    }
+
+    /**
+     * @param eventChannel
+     *            the eventChannel to set
+     */
+    public void setEventChannel(EventChannel eventChannel) {
+        this.eventChannel = eventChannel;
+    }
+
+    /**
+     * @param handler
+     *            the handler to set
+     */
+    public void setHandler(SocketChannelHandler handler) {
         this.handler = handler;
+    }
+
+    /**
+     * @param header
+     *            the header to set
+     */
+    public void setHeader(ReplicatedBatchHeader header) {
+        this.header = header;
+    }
+
+    /**
+     * @param segment
+     *            the segment to set
+     */
+    public void setSegment(Segment segment) {
+        this.segment = segment;
     }
 
 }

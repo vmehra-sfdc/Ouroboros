@@ -35,7 +35,10 @@ import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorState;
+import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.util.Utils;
 
 /**
@@ -66,10 +69,10 @@ public final class Duplicator {
     public void closing() {
         closed.set(true);
         if (current != null) {
-            current.handler.selectForRead();
+            current.getHandler().selectForRead();
         }
         for (EventEntry entry : pending) {
-            entry.handler.selectForRead();
+            entry.getHandler().selectForRead();
         }
         pending.clear();
     }
@@ -86,21 +89,6 @@ public final class Duplicator {
     }
 
     /**
-     * Replicate the event to the mirror
-     */
-    public void replicate(EventEntry event) {
-        if (closed.get()) {
-            event.handler.selectForRead();
-        } else {
-            if (log.isTraceEnabled()) {
-                log.trace(String.format("Replicating event %s on %s", event,
-                                        fsm.getName()));
-            }
-            fsm.replicate(event);
-        }
-    }
-
-    /**
      * @param format
      */
     public void setFsmName(String name) {
@@ -112,27 +100,21 @@ public final class Duplicator {
     }
 
     private boolean transferTo() throws IOException {
-        int written = (int) current.segment.transferTo(position, remaining,
-                                                       handler.getChannel());
+        int written = (int) current.getSegment().transferTo(position,
+                                                            remaining,
+                                                            handler.getChannel());
         remaining -= written;
         position += written;
         if (log.isTraceEnabled()) {
             log.trace(String.format("Writing batch %s, position=%s, written=%s, to %s on %s",
-                                    current.header, position, written,
-                                    current.segment, thisNode));
+                                    current.getHeader(), position, written,
+                                    current.getSegment(), thisNode));
         }
         return remaining == 0;
     }
 
     protected void close() {
         handler.close();
-    }
-
-    /**
-     * @param event
-     */
-    protected void enqueue(EventEntry event) {
-        pending.add(event);
     }
 
     protected boolean hasNext() {
@@ -163,13 +145,13 @@ public final class Duplicator {
     protected void processHeader() {
         current = pending.remove();
         if (log.isTraceEnabled()) {
-            log.trace(String.format("Processing %s on %s", current.header,
+            log.trace(String.format("Processing %s on %s", current.getHeader(),
                                     fsm.getName()));
         }
-        current.handler.selectForRead();
-        remaining = current.header.getBatchByteLength();
-        position = current.header.getPosition();
-        current.header.rewind();
+        current.getHandler().selectForRead();
+        remaining = current.getHeader().getBatchByteLength();
+        position = current.getHeader().getPosition();
+        current.getHeader().rewind();
         if (writeHeader()) {
             fsm.headerWritten();
         } else {
@@ -188,13 +170,13 @@ public final class Duplicator {
     protected boolean writeBatch() {
         try {
             if (transferTo()) {
-                current.eventChannel.commit(current.header.getOffset());
+                current.getEventChannel().commit(current.getHeader().getOffset());
                 if (log.isTraceEnabled()) {
                     log.trace(String.format("Acknowledging replication of %s, on %s",
-                                            current.header, fsm.getName()));
+                                            current.getHeader(), fsm.getName()));
                 }
-                current.acknowledger.acknowledge(current.header.getChannel(),
-                                                 current.header.getSequenceNumber());
+                current.getAcknowledger().acknowledge(current.getHeader().getChannel(),
+                                                      current.getHeader().getSequenceNumber());
                 current = null;
                 return true;
             }
@@ -204,7 +186,8 @@ public final class Duplicator {
                 log.info(String.format("closing duplicator: %s", fsm.getName()));
             } else {
                 log.warn(String.format("Unable to replicate payload for %s from: %s",
-                                       current.header, current.segment), e);
+                                       current.getHeader(),
+                                       current.getSegment()), e);
             }
         }
         return false;
@@ -212,7 +195,7 @@ public final class Duplicator {
 
     protected boolean writeHeader() {
         try {
-            if (current.header.write(handler.getChannel()) < 0) {
+            if (current.getHeader().write(handler.getChannel()) < 0) {
                 inError = true;
                 return false;
             }
@@ -221,18 +204,56 @@ public final class Duplicator {
                 log.info(String.format("closing duplicator: %s", fsm.getName()));
             } else {
                 log.warn(String.format("Unable to write batch header: %s",
-                                       current.header), e);
+                                       current.getHeader()), e);
             }
             inError = true;
             return false;
         }
-        boolean written = !current.header.hasRemaining();
+        boolean written = !current.getHeader().hasRemaining();
         if (written) {
             if (log.isTraceEnabled()) {
                 log.trace(String.format("written header %s on %s",
-                                        current.header, fsm.getName()));
+                                        current.getHeader(), fsm.getName()));
             }
         }
         return written;
+    }
+
+    /**
+     * Replicate the event to the mirror
+     * 
+     * @param header
+     * @param eventChannel
+     * @param segment
+     * @param acknowledger
+     * @param sourceHandler
+     */
+    public void replicate(ReplicatedBatchHeader header,
+                          EventChannel eventChannel, Segment segment,
+                          Acknowledger acknowledger,
+                          SocketChannelHandler sourceHandler) {
+        if (closed.get()) {
+            sourceHandler.selectForRead();
+        } else {
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Replicating batch %s on %s", header,
+                                        fsm.getName()));
+            }
+            fsm.replicate(header, eventChannel, segment, acknowledger,
+                          sourceHandler);
+        }
+    }
+
+    /**
+     * @param header
+     * @param eventChannel
+     * @param segment
+     * @param acknowledger
+     * @param sourceHandler
+     */
+    protected void enqueue(ReplicatedBatchHeader header,
+                           EventChannel eventChannel, Segment segment,
+                           Acknowledger acknowledger,
+                           SocketChannelHandler sourceHandler) {
     }
 }

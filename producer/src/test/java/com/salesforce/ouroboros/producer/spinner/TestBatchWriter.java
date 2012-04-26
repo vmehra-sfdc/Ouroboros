@@ -85,8 +85,8 @@ public class TestBatchWriter {
         batchWriter.connect(handler);
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
         Node mirror = new Node(0x1638);
-        Batch batch = new Batch(mirror, channel, sequenceNumber,
-                                Arrays.asList(payloads));
+        Batch batch = new Batch();
+        batch.set(mirror, channel, sequenceNumber, Arrays.asList(payloads));
         Answer<Integer> readBatchHeader = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {

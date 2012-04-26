@@ -166,16 +166,11 @@ public class TestDuplicator {
         }, 1000L, 100L);
         Node mirror = new Node(0x1638);
         long sequenceNumber = System.currentTimeMillis();
-        replicator.replicate(new EventEntry(
-                                            new ReplicatedBatchHeader(
-                                                                      mirror,
-                                                                      event.totalSize(),
-                                                                      magic,
-                                                                      channel,
-                                                                      sequenceNumber,
-                                                                      0, 0),
-                                            eventChannel, segment,
-                                            acknowledger, handler));
+        replicator.replicate(new ReplicatedBatchHeader(mirror,
+                                                       event.totalSize(),
+                                                       magic, channel,
+                                                       sequenceNumber, 0, 0),
+                             eventChannel, segment, acknowledger, handler);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
             public boolean value() {
@@ -291,15 +286,10 @@ public class TestDuplicator {
         SocketChannelHandler outboundHandler = mock(SocketChannelHandler.class);
         when(outboundHandler.getChannel()).thenReturn(outbound);
         outboundDuplicator.connect(outboundHandler);
-        outboundDuplicator.replicate(new EventEntry(
-                                                    new ReplicatedBatchHeader(
-                                                                              batchHeader,
-                                                                              0,
-                                                                              0),
-                                                    eventChannel,
-                                                    outboundSegment,
-                                                    outboundAcknowledger,
-                                                    outboundHandler));
+        outboundDuplicator.replicate(new ReplicatedBatchHeader(batchHeader, 0,
+                                                               0),
+                                     eventChannel, outboundSegment,
+                                     outboundAcknowledger, outboundHandler);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
             public boolean value() {
