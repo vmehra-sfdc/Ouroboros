@@ -662,19 +662,7 @@ public class Producer implements Comparable<Producer> {
                                                   String.format("Push to channel %s that does not exist on %s",
                                                                 channel, self));
             }
-            Batch batch = new Batch(state.getMirrorProducer(), channel,
-                                    sequenceNumber, events);
-            if (!controller.accept(batch.batchByteSize())) {
-                if (log.isInfoEnabled()) {
-                    log.info(String.format("Rate limit exceeded for push to %s on: %s",
-                                           channel, self));
-                }
-                throw new RateLimiteExceededException(
-                                                      String.format("Rate limit exceeded for push to %s on: %s",
-                                                                    channel,
-                                                                    self));
-            }
-            state.spinner.push(batch);
+            state.spinner.push(state.getMirrorProducer(), channel, sequenceNumber, events, controller);
         } finally {
             publishingThreads.decrementAndGet();
         }

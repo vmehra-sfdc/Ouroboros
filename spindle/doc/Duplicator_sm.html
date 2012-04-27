@@ -38,7 +38,15 @@
         <th>
           replicate
           <br>
-          (EventEntry)
+          (ReplicatedBatchHeader,
+          <br>
+          EventChannel,
+          <br>
+          Segment,
+          <br>
+          Acknowledger,
+          <br>
+          SocketChannelHandler)
         </th>
         <th>
           writeReady
@@ -65,7 +73,7 @@
           <pre>
   WriteHeader
   {
-    enqueue(event);
+    enqueue(header, eventChannel, segment, acknowledger, sourceHandler);
   }
           </pre>
         </td>

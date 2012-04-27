@@ -32,8 +32,8 @@ public class TestBatch {
         final int[] crc32 = new int[] { Event.crc32(events[0].getBytes()),
                 Event.crc32(events[1].getBytes()),
                 Event.crc32(events[2].getBytes()) };
-        Batch batch = new Batch(new Node(0), UUID.randomUUID(), 0L,
-                                Arrays.asList(payloads));
+        Batch batch = new Batch();
+        batch.set(new Node(0), UUID.randomUUID(), 0L, Arrays.asList(payloads));
         ByteBuffer buffer = batch.batch;
         for (int i = 0; i < 3; i++) {
             Event event = Event.readFrom(buffer);

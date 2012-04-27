@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.producer.spinner;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.NavigableMap;
 import java.util.SortedMap;
 import java.util.UUID;
@@ -45,6 +46,7 @@ import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.spinner.SpinnerContext.SpinnerFSM;
 import com.salesforce.ouroboros.producer.spinner.SpinnerContext.SpinnerState;
 import com.salesforce.ouroboros.util.Utils;
+import com.salesforce.ouroboros.util.rate.Controller;
 
 /**
  * 
@@ -59,15 +61,15 @@ public class Spinner implements CommunicationsHandler {
 
     private final BatchAcknowledgement               ack;
     private boolean                                  established         = false;
-    private final Producer                           producer;
     private final SpinnerContext                     fsm                 = new SpinnerContext(
                                                                                               this);
     private SocketChannelHandler                     handler;
     private ByteBuffer                               handshake           = ByteBuffer.allocate(HANDSHAKE_BYTE_SIZE);
     private boolean                                  inError;
     private final NavigableMap<BatchIdentity, Batch> pending             = new ConcurrentSkipListMap<BatchIdentity, Batch>();
-    private final BatchWriter                        writer;
+    private final Producer                           producer;
     private final Node                               to;
+    private final BatchWriter                        writer;
 
     public Spinner(Producer producer, Node to, int maxQueueLength) {
         String fsmName = String.format("%s>%s", producer.getId().processId,
@@ -180,16 +182,32 @@ public class Spinner implements CommunicationsHandler {
         return fsm.getState() == SpinnerFSM.Established;
     }
 
-    /**
-     * Push the batch of events.
-     * 
-     * @param events
-     *            - the batch to push
-     * @throws RateLimiteExceededException
-     *             - if the batch throughput rate has been exceeded.
-     */
-    public void push(Batch events) throws RateLimiteExceededException {
+    public void push(Batch events) {
         writer.push(events, pending);
+    }
+
+    /**
+     * @param mirrorProducer
+     * @param channel
+     * @param sequenceNumber
+     * @param events
+     * @param controller
+     */
+    public void push(Node mirrorProducer, UUID channel, long sequenceNumber,
+                     Collection<ByteBuffer> events, Controller controller) {
+        Batch batch = writer.allocateBatch();
+        batch.set(mirrorProducer, channel, sequenceNumber, events);
+        if (!controller.accept(batch.batchByteSize())) {
+            if (log.isInfoEnabled()) {
+                log.info(String.format("Rate limit exceeded for push to %s on: %s",
+                                       channel, producer));
+            }
+            throw new RateLimiteExceededException(
+                                                  String.format("Rate limit exceeded for push to %s on: %s",
+                                                                channel,
+                                                                producer));
+        }
+        push(batch);
     }
 
     @Override
