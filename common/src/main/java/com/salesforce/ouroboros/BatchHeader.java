@@ -99,7 +99,7 @@ public class BatchHeader {
     public BatchHeader(Node mirror, int batchByteLength, int magic,
                        UUID channel, long sequenceNumber) {
         this();
-        set(mirror, batchByteLength, magic, channel, sequenceNumber);
+        append(bytes, mirror, batchByteLength, magic, channel, sequenceNumber);
     }
 
     @Override
@@ -179,11 +179,6 @@ public class BatchHeader {
      */
     public void rewind() {
         bytes.rewind();
-    }
-
-    public void set(Node mirror, int batchByteLength, int magic, UUID channel,
-                    long sequenceNumber) {
-        append(bytes, mirror, batchByteLength, magic, channel, sequenceNumber);
     }
 
     @Override

@@ -35,22 +35,14 @@
 %class Duplicator
 %package com.salesforce.ouroboros.spindle.replication
 %access public
-%import com.salesforce.ouroboros.spindle.EventChannel
-%import com.salesforce.ouroboros.spindle.Segment
-%import com.salesforce.ouroboros.spindle.source.Acknowledger
-%import com.hellblazer.pinkie.SocketChannelHandler
-
 
 %start DuplicatorFSM::Waiting
 %map DuplicatorFSM
 %% 
 Waiting {
-	replicate(header: ReplicatedBatchHeader,
-                          eventChannel: EventChannel, segment: Segment,
-                          acknowledger: Acknowledger,
-                          sourceHandler: SocketChannelHandler)
+	replicate(event: EventEntry)
 		WriteHeader{
-			enqueue(header, eventChannel, segment, acknowledger, sourceHandler);
+			enqueue(event);
 		}
 	writeReady
 		nil{}
@@ -116,12 +108,9 @@ Entry {
 }
 
 Default {
-	replicate(header: ReplicatedBatchHeader,
-                          eventChannel: EventChannel, segment: Segment,
-                          acknowledger: Acknowledger,
-                          sourceHandler: SocketChannelHandler)
+	replicate(event: EventEntry)
 		nil{
-			enqueue(header, eventChannel, segment, acknowledger, sourceHandler);
+			enqueue(event);
 		}
 		
 	close

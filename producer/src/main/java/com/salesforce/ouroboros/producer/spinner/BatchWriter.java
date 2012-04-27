@@ -33,7 +33,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,18 +53,15 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class BatchWriter {
 
-    private static final Logger        log          = LoggerFactory.getLogger(BatchWriter.class.getCanonicalName());
-    private Batch                      batch;
-    private final Thread               consumer;
-    private Batch                      freeList;
-    private final ReentrantLock        freeListLock = new ReentrantLock();
-    private final BatchWriterContext   fsm          = new BatchWriterContext(
-                                                                             this);
+    private static final Logger        log     = LoggerFactory.getLogger(BatchWriter.class.getCanonicalName());
+    private final BatchWriterContext   fsm     = new BatchWriterContext(this);
     private SocketChannelHandler       handler;
-    private boolean                    inError      = false;
-    private final Semaphore            quantum      = new Semaphore(0);
+    private boolean                    inError = false;
     private final BlockingQueue<Batch> queued;
-    private final AtomicBoolean        run          = new AtomicBoolean(true);
+    private Batch                      batch;
+    private final AtomicBoolean        run     = new AtomicBoolean(true);
+    private final Thread               consumer;
+    private final Semaphore            quantum = new Semaphore(0);
 
     public BatchWriter(int maxQueueLength, String fsmName) {
         queued = new ArrayBlockingQueue<Batch>(maxQueueLength);
@@ -127,39 +123,6 @@ public class BatchWriter {
         }
     }
 
-    private void free() {
-        final ReentrantLock lock = freeListLock;
-        lock.lock();
-        try {
-            freeList = batch.link(freeList);
-            batch = null;
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    /**
-     * @param mirrorProducer
-     * @param channel
-     * @param sequenceNumber
-     * @param events
-     * @return
-     */
-    protected Batch allocateBatch() {
-        final ReentrantLock lock = freeListLock;
-        lock.lock();
-        try {
-            if (freeList == null) {
-                return new Batch();
-            }
-            Batch allocated = freeList;
-            freeList = allocated.delink();
-            return allocated;
-        } finally {
-            lock.unlock();
-        }
-    }
-
     protected void close() {
         queued.clear();
         run.set(false);
@@ -168,7 +131,6 @@ public class BatchWriter {
             handler.close();
         }
         batch = null;
-        freeList = null;
     }
 
     protected Runnable consumerAction() {
@@ -289,7 +251,7 @@ public class BatchWriter {
                                    batch.header.getChannel(), fsm.getName(),
                                    batch.header.getProducerMirror()));
         }
-        free();
+        batch = null;
         return true;
     }
 

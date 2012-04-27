@@ -27,7 +27,6 @@ package com.salesforce.ouroboros;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -36,26 +35,43 @@ import java.util.UUID;
  * 
  */
 public class Batch extends BatchIdentity {
+    /**
+     * 
+     */
     private static final double ONE_BILLION = 1000000000D;
-
-    public final BatchHeader    header      = new BatchHeader();
-    public ByteBuffer           batch;
-    private long                created;
-    private long                interval;
-    private Batch               next;
-
-    public Batch() {
-    }
+    public final BatchHeader header;
+    public final ByteBuffer  batch;
+    private final long       created  = System.nanoTime();
+    private long             interval = -1;
 
     /**
      * @param mirror
      * @param channel
      * @param sequenceNumber
-     * @param emptyList
+     * @param events
      */
     public Batch(Node mirror, UUID channel, long sequenceNumber,
-                 List<ByteBuffer> events) {
-        set(mirror, channel, sequenceNumber, events);
+                 Collection<ByteBuffer> events) {
+        super(channel, sequenceNumber);
+        assert events != null : "events must not be null";
+        int totalSize = 0;
+
+        for (ByteBuffer event : events) {
+            event.rewind();
+            totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
+        }
+
+        batch = ByteBuffer.allocate(totalSize);
+        header = new BatchHeader(mirror, totalSize, BatchHeader.MAGIC, channel,
+                                 sequenceNumber);
+
+        for (ByteBuffer event : events) {
+            event.rewind();
+            EventHeader.append(BatchHeader.MAGIC, event, batch);
+        }
+
+        assert batch.remaining() == 0;
+        batch.rewind();
     }
 
     /**
@@ -65,23 +81,12 @@ public class Batch extends BatchIdentity {
         return batch.capacity() + BatchHeader.HEADER_BYTE_SIZE;
     }
 
-    public Batch delink() {
-        Batch current = next;
-        next = null;
-        return current;
-    }
-
     /**
      * @return the interval, in milliseconds, between when the batch was
      *         submitted and when it was acknowledged
      */
     public long getInterval() {
         return interval;
-    }
-
-    public Batch link(Batch h) {
-        next = h;
-        return this;
     }
 
     /**
@@ -97,7 +102,7 @@ public class Batch extends BatchIdentity {
      * @return the transfer rate in bytes per second of this batch.
      */
     public double rate() {
-        return batchByteSize() * ONE_BILLION / interval;
+        return batchByteSize()* ONE_BILLION / interval;
     }
 
     /**
@@ -113,38 +118,6 @@ public class Batch extends BatchIdentity {
     public void rewind() {
         header.rewind();
         batch.rewind();
-    }
-
-    public void set(Node mirror, UUID channel, long sequenceNumber,
-                    Collection<ByteBuffer> events) {
-        set(channel, sequenceNumber);
-        assert events != null : "events must not be null";
-        int totalSize = 0;
-
-        for (ByteBuffer event : events) {
-            event.rewind();
-            totalSize += EventHeader.HEADER_BYTE_SIZE + event.remaining();
-        }
-
-        if (batch == null || batch.capacity() < totalSize) {
-            batch = ByteBuffer.allocateDirect(totalSize);
-        } else {
-            batch.rewind();
-            batch.limit(totalSize);
-        }
-
-        header.set(mirror, totalSize, BatchHeader.MAGIC, channel,
-                   sequenceNumber);
-
-        for (ByteBuffer event : events) {
-            event.rewind();
-            EventHeader.append(BatchHeader.MAGIC, event, batch);
-        }
-
-        assert batch.remaining() == 0;
-        batch.rewind();
-        created = System.nanoTime();
-        interval = -1;
     }
 
     /* (non-Javadoc)

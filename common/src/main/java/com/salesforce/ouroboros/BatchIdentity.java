@@ -36,11 +36,8 @@ import java.util.UUID;
 public class BatchIdentity implements Comparable<BatchIdentity> {
     public static final int BYTE_SIZE = 3 * 8;
 
-    public UUID             channel;
-    public long             sequenceNumber;
-
-    public BatchIdentity() {
-    }
+    public final UUID       channel;
+    public final long       sequenceNumber;
 
     public BatchIdentity(ByteBuffer buffer) {
         channel = new UUID(buffer.getLong(), buffer.getLong());
@@ -48,7 +45,8 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
     }
 
     public BatchIdentity(UUID channel, long sequenceNumber) {
-        set(channel, sequenceNumber);
+        this.channel = channel;
+        this.sequenceNumber = sequenceNumber;
     }
 
     @Override
@@ -104,11 +102,6 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
         buffer.putLong(channel.getMostSignificantBits());
         buffer.putLong(channel.getLeastSignificantBits());
         buffer.putLong(sequenceNumber);
-    }
-
-    public void set(UUID channel, long sequenceNumber) {
-        this.channel = channel;
-        this.sequenceNumber = sequenceNumber;
     }
 
     /* (non-Javadoc)

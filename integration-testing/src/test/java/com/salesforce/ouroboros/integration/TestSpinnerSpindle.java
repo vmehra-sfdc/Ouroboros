@@ -173,9 +173,7 @@ public class TestSpinnerSpindle {
             eventBuffers.add(ByteBuffer.wrap(event.getBytes()));
         }
 
-        Batch batch = new Batch();
-        batch.set(mirror, channel, sequenceNumber, eventBuffers);
-        spinner.push(batch);
+        spinner.push(new Batch(mirror, channel, sequenceNumber, eventBuffers));
 
         Util.waitFor("Did not commit event batch", new Util.Condition() {
 

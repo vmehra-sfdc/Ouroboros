@@ -39,11 +39,8 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
-import com.salesforce.ouroboros.spindle.EventChannel;
-import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorState;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.util.Rendezvous;
 import com.salesforce.ouroboros.util.Utils;
 
@@ -163,6 +160,10 @@ public class Replicator implements CommunicationsHandler {
         } else {
             fsm.readReady();
         }
+    }
+
+    public void replicate(EventEntry event) {
+        duplicator.replicate(event);
     }
 
     @Override
@@ -290,21 +291,5 @@ public class Replicator implements CommunicationsHandler {
         }
 
         return !handshake.hasRemaining();
-    }
-
-    /**
-     * @param header
-     * @param eventChannel
-     * @param segment
-     * @param acknowledger
-     * @param sourceHandler
-     */
-    public void replicate(ReplicatedBatchHeader header,
-                          EventChannel eventChannel, Segment segment,
-                          Acknowledger acknowledger,
-                          SocketChannelHandler sourceHandler) {
-
-        duplicator.replicate(header, eventChannel, segment, acknowledger,
-                             sourceHandler);
     }
 }

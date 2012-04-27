@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
@@ -272,9 +273,11 @@ public class EventChannel {
             }
             handler.selectForRead();
         } else {
-            replicator.replicate(batchHeader, this,
-                                 getCachedReadSegment(segment.getFile()),
-                                 acknowledger, handler);
+            replicator.replicate(new EventEntry(
+                                                batchHeader,
+                                                this,
+                                                getCachedReadSegment(segment.getFile()),
+                                                acknowledger, handler));
         }
     }
 
