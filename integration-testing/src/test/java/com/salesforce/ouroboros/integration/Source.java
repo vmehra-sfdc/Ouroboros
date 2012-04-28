@@ -164,21 +164,18 @@ public class Source implements EventSource {
     public void shutdown() {
         if (shutdown.compareAndSet(false, true)) {
             log.info(String.format("Stopping publishing on %s",
-                                   producer.getId()),
-                     new Exception("**Stopping**"));
+                                   producer.getId()));
             failedChannels.removeAll(relinquishedPrimaries);
             latch.countDown();
         }
     }
 
-    private void _publish(final int batchSize, final long target) {
-        Long targetTimestamp = Long.valueOf(target);
+    private void _publish(final int batchSize, final Long targetTimestamp) {
         Deque<Runnable> tasks = new LinkedList<Runnable>();
 
         for (Entry<UUID, Long> entry : channels.entrySet()) {
             if (!entry.getValue().equals(targetTimestamp)) {
-                tasks.add(publishBatch(tasks, batchSize, entry, entry.getKey(),
-                                       entry.getValue() + 1));
+                tasks.add(publishBatch(tasks, batchSize, entry, targetTimestamp));
             }
         }
         if (shutdown.get()) {
@@ -196,7 +193,7 @@ public class Source implements EventSource {
             executor.schedule(new Runnable() {
                 @Override
                 public void run() {
-                    _publish(batchSize, target);
+                    _publish(batchSize, targetTimestamp);
                 }
             }, 2, TimeUnit.SECONDS);
             return;
@@ -204,7 +201,7 @@ public class Source implements EventSource {
         tasks.add(new Runnable() {
             @Override
             public void run() {
-                _publish(batchSize, target);
+                _publish(batchSize, targetTimestamp);
             }
         });
         executor.execute(tasks.removeFirst());
@@ -212,28 +209,30 @@ public class Source implements EventSource {
 
     private Runnable publishBatch(final Deque<Runnable> tasks, int batchSize,
                                   final Entry<UUID, Long> entry,
-                                  final UUID channel, final Long sequenceNumber) {
+                                  final Long targetTimestamp) {
         final ArrayList<ByteBuffer> events = new ArrayList<ByteBuffer>();
         for (int i = 0; i < batchSize; i++) {
             events.add(ByteBuffer.wrap(String.format("%s Give me Slack or give me Food or Kill me %s",
-                                                     channel, channel).getBytes()));
+                                                     entry.getKey(),
+                                                     entry.getKey()).getBytes()));
         }
         return new Runnable() {
             public void run() {
-                publishBatch(tasks, entry, channel, events, sequenceNumber + 1);
+                publishBatch(tasks, entry, events, targetTimestamp);
 
             }
         };
     }
 
     private void publishBatch(Deque<Runnable> tasks, Entry<UUID, Long> entry,
-                              UUID channel, ArrayList<ByteBuffer> events,
-                              long nextTimestamp) {
+                              ArrayList<ByteBuffer> events, Long targetTimestamp) {
         if (shutdown.get()) {
             return;
         }
+        long nextTimestamp = entry.getValue() + 1;
+        UUID channel = entry.getKey();
         if (channels.containsKey(channel) && !pausedChannels.contains(channel)
-            && !entry.getValue().equals(Long.valueOf(nextTimestamp))) {
+            && !entry.getValue().equals(targetTimestamp)) {
             Integer retryCount = retries.get(channel);
             try {
                 try {
@@ -262,6 +261,10 @@ public class Source implements EventSource {
                     }
                 }
             }
+        } else {
+            log.info(String.format("skipping publishing for channel %s, seq no %s on %s",
+                                   entry.getKey(), entry.getValue(),
+                                   producer.getId()));
         }
         if (!tasks.isEmpty()) {
             executor.execute(tasks.removeFirst());

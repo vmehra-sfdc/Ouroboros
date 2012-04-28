@@ -141,12 +141,12 @@ public class BatchWriter {
                 while (run.get()) {
                     try {
                         quantum.acquire();
-                        while (batch == null) {
+                        do {
                             batch = queued.poll(4, TimeUnit.SECONDS);
                             if (!run.get()) {
                                 return;
                             }
-                        }
+                        } while (batch == null);
                     } catch (InterruptedException e) {
                         return;
                     }

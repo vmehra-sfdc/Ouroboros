@@ -42,6 +42,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -168,6 +169,8 @@ public class Producer implements Comparable<Producer> {
 
     private final ConcurrentMap<UUID, PrimaryState> channelState      = new ConcurrentHashMap<UUID, PrimaryState>();
     private final Controller                        controller;
+    private Batch                                   freeList;
+    private final ReentrantLock                     freeListLock      = new ReentrantLock();
     private final int                               maxQueueLength;
     private final Map<UUID, MirrorState>            mirrors           = new ConcurrentHashMap<UUID, MirrorState>();
     private HashSet<UUID>                           pausedChannels    = new HashSet<UUID>();
@@ -237,6 +240,7 @@ public class Producer implements Comparable<Producer> {
                                        self, batch.rate()));
             }
         }
+        // free(batch);
     }
 
     /**
@@ -644,6 +648,11 @@ public class Producer implements Comparable<Producer> {
                                                       throws RateLimiteExceededException,
                                                       UnknownChannelException,
                                                       InterruptedException {
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Publishing %s events for channel %s sequence # %s on %s",
+                                    events.size(), channel, sequenceNumber,
+                                    self));
+        }
         publishGate.await();
         publishingThreads.incrementAndGet();
         try {
@@ -662,8 +671,10 @@ public class Producer implements Comparable<Producer> {
                                                   String.format("Push to channel %s that does not exist on %s",
                                                                 channel, self));
             }
-            Batch batch = new Batch(state.getMirrorProducer(), channel,
-                                    sequenceNumber, events);
+            // Batch batch = allocateBatch();
+            Batch batch = new Batch();
+            batch.set(state.getMirrorProducer(), channel, sequenceNumber,
+                      events);
             if (!controller.accept(batch.batchByteSize())) {
                 if (log.isInfoEnabled()) {
                     log.info(String.format("Rate limit exceeded for push to %s on: %s",
@@ -1058,5 +1069,34 @@ public class Producer implements Comparable<Producer> {
 
     protected void setProducerRing(ConsistentHashFunction<Node> newRing) {
         producerRing = newRing;
+    }
+
+    @SuppressWarnings("unused")
+    private void free(Batch free) {
+
+        final ReentrantLock lock = freeListLock;
+        lock.lock();
+        try {
+            freeList = free.link(freeList);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @SuppressWarnings("unused")
+    private Batch allocateBatch() {
+        final ReentrantLock lock = freeListLock;
+        lock.lock();
+        try {
+            if (freeList == null) {
+                return new Batch();
+            }
+            Batch allocated = freeList;
+            freeList = allocated.delink();
+            return allocated;
+        } finally {
+            lock.unlock();
+            System.out.println("Allocated!");
+        }
     }
 }
