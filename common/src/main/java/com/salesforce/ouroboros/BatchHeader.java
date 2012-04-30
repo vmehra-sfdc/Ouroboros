@@ -183,6 +183,7 @@ public class BatchHeader {
 
     public void set(Node mirror, int batchByteLength, int magic, UUID channel,
                     long sequenceNumber) {
+        bytes.rewind();
         append(bytes, mirror, batchByteLength, magic, channel, sequenceNumber);
     }
 

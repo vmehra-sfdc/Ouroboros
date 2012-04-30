@@ -127,7 +127,11 @@ public class Source implements EventSource {
         executor.execute(new Runnable() {
             @Override
             public void run() {
-                _publish(batchSize, targetTimestamp);
+                try {
+                    _publish(batchSize, targetTimestamp);
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
             }
         });
     }
@@ -193,7 +197,11 @@ public class Source implements EventSource {
             executor.schedule(new Runnable() {
                 @Override
                 public void run() {
-                    _publish(batchSize, targetTimestamp);
+                    try {
+                        _publish(batchSize, targetTimestamp);
+                    } catch (Throwable e) {
+                        e.printStackTrace();
+                    }
                 }
             }, 2, TimeUnit.SECONDS);
             return;
@@ -201,7 +209,11 @@ public class Source implements EventSource {
         tasks.add(new Runnable() {
             @Override
             public void run() {
-                _publish(batchSize, targetTimestamp);
+                try {
+                    _publish(batchSize, targetTimestamp);
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
             }
         });
         executor.execute(tasks.removeFirst());
@@ -218,7 +230,11 @@ public class Source implements EventSource {
         }
         return new Runnable() {
             public void run() {
-                publishBatch(tasks, entry, events, targetTimestamp);
+                try {
+                    publishBatch(tasks, entry, events, targetTimestamp);
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
 
             }
         };

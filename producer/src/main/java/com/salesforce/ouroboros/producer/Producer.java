@@ -240,7 +240,7 @@ public class Producer implements Comparable<Producer> {
                                        self, batch.rate()));
             }
         }
-        // free(batch);
+        free(batch);
     }
 
     /**
@@ -671,8 +671,7 @@ public class Producer implements Comparable<Producer> {
                                                   String.format("Push to channel %s that does not exist on %s",
                                                                 channel, self));
             }
-            // Batch batch = allocateBatch();
-            Batch batch = new Batch();
+            Batch batch = allocateBatch();
             batch.set(state.getMirrorProducer(), channel, sequenceNumber,
                       events);
             if (!controller.accept(batch.batchByteSize())) {
@@ -1071,7 +1070,6 @@ public class Producer implements Comparable<Producer> {
         producerRing = newRing;
     }
 
-    @SuppressWarnings("unused")
     private void free(Batch free) {
 
         final ReentrantLock lock = freeListLock;
@@ -1083,7 +1081,6 @@ public class Producer implements Comparable<Producer> {
         }
     }
 
-    @SuppressWarnings("unused")
     private Batch allocateBatch() {
         final ReentrantLock lock = freeListLock;
         lock.lock();
@@ -1096,7 +1093,6 @@ public class Producer implements Comparable<Producer> {
             return allocated;
         } finally {
             lock.unlock();
-            System.out.println("Allocated!");
         }
     }
 }

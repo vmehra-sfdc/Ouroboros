@@ -29,7 +29,6 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 
@@ -44,7 +43,6 @@ public class Batch extends BatchIdentity {
     private long                created;
     private long                interval;
     private Batch               next;
-    private AtomicInteger       reuseCount  = new AtomicInteger(0);
 
     public Batch() {
     }
@@ -70,8 +68,6 @@ public class Batch extends BatchIdentity {
     public Batch delink() {
         Batch current = next;
         next = null;
-        System.out.println("Incing!");
-        reuseCount.incrementAndGet();
         return current;
     }
 
@@ -85,7 +81,6 @@ public class Batch extends BatchIdentity {
 
     public Batch link(Batch h) {
         next = h;
-        reuseCount.incrementAndGet();
         return this;
     }
 
@@ -156,8 +151,7 @@ public class Batch extends BatchIdentity {
      */
     @Override
     public String toString() {
-        return String.format("Batch:%s [#events=%s, created=%s, channel=%s, sequenceNumber=%s]",
-                             reuseCount.get(), batch.capacity(), created,
-                             channel, sequenceNumber);
+        return String.format("Batch [#events=%s, created=%s, channel=%s, sequenceNumber=%s]",
+                             batch.capacity(), created, channel, sequenceNumber);
     }
 }
