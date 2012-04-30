@@ -43,13 +43,19 @@ public class ReplicatedBatchHeader extends BatchHeader {
 
     private static ByteBuffer fromBatchHeader(ByteBuffer headerBytes,
                                               long offset, int position) {
-        headerBytes.rewind();
         ByteBuffer replicatedHeader = ByteBuffer.allocate(HEADER_SIZE);
+        set(headerBytes, offset, position, replicatedHeader);
+        return replicatedHeader;
+    }
+
+    private static void set(ByteBuffer headerBytes, long offset, int position,
+                            ByteBuffer replicatedHeader) {
+        headerBytes.rewind();
+        replicatedHeader.rewind();
         replicatedHeader.put(headerBytes);
         replicatedHeader.putLong(BATCH_OFFSET_OFFSET, offset);
         replicatedHeader.putInt(BATCH_POSITION_OFFSET, position);
         replicatedHeader.rewind();
-        return replicatedHeader;
     }
 
     public ReplicatedBatchHeader() {
@@ -110,5 +116,14 @@ public class ReplicatedBatchHeader extends BatchHeader {
     @Override
     protected int getHeaderSize() {
         return HEADER_SIZE;
+    }
+
+    /**
+     * @param header
+     * @param offset
+     * @param startPosition
+     */
+    public void set(BatchHeader header, long offset, int position) {
+        set(header.getBytes(), offset, position, bytes);
     }
 }

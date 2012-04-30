@@ -53,7 +53,7 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
-import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
+import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
 import com.salesforce.ouroboros.testUtils.Util;
 
@@ -100,9 +100,9 @@ public class TestAppender {
                                              channel, sequenceNumber);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.appendSegmentFor(eq(header))).thenReturn(new AppendSegment(
-                                                                               writeSegment,
-                                                                               0,
-                                                                               0));
+                                                                                     writeSegment,
+                                                                                     0,
+                                                                                     0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(false);
         header.rewind();
         header.write(outbound);
@@ -144,9 +144,7 @@ public class TestAppender {
 
         verify(handler, new Times(2)).selectForRead();
         verify(bundle).eventChannelFor(channel);
-        verify(eventChannel).append(isA(ReplicatedBatchHeader.class),
-                                    eq(writeSegment), isA(Acknowledger.class),
-                                    isA(SocketChannelHandler.class),
+        verify(eventChannel).append(isA(EventEntry.class),
                                     (Acknowledger) eq(null));
         verify(eventChannel).appendSegmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
@@ -187,9 +185,9 @@ public class TestAppender {
                                              channel, sequenceNumber);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.appendSegmentFor(eq(header))).thenReturn(new AppendSegment(
-                                                                               writeSegment,
-                                                                               0,
-                                                                               0));
+                                                                                     writeSegment,
+                                                                                     0,
+                                                                                     0));
         when(eventChannel.isDuplicate(eq(header))).thenReturn(true);
         header.rewind();
         header.write(outbound);

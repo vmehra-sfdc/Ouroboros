@@ -38,7 +38,6 @@ import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
@@ -260,24 +259,20 @@ public class EventChannel {
      * @param acknowledger
      * @throws IOException
      */
-    public void append(ReplicatedBatchHeader batchHeader, Segment segment,
-                       Acknowledger acknowledger, SocketChannelHandler handler,
-                       Acknowledger mirrorAcknowledger) throws IOException {
-        append(batchHeader, batchHeader.getOffset(), segment);
+    public void append(EventEntry entry, Acknowledger mirrorAcknowledger)
+                                                                         throws IOException {
+        ReplicatedBatchHeader batchHeader = entry.getHeader();
+        append(batchHeader, batchHeader.getOffset(), entry.getSegment());
         if (replicator == null) {
-            acknowledger.acknowledge(batchHeader.getChannel(),
-                                     batchHeader.getSequenceNumber());
+            entry.getAcknowledger().acknowledge(batchHeader.getChannel(),
+                                                batchHeader.getSequenceNumber());
             if (mirrorAcknowledger != null) {
                 mirrorAcknowledger.acknowledge(batchHeader.getChannel(),
                                                batchHeader.getSequenceNumber());
             }
-            handler.selectForRead();
+            entry.free();
         } else {
-            replicator.replicate(new EventEntry(
-                                                batchHeader,
-                                                this,
-                                                getCachedReadSegment(segment.getFile()),
-                                                acknowledger, handler));
+            replicator.replicate(entry);
         }
     }
 
@@ -467,7 +462,7 @@ public class EventChannel {
         return getAppendSegment(offset, position, segment);
     }
 
-    private Segment getCachedReadSegment(File segment) throws IOException {
+    public Segment getCachedReadSegment(File segment) throws IOException {
         Segment newSegment = new Segment(segment);
         Segment currentSegment = readSegmentCache.putIfAbsent(segment,
                                                               newSegment);

@@ -26,9 +26,11 @@
 package com.salesforce.ouroboros.spindle.replication;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
+import com.salesforce.ouroboros.spindle.source.Appender;
 
 /**
  * The entry representing the appending of an event.
@@ -37,16 +39,66 @@ import com.salesforce.ouroboros.spindle.source.Acknowledger;
  * 
  */
 public class EventEntry {
-    public final Acknowledger          acknowledger;
-    public final EventChannel          eventChannel;
-    public final ReplicatedBatchHeader header;
-    public final Segment               segment;
-    public final SocketChannelHandler  handler;
+    private final Appender              appender;
+    private Acknowledger                acknowledger;
+    private EventChannel                eventChannel;
+    private SocketChannelHandler        handler;
+    private final ReplicatedBatchHeader header = new ReplicatedBatchHeader();
+    private EventEntry                  next;
+    private Segment                     segment;
 
-    public EventEntry(ReplicatedBatchHeader header, EventChannel eventChannel,
-                      Segment segment, Acknowledger acknowledger,
-                      SocketChannelHandler handler) {
-        this.header = header;
+    public EventEntry(Appender appender) {
+        this.appender = appender;
+    }
+
+    public EventEntry delink() {
+        EventEntry current = next;
+        next = null;
+        return current;
+    }
+
+    /**
+     * @return the acknowledger
+     */
+    public Acknowledger getAcknowledger() {
+        return acknowledger;
+    }
+
+    /**
+     * @return the eventChannel
+     */
+    public EventChannel getEventChannel() {
+        return eventChannel;
+    }
+
+    /**
+     * @return the header
+     */
+    public ReplicatedBatchHeader getHeader() {
+        return header;
+    }
+
+    /**
+     * @return the segment
+     */
+    public Segment getSegment() {
+        return segment;
+    }
+
+    public void free() {
+        appender.free(this);
+        handler.selectForRead();
+    }
+
+    public EventEntry link(EventEntry h) {
+        next = h;
+        return this;
+    }
+
+    public void set(BatchHeader batchHeader, long offset, int startPosition,
+                    EventChannel eventChannel, Segment segment,
+                    Acknowledger acknowledger, SocketChannelHandler handler) {
+        header.set(batchHeader, offset, startPosition);
         this.eventChannel = eventChannel;
         this.segment = segment;
         this.acknowledger = acknowledger;

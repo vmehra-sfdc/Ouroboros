@@ -54,6 +54,7 @@ import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorFSM;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
+import com.salesforce.ouroboros.spindle.source.Appender;
 import com.salesforce.ouroboros.testUtils.Util;
 
 /**
@@ -166,16 +167,12 @@ public class TestDuplicator {
         }, 1000L, 100L);
         Node mirror = new Node(0x1638);
         long sequenceNumber = System.currentTimeMillis();
-        replicator.replicate(new EventEntry(
-                                            new ReplicatedBatchHeader(
-                                                                      mirror,
-                                                                      event.totalSize(),
-                                                                      magic,
-                                                                      channel,
-                                                                      sequenceNumber,
-                                                                      0, 0),
-                                            eventChannel, segment,
-                                            acknowledger, handler));
+        Appender appender = mock(Appender.class);
+        EventEntry entry = new EventEntry(appender);
+        BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
+                                             channel, sequenceNumber);
+        entry.set(header, 0, 0, eventChannel, segment, acknowledger, handler);
+        replicator.replicate(entry);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
             public boolean value() {
@@ -225,13 +222,9 @@ public class TestDuplicator {
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
         Node mirror = new Node(0x1638);
-        ReplicatedBatchHeader batchHeader = new ReplicatedBatchHeader(
-                                                                      mirror,
-                                                                      event.totalSize(),
-                                                                      magic,
-                                                                      channel,
-                                                                      sequenceNumber,
-                                                                      0, 0);
+        BatchHeader batchHeader = new BatchHeader(mirror, event.totalSize(),
+                                                  magic, channel,
+                                                  sequenceNumber);
 
         event.rewind();
         event.write(outboundSegment);
@@ -291,15 +284,11 @@ public class TestDuplicator {
         SocketChannelHandler outboundHandler = mock(SocketChannelHandler.class);
         when(outboundHandler.getChannel()).thenReturn(outbound);
         outboundDuplicator.connect(outboundHandler);
-        outboundDuplicator.replicate(new EventEntry(
-                                                    new ReplicatedBatchHeader(
-                                                                              batchHeader,
-                                                                              0,
-                                                                              0),
-                                                    eventChannel,
-                                                    outboundSegment,
-                                                    outboundAcknowledger,
-                                                    outboundHandler));
+
+        EventEntry entry = new EventEntry(mock(Appender.class));
+        entry.set(batchHeader, 0, 0, eventChannel, outboundSegment,
+                  outboundAcknowledger, outboundHandler);
+        outboundDuplicator.replicate(entry);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
             public boolean value() {

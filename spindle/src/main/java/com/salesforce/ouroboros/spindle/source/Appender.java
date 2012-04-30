@@ -26,6 +26,7 @@
 package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +36,7 @@ import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.NullNode;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
-import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
+import com.salesforce.ouroboros.spindle.replication.EventEntry;
 
 /**
  * 
@@ -43,10 +44,12 @@ import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
  * 
  */
 public class Appender extends AbstractAppender {
-    private final static Logger log = LoggerFactory.getLogger(Appender.class.getCanonicalName());
+    private final static Logger log          = LoggerFactory.getLogger(Appender.class.getCanonicalName());
 
     private final Acknowledger  acknowledger;
     private volatile int        startPosition;
+    private EventEntry          freeList;
+    private final ReentrantLock freeListLock = new ReentrantLock();
 
     public Appender(Bundle bundle, Acknowledger acknowledger) {
         super(bundle);
@@ -63,10 +66,10 @@ public class Appender extends AbstractAppender {
     @Override
     protected void commit() {
         try {
-            ReplicatedBatchHeader batchHeader2 = new ReplicatedBatchHeader(
-                                                                           batchHeader,
-                                                                           offset,
-                                                                           startPosition);
+            EventEntry entry = allocate();
+            entry.set(batchHeader, offset, startPosition, eventChannel,
+                      eventChannel.getCachedReadSegment(segment.getFile()),
+                      acknowledger, handler);
             Node producerMirror = batchHeader.getProducerMirror();
             Acknowledger mirrorAcknowledger = null;
             if (producerMirror.processId != NullNode.INSTANCE.processId) {
@@ -77,8 +80,7 @@ public class Appender extends AbstractAppender {
                                            bundle.getId()));
                 }
             }
-            eventChannel.append(batchHeader2, segment, acknowledger, handler,
-                                mirrorAcknowledger);
+            eventChannel.append(entry, mirrorAcknowledger);
         } catch (IOException e) {
             log.error(String.format("Unable to append to %s for %s at %s on %s",
                                     segment, batchHeader, offset,
@@ -141,5 +143,31 @@ public class Appender extends AbstractAppender {
     @Override
     protected void markPosition() {
         startPosition = position;
+    }
+
+    public void free(EventEntry free) {
+
+        final ReentrantLock lock = freeListLock;
+        lock.lock();
+        try {
+            freeList = free.link(freeList);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private EventEntry allocate() {
+        final ReentrantLock lock = freeListLock;
+        lock.lock();
+        try {
+            if (freeList == null) {
+                return new EventEntry(this);
+            }
+            EventEntry allocated = freeList;
+            freeList = allocated.delink();
+            return allocated;
+        } finally {
+            lock.unlock();
+        }
     }
 }

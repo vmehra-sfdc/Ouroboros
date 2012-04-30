@@ -86,7 +86,7 @@ public class BatchHeader {
         return new BatchHeader(slice.asReadOnlyBuffer());
     }
 
-    private final ByteBuffer bytes;
+    protected final ByteBuffer bytes;
 
     public BatchHeader() {
         bytes = ByteBuffer.allocateDirect(getHeaderSize());
