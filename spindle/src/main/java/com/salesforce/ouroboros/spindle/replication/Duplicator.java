@@ -66,10 +66,10 @@ public final class Duplicator {
     public void closing() {
         closed.set(true);
         if (current != null) {
-            current.free();
+            current.selectAndFree();
         }
-        for (EventEntry entry : pending) {
-            entry.free();
+        for (EventEntry entry : pending) { 
+            entry.selectAndFree();
         }
         pending.clear();
     }
@@ -90,7 +90,7 @@ public final class Duplicator {
      */
     public void replicate(EventEntry event) {
         if (closed.get()) {
-            event.free();
+            event.selectAndFree();
         } else {
             if (log.isTraceEnabled()) {
                 log.trace(String.format("Replicating event %s on %s", event,
@@ -167,7 +167,7 @@ public final class Duplicator {
             log.trace(String.format("Processing %s on %s", current.getHeader(),
                                     fsm.getName()));
         }
-        current.free();
+        current.select();
         remaining = current.getHeader().getBatchByteLength();
         position = current.getHeader().getPosition();
         current.getHeader().rewind();
@@ -196,6 +196,7 @@ public final class Duplicator {
                 }
                 current.getAcknowledger().acknowledge(current.getHeader().getChannel(),
                                                       current.getHeader().getSequenceNumber());
+                current.free();
                 current = null;
                 return true;
             }

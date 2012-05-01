@@ -57,6 +57,10 @@ public class EventEntry {
         return current;
     }
 
+    public void free() {
+        appender.free(this);
+    }
+
     /**
      * @return the acknowledger
      */
@@ -85,11 +89,6 @@ public class EventEntry {
         return segment;
     }
 
-    public void free() {
-        handler.selectForRead();
-        // appender.free(this);
-    }
-
     public EventEntry link(EventEntry h) {
         next = h;
         eventChannel = null;
@@ -98,6 +97,15 @@ public class EventEntry {
         handler = null;
         header.clear();
         return this;
+    }
+
+    public void select() {
+        handler.selectForRead();
+    }
+
+    public void selectAndFree() {
+        select();
+        free();
     }
 
     public void set(BatchHeader batchHeader, long offset, int startPosition,

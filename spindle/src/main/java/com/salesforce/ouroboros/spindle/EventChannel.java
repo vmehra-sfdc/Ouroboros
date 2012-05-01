@@ -270,7 +270,7 @@ public class EventChannel {
                 mirrorAcknowledger.acknowledge(batchHeader.getChannel(),
                                                batchHeader.getSequenceNumber());
             }
-            entry.free();
+            entry.selectAndFree();
         } else {
             replicator.replicate(entry);
         }

@@ -94,7 +94,8 @@ public class TestSpinnerSpindle {
                                                                                   segment,
                                                                                   offset,
                                                                                   0);
-
+        
+        when(eventChannel.getCachedReadSegment(segmentFile)).thenReturn(segment);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.isDuplicate(isA(BatchHeader.class))).thenReturn(false);
         when(eventChannel.appendSegmentFor(isA(BatchHeader.class))).thenReturn(appendSegment);

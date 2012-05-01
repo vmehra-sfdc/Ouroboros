@@ -98,6 +98,7 @@ public class TestAppender {
         Event event = new Event(magic, payloadBuffer);
         BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
                                              channel, sequenceNumber);
+        when(eventChannel.getCachedReadSegment(tmpFile)).thenReturn(writeSegment);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.appendSegmentFor(eq(header))).thenReturn(new AppendSegment(
                                                                                      writeSegment,
