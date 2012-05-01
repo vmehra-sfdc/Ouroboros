@@ -86,18 +86,29 @@ public class EventEntry {
     }
 
     public void free() {
-        appender.free(this);
         handler.selectForRead();
+        // appender.free(this);
     }
 
     public EventEntry link(EventEntry h) {
         next = h;
+        eventChannel = null;
+        segment = null;
+        acknowledger = null;
+        handler = null;
+        header.clear();
         return this;
     }
 
     public void set(BatchHeader batchHeader, long offset, int startPosition,
                     EventChannel eventChannel, Segment segment,
                     Acknowledger acknowledger, SocketChannelHandler handler) {
+        assert batchHeader != null : "Batch header cannot be null";
+        assert eventChannel != null : "Event channel cannot be null";
+        assert segment != null : "Segment cannot be null";
+        assert acknowledger != null : "Acknowledger cannot be null";
+        assert handler != null : "Handler cannot be null";
+
         header.set(batchHeader, offset, startPosition);
         this.eventChannel = eventChannel;
         this.segment = segment;

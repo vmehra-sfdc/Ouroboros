@@ -146,7 +146,6 @@ public class Appender extends AbstractAppender {
     }
 
     public void free(EventEntry free) {
-
         final ReentrantLock lock = freeListLock;
         lock.lock();
         try {

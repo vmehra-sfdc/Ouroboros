@@ -102,6 +102,10 @@ public class BatchHeader {
         set(mirror, batchByteLength, magic, channel, sequenceNumber);
     }
 
+    public void clear() {
+        bytes.clear();
+    }
+
     @Override
     public boolean equals(Object o) {
         if (o instanceof BatchHeader) {

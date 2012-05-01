@@ -81,12 +81,12 @@ public class Batch extends BatchIdentity {
 
     public Batch link(Batch h) {
         next = h;
+        created = interval = -1L;
+        header.clear();
+        batch.clear();
         return this;
     }
 
-    /**
-     * 
-     */
     public void markInterval() {
         if (interval < 0) {
             interval = Math.max(1, System.nanoTime() - created);
