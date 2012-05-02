@@ -180,9 +180,9 @@ public class Switchboard {
     private final SwitchboardContext    fsm             = new SwitchboardContext(
                                                                                  this);
     private final Gate                  inboundGate     = new Gate();
-    private final NoArgGenerator        viewIdGenerator;
     private volatile boolean            leader          = false;
     private Member                      member;
+    private final Gate                  memberGate      = new Gate();
     private SortedSet<Node>             members         = new ConcurrentSkipListSet<Node>();
     private final Executor              messageProcessor;
     private final PartitionNotification notification    = new Notification();
@@ -194,9 +194,11 @@ public class Switchboard {
                                                                             false);
     private NodeIdSet                   view;
     private UUID                        viewId;
+    private final NoArgGenerator        viewIdGenerator;
 
     public Switchboard(Node node, Partition p, NoArgGenerator viewIdGenerator) {
         inboundGate.close();
+        memberGate.close();
         self = node;
         fsm.setName(Integer.toString(self.processId));
         partition = p;
@@ -495,6 +497,13 @@ public class Switchboard {
         } catch (InterruptedException e) {
             return;
         }
+        if (message.type instanceof MemberDispatch) {
+            try {
+                memberGate.await();
+            } catch (InterruptedException e) {
+                return;
+            }
+        }
         if (log.isTraceEnabled()) {
             log.trace(String.format("Processing inbound %s on: %s", message,
                                     self));
@@ -569,6 +578,7 @@ public class Switchboard {
      */
     protected void destabilizePartition() {
         inboundGate.close();
+        memberGate.close();
         stable.set(false);
         previousMembers.addAll(members);
         deadMembers.clear();
@@ -660,6 +670,7 @@ public class Switchboard {
                                     members, getNewMembers(), deadMembers, self));
         }
         member.stabilized();
+        memberGate.open();
     }
 
     // test access
