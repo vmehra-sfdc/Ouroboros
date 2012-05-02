@@ -41,18 +41,18 @@
 %%
 Initial {
 	accept
-		ReadChannelCount{}
+		ReadHandshake{}
 }
-ReadChannelCount
+ReadHandshake
 Entry {
-	getChannelCount();
+	getHandshake();
 }
 {
 	finished
 		Suspended{}
 		
 	readReady
-		[!ctxt.readChannelCount() && !ctxt.inError()]
+		[!ctxt.readHandshake() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}

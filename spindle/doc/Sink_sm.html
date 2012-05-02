@@ -64,7 +64,7 @@
         </td>
         <td>
           <pre>
-  ReadChannelCount
+  ReadHandshake
   {}
           </pre>
         </td>
@@ -87,11 +87,11 @@
       </tr>
       <tr>
         <td>
-          ReadChannelCount
+          ReadHandshake
         </td>
         <td>
           <pre>
-getChannelCount();
+getHandshake();
           </pre>
         </td>
         <td>
@@ -114,8 +114,8 @@ getChannelCount();
         </td>
         <td>
           <pre>
-[!ctxt.readChannelCount() && !ctxt.inError()]
-  ReadChannelCount
+[!ctxt.readHandshake() && !ctxt.inError()]
+  ReadHandshake
   {
     selectForRead();
   }

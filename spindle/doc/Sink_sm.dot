@@ -14,8 +14,8 @@ digraph Sink {
         "SinkFSM::Initial"
             [label="{Initial}"];
 
-        "SinkFSM::ReadChannelCount"
-            [label="{ReadChannelCount}"];
+        "SinkFSM::ReadHandshake"
+            [label="{ReadHandshake}"];
 
         "SinkFSM::Suspended"
             [label="{Suspended}"];
@@ -45,22 +45,22 @@ digraph Sink {
         // Transitions (Edges)
         //
 
-        "SinkFSM::Initial" -> "SinkFSM::ReadChannelCount"
+        "SinkFSM::Initial" -> "SinkFSM::ReadHandshake"
             [label="accept/\l"];
 
         "SinkFSM::Initial" -> "SinkFSM::Closed"
             [label="close/\l"];
 
-        "SinkFSM::ReadChannelCount" -> "SinkFSM::Suspended"
+        "SinkFSM::ReadHandshake" -> "SinkFSM::Suspended"
             [label="finished/\l"];
 
-        "SinkFSM::ReadChannelCount" -> "SinkFSM::Closed"
+        "SinkFSM::ReadHandshake" -> "SinkFSM::Closed"
             [label="readReady/\l"];
 
-        "SinkFSM::ReadChannelCount" -> "SinkFSM::Suspended"
+        "SinkFSM::ReadHandshake" -> "SinkFSM::Suspended"
             [label="readReady/\l"];
 
-        "SinkFSM::ReadChannelCount" -> "SinkFSM::Closed"
+        "SinkFSM::ReadHandshake" -> "SinkFSM::Closed"
             [label="close/\l"];
 
         "SinkFSM::Suspended" -> "SinkFSM::ReadChannelHeader"

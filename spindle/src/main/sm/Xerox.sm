@@ -41,19 +41,19 @@
 %% 
 Initial {
 	connect
-		WriteChannelCount{}
+		WriteHandshake{}
 }
 
-WriteChannelCount
+WriteHandshake
 Entry {
-	sendChannelCount();
+	sendHandshake();
 }
 {
 	finished
 		WriteChannelHeader{}
 		
 	writeReady
-		[!ctxt.writeChannelCount()]
+		[!ctxt.writeHandshake()]
 		nil {
 			selectForWrite();
 		}

@@ -68,7 +68,7 @@ public class TestXerox {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         when(handler.getChannel()).thenReturn(socketChannel);
         when(socketChannel.socket()).thenReturn(socket);
-        Node fromNode = new Node(0, 0, 0);
+        final Node fromNode = new Node(0, 0, 0);
         Node node = new Node(0x1639, 0x1640, 0x1641);
         Rendezvous rendezvous = mock(Rendezvous.class);
         EventChannel channel = mock(EventChannel.class);
@@ -82,13 +82,14 @@ public class TestXerox {
         final long size1 = 2048;
         final long size2 = 1024;
 
-        Answer<Integer> writeChannelCount = new Answer<Integer>() {
+        Answer<Integer> writeHandshake = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertEquals(Xerox.MAGIC, buffer.getInt());
+                assertEquals(fromNode.processId, buffer.getInt());
                 assertEquals(1, buffer.getInt());
-                return Sink.CHANNEL_COUNT_HEADER_SIZE;
+                return Sink.HANDSHAKE_HEADER_SIZE;
             }
         };
 
@@ -130,7 +131,7 @@ public class TestXerox {
                 return Sink.ACK_HEADER_SIZE;
             }
         };
-        when(socketChannel.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(writeChannelCount).thenReturn(0).thenAnswer(writeChannelHeader).thenReturn(0).thenAnswer(writeSegmentHeader1).thenReturn(0).thenAnswer(writeSegmentHeader2).thenReturn(0);
+        when(socketChannel.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(writeHandshake).thenReturn(0).thenAnswer(writeChannelHeader).thenReturn(0).thenAnswer(writeSegmentHeader1).thenReturn(0).thenAnswer(writeSegmentHeader2).thenReturn(0);
         when(socketChannel.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readAck);
         when(segment1.transferTo(0L, 1024L, socketChannel)).thenReturn(1024L);
         when(segment1.transferTo(1024L, 1024L, socketChannel)).thenReturn(1024L);
@@ -148,7 +149,7 @@ public class TestXerox {
         xerox.addChannel(channel);
         assertEquals(XeroxFSM.Initial, xerox.getState());
         xerox.connect(handler);
-        assertEquals(XeroxFSM.WriteChannelCount, xerox.getState());
+        assertEquals(XeroxFSM.WriteHandshake, xerox.getState());
         xerox.writeReady();
         assertEquals(XeroxFSM.Suspended, xerox.getState());
         xerox.writeReady();

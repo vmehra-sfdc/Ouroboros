@@ -39,6 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
@@ -61,8 +62,11 @@ import com.salesforce.ouroboros.spindle.source.Acknowledger;
 public class EventChannel {
 
     public static class AppendSegment {
+        // The logical offset within the channel
         public final long    offset;
+        // The translated position within the segment
         public final int     position;
+        // The segment
         public final Segment segment;
 
         public AppendSegment(Segment segment, long offset, int position) {
@@ -75,6 +79,22 @@ public class EventChannel {
         public String toString() {
             return "AppendSegment [segment=" + segment + ", offset=" + offset
                    + ", position=" + position + "]";
+        }
+    }
+
+    public static class EventSegment {
+        // The translated offset of the event payload in this segment
+        public final long    offset;
+        // The segment where the event lives
+        public final Segment segment;
+
+        /**
+         * @param offset
+         * @param segment
+         */
+        public EventSegment(long offset, Segment segment) {
+            this.offset = offset;
+            this.segment = segment;
         }
     }
 
@@ -276,6 +296,45 @@ public class EventChannel {
         }
     }
 
+    public AppendSegment appendSegmentFor(BatchHeader batchHeader)
+                                                                  throws IOException {
+        AppendSegmentName logicalSegment = mappedSegmentFor(nextOffset,
+                                                            batchHeader.getBatchByteLength(),
+                                                            maxSegmentSize);
+        File segmentFile = new File(channel, logicalSegment.segment);
+        return getAppendSegment(logicalSegment.offset, logicalSegment.position,
+                                segmentFile);
+    }
+
+    /**
+     * Answer the segment for appending the event at the given offset
+     * 
+     * @param offset
+     *            - the offset of the event
+     * @return the segment for the event
+     * @throws IOException
+     */
+    public Segment appendSegmentFor(long offset) throws IOException {
+        File segment = new File(channel, segmentName(prefixFor(offset,
+                                                               maxSegmentSize)));
+        return getCachedAppendSegment(segment);
+    }
+
+    /**
+     * Answer the segment for the event at the given offset
+     * 
+     * @param offset
+     *            - the offset of the event
+     * @return the segment for the event
+     * @throws IOException
+     */
+    public AppendSegment appendSegmentFor(long offset, int position)
+                                                                    throws IOException {
+        File segment = new File(channel, segmentName(prefixFor(offset,
+                                                               maxSegmentSize)));
+        return getAppendSegment(offset, position, segment);
+    }
+
     /**
      * Close the channel
      */
@@ -320,6 +379,24 @@ public class EventChannel {
         return channel.equals(((EventChannel) o).channel);
     }
 
+    /**
+     * Answer the segment for reading the event at the given offset
+     * 
+     * @param eventId
+     *            - the logical offset of the event in the channel
+     * @return the EventSegment translating this event within the channel
+     * @throws IOException
+     */
+    public EventSegment eventSegmentFor(long eventId) throws IOException {
+        long homeSegment = prefixFor(eventId, maxSegmentSize);
+        return new EventSegment(
+                                EventHeader.translateToPayload(eventId
+                                                               - homeSegment),
+                                getCachedReadSegment(new File(
+                                                              channel,
+                                                              segmentName(homeSegment))));
+    }
+
     public void failMirror() {
         replicator = null;
     }
@@ -328,6 +405,17 @@ public class EventChannel {
         failedOver = true;
         role = Role.PRIMARY;
         replicator = null;
+    }
+
+    public Segment getCachedReadSegment(File segment) throws IOException {
+        Segment newSegment = new Segment(segment);
+        Segment currentSegment = readSegmentCache.putIfAbsent(segment,
+                                                              newSegment);
+        if (currentSegment == null) {
+            currentSegment = newSegment;
+            currentSegment.openForRead();
+        }
+        return currentSegment;
     }
 
     public UUID getId() {
@@ -423,54 +511,10 @@ public class EventChannel {
         this.replicator = replicator;
     }
 
-    public AppendSegment appendSegmentFor(BatchHeader batchHeader)
-                                                                  throws IOException {
-        AppendSegmentName logicalSegment = mappedSegmentFor(nextOffset,
-                                                            batchHeader.getBatchByteLength(),
-                                                            maxSegmentSize);
-        File segmentFile = new File(channel, logicalSegment.segment);
-        return getAppendSegment(logicalSegment.offset, logicalSegment.position,
-                                segmentFile);
-    }
-
-    /**
-     * Answer the segment for the event at the given offset
-     * 
-     * @param offset
-     *            - the offset of the event
-     * @return the segment for the event
-     * @throws IOException
-     */
-    public AppendSegment appendSegmentFor(long offset) throws IOException {
-        File segment = new File(channel, segmentName(prefixFor(offset,
-                                                               maxSegmentSize)));
-        return getAppendSegment(offset, -1, segment);
-    }
-
-    /**
-     * Answer the segment for the event at the given offset
-     * 
-     * @param offset
-     *            - the offset of the event
-     * @return the segment for the event
-     * @throws IOException
-     */
-    public AppendSegment appendSegmentFor(long offset, int position)
-                                                                    throws IOException {
-        File segment = new File(channel, segmentName(prefixFor(offset,
-                                                               maxSegmentSize)));
-        return getAppendSegment(offset, position, segment);
-    }
-
-    public Segment getCachedReadSegment(File segment) throws IOException {
-        Segment newSegment = new Segment(segment);
-        Segment currentSegment = readSegmentCache.putIfAbsent(segment,
-                                                              newSegment);
-        if (currentSegment == null) {
-            currentSegment = newSegment;
-            currentSegment.openForRead();
-        }
-        return currentSegment;
+    private AppendSegment getAppendSegment(long offset, int position,
+                                           File segment) throws IOException {
+        return new AppendSegment(getCachedAppendSegment(segment), offset,
+                                 position);
     }
 
     private Segment getCachedAppendSegment(File segment) throws IOException {
@@ -482,12 +526,6 @@ public class EventChannel {
             currentSegment.openForAppend();
         }
         return currentSegment;
-    }
-
-    private AppendSegment getAppendSegment(long offset, int position,
-                                           File segment) throws IOException {
-        return new AppendSegment(getCachedAppendSegment(segment), offset,
-                                 position);
     }
 
     private File[] getSegmentFiles() {

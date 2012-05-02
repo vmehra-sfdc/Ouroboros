@@ -14,8 +14,8 @@ digraph Xerox {
         "XeroxFSM::Initial"
             [label="{Initial}"];
 
-        "XeroxFSM::WriteChannelCount"
-            [label="{WriteChannelCount}"];
+        "XeroxFSM::WriteHandshake"
+            [label="{WriteHandshake}"];
 
         "XeroxFSM::Suspended"
             [label="{Suspended}"];
@@ -45,22 +45,22 @@ digraph Xerox {
         // Transitions (Edges)
         //
 
-        "XeroxFSM::Initial" -> "XeroxFSM::WriteChannelCount"
+        "XeroxFSM::Initial" -> "XeroxFSM::WriteHandshake"
             [label="connect/\l"];
 
         "XeroxFSM::Initial" -> "XeroxFSM::Closed"
             [label="close/\l"];
 
-        "XeroxFSM::WriteChannelCount" -> "XeroxFSM::WriteChannelHeader"
+        "XeroxFSM::WriteHandshake" -> "XeroxFSM::WriteChannelHeader"
             [label="finished/\l"];
 
-        "XeroxFSM::WriteChannelCount" -> "XeroxFSM::Error"
+        "XeroxFSM::WriteHandshake" -> "XeroxFSM::Error"
             [label="writeReady/\l"];
 
-        "XeroxFSM::WriteChannelCount" -> "XeroxFSM::Suspended"
+        "XeroxFSM::WriteHandshake" -> "XeroxFSM::Suspended"
             [label="writeReady/\l"];
 
-        "XeroxFSM::WriteChannelCount" -> "XeroxFSM::Closed"
+        "XeroxFSM::WriteHandshake" -> "XeroxFSM::Closed"
             [label="close/\l"];
 
         "XeroxFSM::Suspended" -> "XeroxFSM::WriteChannelHeader"

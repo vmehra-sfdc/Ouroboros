@@ -306,13 +306,14 @@ public class Xerox implements CommunicationsHandler {
         handler.selectForWrite();
     }
 
-    protected void sendChannelCount() {
+    protected void sendHandshake() {
         buffer.clear();
-        buffer.limit(Sink.CHANNEL_COUNT_HEADER_SIZE);
+        buffer.limit(Sink.HANDSHAKE_HEADER_SIZE);
         buffer.putInt(MAGIC);
+        buffer.putInt(from.processId);
         buffer.putInt(channels.size());
         buffer.flip();
-        if (writeChannelCount()) {
+        if (writeHandshake()) {
             fsm.finished();
         } else {
             if (inError) {
@@ -323,7 +324,7 @@ public class Xerox implements CommunicationsHandler {
         }
     }
 
-    protected boolean writeChannelCount() {
+    protected boolean writeHandshake() {
         try {
             if (handler.getChannel().write(buffer) < 0) {
                 if (log.isTraceEnabled()) {
@@ -337,7 +338,7 @@ public class Xerox implements CommunicationsHandler {
             if (Utils.isClose(e)) {
                 log.info(String.format("closing xerox %s ", fsm.getName()));
             } else {
-                log.warn(String.format("Error writing segment header for %s to %s on %s",
+                log.warn(String.format("Error writing handshake for %s to %s on %s",
                                        currentSegment, idString(), idString()),
                          e);
             }

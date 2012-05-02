@@ -52,27 +52,28 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class Sink implements CommunicationsHandler {
-    private final static Logger  log                       = LoggerFactory.getLogger(Sink.class.getCanonicalName());
-    public static final int      ACK_HEADER_SIZE           = 4;
-    public final static int      CHANNEL_COUNT_HEADER_SIZE = 8;
-    public final static int      CHANNEL_HEADER_SIZE       = 24;
-    public static final int      SEGMENT_HEADER_SIZE       = 20;
+    private final static Logger  log                   = LoggerFactory.getLogger(Sink.class.getCanonicalName());
+    public static final int      ACK_HEADER_SIZE       = 4;
+    public final static int      HANDSHAKE_HEADER_SIZE = 12;
+    public final static int      CHANNEL_HEADER_SIZE   = 24;
+    public static final int      SEGMENT_HEADER_SIZE   = 20;
 
-    private final ByteBuffer     buffer                    = ByteBuffer.allocate(BUFFER_SIZE);
+    private final ByteBuffer     buffer                = ByteBuffer.allocate(BUFFER_SIZE);
     private final Bundle         bundle;
     private long                 bytesWritten;
     private EventChannel         channel;
     private Segment              current;
     private boolean              error;
-    private final SinkContext    fsm                       = new SinkContext(
-                                                                             this);
+    private final SinkContext    fsm                   = new SinkContext(this);
     private SocketChannelHandler handler;
     private int                  segmentCount;
     private long                 segmentSize;
     private int                  channelCount;
+    private int                  sourceNode;
 
     public Sink(Bundle bundle) {
-        fsm.setName(Integer.toString(bundle.getId().processId));
+        fsm.setName(String.format("?>%s",
+                                  Integer.toString(bundle.getId().processId)));
         this.bundle = bundle;
     }
 
@@ -85,7 +86,8 @@ public class Sink implements CommunicationsHandler {
     @Override
     public void closing() {
         if (log.isInfoEnabled()) {
-            log.info(String.format("Closing %s", bundle.getId()));
+            log.info(String.format("Closing %s source %s", bundle.getId(),
+                                   sourceNode));
         }
         channel = null;
     }
@@ -135,33 +137,33 @@ public class Sink implements CommunicationsHandler {
         } catch (IOException e) {
             error = true;
             if (log.isWarnEnabled()) {
-                log.warn(String.format("Error copying segment %s on %s",
-                                       current, bundle.getId()), e);
+                log.warn(String.format("Error copying segment %s on %s from %s",
+                                       current, bundle.getId(), sourceNode), e);
             }
             return false;
         }
         bytesWritten += written;
         if (log.isTraceEnabled()) {
-            log.trace(String.format("copying segment %s, written %s, remaining: %s on %s",
+            log.trace(String.format("copying segment %s, written %s, remaining: %s on %s from %s",
                                     current, written, segmentSize
                                                       - bytesWritten,
-                                    bundle.getId()));
+                                    bundle.getId(), sourceNode));
         }
         if (bytesWritten == segmentSize) {
             segmentCount--;
             if (log.isInfoEnabled()) {
-                log.info(String.format("Sink segment %s copy finished on %s",
-                                       current, bundle.getId()));
+                log.info(String.format("Sink segment %s copy finished on %s source %s",
+                                       current, bundle.getId(), sourceNode));
             }
             return true;
         }
         return false;
     }
 
-    protected void getChannelCount() {
+    protected void getHandshake() {
         buffer.clear();
-        buffer.limit(CHANNEL_COUNT_HEADER_SIZE);
-        if (readChannelCount()) {
+        buffer.limit(HANDSHAKE_HEADER_SIZE);
+        if (readHandshake()) {
             fsm.finished();
         } else {
             if (error) {
@@ -217,7 +219,7 @@ public class Sink implements CommunicationsHandler {
         }
     }
 
-    protected boolean readChannelCount() {
+    protected boolean readHandshake() {
         try {
             if (handler.getChannel().read(buffer) < 0) {
                 if (log.isTraceEnabled()) {
@@ -251,10 +253,12 @@ public class Sink implements CommunicationsHandler {
                 }
                 return false;
             }
+            sourceNode = buffer.getInt();
             channelCount = buffer.getInt();
+            fsm.setName(String.format("%s>%s", sourceNode, bundle.getId()));
             if (log.isInfoEnabled()) {
-                log.info(String.format("Expecting %s channels on %s",
-                                       channelCount, bundle.getId()));
+                log.info(String.format("Expecting %s channels on %s from %s",
+                                       channelCount, bundle.getId(), sourceNode));
             }
             return true;
         }
@@ -279,8 +283,8 @@ public class Sink implements CommunicationsHandler {
         } catch (IOException e) {
             error = true;
             if (log.isWarnEnabled()) {
-                log.warn(String.format("Error reading channel header on %s",
-                                       bundle.getId()), e);
+                log.warn(String.format("Error reading channel header on %s from %s",
+                                       bundle.getId(), sourceNode), e);
             }
             error = true;
             return false;
@@ -292,8 +296,8 @@ public class Sink implements CommunicationsHandler {
             if (MAGIC != magic) {
                 error = true;
                 if (log.isWarnEnabled()) {
-                    log.warn(String.format("Invalid channel header magic value %s on %s",
-                                           magic, bundle.getId()));
+                    log.warn(String.format("Invalid channel header magic value %s on %s from %s",
+                                           magic, bundle.getId(), sourceNode));
                 }
                 error = true;
                 return false;
@@ -304,15 +308,17 @@ public class Sink implements CommunicationsHandler {
                 channel = bundle.xeroxEventChannel(channelId);
             } catch (Throwable e) {
                 if (log.isWarnEnabled()) {
-                    log.warn(String.format("Unable to create channel %s on %s",
-                                           channelId, bundle.getId()), e);
+                    log.warn(String.format("Unable to create channel %s on %s source %s",
+                                           channelId, bundle.getId(),
+                                           sourceNode), e);
                 }
                 error = true;
                 return false;
             }
             if (log.isInfoEnabled()) {
-                log.info(String.format("Sink started for channel %s, segment count %s on %s",
-                                       channelId, segmentCount, bundle.getId()));
+                log.info(String.format("Sink started for channel %s, segment count %s on %s from %s",
+                                       channelId, segmentCount, bundle.getId(),
+                                       sourceNode));
             }
             channelCount--;
             return true;
@@ -332,11 +338,11 @@ public class Sink implements CommunicationsHandler {
         } catch (IOException e) {
             error = true;
             if (Utils.isClose(e)) {
-                log.info(String.format("closing sink %s ", fsm.getName()));
+                log.info(String.format("closing sink %s", fsm.getName()));
             } else {
                 if (log.isWarnEnabled()) {
-                    log.warn(String.format("Error reading header on %s",
-                                           bundle.getId()), e);
+                    log.warn(String.format("Error reading segment header on %s from %s",
+                                           bundle.getId(), sourceNode), e);
                 }
             }
             error = true;
@@ -349,15 +355,15 @@ public class Sink implements CommunicationsHandler {
             if (MAGIC != magic) {
                 error = true;
                 if (log.isWarnEnabled()) {
-                    log.warn(String.format("Invalid handshake magic value %s on %s",
-                                           magic, bundle.getId()));
+                    log.warn(String.format("Invalid handshake magic value %s on %s from %s",
+                                           magic, bundle.getId(), sourceNode));
                 }
                 error = true;
                 return false;
             }
             long offset = buffer.getLong();
             try {
-                current = channel.appendSegmentFor(offset).segment;
+                current = channel.appendSegmentFor(offset);
             } catch (IOException e) {
                 log.warn(String.format("Cannot retrieve segment, shutting down sink %s",
                                        fsm.getName()), e);
@@ -367,16 +373,18 @@ public class Sink implements CommunicationsHandler {
             if (current == null) {
                 error = true;
                 if (log.isWarnEnabled()) {
-                    log.warn(String.format("No segment for offset %s in channel %s on %s",
-                                           offset, channel, bundle.getId()));
+                    log.warn(String.format("No segment for offset %s in channel %s on %s source %s",
+                                           offset, channel, bundle.getId(),
+                                           sourceNode));
                 }
                 error = true;
                 return false;
             }
             segmentSize = buffer.getLong();
             if (log.isInfoEnabled()) {
-                log.info(String.format("Sink segment %s copy, total size %s, started on %s",
-                                       current, segmentSize, bundle.getId()));
+                log.info(String.format("Sink segment %s copy, total size %s, started on %s from %s",
+                                       current, segmentSize, bundle.getId(),
+                                       sourceNode));
             }
             return true;
         }
@@ -393,8 +401,8 @@ public class Sink implements CommunicationsHandler {
 
     protected void sendAck() {
         if (log.isTraceEnabled()) {
-            log.trace(String.format("Copy complete, sending ack from %s",
-                                    bundle.getId()));
+            log.trace(String.format("Copy complete, sending ack from %s to %s",
+                                    bundle.getId(), sourceNode));
         }
         buffer.clear();
         buffer.limit(ACK_HEADER_SIZE);
@@ -415,23 +423,24 @@ public class Sink implements CommunicationsHandler {
         try {
             if (handler.getChannel().write(buffer) < 0) {
                 if (log.isTraceEnabled()) {
-                    log.trace(String.format("Closing channel on %s",
-                                            bundle.getId()));
+                    log.trace(String.format("Closing channel on %s source %s",
+                                            bundle.getId(), sourceNode));
                 }
                 error = true;
                 return false;
             }
         } catch (ClosedChannelException e) {
             if (log.isTraceEnabled()) {
-                log.trace(String.format("Closing channel on %s", bundle.getId()));
+                log.trace(String.format("Closing channel on %s source  %s",
+                                        bundle.getId(), sourceNode));
             }
             error = true;
             return false;
         } catch (IOException e) {
             error = true;
             if (log.isWarnEnabled()) {
-                log.warn(String.format("Error reading handshake on %s",
-                                       bundle.getId()), e);
+                log.warn(String.format("Error writing ack on %s to %s",
+                                       bundle.getId(), sourceNode), e);
             }
             return false;
         }
