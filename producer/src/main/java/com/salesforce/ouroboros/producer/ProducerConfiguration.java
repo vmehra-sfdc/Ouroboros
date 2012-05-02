@@ -56,6 +56,14 @@ public class ProducerConfiguration {
     private double              targetBandwidth              = 1000000.0;
     private int                 tokenLimit                   = 2000000;
     private double              targetPercentile             = 0.9;
+    private int                 maxBatchPoolSize             = 1000;
+
+    /**
+     * @return the maxBatchPoolSize
+     */
+    public int getMaxBatchPoolSize() {
+        return maxBatchPoolSize;
+    }
 
     /**
      * @return the maximumBandwidth
@@ -147,6 +155,14 @@ public class ProducerConfiguration {
      */
     public int getTokenLimit() {
         return tokenLimit;
+    }
+
+    /**
+     * @param maxBatchPoolSize
+     *            the maxBatchPoolSize to set
+     */
+    public void setMaxBatchPoolSize(int maxBatchPoolSize) {
+        this.maxBatchPoolSize = maxBatchPoolSize;
     }
 
     /**

@@ -54,8 +54,8 @@ import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorFSM;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
-import com.salesforce.ouroboros.spindle.source.Appender;
 import com.salesforce.ouroboros.testUtils.Util;
+import com.salesforce.ouroboros.util.Pool;
 
 /**
  * 
@@ -167,8 +167,8 @@ public class TestDuplicator {
         }, 1000L, 100L);
         Node mirror = new Node(0x1638);
         long sequenceNumber = System.currentTimeMillis();
-        Appender appender = mock(Appender.class);
-        EventEntry entry = new EventEntry(appender);
+        @SuppressWarnings("unchecked")
+        EventEntry entry = new EventEntry(mock(Pool.class));
         BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
                                              channel, sequenceNumber);
         entry.set(header, 0, 0, eventChannel, segment, acknowledger, handler);
@@ -285,7 +285,8 @@ public class TestDuplicator {
         when(outboundHandler.getChannel()).thenReturn(outbound);
         outboundDuplicator.connect(outboundHandler);
 
-        EventEntry entry = new EventEntry(mock(Appender.class));
+        @SuppressWarnings("unchecked")
+        EventEntry entry = new EventEntry(mock(Pool.class));
         entry.set(batchHeader, 0, 0, eventChannel, outboundSegment,
                   outboundAcknowledger, outboundHandler);
         outboundDuplicator.replicate(entry);

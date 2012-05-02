@@ -171,7 +171,7 @@ public class TestTransfer {
         when(primaryBundle.getId()).thenReturn(primaryNode);
         when(mirrorBundle.getId()).thenReturn(mirrorNode);
 
-        Spindle spindle = new Spindle(primaryBundle);
+        Spindle spindle = new Spindle(primaryBundle, 1);
         final Replicator primaryReplicator = new Replicator(primaryBundle,
                                                             mirrorNode,
                                                             rendezvous);

@@ -26,7 +26,6 @@
 package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +36,8 @@ import com.salesforce.ouroboros.NullNode;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
+import com.salesforce.ouroboros.util.Pool;
+import com.salesforce.ouroboros.util.Pool.Factory;
 
 /**
  * 
@@ -44,16 +45,27 @@ import com.salesforce.ouroboros.spindle.replication.EventEntry;
  * 
  */
 public class Appender extends AbstractAppender {
-    private final static Logger log          = LoggerFactory.getLogger(Appender.class.getCanonicalName());
+    private final static Logger    log = LoggerFactory.getLogger(Appender.class.getCanonicalName());
 
-    private final Acknowledger  acknowledger;
-    private volatile int        startPosition;
-    private EventEntry          freeList;
-    private final ReentrantLock freeListLock = new ReentrantLock();
+    private final Acknowledger     acknowledger;
+    private volatile int           startPosition;
+    private final Pool<EventEntry> eventEntryPool;
 
-    public Appender(Bundle bundle, Acknowledger acknowledger) {
+    public Appender(Bundle bundle, Acknowledger acknowledger,
+                    int maxEventEntryPoolSize) {
         super(bundle);
         this.acknowledger = acknowledger;
+        this.eventEntryPool = new Pool<EventEntry>(new Factory<EventEntry>() {
+            @Override
+            public EventEntry newInstance() {
+                return new EventEntry(eventEntryPool);
+            }
+
+        }, maxEventEntryPoolSize);
+    }
+
+    public void free(EventEntry free) {
+        eventEntryPool.free(free);
     }
 
     /**
@@ -61,6 +73,10 @@ public class Appender extends AbstractAppender {
      */
     public void setFsmName(String fsmName) {
         fsm.setName(fsmName);
+    }
+
+    private EventEntry allocate() {
+        return eventEntryPool.allocate();
     }
 
     @Override
@@ -143,30 +159,5 @@ public class Appender extends AbstractAppender {
     @Override
     protected void markPosition() {
         startPosition = position;
-    }
-
-    public void free(EventEntry free) {
-        final ReentrantLock lock = freeListLock;
-        lock.lock();
-        try {
-            freeList = free.link(freeList);
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    private EventEntry allocate() {
-        final ReentrantLock lock = freeListLock;
-        lock.lock();
-        try {
-            if (freeList == null) {
-                return new EventEntry(this);
-            }
-            EventEntry allocated = freeList;
-            freeList = allocated.delink();
-            return allocated;
-        } finally {
-            lock.unlock();
-        }
     }
 }

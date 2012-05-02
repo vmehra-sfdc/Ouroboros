@@ -71,6 +71,7 @@ public class WeaverConfigation {
     private Node                      id;
     private int                       initialAppendSegmentCapacity   = 16;
     private int                       initialReadSegmentCapacity     = 16;
+    private int                       maxEventEntryPoolSize          = 100;
     private int                       maximumAppendSegmentCapacity   = 4096;
     private int                       maximumReadSegmentCapacity     = 4096;
     private long                      maxSegmentSize                 = DEFAULT_MAX_SEGMENTSIZE;
@@ -93,10 +94,10 @@ public class WeaverConfigation {
     private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
+
     private ExecutorService           spindles                       = Executors.newFixedThreadPool(5,
                                                                                                     new LabeledThreadFactory(
                                                                                                                              SPINDLE));
-
     private final SocketOptions       spindleSocketOptions           = new SocketOptions();
     private String                    stateName                      = DEFAULT_STATE_NAME;
     private InetSocketAddress         xeroxAddress                   = new InetSocketAddress(
@@ -141,6 +142,13 @@ public class WeaverConfigation {
      */
     public int getInitialReadSegmentCapacity() {
         return initialReadSegmentCapacity;
+    }
+
+    /**
+     * @return the maxEventEntryPoolSize
+     */
+    public int getMaxEventEntryPoolSize() {
+        return maxEventEntryPoolSize;
     }
 
     /**
@@ -327,6 +335,14 @@ public class WeaverConfigation {
      */
     public void setInitialReadSegmentCapacity(int initialReadSegmentCapacity) {
         this.initialReadSegmentCapacity = initialReadSegmentCapacity;
+    }
+
+    /**
+     * @param maxEventEntryPoolSize
+     *            the maxEventEntryPoolSize to set
+     */
+    public void setMaxEventEntryPoolSize(int maxEventEntryPoolSize) {
+        this.maxEventEntryPoolSize = maxEventEntryPoolSize;
     }
 
     /**

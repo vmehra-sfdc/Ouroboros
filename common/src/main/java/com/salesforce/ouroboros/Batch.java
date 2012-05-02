@@ -30,19 +30,21 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+import com.salesforce.ouroboros.util.Pool.Linkable;
+
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class Batch extends BatchIdentity {
+public class Batch extends BatchIdentity implements Linkable<Batch> {
     private static final double ONE_BILLION = 1000000000D;
 
     public final BatchHeader    header      = new BatchHeader();
     public ByteBuffer           batch;
     private long                created;
     private long                interval;
-    private Batch               next;
+    private Linkable<Batch>     next;
 
     public Batch() {
     }
@@ -58,15 +60,21 @@ public class Batch extends BatchIdentity {
         set(mirror, channel, sequenceNumber, events);
     }
 
-    /**
-     * @return
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.util.Pool.Linkable#_self()
      */
+    @Override
+    public Batch _self() {
+        return this;
+    }
+
     public long batchByteSize() {
         return batch.capacity() + BatchHeader.HEADER_BYTE_SIZE;
     }
 
-    public Batch delink() {
-        Batch current = next;
+    @Override
+    public Linkable<Batch> delink() {
+        Linkable<Batch> current = next;
         next = null;
         return current;
     }
@@ -79,8 +87,12 @@ public class Batch extends BatchIdentity {
         return interval;
     }
 
-    public Batch link(Batch h) {
-        next = h;
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.util.Pool.Linkable#link(com.salesforce.ouroboros.util.Pool.Linkable)
+     */
+    @Override
+    public Linkable<Batch> link(Linkable<Batch> freeList) {
+        next = freeList;
         created = interval = -1L;
         header.clear();
         batch.clear();

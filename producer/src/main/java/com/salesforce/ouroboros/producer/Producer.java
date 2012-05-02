@@ -42,7 +42,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -62,6 +61,8 @@ import com.salesforce.ouroboros.api.producer.UnknownChannelException;
 import com.salesforce.ouroboros.producer.spinner.Spinner;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 import com.salesforce.ouroboros.util.Gate;
+import com.salesforce.ouroboros.util.Pool;
+import com.salesforce.ouroboros.util.Pool.Factory;
 import com.salesforce.ouroboros.util.rate.Controller;
 import com.salesforce.ouroboros.util.rate.controllers.RateController;
 import com.salesforce.ouroboros.util.rate.controllers.RateLimiter;
@@ -169,8 +170,6 @@ public class Producer implements Comparable<Producer> {
 
     private final ConcurrentMap<UUID, PrimaryState> channelState      = new ConcurrentHashMap<UUID, PrimaryState>();
     private final Controller                        controller;
-    private Batch                                   freeList;
-    private final ReentrantLock                     freeListLock      = new ReentrantLock();
     private final int                               maxQueueLength;
     private final Map<UUID, MirrorState>            mirrors           = new ConcurrentHashMap<UUID, MirrorState>();
     private HashSet<UUID>                           pausedChannels    = new HashSet<UUID>();
@@ -187,6 +186,7 @@ public class Producer implements Comparable<Producer> {
     private final ConcurrentMap<Node, Spinner>      spinners          = new ConcurrentHashMap<Node, Spinner>();
     private ConsistentHashFunction<Node>            weaverRing;
     private ConsistentHashFunction<Node>            nextProducerRing;
+    private final Pool<Batch>                       batchPool;
 
     public Producer(Node self, EventSource source,
                     ProducerConfiguration configuration) throws IOException {
@@ -214,6 +214,12 @@ public class Producer implements Comparable<Producer> {
         producerRing = new ConsistentHashFunction<Node>(
                                                         configuration.getSkipStrategy(),
                                                         configuration.getNumberOfReplicas());
+        batchPool = new Pool<Batch>(new Factory<Batch>() {
+            @Override
+            public Batch newInstance() {
+                return new Batch();
+            }
+        }, configuration.getMaxBatchPoolSize());
         openPublishingGate();
     }
 
@@ -240,7 +246,7 @@ public class Producer implements Comparable<Producer> {
                                        self, batch.rate()));
             }
         }
-        free(batch);
+        batchPool.free(batch);
     }
 
     /**
@@ -671,7 +677,7 @@ public class Producer implements Comparable<Producer> {
                                                   String.format("Push to channel %s that does not exist on %s",
                                                                 channel, self));
             }
-            Batch batch = allocateBatch();
+            Batch batch = batchPool.allocate();
             batch.set(state.getMirrorProducer(), channel, sequenceNumber,
                       events);
             if (!controller.accept(batch.batchByteSize())) {
@@ -1068,31 +1074,5 @@ public class Producer implements Comparable<Producer> {
 
     protected void setProducerRing(ConsistentHashFunction<Node> newRing) {
         producerRing = newRing;
-    }
-
-    private void free(Batch free) {
-
-        final ReentrantLock lock = freeListLock;
-        lock.lock();
-        try {
-            freeList = free.link(freeList);
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    private Batch allocateBatch() {
-        final ReentrantLock lock = freeListLock;
-        lock.lock();
-        try {
-            if (freeList == null) {
-                return new Batch();
-            }
-            Batch allocated = freeList;
-            freeList = allocated.delink();
-            return allocated;
-        } finally {
-            lock.unlock();
-        }
     }
 }

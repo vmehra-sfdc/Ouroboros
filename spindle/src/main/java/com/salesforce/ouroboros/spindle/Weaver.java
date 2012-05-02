@@ -87,27 +87,29 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     private class SpindleFactory implements CommunicationsHandlerFactory {
         @Override
         public Spindle createCommunicationsHandler(SocketChannel channel) {
-            return new Spindle(Weaver.this);
+            return new Spindle(Weaver.this, maxEventEntryPoolSize);
         }
     }
 
     private static final Logger                     log               = LoggerFactory.getLogger(Weaver.class.getCanonicalName());
+
     private static final String                     WEAVER_REPLICATOR = "Weaver Replicator";
     private static final String                     WEAVER_SPINDLE    = "Weaver Spindle";
     private static final String                     WEAVER_XEROX      = "Weaver Xerox";
     static final int                                HANDSHAKE_SIZE    = Node.BYTE_LENGTH + 4;
     static final int                                MAGIC             = 0x1638;
-
     private final ConcurrentMap<Node, Acknowledger> acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
+
+    private final ConcurrentMap<File, Segment>      appendSegmentCache;
     private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
     private final ContactInformation                contactInfo;
+    private int                                     maxEventEntryPoolSize;
     private final long                              maxSegmentSize;
     private ConsistentHashFunction<Node>            nextRing;
+    private final ConcurrentMap<File, Segment>      readSegmentCache;
     private final ServerSocketChannelHandler        replicationHandler;
     private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
     private final ConsistentHashFunction<File>      roots;
-    private final ConcurrentMap<File, Segment>      appendSegmentCache;
-    private final ConcurrentMap<File, Segment>      readSegmentCache;
     private final Node                              self;
     private final ServerSocketChannelHandler        spindleHandler;
     private ConsistentHashFunction<Node>            weaverRing;
@@ -163,44 +165,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         weaverRing = new ConsistentHashFunction<Node>(
                                                       configuration.getSkipStrategy(),
                                                       configuration.getNumberOfReplicas());
-    }
-
-    private ConcurrentMap<File, Segment> createAppendSegmentCache(WeaverConfigation configuration,
-                                                                  Builder<File, Segment> builder) {
-        builder.initialCapacity(configuration.getInitialAppendSegmentCapacity());
-        builder.concurrencyLevel(configuration.getAppendSegmentConcurrencyLevel());
-        builder.maximumWeightedCapacity(configuration.getMaximumAppendSegmentCapacity());
-        builder.listener(new EvictionListener<File, Segment>() {
-            @Override
-            public void onEviction(File file, Segment segment) {
-                try {
-                    segment.close();
-                } catch (IOException e) {
-                    log.trace(String.format("Error closing %s" + segment), e);
-                }
-                log.trace(String.format("%s evicted on %s", segment, self));
-            }
-        });
-        return builder.build();
-    }
-
-    private ConcurrentMap<File, Segment> createReadSegmentCache(WeaverConfigation configuration,
-                                                                Builder<File, Segment> builder) {
-        builder.initialCapacity(configuration.getInitialReadSegmentCapacity());
-        builder.concurrencyLevel(configuration.getReadSegmentConcurrencyLevel());
-        builder.maximumWeightedCapacity(configuration.getMaximumReadSegmentCapacity());
-        builder.listener(new EvictionListener<File, Segment>() {
-            @Override
-            public void onEviction(File file, Segment segment) {
-                try {
-                    segment.close();
-                } catch (IOException e) {
-                    log.trace(String.format("Error closing %s" + segment), e);
-                }
-                log.trace(String.format("%s evicted on %s", segment, self));
-            }
-        });
-        return builder.build();
+        maxEventEntryPoolSize = configuration.getMaxEventEntryPoolSize();
     }
 
     public void bootstrap(Node[] bootsrappingMembers) {
@@ -689,6 +654,44 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         assert previous == null : String.format("Xeroxed event channel %s is currently hosted on %s",
                                                 channel, self);
         return ec;
+    }
+
+    private ConcurrentMap<File, Segment> createAppendSegmentCache(WeaverConfigation configuration,
+                                                                  Builder<File, Segment> builder) {
+        builder.initialCapacity(configuration.getInitialAppendSegmentCapacity());
+        builder.concurrencyLevel(configuration.getAppendSegmentConcurrencyLevel());
+        builder.maximumWeightedCapacity(configuration.getMaximumAppendSegmentCapacity());
+        builder.listener(new EvictionListener<File, Segment>() {
+            @Override
+            public void onEviction(File file, Segment segment) {
+                try {
+                    segment.close();
+                } catch (IOException e) {
+                    log.trace(String.format("Error closing %s" + segment), e);
+                }
+                log.trace(String.format("%s evicted on %s", segment, self));
+            }
+        });
+        return builder.build();
+    }
+
+    private ConcurrentMap<File, Segment> createReadSegmentCache(WeaverConfigation configuration,
+                                                                Builder<File, Segment> builder) {
+        builder.initialCapacity(configuration.getInitialReadSegmentCapacity());
+        builder.concurrencyLevel(configuration.getReadSegmentConcurrencyLevel());
+        builder.maximumWeightedCapacity(configuration.getMaximumReadSegmentCapacity());
+        builder.listener(new EvictionListener<File, Segment>() {
+            @Override
+            public void onEviction(File file, Segment segment) {
+                try {
+                    segment.close();
+                } catch (IOException e) {
+                    log.trace(String.format("Error closing %s" + segment), e);
+                }
+                log.trace(String.format("%s evicted on %s", segment, self));
+            }
+        });
+        return builder.build();
     }
 
     private void infoLog(String logString, Object... args) {

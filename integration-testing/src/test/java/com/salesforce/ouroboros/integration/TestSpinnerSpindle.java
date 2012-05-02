@@ -94,7 +94,7 @@ public class TestSpinnerSpindle {
                                                                                   segment,
                                                                                   offset,
                                                                                   0);
-        
+
         when(eventChannel.getCachedReadSegment(segmentFile)).thenReturn(segment);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
         when(eventChannel.isDuplicate(isA(BatchHeader.class))).thenReturn(false);
@@ -114,7 +114,7 @@ public class TestSpinnerSpindle {
 
             @Override
             public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
-                Spindle spindle = new Spindle(bundle);
+                Spindle spindle = new Spindle(bundle, 100);
                 spindles.add(spindle);
                 return spindle;
             }
