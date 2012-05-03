@@ -58,6 +58,7 @@ public class Pool<T> {
     }
 
     public T allocate() {
+        if (true) return factory.newInstance();
         final ReentrantLock lock = freeListLock;
         lock.lock();
         try {
@@ -75,6 +76,7 @@ public class Pool<T> {
     }
 
     public void free(Linkable<T> free) {
+        if (true) return;
         if (size.get() <= limit) {
             final ReentrantLock lock = freeListLock;
             lock.lock();
