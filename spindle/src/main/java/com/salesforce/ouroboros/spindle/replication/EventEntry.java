@@ -31,7 +31,6 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.util.Pool;
-import com.salesforce.ouroboros.util.Pool.Linkable;
 
 /**
  * The entry representing the appending of an event.
@@ -39,27 +38,23 @@ import com.salesforce.ouroboros.util.Pool.Linkable;
  * @author hhildebrand
  * 
  */
-public class EventEntry implements Linkable<EventEntry> {
+public class EventEntry {
     private final Pool<EventEntry>      pool;
     private Acknowledger                acknowledger;
     private EventChannel                eventChannel;
     private SocketChannelHandler        handler;
     private final ReplicatedBatchHeader header = new ReplicatedBatchHeader();
-    private Linkable<EventEntry>        next;
     private Segment                     segment;
 
     public EventEntry(Pool<EventEntry> pool) {
         this.pool = pool;
     }
 
-    public Linkable<EventEntry> delink() {
-        Linkable<EventEntry> current = next;
-        next = null;
-        return current;
-    }
-
     public void free() {
-        pool.free(this);
+        header.clear();
+        if (pool != null) {
+            pool.free(this);
+        }
     }
 
     /**
@@ -90,20 +85,6 @@ public class EventEntry implements Linkable<EventEntry> {
         return segment;
     }
 
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.util.Pool.Linkable#link(com.salesforce.ouroboros.util.Pool.Linkable)
-     */
-    @Override
-    public Linkable<EventEntry> link(Linkable<EventEntry> freeList) {
-        next = freeList;
-        eventChannel = null;
-        segment = null;
-        acknowledger = null;
-        handler = null;
-        header.clear();
-        return this;
-    }
-
     public void select() {
         handler.selectForRead();
     }
@@ -128,13 +109,4 @@ public class EventEntry implements Linkable<EventEntry> {
         this.acknowledger = acknowledger;
         this.handler = handler;
     }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.util.Pool.Linkable#_self()
-     */
-    @Override
-    public EventEntry _self() {
-        return this;
-    }
-
 }

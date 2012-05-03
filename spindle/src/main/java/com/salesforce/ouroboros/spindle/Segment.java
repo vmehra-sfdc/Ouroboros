@@ -73,7 +73,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.spi.AbstractInterruptibleChannel#close()
      */
     @Override
-    public void close() throws IOException {
+    public final void close() throws IOException {
         channel.close();
     }
 
@@ -152,30 +152,30 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     }
 
     /**
-     * @param paramLong1
-     * @param paramLong2
-     * @param paramBoolean
+     * @param position
+     * @param size
+     * @param shared
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#lock(long, long, boolean)
      */
-    public FileLock lock(long paramLong1, long paramLong2, boolean paramBoolean)
-                                                                                throws IOException {
-        return channel.lock(paramLong1, paramLong2, paramBoolean);
+    public FileLock lock(long position, long size, boolean shared)
+                                                                  throws IOException {
+        return channel.lock(position, size, shared);
     }
 
     /**
-     * @param paramMapMode
-     * @param paramLong1
-     * @param paramLong2
+     * @param mode
+     * @param position
+     * @param size
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#map(java.nio.channels.FileChannel.MapMode,
      *      long, long)
      */
-    public MappedByteBuffer map(MapMode paramMapMode, long paramLong1,
-                                long paramLong2) throws IOException {
-        return channel.map(paramMapMode, paramLong1, paramLong2);
+    public MappedByteBuffer map(MapMode mode, long position, long size)
+                                                                       throws IOException {
+        return channel.map(mode, position, size);
     }
 
     /**
@@ -204,36 +204,35 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     }
 
     /**
-     * @param paramLong
+     * @param newPosition
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#position(long)
      */
-    public FileChannel position(long paramLong) throws IOException {
-        return channel.position(paramLong);
+    public FileChannel position(long newPosition) throws IOException {
+        return channel.position(newPosition);
     }
 
     /**
-     * @param paramByteBuffer
+     * @param dst
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#read(java.nio.ByteBuffer)
      */
     @Override
-    public int read(ByteBuffer paramByteBuffer) throws IOException {
-        return channel.read(paramByteBuffer);
+    public int read(ByteBuffer dst) throws IOException {
+        return channel.read(dst);
     }
 
     /**
-     * @param paramByteBuffer
-     * @param paramLong
+     * @param dst
+     * @param position
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#read(java.nio.ByteBuffer, long)
      */
-    public int read(ByteBuffer paramByteBuffer, long paramLong)
-                                                               throws IOException {
-        return channel.read(paramByteBuffer, paramLong);
+    public int read(ByteBuffer dst, long position) throws IOException {
+        return channel.read(dst, position);
     }
 
     /**
@@ -248,17 +247,17 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     }
 
     /**
-     * @param paramArrayOfByteBuffer
-     * @param paramInt1
-     * @param paramInt2
+     * @param dsts
+     * @param offset
+     * @param length
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#read(java.nio.ByteBuffer[], int, int)
      */
     @Override
-    public long read(ByteBuffer[] paramArrayOfByteBuffer, int paramInt1,
-                     int paramInt2) throws IOException {
-        return channel.read(paramArrayOfByteBuffer, paramInt1, paramInt2);
+    public long read(ByteBuffer[] dsts, int offset, int length)
+                                                               throws IOException {
+        return channel.read(dsts, offset, length);
     }
 
     /**
@@ -280,45 +279,41 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     }
 
     /**
-     * @param paramReadableByteChannel
-     * @param paramLong1
-     * @param paramLong2
+     * @param src
+     * @param position
+     * @param count
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#transferFrom(java.nio.channels.ReadableByteChannel,
      *      long, long)
      */
-    public long transferFrom(ReadableByteChannel paramReadableByteChannel,
-                             long paramLong1, long paramLong2)
-                                                              throws IOException {
-        return channel.transferFrom(paramReadableByteChannel, paramLong1,
-                                    paramLong2);
+    public long transferFrom(ReadableByteChannel src, long position, long count)
+                                                                                throws IOException {
+        return channel.transferFrom(src, position, count);
     }
 
     /**
-     * @param paramLong1
-     * @param paramLong2
-     * @param paramWritableByteChannel
+     * @param position
+     * @param count
+     * @param target
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#transferTo(long, long,
      *      java.nio.channels.WritableByteChannel)
      */
-    public long transferTo(long paramLong1, long paramLong2,
-                           WritableByteChannel paramWritableByteChannel)
-                                                                        throws IOException {
-        return channel.transferTo(paramLong1, paramLong2,
-                                  paramWritableByteChannel);
+    public long transferTo(long position, long count, WritableByteChannel target)
+                                                                                 throws IOException {
+        return channel.transferTo(position, count, target);
     }
 
     /**
-     * @param paramLong
+     * @param size
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#truncate(long)
      */
-    public FileChannel truncate(long paramLong) throws IOException {
-        return channel.truncate(paramLong);
+    public FileChannel truncate(long size) throws IOException {
+        return channel.truncate(size);
     }
 
     /**
@@ -331,39 +326,38 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     }
 
     /**
-     * @param paramLong1
-     * @param paramLong2
-     * @param paramBoolean
+     * @param position
+     * @param size
+     * @param shared
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#tryLock(long, long, boolean)
      */
-    public FileLock tryLock(long paramLong1, long paramLong2,
-                            boolean paramBoolean) throws IOException {
-        return channel.tryLock(paramLong1, paramLong2, paramBoolean);
+    public FileLock tryLock(long position, long size, boolean shared)
+                                                                     throws IOException {
+        return channel.tryLock(position, size, shared);
     }
 
     /**
-     * @param paramByteBuffer
+     * @param src
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#write(java.nio.ByteBuffer)
      */
     @Override
-    public int write(ByteBuffer paramByteBuffer) throws IOException {
-        return channel.write(paramByteBuffer);
+    public int write(ByteBuffer src) throws IOException {
+        return channel.write(src);
     }
 
     /**
-     * @param paramByteBuffer
-     * @param paramLong
+     * @param src
+     * @param position
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#write(java.nio.ByteBuffer, long)
      */
-    public int write(ByteBuffer paramByteBuffer, long paramLong)
-                                                                throws IOException {
-        return channel.write(paramByteBuffer, paramLong);
+    public int write(ByteBuffer src, long position) throws IOException {
+        return channel.write(src, position);
     }
 
     /**
@@ -378,16 +372,16 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     }
 
     /**
-     * @param paramArrayOfByteBuffer
-     * @param paramInt1
-     * @param paramInt2
+     * @param srcs
+     * @param offset
+     * @param length
      * @return
      * @throws IOException
      * @see java.nio.channels.FileChannel#write(java.nio.ByteBuffer[], int, int)
      */
     @Override
-    public long write(ByteBuffer[] paramArrayOfByteBuffer, int paramInt1,
-                      int paramInt2) throws IOException {
-        return channel.write(paramArrayOfByteBuffer, paramInt1, paramInt2);
+    public long write(ByteBuffer[] srcs, int offset, int length)
+                                                                throws IOException {
+        return channel.write(srcs, offset, length);
     }
 }

@@ -75,7 +75,7 @@ public class TestAppender {
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
         writeSegment.openForAppend();
-        final Appender appender = new Appender(bundle, acknowledger, 100);
+        final Appender appender = new Appender(bundle, acknowledger);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
@@ -161,7 +161,7 @@ public class TestAppender {
         File tmpFile = File.createTempFile("duplicate", ".tst");
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(tmpFile);
-        final Appender appender = new Appender(bundle, acknowledger, 100);
+        final Appender appender = new Appender(bundle, acknowledger);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));

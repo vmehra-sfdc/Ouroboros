@@ -74,7 +74,26 @@ public class Thread {
         remainingBytes = EventHeader.payloadLengthOf(currentPosition, segment);
     }
 
-    public void pull(int maxBytes, int maxEvents, WritableByteChannel channel) {
-
+    /**
+     * Transfer the thread's event stream to the channel. Continue supplying the
+     * event bytes until either the maximum number of events are reached, the
+     * maximum number of bytes are reached, or the channel will not accept more
+     * bytes
+     * 
+     * @param maxBytes
+     *            - the maximum number of bytes to transfer to the channel
+     * @param maxEvents
+     *            - the maximum number of events to transfer to the channel
+     * @param channel
+     *            - the channel to transfer to
+     * 
+     * @return the number of bytes written to the channel
+     * @throws IOException
+     */
+    public long pull(int maxBytes, int maxEvents, WritableByteChannel channel)
+                                                                              throws IOException {
+        int txfr = Math.min(maxBytes, remainingBytes);
+        long written = segment.transferTo(currentPosition, txfr, channel);
+        return written;
     }
 }

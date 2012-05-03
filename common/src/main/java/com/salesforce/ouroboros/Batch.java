@@ -30,23 +30,24 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-import com.salesforce.ouroboros.util.Pool.Linkable;
+import com.salesforce.ouroboros.util.Pool;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class Batch extends BatchIdentity implements Linkable<Batch> {
+public class Batch extends BatchIdentity {
     private static final double ONE_BILLION = 1000000000D;
 
-    public final BatchHeader    header      = new BatchHeader();
     public ByteBuffer           batch;
+    public final BatchHeader    header      = new BatchHeader();
     private long                created;
     private long                interval;
-    private Linkable<Batch>     next;
+    private final Pool<Batch>   pool;
 
     public Batch() {
+        this(null);
     }
 
     /**
@@ -57,26 +58,22 @@ public class Batch extends BatchIdentity implements Linkable<Batch> {
      */
     public Batch(Node mirror, UUID channel, long sequenceNumber,
                  List<ByteBuffer> events) {
+        this();
         set(mirror, channel, sequenceNumber, events);
     }
 
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.util.Pool.Linkable#_self()
-     */
-    @Override
-    public Batch _self() {
-        return this;
+    public Batch(Pool<Batch> pool) {
+        this.pool = pool;
     }
 
     public long batchByteSize() {
         return batch.capacity() + BatchHeader.HEADER_BYTE_SIZE;
     }
 
-    @Override
-    public Linkable<Batch> delink() {
-        Linkable<Batch> current = next;
-        next = null;
-        return current;
+    public void free() {
+        if (pool != null) {
+            pool.free(this);
+        }
     }
 
     /**
@@ -85,18 +82,6 @@ public class Batch extends BatchIdentity implements Linkable<Batch> {
      */
     public long getInterval() {
         return interval;
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.util.Pool.Linkable#link(com.salesforce.ouroboros.util.Pool.Linkable)
-     */
-    @Override
-    public Linkable<Batch> link(Linkable<Batch> freeList) {
-        next = freeList;
-        created = interval = -1L;
-        header.clear();
-        batch.clear();
-        return this;
     }
 
     public void markInterval() {
@@ -126,7 +111,6 @@ public class Batch extends BatchIdentity implements Linkable<Batch> {
 
     public void set(Node mirror, UUID channel, long sequenceNumber,
                     Collection<ByteBuffer> events) {
-        assert next == null : "ruh roh";
         set(channel, sequenceNumber);
         assert events != null : "events must not be null";
         int totalSize = 0;

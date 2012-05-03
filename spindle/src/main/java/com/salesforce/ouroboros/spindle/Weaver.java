@@ -87,7 +87,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     private class SpindleFactory implements CommunicationsHandlerFactory {
         @Override
         public Spindle createCommunicationsHandler(SocketChannel channel) {
-            return new Spindle(Weaver.this, maxEventEntryPoolSize);
+            return new Spindle(Weaver.this);
         }
     }
 
@@ -103,7 +103,6 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     private final ConcurrentMap<File, Segment>      appendSegmentCache;
     private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
     private final ContactInformation                contactInfo;
-    private int                                     maxEventEntryPoolSize;
     private final long                              maxSegmentSize;
     private ConsistentHashFunction<Node>            nextRing;
     private final ConcurrentMap<File, Segment>      readSegmentCache;
@@ -165,7 +164,6 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         weaverRing = new ConsistentHashFunction<Node>(
                                                       configuration.getSkipStrategy(),
                                                       configuration.getNumberOfReplicas());
-        maxEventEntryPoolSize = configuration.getMaxEventEntryPoolSize();
     }
 
     public void bootstrap(Node[] bootsrappingMembers) {

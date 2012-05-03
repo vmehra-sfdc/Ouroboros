@@ -25,75 +25,98 @@
  */
 package com.salesforce.ouroboros.util;
 
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
+ * A non thread safe pooling implementation. Designed to be used via thread
+ * locals
+ * 
  * @author hhildebrand
  * 
  */
 public class Pool<T> {
     public interface Factory<T> {
-        T newInstance();
+        T newInstance(Pool<T> pool);
     }
 
-    public interface Linkable<T> {
-        T _self();
-
-        Linkable<T> delink();
-
-        Linkable<T> link(Linkable<T> freeList);
-    }
-
+    private final ReentrantLock lock      = new ReentrantLock();
+    private int                 created   = 0;
+    private int                 discarded = 0;
     private final Factory<T>    factory;
-    private Linkable<T>         freeList;
-    private final ReentrantLock freeListLock    = new ReentrantLock();
-    private AtomicLong          lifetimeMaxSize = new AtomicLong();
-    private final int           limit;
-    private AtomicLong          size            = new AtomicLong();
+    private final String        name;
+    private final RingBuffer<T> pool;
+    private int                 pooled    = 0;
+    private int                 reused    = 0;
 
-    public Pool(Factory<T> factory, int limit) {
-        this.limit = limit;
+    public Pool(String name, Factory<T> factory, int limit) {
+        this.name = name;
+        pool = new RingBuffer<T>(limit);
         this.factory = factory;
     }
 
     public T allocate() {
-        if (true) return factory.newInstance();
-        final ReentrantLock lock = freeListLock;
-        lock.lock();
+        final ReentrantLock myLock = lock;
+        myLock.lock();
         try {
-            if (freeList == null) {
-                lifetimeMaxSize.set(Math.max(lifetimeMaxSize.get(),
-                                             size.incrementAndGet()));
-                return factory.newInstance();
+            T allocated = pool.poll();
+            if (allocated == null) {
+                created++;
+                allocated = factory.newInstance(this);
+            } else {
+                reused++;
             }
-            Linkable<T> allocated = freeList;
-            freeList = allocated.delink();
-            return allocated._self();
+            return allocated;
         } finally {
-            lock.unlock();
+            myLock.unlock();
         }
     }
 
-    public void free(Linkable<T> free) {
-        if (true) return;
-        if (size.get() <= limit) {
-            final ReentrantLock lock = freeListLock;
-            lock.lock();
-            try {
-                freeList = free.link(freeList);
-                size.decrementAndGet();
-            } finally {
-                lock.unlock();
+    public void free(T free) {
+        final ReentrantLock myLock = lock;
+        myLock.lock();
+        try {
+            if (!pool.offer(free)) {
+                discarded++;
+            } else {
+                pooled++;
             }
+        } finally {
+            myLock.unlock();
         }
     }
 
-    public long size() {
-        return size.get();
+    /**
+     * @return the created
+     */
+    public int getCreated() {
+        return created;
     }
 
-    public long getLifetimeMaximumSize() {
-        return lifetimeMaxSize.get();
+    /**
+     * @return the discarded
+     */
+    public int getDiscarded() {
+        return discarded;
+    }
+
+    /**
+     * @return the name
+     */
+    public String getName() {
+        return name;
+    }
+
+    public int getPooled() {
+        return pooled;
+    }
+
+    public int size() {
+        return pool.size();
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Pool[%s] size: %s reused: %s created: %s pooled: %s discarded: %s",
+                             name, size(), reused, created, pooled, discarded);
     }
 }

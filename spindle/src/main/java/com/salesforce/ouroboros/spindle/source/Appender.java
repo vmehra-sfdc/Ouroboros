@@ -45,27 +45,24 @@ import com.salesforce.ouroboros.util.Pool.Factory;
  * 
  */
 public class Appender extends AbstractAppender {
-    private final static Logger    log = LoggerFactory.getLogger(Appender.class.getCanonicalName());
+    private final static Logger    log                   = LoggerFactory.getLogger(Appender.class.getCanonicalName());
+    private static int             EVENT_ENTRY_POOL_SIZE = 100;
 
     private final Acknowledger     acknowledger;
     private volatile int           startPosition;
     private final Pool<EventEntry> eventEntryPool;
 
-    public Appender(Bundle bundle, Acknowledger acknowledger,
-                    int maxEventEntryPoolSize) {
+    public Appender(Bundle bundle, Acknowledger acknowledger) {
         super(bundle);
         this.acknowledger = acknowledger;
-        this.eventEntryPool = new Pool<EventEntry>(new Factory<EventEntry>() {
-            @Override
-            public EventEntry newInstance() {
-                return new EventEntry(eventEntryPool);
-            }
-
-        }, maxEventEntryPoolSize);
-    }
-
-    public void free(EventEntry free) {
-        eventEntryPool.free(free);
+        eventEntryPool = new Pool<EventEntry>("EventEntry",
+                                              new Factory<EventEntry>() {
+                                                  @Override
+                                                  public EventEntry newInstance(Pool<EventEntry> pool) {
+                                                      return new EventEntry(
+                                                                            pool);
+                                                  }
+                                              }, EVENT_ENTRY_POOL_SIZE);
     }
 
     /**

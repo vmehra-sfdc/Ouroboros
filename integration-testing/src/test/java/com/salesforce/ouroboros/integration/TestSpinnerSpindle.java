@@ -114,7 +114,7 @@ public class TestSpinnerSpindle {
 
             @Override
             public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
-                Spindle spindle = new Spindle(bundle, 100);
+                Spindle spindle = new Spindle(bundle);
                 spindles.add(spindle);
                 return spindle;
             }

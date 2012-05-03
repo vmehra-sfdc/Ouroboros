@@ -93,11 +93,11 @@ public class Producer implements Comparable<Producer> {
     }
 
     private static class MirrorState {
-        volatile long sequenceNumber;
-        Node          primaryProducer;
         Node          mirrorProducer;
-        Node          primaryWeaver;
         Node          mirrorWeaver;
+        Node          primaryProducer;
+        Node          primaryWeaver;
+        volatile long sequenceNumber;
 
         public MirrorState(Node[] producerPair, long sequenceNumber,
                            Node[] weaverPair) {
@@ -166,27 +166,29 @@ public class Producer implements Comparable<Producer> {
         }
     }
 
+    private static int                              BATCH_POOL_SIZE   = 1000;
+
     private static final Logger                     log               = LoggerFactory.getLogger(Producer.class.getCanonicalName());
 
+    private final Pool<Batch>                       batchPool;
     private final ConcurrentMap<UUID, PrimaryState> channelState      = new ConcurrentHashMap<UUID, PrimaryState>();
     private final Controller                        controller;
     private final int                               maxQueueLength;
     private final Map<UUID, MirrorState>            mirrors           = new ConcurrentHashMap<UUID, MirrorState>();
+    private ConsistentHashFunction<Node>            nextProducerRing;
     private HashSet<UUID>                           pausedChannels    = new HashSet<UUID>();
     private ConsistentHashFunction<Node>            producerRing;
     private final Gate                              publishGate       = new Gate();
     private final AtomicInteger                     publishingThreads = new AtomicInteger(
                                                                                           0);
-    private List<UUID>                              relinquishedPrimaries;
     private List<UUID>                              relinquishedMirrors;
+    private List<UUID>                              relinquishedPrimaries;
     private final int                               retryLimit;
     private final Node                              self;
     private final EventSource                       source;
     private final ChannelHandler                    spinnerHandler;
     private final ConcurrentMap<Node, Spinner>      spinners          = new ConcurrentHashMap<Node, Spinner>();
     private ConsistentHashFunction<Node>            weaverRing;
-    private ConsistentHashFunction<Node>            nextProducerRing;
-    private final Pool<Batch>                       batchPool;
 
     public Producer(Node self, EventSource source,
                     ProducerConfiguration configuration) throws IOException {
@@ -214,12 +216,12 @@ public class Producer implements Comparable<Producer> {
         producerRing = new ConsistentHashFunction<Node>(
                                                         configuration.getSkipStrategy(),
                                                         configuration.getNumberOfReplicas());
-        batchPool = new Pool<Batch>(new Factory<Batch>() {
+        batchPool = new Pool<Batch>("Batch", new Factory<Batch>() {
             @Override
-            public Batch newInstance() {
+            public Batch newInstance(Pool<Batch> pool) {
                 return new Batch();
             }
-        }, configuration.getMaxBatchPoolSize());
+        }, BATCH_POOL_SIZE);
         openPublishingGate();
     }
 
@@ -246,6 +248,13 @@ public class Producer implements Comparable<Producer> {
                                        self, batch.rate()));
             }
         }
+        free(batch);
+    }
+
+    /**
+     * @param batch
+     */
+    private void free(Batch batch) {
         batchPool.free(batch);
     }
 
@@ -677,7 +686,7 @@ public class Producer implements Comparable<Producer> {
                                                   String.format("Push to channel %s that does not exist on %s",
                                                                 channel, self));
             }
-            Batch batch = batchPool.allocate();
+            Batch batch = allocate();
             batch.set(state.getMirrorProducer(), channel, sequenceNumber,
                       events);
             if (!controller.accept(batch.batchByteSize())) {
@@ -694,6 +703,10 @@ public class Producer implements Comparable<Producer> {
         } finally {
             publishingThreads.decrementAndGet();
         }
+    }
+
+    private Batch allocate() {
+        return batchPool.allocate();
     }
 
     /**
@@ -902,6 +915,7 @@ public class Producer implements Comparable<Producer> {
     @PreDestroy
     public void terminate() {
         spinnerHandler.terminate();
+        log.info(String.format("%s statistics: %s", this, batchPool));
     }
 
     @Override
