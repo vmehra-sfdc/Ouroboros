@@ -28,6 +28,9 @@ package com.salesforce.ouroboros.util;
 import java.nio.ByteBuffer;
 
 /**
+ * Provides a direct buffer cache. Not thread safe, intended to be put into
+ * thread local.
+ * 
  * @author hhildebrand
  * 
  */
@@ -42,7 +45,7 @@ public class BufferCache {
 
     public ByteBuffer get(int capacity) {
         if (this.count == 0) {
-            return null;
+            return ByteBuffer.allocate(capacity);
         }
         ByteBuffer buffer = this.buffers[this.start];
         if (buffer.capacity() < capacity) {
@@ -58,6 +61,9 @@ public class BufferCache {
                 }
             }
             if (buffer == null) {
+                if (!isEmpty()) {
+                    removeFirst();
+                }
                 return null;
             }
             this.buffers[i] = this.buffers[this.start];
@@ -72,31 +78,27 @@ public class BufferCache {
         return buffer;
     }
 
-    public boolean isEmpty() {
+    private boolean isEmpty() {
         return (this.count == 0);
     }
 
-    public boolean offerFirst(ByteBuffer buffer) {
-        if (this.count >= 8) {
-            return false;
+    public void add(ByteBuffer buffer) {
+        if (this.count < 8) {
+            this.start = (this.start + 7) % 8;
+            this.buffers[this.start] = buffer;
+            this.count += 1;
         }
-        this.start = (this.start + 7) % 8;
-        this.buffers[this.start] = buffer;
-        this.count += 1;
-        return true;
     }
 
-    public boolean offerLast(ByteBuffer buffer) {
-        if (this.count >= 8) {
-            return false;
+    public void recycle(ByteBuffer buffer) {
+        if (this.count < 8) {
+            int i = (this.start + this.count) % 8;
+            this.buffers[i] = buffer;
+            this.count += 1;
         }
-        int i = (this.start + this.count) % 8;
-        this.buffers[i] = buffer;
-        this.count += 1;
-        return true;
     }
 
-    public ByteBuffer removeFirst() {
+    private ByteBuffer removeFirst() {
         assert (this.count > 0);
         ByteBuffer buffer = this.buffers[this.start];
         this.buffers[this.start] = null;

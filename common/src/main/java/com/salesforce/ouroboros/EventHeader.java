@@ -30,6 +30,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
+import com.salesforce.ouroboros.util.BufferCache;
+import com.salesforce.ouroboros.util.Utils;
+
 /**
  * The header containing the metadata of an Event.
  * 
@@ -55,7 +58,7 @@ public class EventHeader implements Cloneable {
      * Append an event to the destination buffer at the current position of the
      * destination. The destination buffer's new position is the next byte after
      * the appended header. The effective EventHeader for the given magic and
-     * payload is written out, followed by the event payload. The bu
+     * payload is written out, followed by the event payload.
      * 
      * @param magic
      *            - the magic value of the effective header
@@ -73,6 +76,54 @@ public class EventHeader implements Cloneable {
         payload.rewind();
         destination.position(position + HEADER_BYTE_SIZE);
         destination.put(payload);
+    }
+
+    /**
+     * Answer the byte length of the event at the offset within a segment
+     * 
+     * @param offset
+     *            - the real offset of the event within the segment
+     * @param segment
+     *            - the segment containing the event
+     * @return the byte length of the event
+     * @throws IOException
+     */
+    public static int payloadLengthOf(long offset, ReadableByteChannel segment)
+                                                                               throws IOException {
+        BufferCache bufferCache = Utils.BUFFER_CACHE.get();
+        ByteBuffer buf = bufferCache.get(4);
+        while (buf.hasRemaining()) {
+            segment.read(buf);
+        }
+        int length = buf.getInt(0);
+        bufferCache.recycle(buf);
+        return length;
+    }
+
+    /**
+     * Answer the total byte length (payload + header) of the event at the
+     * offset within a segment
+     * 
+     * @param offset
+     *            - the real offset of the event within the segment
+     * @param segment
+     *            - the segment containing the event
+     * @return the byte length of the event
+     * @throws IOException
+     */
+    public static int totalLengthOf(long offset, ReadableByteChannel segment)
+                                                                             throws IOException {
+        return payloadLengthOf(offset, segment) + HEADER_BYTE_SIZE;
+    }
+
+    /**
+     * Translate the offset to the position of the first byte of the payload
+     * 
+     * @param offset
+     * @return the translated offset, pointing to the first byte of the payload.
+     */
+    public static long translateToPayload(long offset) {
+        return offset + HEADER_BYTE_SIZE;
     }
 
     protected final ByteBuffer bytes;

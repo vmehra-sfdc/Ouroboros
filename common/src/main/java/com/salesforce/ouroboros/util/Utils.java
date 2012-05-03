@@ -41,7 +41,13 @@ import com.fasterxml.uuid.impl.NameBasedGenerator;
  * 
  */
 final public class Utils {
-    private final static NameBasedGenerator UUID_GENERATOR;
+    private final static NameBasedGenerator      UUID_GENERATOR;
+    public static final ThreadLocal<BufferCache> BUFFER_CACHE = new ThreadLocal<BufferCache>() {
+                                                                  @Override
+                                                                  protected BufferCache initialValue() {
+                                                                      return new BufferCache();
+                                                                  }
+                                                              };
 
     static {
         MessageDigest digester;
