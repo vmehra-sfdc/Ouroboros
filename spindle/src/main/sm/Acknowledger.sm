@@ -93,6 +93,8 @@ Entry {
 }
 
 Default {
+	writeReady
+		nil{}
 	close
 		Closed{}
 }
