@@ -275,11 +275,11 @@ public class Producer implements Comparable<Producer> {
             }
         } else {
             PrimaryState primaryState = channelState.get(ack.channel);
-            log.info(String.format("null mirror state for %s on %s, channel state mirror: %s",
-                                   ack,
-                                   self,
-                                   primaryState == null ? "primary state is null"
-                                                       : primaryState.getMirrorProducer()));
+            log.error(String.format("null mirror state for %s on %s, channel state mirror: %s",
+                                    ack,
+                                    self,
+                                    primaryState == null ? "primary state is null"
+                                                        : primaryState.getMirrorProducer()));
         }
     }
 

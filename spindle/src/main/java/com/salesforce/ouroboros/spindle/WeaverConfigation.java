@@ -84,7 +84,7 @@ public class WeaverConfigation {
                                                                                              0);
     private int                       replicationQueueSize           = DEFAULT_REPLICATION_QUEUE_SIZE;
     private final SocketOptions       replicationSocketOptions       = new SocketOptions();
-    private ExecutorService           replicators                    = Executors.newFixedThreadPool(5,
+    private ExecutorService           replicators                    = Executors.newFixedThreadPool(6,
                                                                                                     new LabeledThreadFactory(
                                                                                                                              REPLICATOR));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
@@ -94,7 +94,7 @@ public class WeaverConfigation {
                                                                                              "127.0.0.1",
                                                                                              0);
 
-    private ExecutorService           spindles                       = Executors.newFixedThreadPool(5,
+    private ExecutorService           spindles                       = Executors.newFixedThreadPool(6,
                                                                                                     new LabeledThreadFactory(
                                                                                                                              SPINDLE));
     private final SocketOptions       spindleSocketOptions           = new SocketOptions();
@@ -102,7 +102,7 @@ public class WeaverConfigation {
     private InetSocketAddress         xeroxAddress                   = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
-    private ExecutorService           xeroxes                        = Executors.newFixedThreadPool(3,
+    private ExecutorService           xeroxes                        = Executors.newFixedThreadPool(4,
                                                                                                     new LabeledThreadFactory(
                                                                                                                              XEROX));
     private final SocketOptions       xeroxSocketOptions             = new SocketOptions();

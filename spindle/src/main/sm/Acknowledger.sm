@@ -37,33 +37,31 @@
 %import java.util.UUID
 %access public
 
-%start AcknowledgerFSM::Waiting
+%start AcknowledgerFSM::Suspended
 %map AcknowledgerFSM
-%% 
-Waiting
+%%
+
+Suspended {
+	connect
+		Waiting {}
+}
+
+Waiting 
 Entry {
-	processPendingAcks();
+	nextQuantum();
 }
 {
-	ack(channel: UUID, sequenceNumber: long)
-		WriteBatch{
-			enqueue(channel, sequenceNumber);
-		}
-
-	waiting
-		nil {}
-		
-	writeReady
-		nil {}
+	writeBatch
+		WriteBatch{}
 }
 
 WriteBatch
 Entry {
-	processPendingAcks();
+	nextBatch();
 }
 {
 	writeReady
-		[!ctxt.writeBuffer() && !ctxt.inError()]
+		[!ctxt.writeBatch() && !ctxt.inError()]
 		nil{
 			selectForWrite();
 		}
@@ -73,13 +71,17 @@ Entry {
 		Closed{}
 		
 	writeReady
-		[ctxt.hasPending()]
+		[ctxt.hasNext()]
 		WriteBatch{}
 		
-	writeReady 
+	writeReady
 		Waiting{}
 		
-	waiting
+	payloadWritten
+		[ctxt.hasNext()]
+		WriteBatch{}
+		
+	payloadWritten
 		Waiting{}
 }
 
@@ -91,10 +93,6 @@ Entry {
 }
 
 Default {
-	ack(channel: UUID, sequenceNumber: long)
-		nil{
-			enqueue(channel, sequenceNumber);
-		}
 	close
 		Closed{}
 }

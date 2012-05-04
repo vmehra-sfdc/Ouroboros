@@ -26,16 +26,20 @@
 package com.salesforce.ouroboros.spindle.source;
 
 import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.ByteBuffer;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
@@ -48,31 +52,30 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class Acknowledger {
+    static final Logger                        log            = LoggerFactory.getLogger(Acknowledger.class.getCanonicalName());
+    static final int                           MAX_BATCH_SIZE = 100;
 
-    static final Logger                log     = LoggerFactory.getLogger(Acknowledger.class.getCanonicalName());
-
-    private ByteBuffer                 buffer;
-    private final AcknowledgerContext  fsm     = new AcknowledgerContext(this);
-    private SocketChannelHandler       handler;
-    private boolean                    inError;
-    private final Queue<BatchIdentity> pending = new LinkedList<BatchIdentity>();
-    private final Bundle               bundle;
-    private Node                       producer;
+    private final ByteBuffer                   buffer         = ByteBuffer.allocateDirect(MAX_BATCH_SIZE
+                                                                                          * BatchIdentity.BYTE_SIZE);
+    private final Bundle                       bundle;
+    private final AcknowledgerContext          fsm            = new AcknowledgerContext(
+                                                                                        this);
+    private SocketChannelHandler               handler;
+    private boolean                            inError;
+    private final BlockingQueue<BatchIdentity> pending        = new LinkedBlockingQueue<>();
+    private Node                               producer;
+    private final ArrayList<BatchIdentity>     drain          = new ArrayList<>(
+                                                                                MAX_BATCH_SIZE);
+    private final AtomicBoolean                run            = new AtomicBoolean(
+                                                                                  true);
+    private final Thread                       consumer;
+    private final Semaphore                    quantum        = new Semaphore(0);
 
     public Acknowledger(Bundle bundle) {
         this.bundle = bundle;
-    }
-
-    /**
-     * Replicate the event to the mirror
-     * 
-     * @param eventChannel
-     * @param offset
-     * @param segment
-     * @param size
-     */
-    public void acknowledge(UUID channel, long sequenceNumber) {
-        fsm.ack(channel, sequenceNumber);
+        consumer = new Thread(consumerAction());
+        consumer.setName(String.format("Consumer thread for Acknowledger[?<%s]",
+                                       bundle.getId()));
     }
 
     public void close() {
@@ -80,12 +83,24 @@ public class Acknowledger {
     }
 
     public void closing() {
+        run.set(false);
+        quantum.release(10);
         pending.clear();
         bundle.closeAcknowledger(producer);
     }
 
     public void connect(SocketChannelHandler handler) {
+        log.info(String.format("connecting %s", fsm.getName()));
         this.handler = handler;
+        consumer.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                log.warn(String.format("Uncaught exception on %s", t), e);
+            }
+        });
+        consumer.setDaemon(true);
+        consumer.start();
+        fsm.connect();
     }
 
     public AcknowledgerState getState() {
@@ -94,6 +109,8 @@ public class Acknowledger {
 
     public void setFsmName(String fsmName) {
         fsm.setName(fsmName);
+        consumer.setName(String.format("Consumer thread for Acknowledger[%s]",
+                                       fsmName));
     }
 
     /**
@@ -109,14 +126,15 @@ public class Acknowledger {
 
     private void error() {
         inError = true;
-        buffer = null;
     }
 
-    protected void enqueue(UUID channel, long sequenceNumber) {
+    public void acknowledge(UUID channel, long sequenceNumber) {
+        log.info(String.format("acknowledging %s:%s on %s", channel,
+                               sequenceNumber, fsm.getName()));
         pending.add(new BatchIdentity(channel, sequenceNumber));
     }
 
-    protected boolean hasPending() {
+    protected boolean hasNext() {
         return !pending.isEmpty();
     }
 
@@ -124,36 +142,36 @@ public class Acknowledger {
         return inError;
     }
 
-    protected void processPendingAcks() {
-        if (pending.isEmpty()) {
-            return;
+    protected void nextBatch() {
+        log.info(String.format("Processing next batch on %s", fsm.getName()));
+        buffer.clear();
+        pending.drainTo(drain, MAX_BATCH_SIZE - 1);
+        for (BatchIdentity bid : drain) {
+            log.info(String.format("Serializing %s on %s", bid, fsm.getName()));
+            bid.serializeOn(buffer);
         }
-        int batchByteSize = pending.size() * BatchHeader.HEADER_BYTE_SIZE;
-        if (buffer != null && buffer.capacity() >= batchByteSize) {
-            buffer.rewind();
-        } else {
-            buffer = ByteBuffer.allocateDirect(batchByteSize);
-        }
-        while (!pending.isEmpty()) {
-            pending.remove().serializeOn(buffer);
-        }
+        drain.clear();
         buffer.flip();
-        if (!writeBuffer()) {
+        if (writeBatch()) {
+            fsm.payloadWritten();
+        } else {
             if (inError) {
                 fsm.close();
             } else {
-                handler.selectForWrite();
+                if (inError) {
+                    fsm.close();
+                } else {
+                    handler.selectForWrite();
+                }
             }
-            return;
         }
-        fsm.waiting();
     }
 
     protected void selectForWrite() {
         handler.selectForWrite();
     }
 
-    protected boolean writeBuffer() {
+    protected boolean writeBatch() {
         try {
             if (handler.getChannel().write(buffer) < 0) {
                 if (log.isTraceEnabled()) {
@@ -174,5 +192,37 @@ public class Acknowledger {
             return false;
         }
         return !buffer.hasRemaining();
+    }
+
+    protected Runnable consumerAction() {
+        return new Runnable() {
+            @Override
+            public void run() {
+                while (run.get()) {
+                    try {
+                        quantum.acquire();
+                        log.info(String.format("processing quantum on %s",
+                                               fsm.getName()));
+                        do {
+                            if (!run.get()) {
+                                return;
+                            }
+                            BatchIdentity bid = pending.poll(1,
+                                                             TimeUnit.SECONDS);
+                            if (bid != null) {
+                                drain.add(bid);
+                            }
+                        } while (drain.isEmpty());
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                    fsm.writeBatch();
+                }
+            }
+        };
+    }
+
+    protected void nextQuantum() {
+        quantum.release();
     }
 }

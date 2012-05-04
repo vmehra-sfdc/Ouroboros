@@ -11,6 +11,9 @@ digraph Acknowledger {
         // States (Nodes)
         //
 
+        "AcknowledgerFSM::Suspended"
+            [label="{Suspended}"];
+
         "AcknowledgerFSM::Waiting"
             [label="{Waiting}"];
 
@@ -27,8 +30,14 @@ digraph Acknowledger {
         // Transitions (Edges)
         //
 
+        "AcknowledgerFSM::Suspended" -> "AcknowledgerFSM::Waiting"
+            [label="connect/\l"];
+
+        "AcknowledgerFSM::Suspended" -> "AcknowledgerFSM::Closed"
+            [label="close/\l"];
+
         "AcknowledgerFSM::Waiting" -> "AcknowledgerFSM::WriteBatch"
-            [label="ack/\l"];
+            [label="writeBatch/\l"];
 
         "AcknowledgerFSM::Waiting" -> "AcknowledgerFSM::Closed"
             [label="close/\l"];
@@ -42,8 +51,11 @@ digraph Acknowledger {
         "AcknowledgerFSM::WriteBatch" -> "AcknowledgerFSM::Waiting"
             [label="writeReady/\l"];
 
+        "AcknowledgerFSM::WriteBatch" -> "AcknowledgerFSM::WriteBatch"
+            [label="payloadWritten/\l"];
+
         "AcknowledgerFSM::WriteBatch" -> "AcknowledgerFSM::Waiting"
-            [label="waiting/\l"];
+            [label="payloadWritten/\l"];
 
         "AcknowledgerFSM::WriteBatch" -> "AcknowledgerFSM::Closed"
             [label="close/\l"];
@@ -51,7 +63,7 @@ digraph Acknowledger {
         "AcknowledgerFSM::Closed" -> "AcknowledgerFSM::Closed"
             [label="close/\l"];
 
-        "%start" -> "AcknowledgerFSM::Waiting"
+        "%start" -> "AcknowledgerFSM::Suspended"
     }
 
 }

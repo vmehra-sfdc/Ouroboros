@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=5>
+        <th colspan=6>
           Transition
         </th>
       </tr>
@@ -27,17 +27,16 @@
          Exit
         </th>
         <th>
-          ack
-          <br>
-          (UUID,
-          <br>
-          long)
-        </th>
-        <th>
           close
         </th>
         <th>
-          waiting
+          connect
+        </th>
+        <th>
+          payloadWritten
+        </th>
+        <th>
+          writeBatch
         </th>
         <th>
           writeReady
@@ -48,36 +47,53 @@
       </tr>
       <tr>
         <td>
+          Suspended
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Waiting
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
           Waiting
         </td>
         <td>
           <pre>
-processPendingAcks();
+nextQuantum();
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
         <td>
           <pre>
   WriteBatch
-  {
-    enqueue(channel, sequenceNumber);
-  }
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  Waiting
   {}
           </pre>
         </td>
         <td>
-          <pre>
-  Waiting
-  {}
-          </pre>
         </td>
         <td>
         </td>
@@ -88,7 +104,7 @@ processPendingAcks();
         </td>
         <td>
           <pre>
-    processPendingAcks();
+nextBatch();
           </pre>
         </td>
         <td>
@@ -99,13 +115,19 @@ processPendingAcks();
         </td>
         <td>
           <pre>
+[ctxt.hasNext()]
+  WriteBatch
+  {}
+
   Waiting
   {}
           </pre>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
-[!ctxt.writeBuffer() && !ctxt.inError()]
+[!ctxt.writeBatch() && !ctxt.inError()]
   WriteBatch
   {
     selectForWrite();
@@ -115,7 +137,7 @@ processPendingAcks();
   Closed
   {}
 
-[ctxt.hasPending()]
+[ctxt.hasNext()]
   WriteBatch
   {}
 
@@ -134,6 +156,8 @@ processPendingAcks();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>

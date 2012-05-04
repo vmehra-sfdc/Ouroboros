@@ -161,10 +161,6 @@ public class BatchWriter {
         return batch != null;
     }
 
-    protected boolean hasPendingBatch() {
-        return queued.poll() != null;
-    }
-
     protected boolean inError() {
         return inError;
     }
