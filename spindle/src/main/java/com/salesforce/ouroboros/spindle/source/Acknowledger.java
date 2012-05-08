@@ -90,7 +90,6 @@ public class Acknowledger {
     }
 
     public void connect(SocketChannelHandler handler) {
-        log.info(String.format("connecting %s", fsm.getName()));
         this.handler = handler;
         consumer.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
             @Override
@@ -129,8 +128,6 @@ public class Acknowledger {
     }
 
     public void acknowledge(UUID channel, long sequenceNumber) {
-        log.info(String.format("acknowledging %s:%s on %s", channel,
-                               sequenceNumber, fsm.getName()));
         pending.add(new BatchIdentity(channel, sequenceNumber));
     }
 
@@ -143,7 +140,6 @@ public class Acknowledger {
     }
 
     protected void nextBatch() {
-        log.info(String.format("Processing next batch on %s", fsm.getName()));
         buffer.clear();
         pending.drainTo(drain, MAX_BATCH_SIZE - 1);
         for (BatchIdentity bid : drain) {
@@ -201,8 +197,6 @@ public class Acknowledger {
                 while (run.get()) {
                     try {
                         quantum.acquire();
-                        log.info(String.format("processing quantum on %s",
-                                               fsm.getName()));
                         do {
                             if (!run.get()) {
                                 return;

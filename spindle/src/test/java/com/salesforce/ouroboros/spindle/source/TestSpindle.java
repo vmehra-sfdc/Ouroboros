@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Test;
 import org.mockito.internal.verification.Times;
@@ -52,6 +53,7 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.source.SpindleContext.SpindleFSM;
+import com.salesforce.ouroboros.testUtils.Util;
 
 /**
  * 
@@ -108,6 +110,7 @@ public class TestSpindle {
             }
         }).when(socketChannel).read(isA(ByteBuffer.class));
 
+        final AtomicBoolean written = new AtomicBoolean();
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
@@ -115,11 +118,11 @@ public class TestSpindle {
                 BatchIdentity identity = new BatchIdentity(buffer);
                 assertEquals(channel, identity.channel);
                 assertEquals(sequenceNumber, identity.sequenceNumber);
+                written.set(true);
                 return BatchIdentity.BYTE_SIZE;
             }
         }).when(socketChannel).write(isA(ByteBuffer.class));
 
-        when(socketChannel.write(isA(ByteBuffer.class))).thenReturn(0);
         when(handler.getChannel()).thenReturn(socketChannel);
         assertEquals(SpindleFSM.Suspended, spindle.getState());
         spindle.accept(handler);
@@ -131,6 +134,12 @@ public class TestSpindle {
         spindle.acknowledger.acknowledge(channel, sequenceNumber);
         verify(segment).transferFrom(socketChannel, 0, event.totalSize());
         spindle.writeReady();
+        Util.waitFor("Acknowledgement not written", new Util.Condition() {
+            @Override
+            public boolean value() {
+                return written.get();
+            }
+        }, 2000, 100);
         verify(socketChannel, new Times(2)).write(isA(ByteBuffer.class));
     }
 }
