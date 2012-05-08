@@ -143,7 +143,6 @@ public class Acknowledger {
         buffer.clear();
         pending.drainTo(drain, MAX_BATCH_SIZE - 1);
         for (BatchIdentity bid : drain) {
-            log.info(String.format("Serializing %s on %s", bid, fsm.getName()));
             bid.serializeOn(buffer);
         }
         drain.clear();

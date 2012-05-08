@@ -34,7 +34,6 @@
 
 %class Acknowledger
 %package com.salesforce.ouroboros.spindle.source
-%import java.util.UUID
 %access public
 
 %start AcknowledgerFSM::Suspended

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011, salesforce.com, inc.
+ * Copyright (c) 2012, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -26,16 +26,17 @@
 package com.salesforce.ouroboros.spindle.source;
 
 import static junit.framework.Assert.assertEquals;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
-import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 import org.mockito.internal.verification.Times;
@@ -43,77 +44,71 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.BatchHeader;
-import com.salesforce.ouroboros.Event;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
-import com.salesforce.ouroboros.spindle.EventChannel;
-import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
-import com.salesforce.ouroboros.spindle.Segment;
-import com.salesforce.ouroboros.spindle.source.SpindleContext.SpindleFSM;
+import com.salesforce.ouroboros.testUtils.Util;
 
 /**
- * 
  * @author hhildebrand
  * 
  */
-public class TestSpindle {
+public class TestAcknowledger {
 
     @Test
-    public void testEstablish() throws Exception {
+    public void testAcknowledge() throws IOException, InterruptedException {
+
         Bundle bundle = mock(Bundle.class);
         when(bundle.getId()).thenReturn(new Node(0));
-        Spindle spindle = new Spindle(bundle);
-        assertEquals(SpindleFSM.Suspended, spindle.getState());
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
-        Segment segment = mock(Segment.class);
-        final Node node = new Node(0x1638);
-
-        EventChannel eventChannel = mock(EventChannel.class);
-        Node mirror = new Node(0x1638);
-        int magic = BatchHeader.MAGIC;
         final UUID channel = UUID.randomUUID();
         final long sequenceNumber = System.currentTimeMillis();
-        final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
-        ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
-        Event event = new Event(magic, payloadBuffer);
-        final BatchHeader header = new BatchHeader(mirror, event.totalSize(),
-                                                   magic, channel,
-                                                   sequenceNumber);
-        when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
-        when(eventChannel.appendSegmentFor(eq(header))).thenReturn(new AppendSegment(
-                                                                                     segment,
-                                                                                     0,
-                                                                                     0));
-        when(eventChannel.isDuplicate(eq(header))).thenReturn(false);
-        when(segment.transferFrom(socketChannel, 0, event.totalSize())).thenReturn(0L);
-        header.rewind();
-
-        doReturn(0).doAnswer(new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                buffer.putInt(Spindle.MAGIC);
-                node.serialize(buffer);
-                return Spindle.HANDSHAKE_SIZE;
-            }
-        }).doAnswer(new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                buffer.put(header.getBytes());
-                return 100;
-            }
-        }).when(socketChannel).read(isA(ByteBuffer.class));
 
         when(handler.getChannel()).thenReturn(socketChannel);
-        assertEquals(SpindleFSM.Suspended, spindle.getState());
-        spindle.accept(handler);
-        assertEquals(SpindleFSM.Handshake, spindle.getState());
-        spindle.readReady();
-        assertEquals(SpindleFSM.Established, spindle.getState());
-        spindle.readReady();
-        verify(handler, new Times(3)).selectForRead();
+
+        final AtomicInteger written = new AtomicInteger(0);
+        Answer<Integer> firstWrite = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                written.incrementAndGet();
+                return 0;
+            }
+        };
+        Answer<Integer> writeBatchBytes = new Answer<Integer>() {
+            @Override
+            public Integer answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                BatchIdentity identity = new BatchIdentity(buffer);
+                assertEquals(channel, identity.channel);
+                assertEquals(sequenceNumber, identity.sequenceNumber);
+                written.incrementAndGet();
+                return BatchIdentity.BYTE_SIZE;
+            }
+        };
+        doAnswer(firstWrite).doAnswer(writeBatchBytes).doAnswer(writeBatchBytes).doAnswer(writeBatchBytes).when(socketChannel).write(isA(ByteBuffer.class));
+
+        Acknowledger acknowledger = new Acknowledger(bundle);
+        acknowledger.connect(handler);
+        for (int i = 0; i < 3; i++) {
+            acknowledger.acknowledge(channel, sequenceNumber);
+        }
+        Util.waitFor("First write never occurred", new Util.Condition() {
+            @Override
+            public boolean value() {
+                return written.get() == 1;
+            }
+        }, 2000, 100);
+
+        acknowledger.writeReady();
+        acknowledger.writeReady();
+        acknowledger.writeReady();
+        Util.waitFor("Acknowledgement not written", new Util.Condition() {
+            @Override
+            public boolean value() {
+                return written.get() == 4;
+            }
+        }, 2000, 100);
+        verify(socketChannel, new Times(4)).write(isA(ByteBuffer.class));
     }
 }
