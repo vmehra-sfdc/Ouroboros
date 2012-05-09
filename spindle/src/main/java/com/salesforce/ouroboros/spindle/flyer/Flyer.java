@@ -25,10 +25,10 @@
  */
 package com.salesforce.ouroboros.spindle.flyer;
 
-import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import com.salesforce.ouroboros.spindle.EventChannel;
 
@@ -42,10 +42,14 @@ import com.salesforce.ouroboros.spindle.EventChannel;
  */
 public class Flyer {
     private final Set<EventChannel> subscriptions = new HashSet<>();
-    private final Deque<EventSpan>  thread        = new ArrayDeque<>();
+    private final Deque<EventSpan>  thread        = new LinkedBlockingDeque<>();
 
     public void subscribe(EventChannel channel, long lastEventId) {
         subscriptions.add(channel);
         channel.subscribe(this, lastEventId);
+    }
+
+    public void deliver(EventSpan span) {
+        thread.add(span);
     }
 }
