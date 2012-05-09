@@ -25,21 +25,27 @@
  */
 package com.salesforce.ouroboros.spindle.flyer;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.salesforce.ouroboros.spindle.EventChannel;
 
 /**
- * Represents the subscription state of a listening client.
+ * 
+ * “For Fate has wove the thread of life with pain And twins even from the birth
+ * are Misery and Man”
  * 
  * @author hhildebrand
  * 
  */
 public class Flyer {
-    private final Map<EventChannel, Long> subscriptions = new HashMap<EventChannel, Long>();
-    private final AtomicInteger           maxEvents     = new AtomicInteger(0);
-    private volatile ScheduledFuture<?>   timeout;
+    private final Set<EventChannel> subscriptions = new HashSet<>();
+    private final Deque<EventSpan>  thread        = new ArrayDeque<>();
+
+    public void subscribe(EventChannel channel, long lastEventId) {
+        subscriptions.add(channel);
+        channel.subscribe(this, lastEventId);
+    }
 }

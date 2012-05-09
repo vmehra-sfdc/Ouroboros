@@ -25,11 +25,29 @@
  */
 package com.salesforce.ouroboros.spindle.flyer;
 
+import com.salesforce.ouroboros.spindle.Segment;
+
 /**
+ * Marks a span of events in a channel's segment
+ * 
  * @author hhildebrand
  * 
  */
-public class Position {
-    private long eventId;
-    private long currentPosition;
+public class EventSpan {
+    // The offset of the last byte of the last event in the span
+    private final long    endpoint;
+    // The offset of the first event in the span
+    private final long    offset;
+    // The segment that contains the span
+    private final Segment segment;
+
+    /**
+     * @param segment
+     * @param offset
+     */
+    public EventSpan(Segment segment, long offset, long endpoint) {
+        this.segment = segment;
+        this.offset = offset;
+        this.endpoint = endpoint;
+    }
 }

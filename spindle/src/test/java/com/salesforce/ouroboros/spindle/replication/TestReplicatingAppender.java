@@ -49,6 +49,7 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
@@ -61,10 +62,10 @@ public class TestReplicatingAppender {
 
     @Test
     public void testInboundReplication() throws Exception {
+        EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("inbound-replication", ".tst");
         tmpFile.deleteOnExit();
-        Segment segment = new Segment(tmpFile);
-        segment.openForAppend();
+        Segment segment = new Segment(eventChannel, tmpFile, Mode.APPEND);
         Acknowledger acknowledger = mock(Acknowledger.class);
 
         int magic = BatchHeader.MAGIC;
@@ -82,7 +83,6 @@ public class TestReplicatingAppender {
                                                                  sequenceNumber,
                                                                  0, 0);
         payloadBuffer.clear();
-        EventChannel eventChannel = mock(EventChannel.class);
         Bundle bundle = mock(Bundle.class);
         when(bundle.getId()).thenReturn(new Node(0));
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
@@ -143,8 +143,7 @@ public class TestReplicatingAppender {
         inboundRead.join(4000);
         assertEquals(AbstractAppenderFSM.Ready, replicator.getState());
 
-        segment = new Segment(tmpFile);
-        segment.openForRead();
+        segment = new Segment(eventChannel, tmpFile, Mode.READ);
         Event replicatedEvent = new Event(segment);
         assertEquals(event.size(), replicatedEvent.size());
         assertEquals(event.getMagic(), replicatedEvent.getMagic());

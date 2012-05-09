@@ -26,11 +26,14 @@
 package com.salesforce.ouroboros.spindle;
 
 import static junit.framework.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.util.Random;
 
 import org.junit.Test;
+
+import com.salesforce.ouroboros.spindle.Segment.Mode;
 
 /**
  * 
@@ -51,7 +54,8 @@ public class TestSegment {
                              + EventChannel.SEGMENT_SUFFIX);
         file.deleteOnExit();
 
-        Segment segment = new Segment(file);
+        Segment segment = new Segment(mock(EventChannel.class), file,
+                                      Mode.APPEND);
         assertEquals(prefix, segment.getPrefix());
     }
 }

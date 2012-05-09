@@ -62,6 +62,7 @@ import com.salesforce.ouroboros.producer.spinner.Spinner;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
@@ -81,8 +82,7 @@ public class TestSpinnerSpindle {
         segmentFile.delete();
         segmentFile.deleteOnExit();
         EventChannel eventChannel = mock(EventChannel.class);
-        Segment segment = new Segment(segmentFile);
-        segment.openForAppend();
+        Segment segment = new Segment(eventChannel, segmentFile, Mode.APPEND);
         final Bundle bundle = mock(Bundle.class);
         Node toNode = new Node(0);
         when(bundle.getId()).thenReturn(toNode);
@@ -183,7 +183,7 @@ public class TestSpinnerSpindle {
 
         segment.force(false);
         segment.close();
-        segment.openForRead();
+        segment = new Segment(eventChannel, segmentFile, Mode.READ);
         segment.position(0);
 
         Event event;

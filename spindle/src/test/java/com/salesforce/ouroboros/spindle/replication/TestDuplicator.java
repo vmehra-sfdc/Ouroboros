@@ -51,6 +51,7 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorFSM;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
@@ -110,10 +111,10 @@ public class TestDuplicator {
 
     @Test
     public void testOutboundReplication() throws Exception {
+        EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("outbound-replication", ".tst");
         tmpFile.deleteOnExit();
-        Segment segment = new Segment(tmpFile);
-        segment.openForAppend();
+        Segment segment = new Segment(eventChannel, tmpFile, Mode.APPEND);
         Bundle bundle = mock(Bundle.class);
         Acknowledger acknowledger = mock(Acknowledger.class);
 
@@ -122,14 +123,13 @@ public class TestDuplicator {
         final byte[] payload = "Give me Slack, or give me Food, or Kill me".getBytes();
         ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
         Event event = new Event(magic, payloadBuffer);
-        EventChannel eventChannel = mock(EventChannel.class);
 
         event.rewind();
         event.write(segment);
         segment.write(payloadBuffer);
         segment.force(false);
         segment.close();
-        segment.openForRead();
+        segment = new Segment(eventChannel, tmpFile, Mode.READ);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
@@ -195,11 +195,12 @@ public class TestDuplicator {
     @Test
     public void testReplicationLoop() throws Exception {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
+        EventChannel eventChannel = mock(EventChannel.class);
 
         File inboundTmpFile = File.createTempFile("inbound-replication", ".tst");
         inboundTmpFile.deleteOnExit();
-        Segment inboundSegment = new Segment(inboundTmpFile);
-        inboundSegment.openForAppend();
+        Segment inboundSegment = new Segment(eventChannel, inboundTmpFile,
+                                             Mode.APPEND);
         EventChannel inboundEventChannel = mock(EventChannel.class);
         Bundle inboundBundle = mock(Bundle.class);
         when(inboundBundle.getId()).thenReturn(new Node(0));
@@ -208,12 +209,11 @@ public class TestDuplicator {
 
         final ReplicatingAppender inboundReplicator = new ReplicatingAppender(
                                                                               inboundBundle);
-        EventChannel eventChannel = mock(EventChannel.class);
 
         File tmpOutboundFile = File.createTempFile("outbound", ".tst");
         tmpOutboundFile.deleteOnExit();
-        Segment outboundSegment = new Segment(tmpOutboundFile);
-        outboundSegment.openForAppend();
+        Segment outboundSegment = new Segment(eventChannel, tmpOutboundFile,
+                                              Mode.APPEND);
 
         int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
@@ -230,7 +230,7 @@ public class TestDuplicator {
         event.write(outboundSegment);
         outboundSegment.force(false);
         outboundSegment.close();
-        outboundSegment.openForRead();
+        outboundSegment = new Segment(eventChannel, tmpOutboundFile, Mode.READ);
         long offset = 0L;
 
         when(inboundBundle.eventChannelFor(channel)).thenReturn(inboundEventChannel);
@@ -304,8 +304,8 @@ public class TestDuplicator {
         inboundSegment.close();
         outboundSegment.close();
 
-        Segment segment = new Segment(inboundTmpFile);
-        segment.openForRead();
+        Segment segment = new Segment(inboundEventChannel, inboundTmpFile,
+                                      Mode.READ);
         assertTrue("Nothing written to inbound segment", segment.size() > 0);
         Event replicatedEvent = new Event(segment);
         assertEquals(event.size(), replicatedEvent.size());

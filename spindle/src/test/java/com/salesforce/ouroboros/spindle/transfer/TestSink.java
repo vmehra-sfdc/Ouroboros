@@ -55,6 +55,7 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.WeaverCoordinator;
+import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.transfer.SinkContext.SinkFSM;
 import com.salesforce.ouroboros.spindle.transfer.XeroxContext.XeroxFSM;
 import com.salesforce.ouroboros.testUtils.Util;
@@ -296,14 +297,14 @@ public class TestSink {
         File inboundTmpFile1 = File.createTempFile("sink1", ".tst");
         inboundTmpFile1.delete();
         inboundTmpFile1.deleteOnExit();
-        Segment inboundSegment1 = new Segment(inboundTmpFile1);
-        inboundSegment1.openForAppend();
+        Segment inboundSegment1 = new Segment(inboundEventChannel,
+                                              inboundTmpFile1, Mode.APPEND);
 
         File inboundTmpFile2 = File.createTempFile("sink2", ".tst");
         inboundTmpFile2.delete();
         inboundTmpFile2.deleteOnExit();
-        Segment inboundSegment2 = new Segment(inboundTmpFile2);
-        inboundSegment2.openForAppend();
+        Segment inboundSegment2 = new Segment(inboundEventChannel,
+                                              inboundTmpFile2, Mode.APPEND);
 
         EventChannel outboundEventChannel = mock(EventChannel.class);
         SocketChannelHandler outboundHandler = mock(SocketChannelHandler.class);
@@ -312,18 +313,15 @@ public class TestSink {
                                          + EventChannel.SEGMENT_SUFFIX);
         tmpOutboundFile1.delete();
         tmpOutboundFile1.deleteOnExit();
-        Segment outboundSegment1 = new Segment(tmpOutboundFile1);
-        outboundSegment1.openForAppend();
+        Segment outboundSegment1 = new Segment(outboundEventChannel,
+                                               tmpOutboundFile1, Mode.APPEND);
 
         File tmpOutboundFile2 = new File(Long.toHexString(prefix2)
                                          + EventChannel.SEGMENT_SUFFIX);
         tmpOutboundFile2.delete();
         tmpOutboundFile2.deleteOnExit();
-        Segment outboundSegment2 = new Segment(tmpOutboundFile2);
-        outboundSegment2.openForAppend();
-        LinkedList<Segment> segments = new LinkedList<Segment>(
-                                                               Arrays.asList(outboundSegment1,
-                                                                             outboundSegment2));
+        Segment outboundSegment2 = new Segment(outboundEventChannel,
+                                               tmpOutboundFile2, Mode.APPEND);
 
         Node toNode = new Node(0, 0, 0);
         Node fromNode = new Node(1, 1, 1);
@@ -353,7 +351,6 @@ public class TestSink {
         when(inboundEventChannel.appendSegmentFor(prefix1)).thenReturn(inboundSegment1);
         when(inboundEventChannel.appendSegmentFor(prefix2)).thenReturn(inboundSegment2);
         when(outboundEventChannel.getId()).thenReturn(channelId);
-        when(outboundEventChannel.getSegmentStack()).thenReturn(segments);
 
         Event event1 = new Event(
                                  666,
@@ -362,7 +359,8 @@ public class TestSink {
         event1.write(outboundSegment1);
         outboundSegment1.force(false);
         outboundSegment1.close();
-        outboundSegment1.openForRead();
+        outboundSegment1 = new Segment(outboundEventChannel, tmpOutboundFile1,
+                                       Mode.READ);
 
         Event event2 = new Event(
                                  666,
@@ -371,7 +369,12 @@ public class TestSink {
         event2.write(outboundSegment2);
         outboundSegment2.force(false);
         outboundSegment2.close();
-        outboundSegment2.openForRead();
+        outboundSegment2 = new Segment(outboundEventChannel, tmpOutboundFile2,
+                                       Mode.READ);
+        LinkedList<Segment> appendSegments = new LinkedList<Segment>(
+                                                                     Arrays.asList(outboundSegment1,
+                                                                                   outboundSegment2));
+        when(outboundEventChannel.getSegmentStack()).thenReturn(appendSegments);
 
         Rendezvous rendezvous = mock(Rendezvous.class);
         final Xerox xerox = new Xerox(fromNode, toNode);
@@ -429,10 +432,10 @@ public class TestSink {
         inboundSegment1.close();
         inboundSegment2.close();
 
-        inboundSegment1 = new Segment(inboundTmpFile1);
-        inboundSegment1.openForRead();
-        inboundSegment2 = new Segment(inboundTmpFile2);
-        inboundSegment2.openForRead();
+        inboundSegment1 = new Segment(inboundEventChannel, inboundTmpFile1,
+                                      Mode.READ);
+        inboundSegment2 = new Segment(inboundEventChannel, inboundTmpFile2,
+                                      Mode.READ);
 
         Event testEvent = new Event(inboundSegment1);
         assertEquals(event1.getCrc32(), testEvent.getCrc32());

@@ -31,7 +31,6 @@ import static java.nio.file.StandardOpenOption.READ;
 import static java.nio.file.StandardOpenOption.WRITE;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
@@ -61,11 +60,34 @@ import java.nio.channels.WritableByteChannel;
 public class Segment implements Channel, InterruptibleChannel, ByteChannel,
         GatheringByteChannel, ScatteringByteChannel, Cloneable {
 
-    private FileChannel channel;
-    private final File  file;
+    public static enum Mode {
+        APPEND, READ;
+    }
 
-    public Segment(File file) throws FileNotFoundException {
+    private final EventChannel channel;
+    private final File         file;
+    private final FileChannel  fileChannel;
+
+    public Segment(EventChannel channel, File file, Mode mode)
+                                                              throws IOException {
         this.file = file;
+        this.channel = channel;
+        switch (mode) {
+            case APPEND: {
+                fileChannel = FileChannel.open(file.toPath(), CREATE, WRITE,
+                                               APPEND);
+                break;
+            }
+            case READ: {
+                fileChannel = FileChannel.open(file.toPath(), READ);
+                break;
+            }
+            default: {
+                throw new IllegalArgumentException(
+                                                   String.format("Unknown segment mode: %s",
+                                                                 mode));
+            }
+        }
     }
 
     /**
@@ -74,7 +96,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     @Override
     public final void close() throws IOException {
-        channel.close();
+        fileChannel.close();
     }
 
     /**
@@ -96,7 +118,11 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.FileChannel#force(boolean)
      */
     public void force(boolean paramBoolean) throws IOException {
-        channel.force(paramBoolean);
+        fileChannel.force(paramBoolean);
+    }
+
+    public EventChannel getEventChannel() {
+        return channel;
     }
 
     /**
@@ -139,7 +165,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     @Override
     public final boolean isOpen() {
-        return channel.isOpen();
+        return fileChannel.isOpen();
     }
 
     /**
@@ -148,7 +174,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.FileChannel#lock()
      */
     public final FileLock lock() throws IOException {
-        return channel.lock();
+        return fileChannel.lock();
     }
 
     /**
@@ -161,7 +187,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     public FileLock lock(long position, long size, boolean shared)
                                                                   throws IOException {
-        return channel.lock(position, size, shared);
+        return fileChannel.lock(position, size, shared);
     }
 
     /**
@@ -175,23 +201,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     public MappedByteBuffer map(MapMode mode, long position, long size)
                                                                        throws IOException {
-        return channel.map(mode, position, size);
-    }
-
-    /**
-     * @throws IOException
-     * 
-     */
-    public void openForAppend() throws IOException {
-        channel = FileChannel.open(file.toPath(), CREATE, WRITE, APPEND);
-    }
-
-    /**
-     * @throws IOException
-     * 
-     */
-    public void openForRead() throws IOException {
-        channel = FileChannel.open(file.toPath(), READ);
+        return fileChannel.map(mode, position, size);
     }
 
     /**
@@ -200,7 +210,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.FileChannel#position()
      */
     public long position() throws IOException {
-        return channel.position();
+        return fileChannel.position();
     }
 
     /**
@@ -210,7 +220,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.FileChannel#position(long)
      */
     public FileChannel position(long newPosition) throws IOException {
-        return channel.position(newPosition);
+        return fileChannel.position(newPosition);
     }
 
     /**
@@ -221,7 +231,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     @Override
     public int read(ByteBuffer dst) throws IOException {
-        return channel.read(dst);
+        return fileChannel.read(dst);
     }
 
     /**
@@ -232,7 +242,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.FileChannel#read(java.nio.ByteBuffer, long)
      */
     public int read(ByteBuffer dst, long position) throws IOException {
-        return channel.read(dst, position);
+        return fileChannel.read(dst, position);
     }
 
     /**
@@ -243,7 +253,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     @Override
     public final long read(ByteBuffer[] dsts) throws IOException {
-        return channel.read(dsts);
+        return fileChannel.read(dsts);
     }
 
     /**
@@ -257,7 +267,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     @Override
     public long read(ByteBuffer[] dsts, int offset, int length)
                                                                throws IOException {
-        return channel.read(dsts, offset, length);
+        return fileChannel.read(dsts, offset, length);
     }
 
     /**
@@ -266,7 +276,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.FileChannel#size()
      */
     public long size() throws IOException {
-        return channel.size();
+        return fileChannel.size();
     }
 
     /**
@@ -289,7 +299,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     public long transferFrom(ReadableByteChannel src, long position, long count)
                                                                                 throws IOException {
-        return channel.transferFrom(src, position, count);
+        return fileChannel.transferFrom(src, position, count);
     }
 
     /**
@@ -303,7 +313,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     public long transferTo(long position, long count, WritableByteChannel target)
                                                                                  throws IOException {
-        return channel.transferTo(position, count, target);
+        return fileChannel.transferTo(position, count, target);
     }
 
     /**
@@ -313,7 +323,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.FileChannel#truncate(long)
      */
     public FileChannel truncate(long size) throws IOException {
-        return channel.truncate(size);
+        return fileChannel.truncate(size);
     }
 
     /**
@@ -322,7 +332,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.FileChannel#tryLock()
      */
     public final FileLock tryLock() throws IOException {
-        return channel.tryLock();
+        return fileChannel.tryLock();
     }
 
     /**
@@ -335,7 +345,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     public FileLock tryLock(long position, long size, boolean shared)
                                                                      throws IOException {
-        return channel.tryLock(position, size, shared);
+        return fileChannel.tryLock(position, size, shared);
     }
 
     /**
@@ -346,7 +356,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     @Override
     public int write(ByteBuffer src) throws IOException {
-        return channel.write(src);
+        return fileChannel.write(src);
     }
 
     /**
@@ -357,7 +367,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      * @see java.nio.channels.FileChannel#write(java.nio.ByteBuffer, long)
      */
     public int write(ByteBuffer src, long position) throws IOException {
-        return channel.write(src, position);
+        return fileChannel.write(src, position);
     }
 
     /**
@@ -368,7 +378,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     @Override
     public final long write(ByteBuffer[] srcs) throws IOException {
-        return channel.write(srcs);
+        return fileChannel.write(srcs);
     }
 
     /**
@@ -382,6 +392,6 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     @Override
     public long write(ByteBuffer[] srcs, int offset, int length)
                                                                 throws IOException {
-        return channel.write(srcs, offset, length);
+        return fileChannel.write(srcs, offset, length);
     }
 }

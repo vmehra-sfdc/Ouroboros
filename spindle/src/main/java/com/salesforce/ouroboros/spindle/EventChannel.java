@@ -41,6 +41,8 @@ import org.slf4j.LoggerFactory;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.Segment.Mode;
+import com.salesforce.ouroboros.spindle.flyer.Flyer;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
@@ -341,16 +343,24 @@ public class EventChannel {
     public void close(Node producerId) {
         log.info(String.format("Closing channel %s on %s, root directory: %s",
                                id, producerId, channel));
-        for (File segmentFile : getSegmentFiles()) {
-            Segment segment = appendSegmentCache.remove(segmentFile);
-            if (segment != null) {
-                try {
-                    segment.close();
-                } catch (IOException e) {
-                    log.trace(String.format("Error closing %s", segment));
-                }
+        for (Segment segment : appendSegmentCache.values()) {
+            try {
+                segment.close();
+            } catch (IOException e) {
+                log.trace(String.format("Error closing %s", segment));
             }
         }
+        appendSegmentCache.clear();
+
+        for (Segment segment : readSegmentCache.values()) {
+            try {
+                segment.close();
+            } catch (IOException e) {
+                log.trace(String.format("Error closing %s", segment));
+            }
+        }
+        readSegmentCache.clear();
+
         deleteDirectory(channel);
         if (log.isTraceEnabled()) {
             log.trace(String.format("Deleted channel root directory: %s",
@@ -408,12 +418,13 @@ public class EventChannel {
     }
 
     public Segment getCachedReadSegment(File segment) throws IOException {
-        Segment newSegment = new Segment(segment);
+        Segment newSegment = new Segment(this, segment, Mode.READ);
         Segment currentSegment = readSegmentCache.putIfAbsent(segment,
                                                               newSegment);
         if (currentSegment == null) {
             currentSegment = newSegment;
-            currentSegment.openForRead();
+        } else {
+            newSegment.close();
         }
         return currentSegment;
     }
@@ -518,12 +529,13 @@ public class EventChannel {
     }
 
     private Segment getCachedAppendSegment(File segment) throws IOException {
-        Segment newSegment = new Segment(segment);
+        Segment newSegment = new Segment(this, segment, Mode.APPEND);
         Segment currentSegment = appendSegmentCache.putIfAbsent(segment,
                                                                 newSegment);
         if (currentSegment == null) {
             currentSegment = newSegment;
-            currentSegment.openForAppend();
+        } else {
+            newSegment.close();
         }
         return currentSegment;
     }
@@ -540,5 +552,14 @@ public class EventChannel {
             }
         });
         return segmentFiles;
+    }
+
+    /**
+     * @param flyer
+     * @param lastEventId
+     */
+    public void subscribe(Flyer flyer, long lastEventId) {
+        // TODO Auto-generated method stub
+
     }
 }

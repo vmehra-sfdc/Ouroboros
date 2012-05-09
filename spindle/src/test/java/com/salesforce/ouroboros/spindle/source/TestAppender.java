@@ -53,6 +53,7 @@ import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
 import com.salesforce.ouroboros.testUtils.Util;
@@ -73,8 +74,8 @@ public class TestAppender {
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
-        final Segment writeSegment = new Segment(tmpFile);
-        writeSegment.openForAppend();
+        final Segment writeSegment = new Segment(eventChannel, tmpFile,
+                                                 Mode.APPEND);
         final Appender appender = new Appender(bundle, acknowledger);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
@@ -160,7 +161,8 @@ public class TestAppender {
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("duplicate", ".tst");
         tmpFile.deleteOnExit();
-        final Segment writeSegment = new Segment(tmpFile);
+        final Segment writeSegment = new Segment(eventChannel, tmpFile,
+                                                 Mode.APPEND);
         final Appender appender = new Appender(bundle, acknowledger);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
