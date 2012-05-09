@@ -27,6 +27,8 @@ package com.salesforce.ouroboros.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -42,12 +44,13 @@ import com.fasterxml.uuid.impl.NameBasedGenerator;
  */
 final public class Utils {
     private final static NameBasedGenerator      UUID_GENERATOR;
-    public static final ThreadLocal<BufferCache> BUFFER_CACHE = new ThreadLocal<BufferCache>() {
+    public static final ThreadLocal<MappedBufferCache> BUFFER_CACHE = new ThreadLocal<MappedBufferCache>() {
                                                                   @Override
-                                                                  protected BufferCache initialValue() {
-                                                                      return new BufferCache();
+                                                                  protected MappedBufferCache initialValue() {
+                                                                      return new MappedBufferCache();
                                                                   }
                                                               };
+    private static final Method                  unmap;
 
     static {
         MessageDigest digester;
@@ -60,6 +63,29 @@ final public class Utils {
         }
         UUID_GENERATOR = new NameBasedGenerator(null, digester,
                                                 UUIDType.NAME_BASED_SHA1);
+    }
+
+    static {
+        Class<?> fileChannelImpl;
+        try {
+            fileChannelImpl = Utils.class.getClassLoader().loadClass("sun.nio.ch.FileChannelImpl");
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(
+                                            "Unable to load sun.nio.ch.FileChannelImpl");
+        }
+        try {
+            unmap = fileChannelImpl.getDeclaredMethod("unmap",
+                                                      MappedByteBuffer.class);
+        } catch (SecurityException e) {
+            throw new IllegalStateException(
+                                            "Security exception retrieving method sun.nio.ch.FileChannelImpl.unmap(MappedByteBuffer)",
+                                            e);
+        } catch (NoSuchMethodException e) {
+            throw new IllegalStateException(
+                                            "No such method sun.nio.ch.FileChannelImpl.unmap(MappedByteBuffer)",
+                                            e);
+        }
+        unmap.setAccessible(true);
     }
 
     public static void delete(File dirOrFile) {
@@ -96,5 +122,22 @@ final public class Utils {
 
     public static UUID toUUID(String string) {
         return UUID_GENERATOR.generate(string);
+    }
+
+    /**
+     * Proactively free a byte buffer if it is a direct allocated byte buffer
+     * 
+     * @param buffer
+     */
+    public static void unmap(MappedByteBuffer buffer) {
+        /*
+        try {
+            unmap.invoke(null, buffer);
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                                            String.format("invoke FileChannelImpl.unmap() on %s",
+                                                          buffer), e);
+        } 
+        */
     }
 }

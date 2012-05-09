@@ -26,6 +26,7 @@
 package com.salesforce.ouroboros.util;
 
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 
 /**
  * Provides a direct buffer cache. Not thread safe, intended to be put into
@@ -34,25 +35,25 @@ import java.nio.ByteBuffer;
  * @author hhildebrand
  * 
  */
-public class BufferCache {
-    private final ByteBuffer[] buffers;
-    private int                count;
-    private int                start;
+public class MappedBufferCache {
+    private final MappedByteBuffer[] buffers;
+    private int                      count = 0;
+    private int                      start = 0;
 
-    public BufferCache() {
-        this.buffers = new ByteBuffer[8];
+    public MappedBufferCache() {
+        buffers = new MappedByteBuffer[8];
     }
 
-    public ByteBuffer get(int capacity) {
-        if (this.count == 0) {
-            return ByteBuffer.allocate(capacity);
+    public MappedByteBuffer get(int capacity) {
+        if (count == 0) {
+            return (MappedByteBuffer) ByteBuffer.allocateDirect(capacity);
         }
-        ByteBuffer buffer = this.buffers[this.start];
+        MappedByteBuffer buffer = buffers[start];
         if (buffer.capacity() < capacity) {
             buffer = null;
-            int i = this.start;
-            while ((i = next(i)) != this.start) {
-                ByteBuffer candidate = this.buffers[i];
+            int i = start;
+            while ((i = next(i)) != start) {
+                MappedByteBuffer candidate = buffers[i];
                 if (candidate == null)
                     break;
                 if (candidate.capacity() >= capacity) {
@@ -62,16 +63,16 @@ public class BufferCache {
             }
             if (buffer == null) {
                 if (!isEmpty()) {
-                    removeFirst();
+                    Utils.unmap(removeFirst());
                 }
-                return null;
+                return (MappedByteBuffer) ByteBuffer.allocateDirect(capacity);
             }
-            this.buffers[i] = this.buffers[this.start];
+            buffers[i] = buffers[start];
         }
 
-        this.buffers[this.start] = null;
-        this.start = next(this.start);
-        this.count -= 1;
+        buffers[start] = null;
+        start = next(start);
+        count -= 1;
 
         buffer.rewind();
         buffer.limit(capacity);
@@ -79,31 +80,27 @@ public class BufferCache {
     }
 
     private boolean isEmpty() {
-        return (this.count == 0);
+        return (count == 0);
     }
 
-    public void add(ByteBuffer buffer) {
-        if (this.count < 8) {
-            this.start = (this.start + 7) % 8;
-            this.buffers[this.start] = buffer;
-            this.count += 1;
+    public void recycle(MappedByteBuffer buffer) {
+        MappedByteBuffer mapped = (MappedByteBuffer) buffer;
+        if (count < 8) {
+            int i = (start + count) % 8;
+            Utils.unmap(buffers[i]);
+            buffers[i] = mapped;
+            count += 1;
+        } else {
+            Utils.unmap(mapped);
         }
     }
 
-    public void recycle(ByteBuffer buffer) {
-        if (this.count < 8) {
-            int i = (this.start + this.count) % 8;
-            this.buffers[i] = buffer;
-            this.count += 1;
-        }
-    }
-
-    private ByteBuffer removeFirst() {
-        assert (this.count > 0);
-        ByteBuffer buffer = this.buffers[this.start];
-        this.buffers[this.start] = null;
-        this.start = next(this.start);
-        this.count -= 1;
+    private MappedByteBuffer removeFirst() {
+        assert (count > 0);
+        MappedByteBuffer buffer = buffers[start];
+        buffers[start] = null;
+        start = next(start);
+        count -= 1;
         return buffer;
     }
 

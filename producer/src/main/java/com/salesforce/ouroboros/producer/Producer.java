@@ -255,6 +255,7 @@ public class Producer implements Comparable<Producer> {
      * @param batch
      */
     private void free(Batch batch) {
+        batch.recycle();
         batchPool.free(batch);
     }
 

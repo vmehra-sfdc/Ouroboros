@@ -27,10 +27,11 @@ package com.salesforce.ouroboros;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
-import com.salesforce.ouroboros.util.BufferCache;
+import com.salesforce.ouroboros.util.MappedBufferCache;
 import com.salesforce.ouroboros.util.Utils;
 
 /**
@@ -90,8 +91,8 @@ public class EventHeader implements Cloneable {
      */
     public static int payloadLengthOf(long offset, ReadableByteChannel segment)
                                                                                throws IOException {
-        BufferCache bufferCache = Utils.BUFFER_CACHE.get();
-        ByteBuffer buf = bufferCache.get(4);
+        MappedBufferCache bufferCache = Utils.BUFFER_CACHE.get();
+        MappedByteBuffer buf = bufferCache.get(4);
         while (buf.hasRemaining()) {
             segment.read(buf);
         }

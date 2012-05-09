@@ -50,4 +50,25 @@ public class EventSpan {
         this.offset = offset;
         this.endpoint = endpoint;
     }
+
+    /**
+     * @return the endpoint
+     */
+    public long getEndpoint() {
+        return endpoint;
+    }
+
+    /**
+     * @return the offset
+     */
+    public long getOffset() {
+        return offset;
+    }
+
+    /**
+     * @return the segment
+     */
+    public Segment getSegment() {
+        return segment;
+    }
 }

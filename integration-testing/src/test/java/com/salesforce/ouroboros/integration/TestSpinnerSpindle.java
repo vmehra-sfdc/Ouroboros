@@ -47,6 +47,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.ChannelHandler;
 import com.hellblazer.pinkie.CommunicationsHandler;
@@ -74,8 +76,11 @@ import com.salesforce.ouroboros.testUtils.Util;
  * 
  */
 public class TestSpinnerSpindle {
+    private final static Logger log = LoggerFactory.getLogger(TestSpinnerSpindle.class);
+
     @Test
     public void testSimpleAppend() throws Exception {
+        log.info("TestSpinnerSpindle.testSimpleAppend");
         final AtomicBoolean committed = new AtomicBoolean();
 
         File segmentFile = File.createTempFile("simpleAppend", "segment");

@@ -348,6 +348,7 @@ public class ProducerWeaverClusterTest {
 
     @Test
     public void testPartitioning() throws Exception {
+        log.info("ProducerWeaverClusterTest.testPartitioning");
         bootstrap();
         asymmetricallyPartition();
         reformPartition();
@@ -355,6 +356,7 @@ public class ProducerWeaverClusterTest {
 
     @Test
     public void testRebalance() throws Exception {
+        log.info("ProducerWeaverClusterTest.testRebalance");
         bootstrap();
         asymmetricallyPartition();
         rebalance();
@@ -364,6 +366,7 @@ public class ProducerWeaverClusterTest {
 
     @Test
     public void testSimplePublishing() throws Exception {
+        log.info("ProducerWeaverClusterTest.testSimplePublishing");
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
                                                                                              new ProducerSkipStrategy(),
@@ -399,6 +402,7 @@ public class ProducerWeaverClusterTest {
 
     @Test
     public void testPublishingAfterPartition() throws Exception {
+        log.info("ProducerWeaverClusterTest.testPublishingAfterPartition");
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
                                                                                              new ProducerSkipStrategy(),
@@ -455,6 +459,7 @@ public class ProducerWeaverClusterTest {
 
     @Test
     public void testPublishingDuringPartitionAndRebalancing() throws Exception {
+        log.info("ProducerWeaverClusterTest.testPublishingDuringPartitionAndRebalancing");
         bootstrap();
         ConsistentHashFunction<Producer> producerRing = new ConsistentHashFunction<Producer>(
                                                                                              new ProducerSkipStrategy(),

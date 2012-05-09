@@ -209,7 +209,7 @@ abstract public class AbstractAppender {
 
     protected void drain() {
         segment = null;
-        devNull = ByteBuffer.allocate(32 * 1024);
+        devNull = ByteBuffer.allocateDirect(3 * 1024);
         if (devNull()) {
             fsm.ready();
         } else {

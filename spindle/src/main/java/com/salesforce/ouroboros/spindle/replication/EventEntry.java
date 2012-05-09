@@ -31,6 +31,7 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.util.Pool;
+import com.salesforce.ouroboros.util.Pool.Freeable;
 
 /**
  * The entry representing the appending of an event.
@@ -38,7 +39,7 @@ import com.salesforce.ouroboros.util.Pool;
  * @author hhildebrand
  * 
  */
-public class EventEntry {
+public class EventEntry implements Freeable {
     private final Pool<EventEntry>      pool;
     private Acknowledger                acknowledger;
     private EventChannel                eventChannel;
@@ -50,7 +51,11 @@ public class EventEntry {
         this.pool = pool;
     }
 
-    public void free() {
+    public void recycle() {
+        acknowledger = null;
+        eventChannel = null;
+        handler = null;
+        segment = null;
         header.clear();
         if (pool != null) {
             pool.free(this);
@@ -91,7 +96,7 @@ public class EventEntry {
 
     public void selectAndFree() {
         select();
-        free();
+        recycle();
     }
 
     public void set(BatchHeader batchHeader, long offset, int startPosition,
@@ -108,5 +113,13 @@ public class EventEntry {
         this.segment = segment;
         this.acknowledger = acknowledger;
         this.handler = handler;
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.util.Pool.Freeable#free()
+     */
+    @Override
+    public void free() {
+        header.free();
     }
 }

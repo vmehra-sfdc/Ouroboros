@@ -26,28 +26,28 @@
 package com.salesforce.ouroboros;
 
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-import com.salesforce.ouroboros.util.Pool;
+import com.salesforce.ouroboros.util.Pool.Freeable;
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class Batch extends BatchIdentity {
+public class Batch extends BatchIdentity implements Freeable {
     private static final double ONE_BILLION = 1000000000D;
 
-    public ByteBuffer           batch;
+    public MappedByteBuffer     batch;
     public final BatchHeader    header      = new BatchHeader();
     private long                created;
     private long                interval;
-    private final Pool<Batch>   pool;
 
     public Batch() {
-        this(null);
     }
 
     /**
@@ -58,22 +58,17 @@ public class Batch extends BatchIdentity {
      */
     public Batch(Node mirror, UUID channel, long sequenceNumber,
                  List<ByteBuffer> events) {
-        this();
         set(mirror, channel, sequenceNumber, events);
-    }
-
-    public Batch(Pool<Batch> pool) {
-        this.pool = pool;
     }
 
     public long batchByteSize() {
         return batch.capacity() + BatchHeader.HEADER_BYTE_SIZE;
     }
 
+    @Override
     public void free() {
-        if (pool != null) {
-            pool.free(this);
-        }
+        Utils.unmap(batch);
+        header.free();
     }
 
     /**
@@ -95,6 +90,12 @@ public class Batch extends BatchIdentity {
      */
     public double rate() {
         return batchByteSize() * ONE_BILLION / interval;
+    }
+
+    public void recycle() {
+        batch.clear();
+        channel = null;
+        sequenceNumber = created = interval = -1L;
     }
 
     /**
@@ -121,7 +122,7 @@ public class Batch extends BatchIdentity {
         }
 
         if (batch == null || batch.capacity() < totalSize) {
-            batch = ByteBuffer.allocateDirect(totalSize);
+            batch = (MappedByteBuffer) ByteBuffer.allocateDirect(totalSize);
         } else {
             batch.limit(totalSize);
             batch.rewind();
