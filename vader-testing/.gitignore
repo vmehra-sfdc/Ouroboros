@@ -2,3 +2,9 @@
 /target
 /.classpath
 /.project
+/.value
+/.pid
+/.in
+/.out
+/.sh
+/.class

@@ -133,6 +133,12 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 	<modules>
+		<module>common</module>
+		<module>spindle</module>
+		<module>producer</module>
+		<module>consumer</module>
+		<module>integration-testing</module>
 		<module>vader-testing</module>
-	</modules>
+	</modules>	
+	
 </project>
