@@ -92,7 +92,9 @@ public class Batch extends BatchIdentity implements Freeable {
         return batchByteSize() * ONE_BILLION / interval;
     }
 
+    @Override
     public void recycle() {
+        super.recycle();
         batch.clear();
         created = interval = -1L;
     }

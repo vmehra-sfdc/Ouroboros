@@ -100,6 +100,11 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
         return result;
     }
 
+    public void recycle() {
+        channel = null;
+        sequenceNumber = -1;
+    }
+
     public void serializeOn(ByteBuffer buffer) {
         buffer.putLong(channel.getMostSignificantBits());
         buffer.putLong(channel.getLeastSignificantBits());
