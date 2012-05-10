@@ -185,6 +185,7 @@ public class TestProducerChannelBuffer {
 
     @Test
     public void testPush() throws Exception {
+        log.info("TestProducerChannelBuffer.testPush");
         final Switchboard producerSwitchboard = producerContext.getBean(Switchboard.class);
         final Switchboard weaverSwitchboard = weaverContext.getBean(Switchboard.class);
         Util.waitFor("producer switchboard did not stabilize",

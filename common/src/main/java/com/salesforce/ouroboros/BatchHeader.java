@@ -27,9 +27,12 @@ package com.salesforce.ouroboros;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.UUID;
+
+import com.salesforce.ouroboros.util.Utils;
 
 /**
  * The header for a batch of events.
@@ -117,6 +120,12 @@ public class BatchHeader {
                    && b.getChannel().equals(getChannel());
         }
         return false;
+    }
+
+    public void free() {
+        if (bytes instanceof MappedByteBuffer) {
+            Utils.unmap((MappedByteBuffer) bytes);
+        }
     }
 
     /**

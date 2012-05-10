@@ -43,13 +43,15 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class BatchAcknowledgement {
-    private final static Logger               log       = LoggerFactory.getLogger(BatchAcknowledgement.class.getCanonicalName());
+    private final static int                  MAX_ACK_BATCH = 1000;
+    private final static Logger               log           = LoggerFactory.getLogger(BatchAcknowledgement.class.getCanonicalName());
 
-    private final ByteBuffer                  ackBuffer = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE);
-    private final BatchAcknowledgementContext fsm       = new BatchAcknowledgementContext(
-                                                                                          this);
+    private final ByteBuffer                  ackBuffer     = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE
+                                                                                  * MAX_ACK_BATCH);
+    private final BatchAcknowledgementContext fsm           = new BatchAcknowledgementContext(
+                                                                                              this);
     private SocketChannelHandler              handler;
-    private boolean                           inError   = false;
+    private boolean                           inError       = false;
     private final Spinner                     spinner;
 
     public BatchAcknowledgement(Spinner spinner, String fsmName) {
@@ -81,8 +83,10 @@ public class BatchAcknowledgement {
     }
 
     private boolean readAcknowledgement() {
+        int read;
         try {
-            if (handler.getChannel().read(ackBuffer) < 0) {
+            read = handler.getChannel().read(ackBuffer);
+            if (read < 0) {
                 if (log.isInfoEnabled()) {
                     log.info("closing channel");
                 }
@@ -98,11 +102,7 @@ public class BatchAcknowledgement {
             inError = true;
             return false;
         }
-        return !ackBuffer.hasRemaining();
-    }
-
-    protected boolean acknowledgementRead() {
-        return !ackBuffer.hasRemaining();
+        return read != 0;
     }
 
     protected void close() {
@@ -118,9 +118,11 @@ public class BatchAcknowledgement {
     protected boolean readAcknowledgements() {
         while (readAcknowledgement()) {
             ackBuffer.flip();
-            BatchIdentity ack = new BatchIdentity(ackBuffer);
-            ackBuffer.rewind();
-            spinner.acknowledge(ack);
+            while (ackBuffer.remaining() >= BatchIdentity.BYTE_SIZE) {
+                BatchIdentity ack = new BatchIdentity(ackBuffer);
+                spinner.acknowledge(ack);
+            }
+            ackBuffer.compact();
         }
         return false;
     }

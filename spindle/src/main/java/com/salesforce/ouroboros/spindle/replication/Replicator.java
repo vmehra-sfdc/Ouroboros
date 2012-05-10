@@ -78,7 +78,7 @@ public class Replicator implements CommunicationsHandler {
     private final Duplicator        duplicator;
     private final ReplicatorContext fsm            = new ReplicatorContext(this);
     private SocketChannelHandler    handler;
-    private final ByteBuffer        handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private ByteBuffer              handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
     private boolean                 inError;
     private Node                    partner;
     private Rendezvous              rendezvous;
@@ -258,6 +258,7 @@ public class Replicator implements CommunicationsHandler {
         bundle.map(partner, this);
         duplicator.setFsmName(String.format("%s>%s", bundle.getId().processId,
                                             partner.processId));
+        handshake = null;
         return true;
     }
 
@@ -290,6 +291,10 @@ public class Replicator implements CommunicationsHandler {
             return false;
         }
 
-        return !handshake.hasRemaining();
+        if (!handshake.hasRemaining()) {
+            handshake = null;
+            return true;
+        }
+        return false;
     }
 }

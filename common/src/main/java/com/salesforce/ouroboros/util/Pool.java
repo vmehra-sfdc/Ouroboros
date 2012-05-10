@@ -35,6 +35,10 @@ import java.util.concurrent.locks.ReentrantLock;
  * 
  */
 public class Pool<T> {
+    public interface Freeable {
+        void free();
+    }
+
     public interface Factory<T> {
         T newInstance(Pool<T> pool);
     }
@@ -79,6 +83,9 @@ public class Pool<T> {
                 discarded++;
             } else {
                 pooled++;
+                if (free instanceof Freeable) {
+                    ((Freeable) free).free();
+                }
             }
         } finally {
             myLock.unlock();

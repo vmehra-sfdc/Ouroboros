@@ -196,7 +196,7 @@ public final class Duplicator {
                 }
                 current.getAcknowledger().acknowledge(current.getHeader().getChannel(),
                                                       current.getHeader().getSequenceNumber());
-                current.free();
+                current.recycle();
                 current = null;
                 return true;
             }

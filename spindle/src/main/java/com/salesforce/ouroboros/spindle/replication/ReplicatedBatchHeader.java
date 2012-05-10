@@ -41,13 +41,6 @@ public class ReplicatedBatchHeader extends BatchHeader {
     public static final int  BATCH_POSITION_OFFSET = BATCH_OFFSET_OFFSET + 8;
     public static final int  HEADER_SIZE           = BATCH_POSITION_OFFSET + 4;
 
-    private static ByteBuffer fromBatchHeader(ByteBuffer headerBytes,
-                                              long offset, int position) {
-        ByteBuffer replicatedHeader = ByteBuffer.allocate(HEADER_SIZE);
-        set(headerBytes, offset, position, replicatedHeader);
-        return replicatedHeader;
-    }
-
     private static void set(ByteBuffer headerBytes, long offset, int position,
                             ByteBuffer replicatedHeader) {
         headerBytes.rewind();
@@ -60,10 +53,6 @@ public class ReplicatedBatchHeader extends BatchHeader {
 
     public ReplicatedBatchHeader() {
         super();
-    }
-
-    public ReplicatedBatchHeader(BatchHeader header, long offset, int position) {
-        this(fromBatchHeader(header.getBytes(), offset, position));
     }
 
     public ReplicatedBatchHeader(ByteBuffer b) {
