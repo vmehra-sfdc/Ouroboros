@@ -138,7 +138,6 @@
 		<module>producer</module>
 		<module>consumer</module>
 		<module>integration-testing</module>
-		<module>vader-testing</module>
 	</modules>	
 	
 </project>
