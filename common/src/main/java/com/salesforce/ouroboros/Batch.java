@@ -94,8 +94,7 @@ public class Batch extends BatchIdentity implements Freeable {
 
     public void recycle() {
         batch.clear();
-        channel = null;
-        sequenceNumber = created = interval = -1L;
+        created = interval = -1L;
     }
 
     /**
