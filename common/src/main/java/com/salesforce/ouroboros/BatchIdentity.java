@@ -101,8 +101,10 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
     }
 
     public void recycle() {
-        channel = null;
-        sequenceNumber = -1;
+        // Commented out to handle spurious NPE in the ConcurrentSkipListMap - HSH
+        // Believe it's a true heisenbug, caused by the CSLM implementation of remove
+        // channel = null; 
+        // sequenceNumber = -1;
     }
 
     public void serializeOn(ByteBuffer buffer) {
