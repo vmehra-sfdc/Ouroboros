@@ -31,15 +31,14 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-import com.salesforce.ouroboros.util.Pool.Freeable;
-import com.salesforce.ouroboros.util.Utils;
+import com.salesforce.ouroboros.util.Pool.Clearable;
 
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class Batch extends BatchIdentity implements Freeable {
+public class Batch extends BatchIdentity implements Clearable {
     private static final double ONE_BILLION = 1000000000D;
 
     public MappedByteBuffer     batch;
@@ -65,10 +64,14 @@ public class Batch extends BatchIdentity implements Freeable {
         return batch.capacity() + BatchHeader.HEADER_BYTE_SIZE;
     }
 
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.util.Pool.Clearable.clear()
+     */
     @Override
-    public void free() {
-        Utils.unmap(batch);
-        header.free();
+    public void clear() {
+        super.clear();
+        batch.clear();
+        created = interval = -1L;
     }
 
     /**
@@ -90,13 +93,6 @@ public class Batch extends BatchIdentity implements Freeable {
      */
     public double rate() {
         return batchByteSize() * ONE_BILLION / interval;
-    }
-
-    @Override
-    public void recycle() {
-        super.recycle();
-        batch.clear();
-        created = interval = -1L;
     }
 
     /**

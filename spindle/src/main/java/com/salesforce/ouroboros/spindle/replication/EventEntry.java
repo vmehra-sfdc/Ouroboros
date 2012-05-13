@@ -31,7 +31,7 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.util.Pool;
-import com.salesforce.ouroboros.util.Pool.Freeable;
+import com.salesforce.ouroboros.util.Pool.Clearable;
 
 /**
  * The entry representing the appending of an event.
@@ -39,24 +39,31 @@ import com.salesforce.ouroboros.util.Pool.Freeable;
  * @author hhildebrand
  * 
  */
-public class EventEntry implements Freeable {
-    private final Pool<EventEntry>        pool;
-    private volatile Acknowledger         acknowledger;
-    private volatile EventChannel         eventChannel;
-    private volatile SocketChannelHandler handler;
-    private final ReplicatedBatchHeader   header = new ReplicatedBatchHeader();
-    private volatile Segment              segment;
+public class EventEntry implements Clearable {
+    private final Pool<EventEntry>      pool;
+    private Acknowledger                acknowledger;
+    private EventChannel                eventChannel;
+    private SocketChannelHandler        handler;
+    private final ReplicatedBatchHeader header = new ReplicatedBatchHeader();
+    private Segment                     segment;
 
     public EventEntry(Pool<EventEntry> pool) {
         this.pool = pool;
     }
 
-    public void recycle() {
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.util.Pool.Clearable.clear()
+     */
+    @Override
+    public void clear() {
         acknowledger = null;
         eventChannel = null;
         handler = null;
         segment = null;
         header.clear();
+    }
+
+    public void free() {
         if (pool != null) {
             pool.free(this);
         }
@@ -96,7 +103,7 @@ public class EventEntry implements Freeable {
 
     public void selectAndFree() {
         select();
-        recycle();
+        free();
     }
 
     public void set(BatchHeader batchHeader, long offset, int startPosition,
@@ -113,13 +120,5 @@ public class EventEntry implements Freeable {
         this.segment = segment;
         this.acknowledger = acknowledger;
         this.handler = handler;
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.util.Pool.Freeable#free()
-     */
-    @Override
-    public void free() {
-        header.free();
     }
 }

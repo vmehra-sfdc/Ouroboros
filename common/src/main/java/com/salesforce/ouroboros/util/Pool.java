@@ -35,8 +35,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * 
  */
 public class Pool<T> {
-    public interface Freeable {
-        void free();
+    public interface Clearable {
+        void clear();
     }
 
     public interface Factory<T> {
@@ -83,8 +83,8 @@ public class Pool<T> {
                 discarded++;
             } else {
                 pooled++;
-                if (free instanceof Freeable) {
-                    ((Freeable) free).free();
+                if (free instanceof Clearable) {
+                    ((Clearable) free).clear();
                 }
             }
         } finally {

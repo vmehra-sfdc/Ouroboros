@@ -100,7 +100,7 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
         return result;
     }
 
-    public void recycle() {
+    public void clear() {
         channel = null;
         sequenceNumber = -1;
     }
