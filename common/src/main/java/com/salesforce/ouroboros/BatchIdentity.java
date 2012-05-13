@@ -36,8 +36,8 @@ import java.util.UUID;
 public class BatchIdentity implements Comparable<BatchIdentity> {
     public static final int BYTE_SIZE = 3 * 8;
 
-    public UUID             channel;
-    public long             sequenceNumber;
+    public volatile UUID    channel;
+    public volatile long    sequenceNumber;
 
     public BatchIdentity() {
     }
@@ -101,10 +101,8 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
     }
 
     public void recycle() {
-        // Commented out to handle spurious NPE in the ConcurrentSkipListMap - HSH
-        // Believe it's a true heisenbug, caused by the CSLM implementation of remove
-        // channel = null; 
-        // sequenceNumber = -1;
+        channel = null;
+        sequenceNumber = -1;
     }
 
     public void serializeOn(ByteBuffer buffer) {

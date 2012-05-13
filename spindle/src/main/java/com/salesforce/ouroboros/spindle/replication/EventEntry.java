@@ -40,12 +40,12 @@ import com.salesforce.ouroboros.util.Pool.Freeable;
  * 
  */
 public class EventEntry implements Freeable {
-    private final Pool<EventEntry>      pool;
-    private Acknowledger                acknowledger;
-    private EventChannel                eventChannel;
-    private SocketChannelHandler        handler;
-    private final ReplicatedBatchHeader header = new ReplicatedBatchHeader();
-    private Segment                     segment;
+    private final Pool<EventEntry>        pool;
+    private volatile Acknowledger         acknowledger;
+    private volatile EventChannel         eventChannel;
+    private volatile SocketChannelHandler handler;
+    private final ReplicatedBatchHeader   header = new ReplicatedBatchHeader();
+    private volatile Segment              segment;
 
     public EventEntry(Pool<EventEntry> pool) {
         this.pool = pool;
