@@ -101,8 +101,10 @@ public class BatchIdentity implements Comparable<BatchIdentity> {
     }
 
     public void clear() {
+        /*
         channel = null;
         sequenceNumber = -1;
+        */
     }
 
     public void serializeOn(ByteBuffer buffer) {
