@@ -7,23 +7,25 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
-
-import javax.management.MBeanServerConnection;
-import javax.management.remote.JMXConnector;
-
-import com.hellblazer.process.impl.JavaProcessImpl;
-import com.hellblazer.process.impl.ManagedProcessFactoryImpl;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+
+import javax.management.MBeanServerConnection;
+import javax.management.remote.JMXConnector;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import com.hellblazer.process.JavaProcess;
+import com.hellblazer.process.impl.JavaProcessImpl;
+import com.hellblazer.process.impl.ManagedProcessFactoryImpl;
 
 public class MultiProcessTest extends ProcessTest {
 
-	protected static final String TEST_DIR       = "test-dirs/java-process-test";
+	protected static final String TEST_DIR       = "test-dirs/multi-process-test";
     protected static final String TEST_JAR       = "test.jar";
     MBeanServerConnection         connection;
 	JMXConnector connector;
@@ -32,8 +34,8 @@ public class MultiProcessTest extends ProcessTest {
 
 	final int numberOfProcesses = 20;
 	
-    @Override
-    protected void setUp() {
+	@Before
+    public void setUp() {
         System.setProperty("sun.net.client.defaultConnectTimeout", "10000");
         System.setProperty("sun.net.client.defaultReadTimeout", "10000");
         System.setProperty("javax.net.debug", "all");
@@ -109,6 +111,7 @@ public class MultiProcessTest extends ProcessTest {
      * Spawn multiple instances of HelloWorld.class and have them run serially.
      * @throws Exception
      */
+	@Test
     public void testSerialMultipleClassExecution() throws Exception {
         copyTestClassFile();
         
@@ -128,6 +131,7 @@ public class MultiProcessTest extends ProcessTest {
      * Spawn multiple instances of HelloWorld.class and have them run concurrently
      * @throws Exception
      */
+	@Test
     public void testConcurrentMultipleClassExecution() throws Exception {
     	copyTestClassFile();
     	
@@ -171,4 +175,11 @@ public class MultiProcessTest extends ProcessTest {
     		}
     	}
     }
+    /**
+     * Spawn multiple instances of HelloWorld.class and have them run concurrently. Assert messages can be passed between processes.
+     * @throws Exception
+     */
+	@Test
+    public void testAsynchStablizationAndCommunication() throws Exception {
+	}
 }
