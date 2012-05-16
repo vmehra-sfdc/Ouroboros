@@ -148,4 +148,12 @@ public class Batch extends BatchIdentity implements Clearable {
         return String.format("Batch [#events=%s, created=%s, channel=%s, sequenceNumber=%s]",
                              batch.capacity(), created, channel, sequenceNumber);
     }
+
+    /**
+     * @param buffers
+     */
+    public void appendBuffersTo(List<ByteBuffer> buffers) {
+        header.appendTo(buffers);
+        buffers.add(batch);
+    }
 }

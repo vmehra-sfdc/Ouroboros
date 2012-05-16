@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.List;
 import java.util.UUID;
 
 import com.salesforce.ouroboros.util.Utils;
@@ -103,6 +104,10 @@ public class BatchHeader {
                        UUID channel, long sequenceNumber) {
         this();
         set(mirror, batchByteLength, magic, channel, sequenceNumber);
+    }
+
+    public void appendTo(List<ByteBuffer> bufferList) {
+        bufferList.add(bytes);
     }
 
     public void clear() {
