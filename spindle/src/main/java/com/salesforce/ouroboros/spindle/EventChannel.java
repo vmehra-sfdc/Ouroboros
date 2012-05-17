@@ -123,7 +123,7 @@ public class EventChannel {
     }
 
     public static final String          SEGMENT_SUFFIX = ".segment";
-    private static final Logger         log            = LoggerFactory.getLogger(Weaver.class.getCanonicalName());
+    private static final Logger         log            = LoggerFactory.getLogger(EventChannel.class.getCanonicalName());
     private static final FilenameFilter SEGMENT_FILTER = new FilenameFilter() {
                                                            @Override
                                                            public boolean accept(File dir,
@@ -292,7 +292,7 @@ public class EventChannel {
                 mirrorAcknowledger.acknowledge(batchHeader.getChannel(),
                                                batchHeader.getSequenceNumber());
             }
-            entry.selectAndFree();
+            entry.free();
         } else {
             replicator.replicate(entry);
         }

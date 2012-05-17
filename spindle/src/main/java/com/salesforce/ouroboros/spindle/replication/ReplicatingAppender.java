@@ -121,11 +121,6 @@ public class ReplicatingAppender extends AbstractAppender {
     protected AppendSegment getLogicalSegment() throws IOException {
         ReplicatedBatchHeader replicated = (ReplicatedBatchHeader) batchHeader;
         return eventChannel.appendSegmentFor(replicated.getOffset(),
-                                       replicated.getPosition());
-    }
-
-    @Override
-    protected void ready() {
-        handler.selectForRead();
+                                             replicated.getPosition());
     }
 }

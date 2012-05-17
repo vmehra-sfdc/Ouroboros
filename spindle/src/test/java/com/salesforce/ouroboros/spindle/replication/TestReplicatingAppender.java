@@ -120,27 +120,13 @@ public class TestReplicatingAppender {
         assertEquals(AbstractAppenderFSM.Ready, replicator.getState());
         replicator.readReady();
         assertEquals(AbstractAppenderFSM.ReadBatchHeader, replicator.getState());
-
-        Runnable reader = new Runnable() {
-            @Override
-            public void run() {
-                while (AbstractAppenderFSM.Ready != replicator.getState()) {
-                    replicator.readReady();
-                    try {
-                        Thread.sleep(10);
-                    } catch (InterruptedException e) {
-                        return;
-                    }
-                }
-            }
-        };
-        Thread inboundRead = new Thread(reader, "Inbound read thread");
-        inboundRead.start();
         header.rewind();
         header.write(outbound);
+        replicator.readReady();
+        assertEquals(AbstractAppenderFSM.Append, replicator.getState());
         event.rewind();
         event.write(outbound);
-        inboundRead.join(4000);
+        replicator.readReady();
         assertEquals(AbstractAppenderFSM.Ready, replicator.getState());
 
         segment = new Segment(eventChannel, tmpFile, Mode.READ);

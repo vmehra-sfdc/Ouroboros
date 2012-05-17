@@ -38,19 +38,48 @@
 
 %start DuplicatorFSM::Waiting
 %map DuplicatorFSM
-%% 
-Waiting {
-	replicate(event: EventEntry)
-		WriteHeader{
-			enqueue(event);
-		}
+%%  
+
+Waiting 
+Entry {
+	nextQuantum();
+}
+{
+	replicate
+		Replicate{}
+}
+
+Replicate
+Entry {
+	batchReplicate();
+}
+{
 	writeReady
-		nil{}
+		[!ctxt.replicate() && !ctxt.inError()]
+		nil{
+			selectForWrite();
+		}
+		
+	writeReady
+		[ctxt.inError()]
+		Closed{}
+		
+	writeReady
+		Waiting{}
+		
+	writeHeader
+		WriteHeader{}
+		
+	writeBatch
+		WriteBatch{}
+		
+	quantumProcessed
+		Waiting{}
 }
 
 WriteHeader
 Entry {
-	processHeader();
+	selectForWrite();
 }
 {
 	writeReady
@@ -63,16 +92,13 @@ Entry {
 		[ctxt.inError()]
 		Closed{}
 		
-	writeReady 
-		WriteBatch{}
-		
-	headerWritten
+	writeReady
 		WriteBatch{}
 }
 
 WriteBatch
 Entry {
-	processBatch();
+	selectForWrite();
 }
 {
 	writeReady
@@ -86,18 +112,7 @@ Entry {
 		Closed{}
 		
 	writeReady
-		[ctxt.hasNext()]
-		WriteHeader{}
-		
-	writeReady
-		Waiting{}
-		
-	batchWritten
-		[ctxt.hasNext()]
-		WriteHeader{}
-		
-	batchWritten
-		Waiting{}
+		Replicate{}
 }
 
 Closed
@@ -108,11 +123,8 @@ Entry {
 }
 
 Default {
-	replicate(event: EventEntry)
-		nil{
-			enqueue(event);
-		}
-		
+	writeReady
+		nil{}
 	close
 		Closed{}
 }

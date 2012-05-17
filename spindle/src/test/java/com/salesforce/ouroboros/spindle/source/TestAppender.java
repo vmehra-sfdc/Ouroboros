@@ -144,7 +144,7 @@ public class TestAppender {
             assertEquals(b, writtenPayload.get());
         }
 
-        verify(handler, new Times(2)).selectForRead();
+        verify(handler, new Times(3)).selectForRead();
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).append(isA(EventEntry.class),
                                     (Acknowledger) eq(null));
@@ -210,7 +210,7 @@ public class TestAppender {
             @Override
             public boolean value() {
                 appender.readReady();
-                return appender.getState() == AbstractAppenderFSM.ReadBatchHeader;
+                return appender.getState() == AbstractAppenderFSM.Ready;
             }
         }, 1000, 100);
 

@@ -171,7 +171,7 @@ public class TestDuplicator {
         EventEntry entry = new EventEntry(mock(Pool.class));
         BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
                                              channel, sequenceNumber);
-        entry.set(header, 0, 0, eventChannel, segment, acknowledger, handler);
+        entry.set(header, 0, 0, eventChannel, segment, acknowledger);
         replicator.replicate(entry);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
@@ -288,7 +288,7 @@ public class TestDuplicator {
         @SuppressWarnings("unchecked")
         EventEntry entry = new EventEntry(mock(Pool.class));
         entry.set(batchHeader, 0, 0, eventChannel, outboundSegment,
-                  outboundAcknowledger, outboundHandler);
+                  outboundAcknowledger);
         outboundDuplicator.replicate(entry);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override

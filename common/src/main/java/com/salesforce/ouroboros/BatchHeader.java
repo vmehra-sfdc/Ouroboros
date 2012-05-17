@@ -188,6 +188,10 @@ public class BatchHeader {
         return channel.read(bytes);
     }
 
+    public int readPosition() {
+        return bytes.position();
+    }
+
     public void resetMirror(Node mirror) {
         bytes.putInt(PRODUCER_MIRROR_OFFSET, mirror.processId);
     }

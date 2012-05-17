@@ -30,13 +30,13 @@
           append
         </th>
         <th>
-          appended
-        </th>
-        <th>
           close
         </th>
         <th>
           drain
+        </th>
+        <th>
+          readBatchHeader
         </th>
         <th>
           readReady
@@ -54,7 +54,7 @@
         </td>
         <td>
           <pre>
-ready();
+selectForRead();
           </pre>
         </td>
         <td>
@@ -69,7 +69,7 @@ ready();
         </td>
         <td>
           <pre>
-  ReadBatchHeader
+  ReadBatch
   {}
           </pre>
         </td>
@@ -80,20 +80,18 @@ ready();
       </tr>
       <tr>
         <td>
-          Append
+          ReadBatch
         </td>
         <td>
           <pre>
-beginAppend();
+readBatch();
           </pre>
         </td>
         <td>
         </td>
         <td>
-        </td>
-        <td>
           <pre>
-  Ready
+  Append
   {}
           </pre>
         </td>
@@ -107,7 +105,113 @@ beginAppend();
         </td>
         <td>
           <pre>
-[!ctxt.append() && !ctxt.inError()]
+  ReadBatchHeader
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReadBatchHeader
+        </td>
+        <td>
+          <pre>
+selectForRead();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.readBatchHeader() && !ctxt.inError()]
+  ReadBatchHeader
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  CheckDuplicate
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          CheckDuplicate
+        </td>
+        <td>
+          <pre>
+    checkDuplicate();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Append
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  DevNull
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Append
+        </td>
+        <td>
+          <pre>
+    selectForRead();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.appendSegment() && !ctxt.inError()]
   Append
   {
     selectForRead();
@@ -165,53 +269,9 @@ beginAppend();
         </td>
         <td>
           <pre>
-  ReadBatchHeader
+  ReadBatch
   {}
           </pre>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          ReadBatchHeader
-        </td>
-        <td>
-          <pre>
-    nextBatchHeader();
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  Append
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-[!ctxt.readBatchHeader() && !ctxt.inError()]
-  ReadBatchHeader
-  {
-    selectForRead();
-  }
-
-[ctxt.inError()]
-  Closed
-  {}
-
-  Append
-  {}
-          </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>

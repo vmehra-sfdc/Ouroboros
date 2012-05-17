@@ -87,6 +87,29 @@ abstract public class AbstractAppender {
     }
 
     protected boolean append() {
+        if (readBatchHeader()) {
+            if (beginAppend()) {
+                if (appendSegment()) {
+                    return true;
+                } else if (inError) {
+                    fsm.close();
+                } else {
+                    fsm.append();
+                }
+                return false;
+            } else if (inError) {
+                fsm.close();
+            }
+            return false;
+        } else if (inError) {
+            fsm.close();
+        } else {
+            fsm.readBatchHeader();
+        }
+        return false;
+    }
+
+    protected boolean appendSegment() {
         long written;
         try {
             written = segment.transferFrom(handler.getChannel(), position,
@@ -120,6 +143,7 @@ abstract public class AbstractAppender {
                 return false;
             }
             commit();
+            eventChannel = null;
             segment = null;
             return true;
         }
@@ -130,12 +154,12 @@ abstract public class AbstractAppender {
         return !batchHeader.hasRemaining();
     }
 
-    protected void beginAppend() {
+    protected boolean beginAppend() {
         if (eventChannel == null) {
             getLogger().warn(String.format("No existing event channel for: %s on %s",
                                            batchHeader, fsm.getName()));
             fsm.drain();
-            return;
+            return false;
         }
         AppendSegment logicalSegment;
         try {
@@ -144,7 +168,7 @@ abstract public class AbstractAppender {
             getLogger().warn(String.format("Cannot retrieve segment, shutting down appender %s",
                                            fsm.getName()), e);
             error();
-            return;
+            return false;
         }
         segment = logicalSegment.segment;
         offset = logicalSegment.offset;
@@ -155,21 +179,19 @@ abstract public class AbstractAppender {
             getLogger().warn(String.format("Duplicate event batch %s received on %s",
                                            batchHeader, fsm.getName()));
             fsm.drain();
-            return;
+            return false;
         }
         if (getLogger().isTraceEnabled()) {
             getLogger().trace(String.format("Beginning append of %s, offset=%s, position=%s, remaining=%s on %s",
                                             segment, offset, position,
                                             remaining, fsm.getName()));
         }
-        if (append()) {
-            fsm.appended();
-        } else {
-            if (inError) {
-                fsm.close();
-            } else {
-                handler.selectForRead();
-            }
+        return true;
+    }
+
+    protected void checkDuplicate() {
+        if (beginAppend()) {
+            fsm.append();
         }
     }
 
@@ -240,16 +262,14 @@ abstract public class AbstractAppender {
         // default is to do nothing
     }
 
-    protected void nextBatchHeader() {
+    protected void readBatch() {
         batchHeader.rewind();
-        if (readBatchHeader()) {
-            fsm.append();
-        } else {
-            if (inError) {
-                fsm.close();
-            } else {
-                handler.selectForRead();
-            }
+        while (append()) {
+            // party on
+            batchHeader.rewind();
+        }
+        if (inError) {
+            fsm.close();
         }
     }
 
@@ -283,14 +303,17 @@ abstract public class AbstractAppender {
                 return false;
             }
             eventChannel = bundle.eventChannelFor(batchHeader.getChannel());
+            assert eventChannel != null;
+
+            if (getLogger().isInfoEnabled()) {
+                getLogger().info(String.format("current channel %s on %s",
+                                               eventChannel.getId(),
+                                               fsm.getName()));
+            }
             return true;
         } else {
             return false;
         }
-    }
-
-    protected void ready() {
-        // default is to do nothing
     }
 
     protected void selectForRead() {

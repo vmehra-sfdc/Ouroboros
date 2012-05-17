@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=6>
+        <th colspan=7>
           Transition
         </th>
       </tr>
@@ -27,18 +27,19 @@
          Exit
         </th>
         <th>
-          batchWritten
-        </th>
-        <th>
           close
         </th>
         <th>
-          headerWritten
+          quantumProcessed
         </th>
         <th>
           replicate
-          <br>
-          (EventEntry)
+        </th>
+        <th>
+          writeBatch
+        </th>
+        <th>
+          writeHeader
         </th>
         <th>
           writeReady
@@ -52,8 +53,9 @@
           Waiting
         </td>
         <td>
-        </td>
-        <td>
+          <pre>
+nextQuantum();
+          </pre>
         </td>
         <td>
         </td>
@@ -63,14 +65,64 @@
         </td>
         <td>
           <pre>
-  WriteHeader
-  {
-    enqueue(event);
-  }
+  Replicate
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Replicate
+        </td>
+        <td>
+          <pre>
+batchReplicate();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Waiting
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  WriteBatch
+  {}
           </pre>
         </td>
         <td>
           <pre>
+  WriteHeader
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
+[!ctxt.replicate() && !ctxt.inError()]
+  Replicate
+  {
+    selectForWrite();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
   Waiting
   {}
           </pre>
@@ -84,7 +136,7 @@
         </td>
         <td>
           <pre>
-    processHeader();
+    selectForWrite();
           </pre>
         </td>
         <td>
@@ -94,10 +146,8 @@
         <td>
         </td>
         <td>
-          <pre>
-  WriteBatch
-  {}
-          </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -126,20 +176,14 @@
         </td>
         <td>
           <pre>
-    processBatch();
+    selectForWrite();
           </pre>
         </td>
         <td>
         </td>
         <td>
-          <pre>
-[ctxt.hasNext()]
-  WriteHeader
-  {}
-
-  Waiting
-  {}
-          </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -159,11 +203,7 @@
   Closed
   {}
 
-[ctxt.hasNext()]
-  WriteHeader
-  {}
-
-  Waiting
+  Replicate
   {}
           </pre>
         </td>
@@ -178,6 +218,8 @@
           <pre>
     close();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
