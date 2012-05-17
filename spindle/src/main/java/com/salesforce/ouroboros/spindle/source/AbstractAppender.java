@@ -303,13 +303,6 @@ abstract public class AbstractAppender {
                 return false;
             }
             eventChannel = bundle.eventChannelFor(batchHeader.getChannel());
-            // assert eventChannel != null;
-
-            if (getLogger().isInfoEnabled()) {
-                getLogger().info(String.format("current channel %s on %s",
-                                               eventChannel.getId(),
-                                               fsm.getName()));
-            }
             return true;
         } else {
             return false;
