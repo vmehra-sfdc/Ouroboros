@@ -49,9 +49,8 @@ public class ProducerConfiguration {
     private int                 sampleFrequency              = 10;
     private int                 sampleWindowSize             = 1000;
     private SkipStrategy<Node>  skipStrategy                 = new DefaultSkipStrategy();
-    private ExecutorService     spinners                     = Executors.newFixedThreadPool(6,
-                                                                                            new LabeledThreadFactory(
-                                                                                                                     "Spinner"));
+    private ExecutorService     spinners                     = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                      "Spinner"));
     private final SocketOptions spinnerSocketOptions         = new SocketOptions();
     private double              targetBandwidth              = 1000000.0;
     private int                 tokenLimit                   = 2000000;
