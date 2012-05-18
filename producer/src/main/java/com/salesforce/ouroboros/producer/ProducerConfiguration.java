@@ -41,6 +41,7 @@ import com.salesforce.ouroboros.util.LabeledThreadFactory;
  */
 public class ProducerConfiguration {
     private double              maximumBandwidth             = 20000000.0;
+    private int                 maximumBatchedSize           = 100;
     private int                 maxQueueLength               = 100;
     private double              minimumBandwidth             = 500000.0;
     private int                 minimumTokenRegenerationTime = 1;
@@ -49,19 +50,25 @@ public class ProducerConfiguration {
     private int                 sampleFrequency              = 10;
     private int                 sampleWindowSize             = 1000;
     private SkipStrategy<Node>  skipStrategy                 = new DefaultSkipStrategy();
-    private ExecutorService     spinners                     = Executors.newFixedThreadPool(6,
-                                                                                            new LabeledThreadFactory(
-                                                                                                                     "Spinner"));
+    private ExecutorService     spinners                     = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                      "Spinner"));
     private final SocketOptions spinnerSocketOptions         = new SocketOptions();
     private double              targetBandwidth              = 1000000.0;
-    private int                 tokenLimit                   = 2000000;
     private double              targetPercentile             = 0.9;
+    private int                 tokenLimit                   = 2000000;
 
     /**
      * @return the maximumBandwidth
      */
     public double getMaximumBandwidth() {
         return maximumBandwidth;
+    }
+
+    /**
+     * @return the maximumBatchedSize
+     */
+    public int getMaximumBatchedSize() {
+        return maximumBatchedSize;
     }
 
     public int getMaxQueueLength() {
@@ -155,6 +162,14 @@ public class ProducerConfiguration {
      */
     public void setMaximumBandwidth(double maximumEventRate) {
         maximumBandwidth = maximumEventRate;
+    }
+
+    /**
+     * @param maximumBatchedSize
+     *            the maximumBatchedSize to set
+     */
+    public void setMaximumBatchedSize(int maximumBatchedSize) {
+        this.maximumBatchedSize = maximumBatchedSize;
     }
 
     public void setMaxQueueLength(int maxQueueLength) {
