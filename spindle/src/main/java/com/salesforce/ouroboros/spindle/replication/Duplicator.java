@@ -26,8 +26,11 @@
 package com.salesforce.ouroboros.spindle.replication;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.lang.Thread.UncaughtExceptionHandler;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -47,20 +50,35 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public final class Duplicator {
 
-    static final Logger             log     = LoggerFactory.getLogger(Duplicator.class.getCanonicalName());
+    static final Logger                     log     = LoggerFactory.getLogger(Duplicator.class.getCanonicalName());
 
-    private EventEntry              current;
-    private final DuplicatorContext fsm     = new DuplicatorContext(this);
-    private SocketChannelHandler    handler;
-    private boolean                 inError;
-    private final Queue<EventEntry> pending = new LinkedList<EventEntry>();
-    private long                    position;
-    private int                     remaining;
-    private final Node              thisNode;
-    private AtomicBoolean           closed  = new AtomicBoolean();
+    private AtomicBoolean                   closed  = new AtomicBoolean();
+    private final Thread                    consumer;
+    private EventEntry                      current;
+    private final DuplicatorContext         fsm     = new DuplicatorContext(
+                                                                            this);
+    private SocketChannelHandler            handler;
+    private boolean                         inError;
+    private final BlockingDeque<EventEntry> pending = new LinkedBlockingDeque<EventEntry>();
+    private long                            position;
+    private final Semaphore                 quantum = new Semaphore(1);
+    private int                             remaining;
+    private final Node                      thisNode;
 
     public Duplicator(Node node) {
         thisNode = node;
+        consumer = new Thread(
+                              consumerAction(),
+                              String.format("Consumer thread for Duplicator[%s>?]",
+                                            thisNode));
+        consumer.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                log.warn(String.format("Uncaught exception on %s", t), e);
+            }
+        });
+        consumer.setDaemon(true);
+        consumer.start();
     }
 
     public void closing() {
@@ -68,7 +86,7 @@ public final class Duplicator {
         if (current != null) {
             current.selectAndFree();
         }
-        for (EventEntry entry : pending) { 
+        for (EventEntry entry : pending) {
             entry.selectAndFree();
         }
         pending.clear();
@@ -96,7 +114,7 @@ public final class Duplicator {
                 log.trace(String.format("Replicating event %s on %s", event,
                                         fsm.getName()));
             }
-            fsm.replicate(event);
+            pending.add(event);
         }
     }
 
@@ -105,6 +123,8 @@ public final class Duplicator {
      */
     public void setFsmName(String name) {
         fsm.setName(name);
+        consumer.setName(String.format("Consumer thread for Duplicator[%s]",
+                                       name));
     }
 
     public void writeReady() {
@@ -118,9 +138,11 @@ public final class Duplicator {
         remaining -= written;
         position += written;
         if (log.isTraceEnabled()) {
-            log.trace(String.format("Writing batch %s, position=%s, written=%s, to %s on %s",
-                                    current.getHeader(), position, written,
-                                    current.getSegment(), thisNode));
+            log.trace(String.format("Writing batch %s:%s, position=%s, written=%s, to %s on %s",
+                                    current.getHeader().getChannel(),
+                                    current.getHeader().getSequenceNumber(),
+                                    position, written, current.getSegment(),
+                                    thisNode));
         }
         return remaining == 0;
     }
@@ -129,56 +151,82 @@ public final class Duplicator {
         handler.close();
     }
 
-    /**
-     * @param event
-     */
-    protected void enqueue(EventEntry event) {
-        pending.add(event);
-    }
+    protected Runnable consumerAction() {
+        return new Runnable() {
 
-    protected boolean hasNext() {
-        assert current == null : "Concurrent events are being processed";
-        return pending.peek() != null;
+            @Override
+            public void run() {
+                while (!closed.get()) {
+                    try {
+                        quantum.acquire();
+                        do {
+                            current = pending.poll(4, TimeUnit.SECONDS);
+                            if (closed.get()) {
+                                return;
+                            }
+                        } while (current == null);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                    if (log.isTraceEnabled()) {
+                        log.trace(String.format("pushing batch %s", current));
+                    }
+                    fsm.replicate();
+                }
+            }
+        };
     }
 
     protected boolean inError() {
         return inError;
     }
 
-    protected void processBatch() {
-        if (writeBatch()) {
-            fsm.batchWritten();
-        } else {
-            if (inError) {
-                fsm.close();
-            } else {
-                if (inError) {
-                    fsm.close();
-                } else {
-                    handler.selectForWrite();
-                }
-            }
+    protected void nextQuantum() {
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Releasing next quantum, %s waiting",
+                                    pending.size()));
         }
+        quantum.release();
     }
 
-    protected void processHeader() {
-        current = pending.remove();
-        if (log.isTraceEnabled()) {
-            log.trace(String.format("Processing %s on %s", current.getHeader(),
-                                    fsm.getName()));
+    protected void batchReplicate() {
+        if (current == null) {
+            return;
         }
         current.select();
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Processing %s:%s on %s",
+                                    current.getHeader().getChannel(),
+                                    current.getHeader().getSequenceNumber(),
+                                    fsm.getName()));
+        }
         remaining = current.getHeader().getBatchByteLength();
         position = current.getHeader().getPosition();
         current.getHeader().rewind();
+        if (!replicate()) {
+            if (inError) {
+                fsm.close();
+            }
+            return;
+        }
+        fsm.quantumProcessed();
+    }
+
+    protected boolean replicate() {
         if (writeHeader()) {
-            fsm.headerWritten();
+            if (writeBatch()) {
+                return true;
+            } else {
+                if (inError) {
+                    fsm.close();
+                }
+                return false;
+            }
         } else {
             if (inError) {
                 fsm.close();
-            } else {
-                handler.selectForWrite();
             }
+            return false;
         }
     }
 
@@ -191,8 +239,10 @@ public final class Duplicator {
             if (transferTo()) {
                 current.getEventChannel().commit(current.getHeader().getOffset());
                 if (log.isTraceEnabled()) {
-                    log.trace(String.format("Acknowledging replication of %s, on %s",
-                                            current.getHeader(), fsm.getName()));
+                    log.trace(String.format("Acknowledging replication of %s:%s, on %s",
+                                            current.getHeader().getChannel(),
+                                            current.getHeader().getSequenceNumber(),
+                                            fsm.getName()));
                 }
                 current.getAcknowledger().acknowledge(current.getHeader().getChannel(),
                                                       current.getHeader().getSequenceNumber());
@@ -205,11 +255,13 @@ public final class Duplicator {
             if (Utils.isClose(e)) {
                 log.info(String.format("closing duplicator: %s", fsm.getName()));
             } else {
-                log.warn(String.format("Unable to replicate payload for %s from: %s",
-                                       current.getHeader(),
+                log.warn(String.format("Unable to replicate payload for %s:%s from: %s",
+                                       current.getHeader().getChannel(),
+                                       current.getHeader().getSequenceNumber(),
                                        current.getSegment()), e);
             }
         }
+        fsm.writeBatch();
         return false;
     }
 
@@ -223,19 +275,25 @@ public final class Duplicator {
             if (Utils.isClose(e)) {
                 log.info(String.format("closing duplicator: %s", fsm.getName()));
             } else {
-                log.warn(String.format("Unable to write batch header: %s",
-                                       current.getHeader()), e);
+                log.warn(String.format("Unable to write batch header: %s:%s",
+                                       current.getHeader().getChannel(),
+                                       current.getHeader().getSequenceNumber()),
+                         e);
             }
             inError = true;
             return false;
         }
-        boolean written = !current.getHeader().hasRemaining();
-        if (written) {
+        if (!current.getHeader().hasRemaining()) {
             if (log.isTraceEnabled()) {
-                log.trace(String.format("written header %s on %s",
-                                        current.getHeader(), fsm.getName()));
+                log.trace(String.format("written header %s:%s on %s",
+                                        current.getHeader().getChannel(),
+                                        current.getHeader().getSequenceNumber(),
+                                        fsm.getName()));
             }
+            return true;
+        } else {
+            fsm.writeHeader();
+            return false;
         }
-        return written;
     }
 }
