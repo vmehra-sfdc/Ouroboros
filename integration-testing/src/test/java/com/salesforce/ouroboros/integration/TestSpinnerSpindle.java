@@ -119,7 +119,7 @@ public class TestSpinnerSpindle {
 
             @Override
             public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
-                Spindle spindle = new Spindle(bundle);
+                Spindle spindle = new Spindle(bundle, 5);
                 spindles.add(spindle);
                 return spindle;
             }
@@ -148,7 +148,7 @@ public class TestSpinnerSpindle {
         Node coordNode = new Node(2);
         Producer producer = mock(Producer.class);
         when(producer.getId()).thenReturn(coordNode);
-        final Spinner spinner = new Spinner(producer, toNode, 10);
+        final Spinner spinner = new Spinner(5, producer, toNode, 10);
 
         spindleHandler.connectTo(spindleAddress, spinner);
 

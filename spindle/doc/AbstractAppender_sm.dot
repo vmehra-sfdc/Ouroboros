@@ -54,6 +54,9 @@ digraph AbstractAppender {
         "AbstractAppenderFSM::ReadBatch" -> "AbstractAppenderFSM::ReadBatchHeader"
             [label="readBatchHeader/\l"];
 
+        "AbstractAppenderFSM::ReadBatch" -> "AbstractAppenderFSM::Ready"
+            [label="consumed/\l"];
+
         "AbstractAppenderFSM::ReadBatch" -> "AbstractAppenderFSM::Closed"
             [label="close/\l"];
 

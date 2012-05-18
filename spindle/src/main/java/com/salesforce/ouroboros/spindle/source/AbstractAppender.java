@@ -60,11 +60,13 @@ abstract public class AbstractAppender {
     protected int                           position = -1;
     protected long                          remaining;
     protected Segment                       segment;
+    private final int                       maxBatchedSize;
 
-    public AbstractAppender(Bundle bundle) {
+    public AbstractAppender(Bundle bundle, int maxBatchedSize) {
         fsm.setName(Integer.toString(bundle.getId().processId));
         this.bundle = bundle;
         batchHeader = createBatchHeader();
+        this.maxBatchedSize = maxBatchedSize;
     }
 
     public void accept(SocketChannelHandler handler) {
@@ -264,7 +266,12 @@ abstract public class AbstractAppender {
 
     protected void readBatch() {
         batchHeader.rewind();
+        int count = 0;
         while (append()) {
+            if (count++ < maxBatchedSize) {
+                fsm.consumed();
+                return;
+            }
             // party on
             batchHeader.rewind();
         }

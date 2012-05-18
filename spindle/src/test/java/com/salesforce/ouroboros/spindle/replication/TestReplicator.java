@@ -61,7 +61,7 @@ public class TestReplicator {
         when(handler.getChannel()).thenReturn(socketChannel);
         final Node node = new Node(0x1639, 0x1640, 0x1650);
 
-        Replicator replicator = new Replicator(bundle);
+        Replicator replicator = new Replicator(5, bundle, 5);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -92,7 +92,7 @@ public class TestReplicator {
         Rendezvous rendezvous = mock(Rendezvous.class);
         when(bundle.getId()).thenReturn(node);
 
-        Replicator replicator = new Replicator(bundle, node, rendezvous);
+        Replicator replicator = new Replicator(5, bundle, node, rendezvous, 5);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override

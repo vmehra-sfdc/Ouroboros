@@ -62,14 +62,16 @@ public final class Duplicator {
     private SocketChannelHandler            handler;
     private boolean                         inError;
     private final Queue<EventEntry>         inFlight = new LinkedList<EventEntry>();
+    private final int                       maxBatchedSize;
     private final BlockingDeque<EventEntry> pending  = new LinkedBlockingDeque<EventEntry>();
     private long                            position;
     private final Semaphore                 quantum  = new Semaphore(1);
     private int                             remaining;
     private final Node                      thisNode;
 
-    public Duplicator(Node node) {
+    public Duplicator(Node node, int maxBatchedSize) {
         thisNode = node;
+        this.maxBatchedSize = maxBatchedSize;
         consumer = new Thread(
                               consumerAction(),
                               String.format("Consumer thread for Duplicator[%s>?]",
@@ -215,7 +217,8 @@ public final class Duplicator {
     }
 
     protected void batchReplicate() {
-        while (next()) {
+        int count = 0;
+        while (count++ < maxBatchedSize && next()) {
             if (!replicate()) {
                 if (inError) {
                     fsm.close();
@@ -223,7 +226,11 @@ public final class Duplicator {
                 return;
             }
         }
-        fsm.quantumProcessed();
+        if (inError) {
+            fsm.close();
+        } else {
+            fsm.quantumProcessed();
+        }
     }
 
     protected boolean replicate() {

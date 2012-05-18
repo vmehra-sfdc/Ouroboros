@@ -73,7 +73,10 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     private class ReplicatorFactory implements CommunicationsHandlerFactory {
         @Override
         public Replicator createCommunicationsHandler(SocketChannel channel) {
-            return new Replicator(Weaver.this);
+            return new Replicator(
+                                  configuration.getMaximumDuplicateBatchedSize(),
+                                  Weaver.this,
+                                  configuration.getMaximumReplicateBatchedSize());
         }
     }
 
@@ -87,7 +90,8 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     private class SpindleFactory implements CommunicationsHandlerFactory {
         @Override
         public Spindle createCommunicationsHandler(SocketChannel channel) {
-            return new Spindle(Weaver.this);
+            return new Spindle(Weaver.this,
+                               configuration.getMaximumAppendBatchedSize());
         }
     }
 
@@ -102,8 +106,8 @@ public class Weaver implements Bundle, Comparable<Weaver> {
 
     private final ConcurrentMap<File, Segment>      appendSegmentCache;
     private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
+    private final WeaverConfigation                 configuration;
     private final ContactInformation                contactInfo;
-    private final long                              maxSegmentSize;
     private ConsistentHashFunction<Node>            nextRing;
     private final ConcurrentMap<File, Segment>      readSegmentCache;
     private final ServerSocketChannelHandler        replicationHandler;
@@ -114,8 +118,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     private ConsistentHashFunction<Node>            weaverRing;
     private final ServerSocketChannelHandler        xeroxHandler;
 
-    public Weaver(WeaverConfigation configuration) throws IOException {
-        configuration.validate();
+    public Weaver(WeaverConfigation config) throws IOException {
+        config.validate();
+        this.configuration = config;
         Builder<File, Segment> builder = new Builder<File, Segment>();
         appendSegmentCache = createAppendSegmentCache(configuration, builder);
         readSegmentCache = createReadSegmentCache(configuration, builder);
@@ -138,7 +143,6 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                                                               root.directory.getAbsolutePath()));
             }
         }
-        maxSegmentSize = configuration.getMaxSegmentSize();
         replicationHandler = new ServerSocketChannelHandler(
                                                             WEAVER_REPLICATOR,
                                                             configuration.getReplicationSocketOptions(),
@@ -432,8 +436,8 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         channels.put(channel,
                      new EventChannel(self, Role.MIRROR, primary, channel,
                                       roots.hash(point(channel)),
-                                      maxSegmentSize, null, appendSegmentCache,
-                                      readSegmentCache));
+                                      configuration.getMaxSegmentSize(), null,
+                                      appendSegmentCache, readSegmentCache));
     }
 
     /**
@@ -460,8 +464,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         channels.put(channel,
                      new EventChannel(self, Role.PRIMARY, mirror, channel,
                                       roots.hash(point(channel)),
-                                      maxSegmentSize, replicator,
-                                      appendSegmentCache, readSegmentCache));
+                                      configuration.getMaxSegmentSize(),
+                                      replicator, appendSegmentCache,
+                                      readSegmentCache));
     }
 
     /**
@@ -477,7 +482,12 @@ public class Weaver implements Bundle, Comparable<Weaver> {
      */
     public Replicator openReplicator(Node node, ContactInformation info,
                                      Rendezvous rendezvous) {
-        Replicator replicator = new Replicator(this, node, rendezvous);
+        Replicator replicator = new Replicator(
+                                               configuration.getMaximumDuplicateBatchedSize(),
+                                               this,
+                                               node,
+                                               rendezvous,
+                                               configuration.getMaximumReplicateBatchedSize());
         Replicator previous = replicators.putIfAbsent(node, replicator);
         assert previous == null : String.format("Replicator already opend on weaver %s to weaver %s",
                                                 self, node);
@@ -636,13 +646,15 @@ public class Weaver implements Bundle, Comparable<Weaver> {
             assert replicator == null : String.format("Replicator for %s is null on %s",
                                                       channel, self);
             ec = new EventChannel(self, Role.PRIMARY, pair.get(1), channel,
-                                  roots.hash(point(channel)), maxSegmentSize,
+                                  roots.hash(point(channel)),
+                                  configuration.getMaxSegmentSize(),
                                   replicator, appendSegmentCache,
                                   readSegmentCache);
         } else if (self.equals(pair.get(1))) {
             ec = new EventChannel(self, Role.MIRROR, pair.get(0), channel,
-                                  roots.hash(point(channel)), maxSegmentSize,
-                                  null, appendSegmentCache, readSegmentCache);
+                                  roots.hash(point(channel)),
+                                  configuration.getMaxSegmentSize(), null,
+                                  appendSegmentCache, readSegmentCache);
         } else {
             throw new IllegalStateException(
                                             String.format("%s is neither mirror nor primary for %, cannot xerox",

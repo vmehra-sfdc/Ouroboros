@@ -133,7 +133,7 @@ public class TestDuplicator {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
-        final Duplicator replicator = new Duplicator(new Node(0));
+        final Duplicator replicator = new Duplicator(new Node(0), 5);
         assertEquals(DuplicatorFSM.Waiting, replicator.getState());
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);
@@ -208,7 +208,8 @@ public class TestDuplicator {
         Acknowledger inboundAcknowledger = mock(Acknowledger.class);
 
         final ReplicatingAppender inboundReplicator = new ReplicatingAppender(
-                                                                              inboundBundle);
+                                                                              inboundBundle,
+                                                                              5);
 
         File tmpOutboundFile = File.createTempFile("outbound", ".tst");
         tmpOutboundFile.deleteOnExit();
@@ -240,7 +241,7 @@ public class TestDuplicator {
                                                                                            0,
                                                                                            0));
 
-        final Duplicator outboundDuplicator = new Duplicator(new Node(0));
+        final Duplicator outboundDuplicator = new Duplicator(new Node(0), 5);
         assertEquals(DuplicatorFSM.Waiting, outboundDuplicator.getState());
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);

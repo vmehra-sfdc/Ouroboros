@@ -80,7 +80,7 @@ public class TestBatchWriter {
 
         SortedMap<BatchIdentity, Batch> pending = new TreeMap<BatchIdentity, Batch>();
 
-        final BatchWriter batchWriter = new BatchWriter(100, "test");
+        final BatchWriter batchWriter = new BatchWriter(100, 5, "test");
         assertEquals(BatchWriterFSM.Suspended, batchWriter.getState());
         batchWriter.connect(handler);
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());

@@ -185,11 +185,11 @@ public class TestTransfer {
         when(primaryBundle.getId()).thenReturn(primaryNode);
         when(mirrorBundle.getId()).thenReturn(mirrorNode);
 
-        Spindle spindle = new Spindle(primaryBundle);
-        final Replicator primaryReplicator = new Replicator(primaryBundle,
+        Spindle spindle = new Spindle(primaryBundle, 5);
+        final Replicator primaryReplicator = new Replicator(5, primaryBundle,
                                                             mirrorNode,
-                                                            rendezvous);
-        final Replicator mirrorReplicator = new Replicator(mirrorBundle);
+                                                            rendezvous, 5);
+        final Replicator mirrorReplicator = new Replicator(5, mirrorBundle, 5);
         primaryEventChannel = new EventChannel(primaryNode, Role.PRIMARY,
                                                mirrorNode, channelId,
                                                primaryRoot, maxSegmentSize,

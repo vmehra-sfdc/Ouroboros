@@ -52,8 +52,8 @@ public class Appender extends AbstractAppender {
     private volatile int           startPosition;
     private final Pool<EventEntry> eventEntryPool;
 
-    public Appender(Bundle bundle, Acknowledger acknowledger) {
-        super(bundle);
+    public Appender(Bundle bundle, Acknowledger acknowledger, int maxBatchedSize) {
+        super(bundle, maxBatchedSize);
         this.acknowledger = acknowledger;
         eventEntryPool = new Pool<EventEntry>("EventEntry",
                                               new Factory<EventEntry>() {

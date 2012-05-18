@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=7>
+        <th colspan=8>
           Transition
         </th>
       </tr>
@@ -31,6 +31,9 @@
         </th>
         <th>
           close
+        </th>
+        <th>
+          consumed
         </th>
         <th>
           drain
@@ -56,6 +59,8 @@
           <pre>
 selectForRead();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -99,6 +104,12 @@ readBatch();
         </td>
         <td>
           <pre>
+  Ready
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
   DevNull
   {}
           </pre>
@@ -124,6 +135,8 @@ readBatch();
           <pre>
 selectForRead();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -176,6 +189,8 @@ selectForRead();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   DevNull
   {}
@@ -198,6 +213,8 @@ selectForRead();
           <pre>
     selectForRead();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -250,6 +267,8 @@ selectForRead();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [!ctxt.devNull() && !ctxt.inError()]
   DevNull
@@ -284,6 +303,8 @@ selectForRead();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>

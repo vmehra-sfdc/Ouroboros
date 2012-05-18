@@ -76,7 +76,7 @@ public class TestAppender {
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(eventChannel, tmpFile,
                                                  Mode.APPEND);
-        final Appender appender = new Appender(bundle, acknowledger);
+        final Appender appender = new Appender(bundle, acknowledger, 5);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
@@ -163,7 +163,7 @@ public class TestAppender {
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(eventChannel, tmpFile,
                                                  Mode.APPEND);
-        final Appender appender = new Appender(bundle, acknowledger);
+        final Appender appender = new Appender(bundle, acknowledger, 5);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));

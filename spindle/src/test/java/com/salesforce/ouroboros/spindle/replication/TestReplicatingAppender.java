@@ -95,7 +95,8 @@ public class TestReplicatingAppender {
                                                                                                0));
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
-        final ReplicatingAppender replicator = new ReplicatingAppender(bundle);
+        final ReplicatingAppender replicator = new ReplicatingAppender(bundle,
+                                                                       5);
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);
         options.setReceive_buffer_size(4);

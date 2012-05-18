@@ -62,12 +62,15 @@ public class BatchWriter {
     private SocketChannelHandler       handler;
     private boolean                    inError  = false;
     private final List<Batch>          inFlight = new ArrayList<Batch>();
+    private final int                  maximumBatchedSize;
     private final Semaphore            quantum  = new Semaphore(0);
     private final BlockingDeque<Batch> queued;
     private final AtomicBoolean        run      = new AtomicBoolean(true);
 
-    public BatchWriter(int maxQueueLength, String fsmName) {
+    public BatchWriter(int maxQueueLength, int maximumBatchedSize,
+                       String fsmName) {
         queued = new LinkedBlockingDeque<Batch>(maxQueueLength);
+        this.maximumBatchedSize = maximumBatchedSize;
         fsm.setName(fsmName);
         consumer = new Thread(
                               consumerAction(),
@@ -156,7 +159,7 @@ public class BatchWriter {
                         return;
                     }
                     inFlight.add(first);
-                    queued.drainTo(inFlight);
+                    queued.drainTo(inFlight, maximumBatchedSize);
                     if (log.isTraceEnabled()) {
                         log.trace(String.format("pushing %s batches",
                                                 inFlight.size()));

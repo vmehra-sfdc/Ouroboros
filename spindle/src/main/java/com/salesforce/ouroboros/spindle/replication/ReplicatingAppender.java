@@ -48,8 +48,8 @@ public class ReplicatingAppender extends AbstractAppender {
 
     private static final Logger log = LoggerFactory.getLogger(ReplicatingAppender.class.getCanonicalName());
 
-    public ReplicatingAppender(final Bundle bundle) {
-        super(bundle);
+    public ReplicatingAppender(Bundle bundle, int maxBatchedSize) {
+        super(bundle, maxBatchedSize);
     }
 
     /* (non-Javadoc)

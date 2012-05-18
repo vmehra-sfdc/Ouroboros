@@ -82,16 +82,21 @@ public class Replicator implements CommunicationsHandler {
     private boolean                 inError;
     private Node                    partner;
     private Rendezvous              rendezvous;
+    private final int               maxReplicateBatchedSize;
 
-    public Replicator(Bundle bundle) {
+    public Replicator(int maxDuplicatorBatchedSize, Bundle bundle,
+                      int maxReplicateBatchedSize) {
         fsm.setName(Integer.toString(bundle.getId().processId));
-        duplicator = new Duplicator(bundle.getId());
+        duplicator = new Duplicator(bundle.getId(), maxDuplicatorBatchedSize);
         this.bundle = bundle;
+        this.maxReplicateBatchedSize = maxReplicateBatchedSize;
     }
 
-    public Replicator(Bundle bundle, Node partner, Rendezvous rendezvous) {
-        this(bundle);
-        appender = new ReplicatingAppender(bundle);
+    public Replicator(int maxDuplicatorBatchedSize, Bundle bundle,
+                      Node partner, Rendezvous rendezvous,
+                      int maxReplicateBatchedSize) {
+        this(maxDuplicatorBatchedSize, bundle, maxReplicateBatchedSize);
+        appender = new ReplicatingAppender(bundle, maxReplicateBatchedSize);
         this.partner = partner;
         this.rendezvous = rendezvous;
         duplicator.setFsmName(String.format("%s>%s", bundle.getId().processId,
@@ -102,7 +107,7 @@ public class Replicator implements CommunicationsHandler {
     public void accept(SocketChannelHandler handler) {
         assert this.handler == null : "This replicator has already been established";
         assert appender == null : "This replicator does not accept handshakes";
-        appender = new ReplicatingAppender(bundle);
+        appender = new ReplicatingAppender(bundle, maxReplicateBatchedSize);
         this.handler = handler;
         fsm.acceptHandshake();
     }
