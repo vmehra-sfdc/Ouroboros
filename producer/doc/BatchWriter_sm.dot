@@ -51,8 +51,14 @@ digraph BatchWriter {
         "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::Closed"
             [label="writeReady/\l"];
 
+        "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::WriteBatch"
+            [label="writeReady/\l"];
+
         "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::Waiting"
             [label="writeReady/\l"];
+
+        "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::WriteBatch"
+            [label="payloadWritten/\l"];
 
         "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::Waiting"
             [label="payloadWritten/\l"];

@@ -79,7 +79,7 @@ public class TestSpinner {
         final Node node = new Node(0x1638);
         Node toNode = new Node(0x16);
         when(producer.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(5, producer, toNode, 100);
+        Spinner spinner = new Spinner(producer, toNode, 100);
 
         doReturn(0).doAnswer(new Answer<Integer>() {
             @Override
@@ -109,7 +109,7 @@ public class TestSpinner {
         Node node = new Node(0x1638);
         Node toNode = new Node(0x16);
         when(producer.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(5, producer, toNode, 100);
+        Spinner spinner = new Spinner(producer, toNode, 100);
         spinner.connect(handler);
 
         long sequenceNumber = 100000L;
@@ -152,7 +152,7 @@ public class TestSpinner {
         Node node = new Node(0x1638);
         Node toNode = new Node(0x16);
         when(producer.getId()).thenReturn(node);
-        Spinner spinner = new Spinner(5, producer, toNode, 100);
+        Spinner spinner = new Spinner(producer, toNode, 100);
         spinner.connect(handler);
 
         Node mirror = new Node(0x1638);

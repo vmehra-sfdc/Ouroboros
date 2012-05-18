@@ -69,8 +69,7 @@ public class Spinner implements CommunicationsHandler {
     private final BatchWriter                        writer;
     private final Node                               to;
 
-    public Spinner(int maxBatchedSize, Producer producer, Node to,
-                   int maxQueueLength) {
+    public Spinner(Producer producer, Node to, int maxQueueLength) {
         String fsmName = String.format("%s>%s", producer.getId().processId,
                                        to.processId);
         this.to = to;
@@ -79,7 +78,7 @@ public class Spinner implements CommunicationsHandler {
         handshake.putInt(MAGIC);
         producer.getId().serialize(handshake);
         handshake.flip();
-        writer = new BatchWriter(maxQueueLength, maxBatchedSize, fsmName);
+        writer = new BatchWriter(maxQueueLength, fsmName);
         ack = new BatchAcknowledgement(
                                        this,
                                        String.format("%s<%s",

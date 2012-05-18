@@ -173,6 +173,7 @@ public class Producer implements Comparable<Producer> {
     private final Pool<Batch>                       batchPool;
     private final ConcurrentMap<UUID, PrimaryState> channelState      = new ConcurrentHashMap<UUID, PrimaryState>();
     private final Controller                        controller;
+    private final int                               maxQueueLength;
     private final Map<UUID, MirrorState>            mirrors           = new ConcurrentHashMap<UUID, MirrorState>();
     private ConsistentHashFunction<Node>            nextProducerRing;
     private HashSet<UUID>                           pausedChannels    = new HashSet<UUID>();
@@ -182,16 +183,15 @@ public class Producer implements Comparable<Producer> {
                                                                                           0);
     private List<UUID>                              relinquishedMirrors;
     private List<UUID>                              relinquishedPrimaries;
+    private final int                               retryLimit;
     private final Node                              self;
     private final EventSource                       source;
     private final ChannelHandler                    spinnerHandler;
     private final ConcurrentMap<Node, Spinner>      spinners          = new ConcurrentHashMap<Node, Spinner>();
     private ConsistentHashFunction<Node>            weaverRing;
-    private final ProducerConfiguration             configuration;
 
-    public Producer(Node self, EventSource source, ProducerConfiguration config)
-                                                                                throws IOException {
-        configuration = config;
+    public Producer(Node self, EventSource source,
+                    ProducerConfiguration configuration) throws IOException {
         controller = new RateController(
                                         new RateLimiter(
                                                         configuration.getTargetBandwidth(),
@@ -208,6 +208,8 @@ public class Producer implements Comparable<Producer> {
                                             "Spinner Handler",
                                             configuration.getSpinnerSocketOptions(),
                                             configuration.getSpinners());
+        maxQueueLength = configuration.getMaxQueueLength();
+        retryLimit = configuration.getRetryLimit();
         weaverRing = new ConsistentHashFunction<Node>(
                                                       configuration.getSkipStrategy(),
                                                       configuration.getNumberOfReplicas());
@@ -247,6 +249,13 @@ public class Producer implements Comparable<Producer> {
             }
         }
         free(batch);
+    }
+
+    /**
+     * @param batch
+     */
+    private void free(Batch batch) {
+        batchPool.free(batch);
     }
 
     /**
@@ -455,7 +464,7 @@ public class Producer implements Comparable<Producer> {
                     // Fail over to the new primary
                     for (Batch batch : failedPrimary.spinner.getPending(entry.getKey()).values()) {
                         boolean delivered = false;
-                        for (int i = 0; i < configuration.getRetryLimit(); i++) {
+                        for (int i = 0; i < retryLimit; i++) {
                             try {
                                 newPrimary.push(batch);
                                 delivered = true;
@@ -696,6 +705,10 @@ public class Producer implements Comparable<Producer> {
         }
     }
 
+    private Batch allocate() {
+        return batchPool.allocate();
+    }
+
     /**
      * Rebalance a channel that this node serves as either the primary or
      * mirror. Add the list of channels to the map of update states that will
@@ -843,7 +856,7 @@ public class Producer implements Comparable<Producer> {
                 mapping.getValue().spinner = remapped;
                 for (Batch batch : mapping.getValue().spinner.getPending(mapping.getKey()).values()) {
                     boolean delivered = false;
-                    for (int i = 0; i < configuration.getRetryLimit(); i++) {
+                    for (int i = 0; i < retryLimit; i++) {
                         try {
                             remapped.push(batch);
                             delivered = true;
@@ -910,17 +923,6 @@ public class Producer implements Comparable<Producer> {
         return String.format("Producer[%s]", self.processId);
     }
 
-    private Batch allocate() {
-        return batchPool.allocate();
-    }
-
-    /**
-     * @param batch
-     */
-    private void free(Batch batch) {
-        batchPool.free(batch);
-    }
-
     protected void closePublishingGate() throws InterruptedException {
         publishGate.close();
         // Wait until all publishing threads are finished
@@ -945,10 +947,7 @@ public class Producer implements Comparable<Producer> {
             ContactInformation info = yellowPages.get(n);
             assert info != null : String.format("Did not find any connection information for node %s",
                                                 n);
-            Spinner spinner = new Spinner(
-                                          configuration.getMaximumBatchedSize(),
-                                          this, n,
-                                          configuration.getMaxQueueLength());
+            Spinner spinner = new Spinner(this, n, maxQueueLength);
             if (log.isInfoEnabled()) {
                 log.info(String.format("Connecting spinner to %s on %s address %s",
                                        n, self, info.spindle));

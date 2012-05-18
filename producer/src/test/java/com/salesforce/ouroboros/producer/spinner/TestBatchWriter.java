@@ -27,7 +27,7 @@ package com.salesforce.ouroboros.producer.spinner;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
-import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -80,7 +80,7 @@ public class TestBatchWriter {
 
         SortedMap<BatchIdentity, Batch> pending = new TreeMap<BatchIdentity, Batch>();
 
-        final BatchWriter batchWriter = new BatchWriter(100, 5, "test");
+        final BatchWriter batchWriter = new BatchWriter(100, "test");
         assertEquals(BatchWriterFSM.Suspended, batchWriter.getState());
         batchWriter.connect(handler);
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
@@ -90,9 +90,9 @@ public class TestBatchWriter {
         Answer<Integer> readBatchHeader = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer[] buffers = (ByteBuffer[]) invocation.getArguments()[0];
-                int totalLength = buffers[0].remaining();
-                BatchHeader header = BatchHeader.readFrom(buffers[0]);
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                int totalLength = buffer.remaining();
+                BatchHeader header = BatchHeader.readFrom(buffer);
                 assertEquals(channel, header.getChannel());
                 return totalLength;
             }
@@ -100,10 +100,10 @@ public class TestBatchWriter {
         Answer<Integer> readBatch = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer[] buffers = (ByteBuffer[]) invocation.getArguments()[0];
-                int totalLength = buffers[1].remaining();
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                int totalLength = buffer.remaining();
                 for (int i = 0; i < 3; i++) {
-                    Event event = Event.readFrom(buffers[1]);
+                    Event event = Event.readFrom(buffer);
                     byte[] buf = new byte[events[i].getBytes().length];
                     event.getPayload().get(buf);
                     String payload = new String(buf);
@@ -113,14 +113,11 @@ public class TestBatchWriter {
                     assertEquals(String.format("unexpected event content '%s'",
                                                payload), events[i], payload);
                 }
-                assertEquals(0, buffers[1].remaining());
+                assertEquals(0, buffer.remaining());
                 return totalLength;
             }
         };
-        ByteBuffer[] temp = new ByteBuffer[0];
-        when(
-             outbound.write(any(temp.getClass()), any(Integer.class),
-                            any(Integer.class))).thenReturn(0L).thenAnswer(readBatchHeader).thenAnswer(readBatch);
+        when(outbound.write(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(readBatchHeader).thenAnswer(readBatch);
 
         batchWriter.push(batch, pending);
         Util.waitFor("Never entered the WriteBatch state", new Condition() {
@@ -130,12 +127,9 @@ public class TestBatchWriter {
             }
         }, 2000, 100);
         batchWriter.writeReady();
-        batchWriter.writeReady();
         assertEquals(1, pending.size());
         assertEquals(batch, pending.get(batch));
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());
-        verify(outbound, new Times(3)).write(any(temp.getClass()),
-                                             any(Integer.class),
-                                             any(Integer.class));
+        verify(outbound, new Times(3)).write(isA(ByteBuffer.class));
     }
 }

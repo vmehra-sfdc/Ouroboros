@@ -69,7 +69,15 @@ Entry {
 		Closed{}
 		
 	writeReady
+		[ctxt.hasNext()]
+		WriteBatch{}
+		
+	writeReady
 		Waiting{}
+		
+	payloadWritten
+		[ctxt.hasNext()]
+		WriteBatch{}
 		
 	payloadWritten
 		Waiting{}

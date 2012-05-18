@@ -27,12 +27,9 @@ package com.salesforce.ouroboros.producer.spinner;
 
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,6 +41,7 @@ import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Batch;
 import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.api.producer.RateLimiteExceededException;
+import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterFSM;
 import com.salesforce.ouroboros.producer.spinner.BatchWriterContext.BatchWriterState;
 import com.salesforce.ouroboros.util.Utils;
 
@@ -55,22 +53,18 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class BatchWriter {
 
-    private static final Logger        log      = LoggerFactory.getLogger(BatchWriter.class.getCanonicalName());
-    private final Thread               consumer;
-    private ByteBuffer[]               currentWrite;
-    private final BatchWriterContext   fsm      = new BatchWriterContext(this);
+    private static final Logger        log     = LoggerFactory.getLogger(BatchWriter.class.getCanonicalName());
+    private final BatchWriterContext   fsm     = new BatchWriterContext(this);
     private SocketChannelHandler       handler;
-    private boolean                    inError  = false;
-    private final List<Batch>          inFlight = new ArrayList<Batch>();
-    private final int                  maximumBatchedSize;
-    private final Semaphore            quantum  = new Semaphore(0);
-    private final BlockingDeque<Batch> queued;
-    private final AtomicBoolean        run      = new AtomicBoolean(true);
+    private boolean                    inError = false;
+    private final BlockingQueue<Batch> queued;
+    private Batch                      batch;
+    private final AtomicBoolean        run     = new AtomicBoolean(true);
+    private final Thread               consumer;
+    private final Semaphore            quantum = new Semaphore(0);
 
-    public BatchWriter(int maxQueueLength, int maximumBatchedSize,
-                       String fsmName) {
-        queued = new LinkedBlockingDeque<Batch>(maxQueueLength);
-        this.maximumBatchedSize = maximumBatchedSize;
+    public BatchWriter(int maxQueueLength, String fsmName) {
+        queued = new ArrayBlockingQueue<Batch>(maxQueueLength);
         fsm.setName(fsmName);
         consumer = new Thread(
                               consumerAction(),
@@ -119,7 +113,7 @@ public class BatchWriter {
      */
     public void push(Batch events, Map<BatchIdentity, Batch> pending)
                                                                      throws RateLimiteExceededException {
-        if (!run.get()) {
+        if (fsm.getState() == BatchWriterFSM.Closed) {
             return;
         }
         pending.put(events, events);
@@ -136,8 +130,7 @@ public class BatchWriter {
         if (handler != null) {
             handler.close();
         }
-        currentWrite = null;
-        inFlight.clear();
+        batch = null;
     }
 
     protected Runnable consumerAction() {
@@ -146,33 +139,26 @@ public class BatchWriter {
             @Override
             public void run() {
                 while (run.get()) {
-                    Batch first = null;
                     try {
                         quantum.acquire();
                         do {
-                            first = queued.poll(4, TimeUnit.SECONDS);
+                            batch = queued.poll(4, TimeUnit.SECONDS);
                             if (!run.get()) {
                                 return;
                             }
-                        } while (first == null);
+                        } while (batch == null);
                     } catch (InterruptedException e) {
                         return;
                     }
-                    inFlight.add(first);
-                    queued.drainTo(inFlight, maximumBatchedSize);
-                    if (log.isTraceEnabled()) {
-                        log.trace(String.format("pushing %s batches",
-                                                inFlight.size()));
-                    }
-                    List<ByteBuffer> buffers = new ArrayList<ByteBuffer>();
-                    for (Batch batch : inFlight) {
-                        batch.appendBuffersTo(buffers);
-                    }
-                    currentWrite = buffers.toArray(new ByteBuffer[buffers.size()]);
                     fsm.writeBatch();
                 }
             }
         };
+    }
+
+    protected boolean hasNext() {
+        batch = queued.poll();
+        return batch != null;
     }
 
     protected boolean inError() {
@@ -180,6 +166,7 @@ public class BatchWriter {
     }
 
     protected void nextBatch() {
+        batch.rewind();
         if (writeBatch()) {
             fsm.payloadWritten();
         } else {
@@ -204,12 +191,34 @@ public class BatchWriter {
     }
 
     protected boolean writeBatch() {
-        try {
-            long written = handler.getChannel().write(currentWrite);
-            if (log.isTraceEnabled()) {
-                log.trace(String.format("%s bytes written", written));
+        if (batch.header.hasRemaining()) {
+            try {
+                if (batch.header.write(handler.getChannel()) < 0) {
+                    if (log.isTraceEnabled()) {
+                        log.trace("Closing channel");
+                    }
+                    inError = true;
+                    return false;
+                }
+            } catch (IOException e) {
+                if (Utils.isClose(e)) {
+                    log.info(String.format("closing batch writer %s ",
+                                           fsm.getName()));
+                } else {
+                    if (log.isWarnEnabled()) {
+                        log.warn(String.format("Unable to write event batch payload %s",
+                                               handler.getChannel()), e);
+                    }
+                }
+                inError = true;
+                return false;
             }
-            if (written < 0) {
+            if (batch.header.hasRemaining()) {
+                return false;
+            }
+        }
+        try {
+            if (handler.getChannel().write(batch.batch) < 0) {
                 if (log.isTraceEnabled()) {
                     log.trace("Closing channel");
                 }
@@ -229,28 +238,16 @@ public class BatchWriter {
             inError = true;
             return false;
         }
-        if (currentWrite[currentWrite.length - 1].hasRemaining()) {
+        if (batch.batch.hasRemaining()) {
             return false;
         }
         if (log.isInfoEnabled()) {
-            StringBuilder builder = new StringBuilder(4096);
-            builder.append('\n');
-            int i = 0;
-            for (Batch batch : inFlight) {
-                builder.append('\t');
-                builder.append(String.format("Pushed %s,%s,%s,%s",
-                                             batch.header.getSequenceNumber(),
-                                             batch.header.getChannel(),
-                                             fsm.getName(),
-                                             batch.header.getProducerMirror()));
-                if (++i != inFlight.size()) {
-                    builder.append('\n');
-                }
-            }
-            log.info(builder.toString());
+            log.info(String.format("Pushed %s,%s,%s,%s",
+                                   batch.header.getSequenceNumber(),
+                                   batch.header.getChannel(), fsm.getName(),
+                                   batch.header.getProducerMirror()));
         }
-        inFlight.clear();
-        currentWrite = null;
+        batch = null;
         return true;
     }
 
