@@ -99,6 +99,9 @@ public class Appender extends AbstractAppender {
                                     segment, batchHeader, offset,
                                     bundle.getId()));
             close();
+        } finally {
+            segment = null;
+            eventChannel = null;
         }
         if (log.isTraceEnabled()) {
             log.trace(String.format("Committed %s on %s ", batchHeader,

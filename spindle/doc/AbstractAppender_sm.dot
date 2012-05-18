@@ -14,14 +14,20 @@ digraph AbstractAppender {
         "AbstractAppenderFSM::Ready"
             [label="{Ready}"];
 
+        "AbstractAppenderFSM::ReadBatch"
+            [label="{ReadBatch}"];
+
+        "AbstractAppenderFSM::ReadBatchHeader"
+            [label="{ReadBatchHeader}"];
+
+        "AbstractAppenderFSM::CheckDuplicate"
+            [label="{CheckDuplicate}"];
+
         "AbstractAppenderFSM::Append"
             [label="{Append}"];
 
         "AbstractAppenderFSM::DevNull"
             [label="{DevNull}"];
-
-        "AbstractAppenderFSM::ReadBatchHeader"
-            [label="{ReadBatchHeader}"];
 
         "AbstractAppenderFSM::Closed"
             [label="{Closed}"];
@@ -33,28 +39,55 @@ digraph AbstractAppender {
         // Transitions (Edges)
         //
 
-        "AbstractAppenderFSM::Ready" -> "AbstractAppenderFSM::ReadBatchHeader"
+        "AbstractAppenderFSM::Ready" -> "AbstractAppenderFSM::ReadBatch"
             [label="readReady/\l"];
 
         "AbstractAppenderFSM::Ready" -> "AbstractAppenderFSM::Closed"
             [label="close/\l"];
 
-        "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::DevNull"
+        "AbstractAppenderFSM::ReadBatch" -> "AbstractAppenderFSM::DevNull"
             [label="drain/\l"];
+
+        "AbstractAppenderFSM::ReadBatch" -> "AbstractAppenderFSM::Append"
+            [label="append/\l"];
+
+        "AbstractAppenderFSM::ReadBatch" -> "AbstractAppenderFSM::ReadBatchHeader"
+            [label="readBatchHeader/\l"];
+
+        "AbstractAppenderFSM::ReadBatch" -> "AbstractAppenderFSM::Ready"
+            [label="consumed/\l"];
+
+        "AbstractAppenderFSM::ReadBatch" -> "AbstractAppenderFSM::Closed"
+            [label="close/\l"];
+
+        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Closed"
+            [label="readReady/\l"];
+
+        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::CheckDuplicate"
+            [label="readReady/\l"];
+
+        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Closed"
+            [label="close/\l"];
+
+        "AbstractAppenderFSM::CheckDuplicate" -> "AbstractAppenderFSM::Append"
+            [label="append/\l"];
+
+        "AbstractAppenderFSM::CheckDuplicate" -> "AbstractAppenderFSM::DevNull"
+            [label="drain/\l"];
+
+        "AbstractAppenderFSM::CheckDuplicate" -> "AbstractAppenderFSM::Closed"
+            [label="close/\l"];
 
         "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::Closed"
             [label="readReady/\l"];
 
         "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::Ready"
             [label="readReady/\l"];
-
-        "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::Ready"
-            [label="appended/\l"];
 
         "AbstractAppenderFSM::Append" -> "AbstractAppenderFSM::Closed"
             [label="close/\l"];
 
-        "AbstractAppenderFSM::DevNull" -> "AbstractAppenderFSM::ReadBatchHeader"
+        "AbstractAppenderFSM::DevNull" -> "AbstractAppenderFSM::ReadBatch"
             [label="ready/\l"];
 
         "AbstractAppenderFSM::DevNull" -> "AbstractAppenderFSM::Closed"
@@ -64,18 +97,6 @@ digraph AbstractAppender {
             [label="readReady/\l"];
 
         "AbstractAppenderFSM::DevNull" -> "AbstractAppenderFSM::Closed"
-            [label="close/\l"];
-
-        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Append"
-            [label="append/\l"];
-
-        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Closed"
-            [label="readReady/\l"];
-
-        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Append"
-            [label="readReady/\l"];
-
-        "AbstractAppenderFSM::ReadBatchHeader" -> "AbstractAppenderFSM::Closed"
             [label="close/\l"];
 
         "AbstractAppenderFSM::Closed" -> "AbstractAppenderFSM::Closed"

@@ -45,19 +45,64 @@ Entry {
 }
 {
 	readReady
-		ReadBatchHeader{}
+		ReadBatch{}
 }
 
-Append
+ReadBatch
 Entry {
-	beginAppend();
+	readBatch();
 }
 {
 	drain
 		DevNull{}
 		
+	append
+		Append{}
+		
+	readBatchHeader
+		ReadBatchHeader{}
+		
+	consumed
+		Ready{}
+}
+
+ReadBatchHeader
+Entry {
+	selectForRead();
+}
+{
 	readReady
-		[!ctxt.append() && !ctxt.inError()]
+		[!ctxt.readBatchHeader() && !ctxt.inError()]
+		nil{
+			selectForRead();
+		}
+	readReady
+		[ctxt.inError()]
+		Closed{}
+
+	readReady
+		CheckDuplicate{}
+}
+
+CheckDuplicate
+Entry {
+	checkDuplicate();
+}
+{
+	append
+		Append{}
+		
+	drain
+		DevNull{}
+}
+
+Append
+Entry {
+	selectForRead();
+}
+{
+	readReady
+		[!ctxt.appendSegment() && !ctxt.inError()]
 		nil{
 			selectForRead();
 		}
@@ -67,9 +112,6 @@ Entry {
 
 	readReady
 		Ready{}
-
-	appended
-		Ready{}
 }
 
 DevNull
@@ -78,7 +120,7 @@ Entry {
 }
 {
 	ready
-		ReadBatchHeader{}
+		ReadBatch{}
 		
 	readReady
 		[!ctxt.devNull() && !ctxt.inError()]
@@ -93,27 +135,6 @@ Entry {
 		Ready{
 			selectForRead();
 		}
-}
-
-ReadBatchHeader
-Entry{
-	nextBatchHeader();
-}
-{
-	append
-		Append{} 
-		
-	readReady
-		[!ctxt.readBatchHeader() && !ctxt.inError()]
-		nil{
-			selectForRead();
-		}
-	readReady
-		[ctxt.inError()]
-		Closed{}
-
-	readReady
-		Append{}
 }
 
 Closed

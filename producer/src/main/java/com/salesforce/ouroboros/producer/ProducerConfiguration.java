@@ -40,22 +40,23 @@ import com.salesforce.ouroboros.util.LabeledThreadFactory;
  * 
  */
 public class ProducerConfiguration {
-    private double              maximumBandwidth             = 20000000.0;
-    private int                 maximumBatchedSize           = 100;
+    private double              maximumBandwidth             = 20000.0;
+    private int                 maximumBatchedSize           = 1;
     private int                 maxQueueLength               = 100;
-    private double              minimumBandwidth             = 500000.0;
+    private double              minimumBandwidth             = 500.0;
     private int                 minimumTokenRegenerationTime = 1;
     private int                 numberOfReplicas             = 200;
     private int                 retryLimit                   = 10;
     private int                 sampleFrequency              = 10;
     private int                 sampleWindowSize             = 1000;
     private SkipStrategy<Node>  skipStrategy                 = new DefaultSkipStrategy();
-    private ExecutorService     spinners                     = Executors.newCachedThreadPool(new LabeledThreadFactory(
-                                                                                                                      "Spinner"));
+    private ExecutorService     spinners                     = Executors.newFixedThreadPool(10,
+                                                                                            new LabeledThreadFactory(
+                                                                                                                     "Spinner"));
     private final SocketOptions spinnerSocketOptions         = new SocketOptions();
-    private double              targetBandwidth              = 1000000.0;
+    private double              targetBandwidth              = 10000.0;
     private double              targetPercentile             = 0.9;
-    private int                 tokenLimit                   = 2000000;
+    private int                 tokenLimit                   = 20000;
 
     /**
      * @return the maximumBandwidth

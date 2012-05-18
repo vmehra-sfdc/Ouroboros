@@ -159,7 +159,7 @@ public class BatchWriter {
                         return;
                     }
                     inFlight.add(first);
-                    queued.drainTo(inFlight, maximumBatchedSize);
+                    queued.drainTo(inFlight, maximumBatchedSize - 1);
                     if (log.isTraceEnabled()) {
                         log.trace(String.format("pushing %s batches",
                                                 inFlight.size()));

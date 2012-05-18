@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=7>
+        <th colspan=8>
           Transition
         </th>
       </tr>
@@ -30,13 +30,16 @@
           append
         </th>
         <th>
-          appended
-        </th>
-        <th>
           close
         </th>
         <th>
+          consumed
+        </th>
+        <th>
           drain
+        </th>
+        <th>
+          readBatchHeader
         </th>
         <th>
           readReady
@@ -68,10 +71,134 @@ ready();
         <td>
         </td>
         <td>
+        </td>
+        <td>
+          <pre>
+  ReadBatch
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReadBatch
+        </td>
+        <td>
+          <pre>
+readBatch();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Append
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Ready
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
+  DevNull
+  {}
+          </pre>
+        </td>
+        <td>
           <pre>
   ReadBatchHeader
   {}
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReadBatchHeader
+        </td>
+        <td>
+          <pre>
+selectForRead();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.readBatchHeader() && !ctxt.inError()]
+  ReadBatchHeader
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  CheckDuplicate
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          CheckDuplicate
+        </td>
+        <td>
+          <pre>
+    checkDuplicate();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Append
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  DevNull
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -84,7 +211,7 @@ ready();
         </td>
         <td>
           <pre>
-beginAppend();
+    selectForRead();
           </pre>
         </td>
         <td>
@@ -92,22 +219,16 @@ beginAppend();
         <td>
         </td>
         <td>
-          <pre>
-  Ready
-  {}
-          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
         </td>
         <td>
         </td>
         <td>
           <pre>
-  DevNull
-  {}
-          </pre>
-        </td>
-        <td>
-          <pre>
-[!ctxt.append() && !ctxt.inError()]
+[!ctxt.appendSegment() && !ctxt.inError()]
   Append
   {
     selectForRead();
@@ -146,6 +267,8 @@ beginAppend();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [!ctxt.devNull() && !ctxt.inError()]
   DevNull
@@ -165,53 +288,9 @@ beginAppend();
         </td>
         <td>
           <pre>
-  ReadBatchHeader
+  ReadBatch
   {}
           </pre>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          ReadBatchHeader
-        </td>
-        <td>
-          <pre>
-    nextBatchHeader();
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  Append
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-[!ctxt.readBatchHeader() && !ctxt.inError()]
-  ReadBatchHeader
-  {
-    selectForRead();
-  }
-
-[ctxt.inError()]
-  Closed
-  {}
-
-  Append
-  {}
-          </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -224,6 +303,8 @@ beginAppend();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>

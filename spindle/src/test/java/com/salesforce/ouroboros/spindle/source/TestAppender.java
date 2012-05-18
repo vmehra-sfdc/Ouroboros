@@ -210,7 +210,7 @@ public class TestAppender {
             @Override
             public boolean value() {
                 appender.readReady();
-                return appender.getState() == AbstractAppenderFSM.ReadBatchHeader;
+                return appender.getState() == AbstractAppenderFSM.Ready;
             }
         }, 1000, 100);
 
@@ -219,7 +219,7 @@ public class TestAppender {
         server.close();
 
         assertEquals(0L, tmpFile.length());
-        verify(handler, new Times(3)).selectForRead();
+        verify(handler, new Times(2)).selectForRead();
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).appendSegmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));

@@ -455,7 +455,7 @@ public class Producer implements Comparable<Producer> {
                     // Fail over to the new primary
                     for (Batch batch : failedPrimary.spinner.getPending(entry.getKey()).values()) {
                         boolean delivered = false;
-                        for (int i = 0; i < configuration.getRetryLimit(); i++) {
+                        for (int i = 1; i < configuration.getRetryLimit(); i++) {
                             try {
                                 newPrimary.push(batch);
                                 delivered = true;

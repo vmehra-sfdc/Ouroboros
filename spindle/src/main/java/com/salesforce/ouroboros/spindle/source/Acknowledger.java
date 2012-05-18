@@ -53,7 +53,7 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class Acknowledger {
     static final Logger                        log            = LoggerFactory.getLogger(Acknowledger.class.getCanonicalName());
-    static final int                           MAX_BATCH_SIZE = 100;
+    static final int                           MAX_BATCH_SIZE = 1000;
 
     private final ByteBuffer                   buffer         = ByteBuffer.allocateDirect(MAX_BATCH_SIZE
                                                                                           * BatchIdentity.BYTE_SIZE);
