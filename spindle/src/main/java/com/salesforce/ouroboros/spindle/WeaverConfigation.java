@@ -84,9 +84,8 @@ public class WeaverConfigation {
                                                                                              0);
     private int                       replicationQueueSize           = DEFAULT_REPLICATION_QUEUE_SIZE;
     private final SocketOptions       replicationSocketOptions       = new SocketOptions();
-    private ExecutorService           replicators                    = Executors.newFixedThreadPool(6,
-                                                                                                    new LabeledThreadFactory(
-                                                                                                                             REPLICATOR));
+    private ExecutorService           replicators                    = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                              REPLICATOR));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
     private SkipStrategy<File>        rootSkipStrategy               = new NoSkipStrategy<File>();
     private SkipStrategy<Node>        skipStrategy                   = new DefaultSkipStrategy();
@@ -94,17 +93,15 @@ public class WeaverConfigation {
                                                                                              "127.0.0.1",
                                                                                              0);
 
-    private ExecutorService           spindles                       = Executors.newFixedThreadPool(6,
-                                                                                                    new LabeledThreadFactory(
-                                                                                                                             SPINDLE));
+    private ExecutorService           spindles                       = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                              SPINDLE));
     private final SocketOptions       spindleSocketOptions           = new SocketOptions();
     private String                    stateName                      = DEFAULT_STATE_NAME;
     private InetSocketAddress         xeroxAddress                   = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
-    private ExecutorService           xeroxes                        = Executors.newFixedThreadPool(4,
-                                                                                                    new LabeledThreadFactory(
-                                                                                                                             XEROX));
+    private ExecutorService           xeroxes                        = Executors.newCachedThreadPool(new LabeledThreadFactory(
+                                                                                                                              XEROX));
     private final SocketOptions       xeroxSocketOptions             = new SocketOptions();
 
     public void addRoot(File directory) {
