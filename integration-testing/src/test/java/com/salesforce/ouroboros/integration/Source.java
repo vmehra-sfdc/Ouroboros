@@ -37,8 +37,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -58,7 +57,7 @@ public class Source implements EventSource {
     private final Set<UUID>                        pausedChannels        = new ConcurrentSkipListSet<UUID>();
     public final Set<UUID>                         relinquishedPrimaries = new ConcurrentSkipListSet<UUID>();
     private final AtomicBoolean                    shutdown              = new AtomicBoolean();
-    private final ScheduledExecutorService         executor;
+    private final ExecutorService                  executor;
     private final ConcurrentHashMap<UUID, Integer> retries               = new ConcurrentHashMap<UUID, Integer>();
     private volatile CountDownLatch                latch;
     private final AtomicBoolean                    rebalanced            = new AtomicBoolean();
@@ -66,7 +65,7 @@ public class Source implements EventSource {
     /**
      * @param executor
      */
-    public Source(ScheduledExecutorService executor) {
+    public Source(ExecutorService executor) {
         this.executor = executor;
     }
 
@@ -194,16 +193,21 @@ public class Source implements EventSource {
             }
             log.info(String.format("currently no event to publish on %s ",
                                    producer.getId()));
-            executor.schedule(new Runnable() {
+            executor.execute(new Runnable() {
                 @Override
                 public void run() {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e1) {
+                        return;
+                    }
                     try {
                         _publish(batchSize, targetTimestamp);
                     } catch (Throwable e) {
                         e.printStackTrace();
                     }
                 }
-            }, 2, TimeUnit.SECONDS);
+            });
             return;
         }
         tasks.add(new Runnable() {

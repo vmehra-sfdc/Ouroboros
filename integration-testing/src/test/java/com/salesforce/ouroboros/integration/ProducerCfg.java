@@ -3,8 +3,9 @@
 package com.salesforce.ouroboros.integration;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 
 import org.smartfrog.services.anubis.partition.Partition;
 import org.smartfrog.services.anubis.partition.util.Identity;
@@ -21,7 +22,19 @@ import com.salesforce.ouroboros.producer.ProducerCoordinator;
 
 @Configuration
 public class ProducerCfg {
-    private static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(4);
+    private static final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
+                                                      int count = 0;
+
+                                                      @Override
+                                                      public Thread newThread(Runnable r) {
+                                                          Thread daemon = new Thread(
+                                                                                     r,
+                                                                                     String.format("Producer worker[%s]",
+                                                                                                   count++));
+                                                          daemon.setDaemon(true);
+                                                          return daemon;
+                                                      }
+                                                  });
 
     @Bean
     public ProducerConfiguration configuration() {
