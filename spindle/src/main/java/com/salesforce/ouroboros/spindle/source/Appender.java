@@ -52,8 +52,8 @@ public class Appender extends AbstractAppender {
     private volatile int           startPosition;
     private final Pool<EventEntry> eventEntryPool;
 
-    public Appender(Bundle bundle, Acknowledger acknowledger, int maxBatchedSize) {
-        super(bundle, maxBatchedSize);
+    public Appender(Bundle bundle, Acknowledger acknowledger) {
+        super(bundle);
         this.acknowledger = acknowledger;
         eventEntryPool = new Pool<EventEntry>("EventEntry",
                                               new Factory<EventEntry>() {
@@ -82,7 +82,7 @@ public class Appender extends AbstractAppender {
             EventEntry entry = allocate();
             entry.set(batchHeader, offset, startPosition, eventChannel,
                       eventChannel.getCachedReadSegment(segment.getFile()),
-                      acknowledger);
+                      acknowledger, handler);
             Node producerMirror = batchHeader.getProducerMirror();
             Acknowledger mirrorAcknowledger = null;
             if (producerMirror.processId != NullNode.INSTANCE.processId) {
@@ -99,9 +99,6 @@ public class Appender extends AbstractAppender {
                                     segment, batchHeader, offset,
                                     bundle.getId()));
             close();
-        } finally {
-            segment = null;
-            eventChannel = null;
         }
         if (log.isTraceEnabled()) {
             log.trace(String.format("Committed %s on %s ", batchHeader,
@@ -159,9 +156,5 @@ public class Appender extends AbstractAppender {
     @Override
     protected void markPosition() {
         startPosition = position;
-    }
-
-    protected void ready() {
-        handler.selectForRead();
     }
 }

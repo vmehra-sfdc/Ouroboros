@@ -60,13 +60,11 @@ abstract public class AbstractAppender {
     protected int                           position = -1;
     protected long                          remaining;
     protected Segment                       segment;
-    private final int                       maxBatchedSize;
 
-    public AbstractAppender(Bundle bundle, int maxBatchedSize) {
+    public AbstractAppender(Bundle bundle) {
         fsm.setName(Integer.toString(bundle.getId().processId));
         this.bundle = bundle;
         batchHeader = createBatchHeader();
-        this.maxBatchedSize = maxBatchedSize;
     }
 
     public void accept(SocketChannelHandler handler) {
@@ -89,29 +87,6 @@ abstract public class AbstractAppender {
     }
 
     protected boolean append() {
-        if (readBatchHeader()) {
-            if (beginAppend()) {
-                if (appendSegment()) {
-                    return true;
-                } else if (inError) {
-                    fsm.close();
-                } else {
-                    fsm.append();
-                }
-                return false;
-            } else if (inError) {
-                fsm.close();
-            }
-            return false;
-        } else if (inError) {
-            fsm.close();
-        } else {
-            fsm.readBatchHeader();
-        }
-        return false;
-    }
-
-    protected boolean appendSegment() {
         long written;
         try {
             written = segment.transferFrom(handler.getChannel(), position,
@@ -145,7 +120,6 @@ abstract public class AbstractAppender {
                 return false;
             }
             commit();
-            eventChannel = null;
             segment = null;
             return true;
         }
@@ -156,12 +130,12 @@ abstract public class AbstractAppender {
         return !batchHeader.hasRemaining();
     }
 
-    protected boolean beginAppend() {
+    protected void beginAppend() {
         if (eventChannel == null) {
             getLogger().warn(String.format("No existing event channel for: %s on %s",
                                            batchHeader, fsm.getName()));
             fsm.drain();
-            return false;
+            return;
         }
         AppendSegment logicalSegment;
         try {
@@ -170,7 +144,7 @@ abstract public class AbstractAppender {
             getLogger().warn(String.format("Cannot retrieve segment, shutting down appender %s",
                                            fsm.getName()), e);
             error();
-            return false;
+            return;
         }
         segment = logicalSegment.segment;
         offset = logicalSegment.offset;
@@ -181,19 +155,21 @@ abstract public class AbstractAppender {
             getLogger().warn(String.format("Duplicate event batch %s received on %s",
                                            batchHeader, fsm.getName()));
             fsm.drain();
-            return false;
+            return;
         }
         if (getLogger().isTraceEnabled()) {
             getLogger().trace(String.format("Beginning append of %s, offset=%s, position=%s, remaining=%s on %s",
                                             segment, offset, position,
                                             remaining, fsm.getName()));
         }
-        return true;
-    }
-
-    protected void checkDuplicate() {
-        if (beginAppend()) {
-            fsm.append();
+        if (append()) {
+            fsm.appended();
+        } else {
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
+            }
         }
     }
 
@@ -264,19 +240,16 @@ abstract public class AbstractAppender {
         // default is to do nothing
     }
 
-    protected void readBatch() {
+    protected void nextBatchHeader() {
         batchHeader.rewind();
-        int count = 0;
-        while (append()) {
-            if (count++ < maxBatchedSize) {
-                fsm.consumed();
-                return;
+        if (readBatchHeader()) {
+            fsm.append();
+        } else {
+            if (inError) {
+                fsm.close();
+            } else {
+                handler.selectForRead();
             }
-            // party on
-            batchHeader.rewind();
-        }
-        if (inError) {
-            fsm.close();
         }
     }
 
@@ -314,6 +287,10 @@ abstract public class AbstractAppender {
         } else {
             return false;
         }
+    }
+
+    protected void ready() {
+        // default is to do nothing
     }
 
     protected void selectForRead() {

@@ -48,8 +48,8 @@ public class ReplicatingAppender extends AbstractAppender {
 
     private static final Logger log = LoggerFactory.getLogger(ReplicatingAppender.class.getCanonicalName());
 
-    public ReplicatingAppender(Bundle bundle, int maxBatchedSize) {
-        super(bundle, maxBatchedSize);
+    public ReplicatingAppender(final Bundle bundle) {
+        super(bundle);
     }
 
     /* (non-Javadoc)
@@ -121,6 +121,11 @@ public class ReplicatingAppender extends AbstractAppender {
     protected AppendSegment getLogicalSegment() throws IOException {
         ReplicatedBatchHeader replicated = (ReplicatedBatchHeader) batchHeader;
         return eventChannel.appendSegmentFor(replicated.getOffset(),
-                                             replicated.getPosition());
+                                       replicated.getPosition());
+    }
+
+    @Override
+    protected void ready() {
+        handler.selectForRead();
     }
 }

@@ -1,6 +1,5 @@
-%{
 /**
- * Copyright (c) 2011, salesforce.com, inc.
+ * Copyright (c) 2012, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -24,96 +23,37 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.ouroboros.spindle.replication;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+import com.hellblazer.pinkie.SocketChannelHandler;
 
 /**
  * @author hhildebrand
+ * 
  */
-%}
+public class MeteringGate {
+    private final AtomicInteger        count;
+    private final SocketChannelHandler handler;
 
-// The FSM of the Duplicator protocol
+    public MeteringGate(int initialCount, SocketChannelHandler appendHandler) {
+        this.handler = appendHandler;
+        count = new AtomicInteger(initialCount);
+    }
 
-%class Duplicator
-%package com.salesforce.ouroboros.spindle.replication
-%access public
+    public void select() {
+        select(1);
+    }
 
-%start DuplicatorFSM::Waiting
-%map DuplicatorFSM
-%% 
-Waiting {
-	replicate(event: EventEntry)
-		WriteHeader{
-			enqueue(event);
-		}
-	writeReady
-		nil{}
+    /**
+     * @param i
+     */
+    public void select(int c) {
+        for (int i = 0; i < c; i++) {
+            if (count.decrementAndGet() == 0) {
+                handler.selectForRead();
+            }
+        }
+    }
 }
-
-WriteHeader
-Entry {
-	processHeader();
-}
-{
-	writeReady
-		[!ctxt.writeHeader() && !ctxt.inError()]
-		nil{
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{}
-		
-	writeReady 
-		WriteBatch{}
-		
-	headerWritten
-		WriteBatch{}
-}
-
-WriteBatch
-Entry {
-	processBatch();
-}
-{
-	writeReady
-		[!ctxt.writeBatch() && !ctxt.inError()]
-		nil{
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{}
-		
-	writeReady
-		[ctxt.hasNext()]
-		WriteHeader{}
-		
-	writeReady
-		Waiting{}
-		
-	batchWritten
-		[ctxt.hasNext()]
-		WriteHeader{}
-		
-	batchWritten
-		Waiting{}
-}
-
-Closed
-Entry {
-	close();
-}
-{
-}
-
-Default {
-	replicate(event: EventEntry)
-		nil{
-			enqueue(event);
-		}
-		
-	close
-		Closed{}
-}
-%%

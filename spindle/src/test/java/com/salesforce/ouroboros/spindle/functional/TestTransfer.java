@@ -40,7 +40,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
@@ -90,7 +89,7 @@ public class TestTransfer {
     UUID                               channelId      = UUID.randomUUID();
     int                                maxSegmentSize = 1024 * 1024;
 
-    public ServerSocketChannelHandler createHandler(final String label,
+    public ServerSocketChannelHandler createHandler(String label,
                                                     final CommunicationsHandler handler,
                                                     SocketOptions socketOptions)
                                                                                 throws IOException {
@@ -100,20 +99,7 @@ public class TestTransfer {
                                               new InetSocketAddress(
                                                                     "127.0.0.1",
                                                                     0),
-                                              Executors.newCachedThreadPool(new ThreadFactory() {
-                                                  int count;
-
-                                                  @Override
-                                                  public Thread newThread(Runnable r) {
-                                                      Thread daemon = new Thread(
-                                                                                 r,
-                                                                                 String.format("%s[%s]",
-                                                                                               label,
-                                                                                               count++));
-                                                      daemon.setDaemon(true);
-                                                      return daemon;
-                                                  }
-                                              }),
+                                              Executors.newCachedThreadPool(),
                                               new CommunicationsHandlerFactory() {
                                                   @Override
                                                   public CommunicationsHandler createCommunicationsHandler(SocketChannel channel) {
@@ -185,11 +171,11 @@ public class TestTransfer {
         when(primaryBundle.getId()).thenReturn(primaryNode);
         when(mirrorBundle.getId()).thenReturn(mirrorNode);
 
-        Spindle spindle = new Spindle(primaryBundle, 5);
-        final Replicator primaryReplicator = new Replicator(5, primaryBundle,
+        Spindle spindle = new Spindle(primaryBundle);
+        final Replicator primaryReplicator = new Replicator(primaryBundle,
                                                             mirrorNode,
-                                                            rendezvous, 5);
-        final Replicator mirrorReplicator = new Replicator(5, mirrorBundle, 5);
+                                                            rendezvous);
+        final Replicator mirrorReplicator = new Replicator(mirrorBundle);
         primaryEventChannel = new EventChannel(primaryNode, Role.PRIMARY,
                                                mirrorNode, channelId,
                                                primaryRoot, maxSegmentSize,
@@ -239,10 +225,10 @@ public class TestTransfer {
                                          batchSize, producerNode, primaryNode);
         spindleHandler.connectTo(spindleHandler.getLocalAddress(), producer);
         assertTrue("Did not publish all events in given time",
-                   producerLatch.await(30, TimeUnit.SECONDS));
+                   producerLatch.await(120, TimeUnit.SECONDS));
         System.out.println("Events published");
         assertTrue("Did not receive acknowledgement from all event writes and replications",
-                   ackLatch.await(30, TimeUnit.SECONDS));
+                   ackLatch.await(60, TimeUnit.SECONDS));
 
         // set up the xeroxes and sinks for both the primary and secondary
         Node primarySinkNode = new Node(3);

@@ -14,9 +14,6 @@ digraph Duplicator {
         "DuplicatorFSM::Waiting"
             [label="{Waiting}"];
 
-        "DuplicatorFSM::Replicate"
-            [label="{Replicate}"];
-
         "DuplicatorFSM::WriteHeader"
             [label="{WriteHeader}"];
 
@@ -33,28 +30,10 @@ digraph Duplicator {
         // Transitions (Edges)
         //
 
-        "DuplicatorFSM::Waiting" -> "DuplicatorFSM::Replicate"
+        "DuplicatorFSM::Waiting" -> "DuplicatorFSM::WriteHeader"
             [label="replicate/\l"];
 
         "DuplicatorFSM::Waiting" -> "DuplicatorFSM::Closed"
-            [label="close/\l"];
-
-        "DuplicatorFSM::Replicate" -> "DuplicatorFSM::Closed"
-            [label="writeReady/\l"];
-
-        "DuplicatorFSM::Replicate" -> "DuplicatorFSM::Waiting"
-            [label="writeReady/\l"];
-
-        "DuplicatorFSM::Replicate" -> "DuplicatorFSM::WriteHeader"
-            [label="writeHeader/\l"];
-
-        "DuplicatorFSM::Replicate" -> "DuplicatorFSM::WriteBatch"
-            [label="writeBatch/\l"];
-
-        "DuplicatorFSM::Replicate" -> "DuplicatorFSM::Waiting"
-            [label="quantumProcessed/\l"];
-
-        "DuplicatorFSM::Replicate" -> "DuplicatorFSM::Closed"
             [label="close/\l"];
 
         "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::Closed"
@@ -63,14 +42,26 @@ digraph Duplicator {
         "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::WriteBatch"
             [label="writeReady/\l"];
 
+        "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::WriteBatch"
+            [label="headerWritten/\l"];
+
         "DuplicatorFSM::WriteHeader" -> "DuplicatorFSM::Closed"
             [label="close/\l"];
 
         "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Closed"
             [label="writeReady/\l"];
 
-        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Replicate"
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::WriteHeader"
             [label="writeReady/\l"];
+
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Waiting"
+            [label="writeReady/\l"];
+
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::WriteHeader"
+            [label="batchWritten/\l"];
+
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Waiting"
+            [label="batchWritten/\l"];
 
         "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Closed"
             [label="close/\l"];

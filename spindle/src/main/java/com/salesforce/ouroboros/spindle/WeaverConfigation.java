@@ -71,11 +71,8 @@ public class WeaverConfigation {
     private Node                      id;
     private int                       initialAppendSegmentCapacity   = 16;
     private int                       initialReadSegmentCapacity     = 16;
-    private int                       maximumAppendBatchedSize       = 50;
     private int                       maximumAppendSegmentCapacity   = 4096;
-    private int                       maximumDuplicateBatchedSize    = 50;
     private int                       maximumReadSegmentCapacity     = 4096;
-    private int                       maximumReplicateBatchedSize    = 50;
     private long                      maxSegmentSize                 = DEFAULT_MAX_SEGMENTSIZE;
     private int                       numberOfReplicas               = 200;
     private int                       numberOfRootReplicas           = 200;
@@ -87,23 +84,27 @@ public class WeaverConfigation {
                                                                                              0);
     private int                       replicationQueueSize           = DEFAULT_REPLICATION_QUEUE_SIZE;
     private final SocketOptions       replicationSocketOptions       = new SocketOptions();
-    private ExecutorService           replicators                    = Executors.newCachedThreadPool(new LabeledThreadFactory(
-                                                                                                                              REPLICATOR));
+    private ExecutorService           replicators                    = Executors.newFixedThreadPool(6,
+                                                                                                    new LabeledThreadFactory(
+                                                                                                                             REPLICATOR));
     private final List<RootDirectory> roots                          = new ArrayList<RootDirectory>();
     private SkipStrategy<File>        rootSkipStrategy               = new NoSkipStrategy<File>();
     private SkipStrategy<Node>        skipStrategy                   = new DefaultSkipStrategy();
     private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
-    private ExecutorService           spindles                       = Executors.newCachedThreadPool(new LabeledThreadFactory(
-                                                                                                                              SPINDLE));
+
+    private ExecutorService           spindles                       = Executors.newFixedThreadPool(6,
+                                                                                                    new LabeledThreadFactory(
+                                                                                                                             SPINDLE));
     private final SocketOptions       spindleSocketOptions           = new SocketOptions();
     private String                    stateName                      = DEFAULT_STATE_NAME;
     private InetSocketAddress         xeroxAddress                   = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
-    private ExecutorService           xeroxes                        = Executors.newCachedThreadPool(new LabeledThreadFactory(
-                                                                                                                              XEROX));
+    private ExecutorService           xeroxes                        = Executors.newFixedThreadPool(4,
+                                                                                                    new LabeledThreadFactory(
+                                                                                                                             XEROX));
     private final SocketOptions       xeroxSocketOptions             = new SocketOptions();
 
     public void addRoot(File directory) {
@@ -143,13 +144,6 @@ public class WeaverConfigation {
     }
 
     /**
-     * @return the maximumAppendBatchedSize
-     */
-    public int getMaximumAppendBatchedSize() {
-        return maximumAppendBatchedSize;
-    }
-
-    /**
      * @return the maximumAppendSegmentCapacity
      */
     public int getMaximumAppendSegmentCapacity() {
@@ -157,24 +151,10 @@ public class WeaverConfigation {
     }
 
     /**
-     * @return the maximumDuplicateBatchedSize
-     */
-    public int getMaximumDuplicateBatchedSize() {
-        return maximumDuplicateBatchedSize;
-    }
-
-    /**
      * @return the maximumReadSegmentCapacity
      */
     public int getMaximumReadSegmentCapacity() {
         return maximumReadSegmentCapacity;
-    }
-
-    /**
-     * @return the maximumReplicateBatchedSize
-     */
-    public int getMaximumReplicateBatchedSize() {
-        return maximumReplicateBatchedSize;
     }
 
     /**
@@ -350,14 +330,6 @@ public class WeaverConfigation {
     }
 
     /**
-     * @param maximumAppendBatchedSize
-     *            the maximumAppendBatchedSize to set
-     */
-    public void setMaximumAppendBatchedSize(int maximumAppendBatchedSize) {
-        this.maximumAppendBatchedSize = maximumAppendBatchedSize;
-    }
-
-    /**
      * @param maximumSegmentCapacity
      *            the maximumSegmentCapacity to set
      */
@@ -366,27 +338,11 @@ public class WeaverConfigation {
     }
 
     /**
-     * @param maximumDuplicateBatchedSize
-     *            the maximumDuplicateBatchedSize to set
-     */
-    public void setMaximumDuplicateBatchedSize(int maximumDuplicateBatchedSize) {
-        this.maximumDuplicateBatchedSize = maximumDuplicateBatchedSize;
-    }
-
-    /**
      * @param maximumReadSegmentCapacity
      *            the maximumReadSegmentCapacity to set
      */
     public void setMaximumReadSegmentCapacity(int maximumReadSegmentCapacity) {
         this.maximumReadSegmentCapacity = maximumReadSegmentCapacity;
-    }
-
-    /**
-     * @param maximumReplicateBatchedSize
-     *            the maximumReplicateBatchedSize to set
-     */
-    public void setMaximumReplicateBatchedSize(int maximumReplicateBatchedSize) {
-        this.maximumReplicateBatchedSize = maximumReplicateBatchedSize;
     }
 
     /**

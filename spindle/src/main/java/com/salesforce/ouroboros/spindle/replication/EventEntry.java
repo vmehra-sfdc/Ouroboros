@@ -25,6 +25,7 @@
  */
 package com.salesforce.ouroboros.spindle.replication;
 
+import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
@@ -39,11 +40,12 @@ import com.salesforce.ouroboros.util.Pool.Clearable;
  * 
  */
 public class EventEntry implements Clearable {
-    private final Pool<EventEntry>      pool;
-    private volatile Acknowledger       acknowledger;
-    private volatile EventChannel       eventChannel;
-    private final ReplicatedBatchHeader header = new ReplicatedBatchHeader();
-    private volatile Segment            segment;
+    private final Pool<EventEntry>        pool;
+    private volatile Acknowledger         acknowledger;
+    private volatile EventChannel         eventChannel;
+    private volatile SocketChannelHandler handler;
+    private final ReplicatedBatchHeader   header = new ReplicatedBatchHeader();
+    private volatile Segment              segment;
 
     public EventEntry(Pool<EventEntry> pool) {
         this.pool = pool;
@@ -56,6 +58,7 @@ public class EventEntry implements Clearable {
     public void clear() {
         acknowledger = null;
         eventChannel = null;
+        handler = null;
         segment = null;
         header.clear();
     }
@@ -94,23 +97,28 @@ public class EventEntry implements Clearable {
         return segment;
     }
 
+    public void select() {
+        handler.selectForRead();
+    }
+
+    public void selectAndFree() {
+        select();
+        free();
+    }
+
     public void set(BatchHeader batchHeader, long offset, int startPosition,
                     EventChannel eventChannel, Segment segment,
-                    Acknowledger acknowledger) {
+                    Acknowledger acknowledger, SocketChannelHandler handler) {
         assert batchHeader != null : "Batch header cannot be null";
         assert eventChannel != null : "Event channel cannot be null";
         assert segment != null : "Segment cannot be null";
         assert acknowledger != null : "Acknowledger cannot be null";
+        assert handler != null : "Handler cannot be null";
 
         header.set(batchHeader, offset, startPosition);
         this.eventChannel = eventChannel;
         this.segment = segment;
         this.acknowledger = acknowledger;
-    }
-
-    @Override
-    public String toString() {
-        return String.format("EventEntry %s:%s", eventChannel.getId(),
-                             header.getSequenceNumber());
+        this.handler = handler;
     }
 }

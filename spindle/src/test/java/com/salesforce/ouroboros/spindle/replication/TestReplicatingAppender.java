@@ -95,8 +95,7 @@ public class TestReplicatingAppender {
                                                                                                0));
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
-        final ReplicatingAppender replicator = new ReplicatingAppender(bundle,
-                                                                       5);
+        final ReplicatingAppender replicator = new ReplicatingAppender(bundle);
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);
         options.setReceive_buffer_size(4);
@@ -121,13 +120,27 @@ public class TestReplicatingAppender {
         assertEquals(AbstractAppenderFSM.Ready, replicator.getState());
         replicator.readReady();
         assertEquals(AbstractAppenderFSM.ReadBatchHeader, replicator.getState());
+
+        Runnable reader = new Runnable() {
+            @Override
+            public void run() {
+                while (AbstractAppenderFSM.Ready != replicator.getState()) {
+                    replicator.readReady();
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+            }
+        };
+        Thread inboundRead = new Thread(reader, "Inbound read thread");
+        inboundRead.start();
         header.rewind();
         header.write(outbound);
-        replicator.readReady();
-        assertEquals(AbstractAppenderFSM.Append, replicator.getState());
         event.rewind();
         event.write(outbound);
-        replicator.readReady();
+        inboundRead.join(4000);
         assertEquals(AbstractAppenderFSM.Ready, replicator.getState());
 
         segment = new Segment(eventChannel, tmpFile, Mode.READ);

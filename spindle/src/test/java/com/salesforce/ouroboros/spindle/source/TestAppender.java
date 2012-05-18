@@ -76,7 +76,7 @@ public class TestAppender {
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(eventChannel, tmpFile,
                                                  Mode.APPEND);
-        final Appender appender = new Appender(bundle, acknowledger, 5);
+        final Appender appender = new Appender(bundle, acknowledger);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
@@ -144,7 +144,7 @@ public class TestAppender {
             assertEquals(b, writtenPayload.get());
         }
 
-        verify(handler, new Times(3)).selectForRead();
+        verify(handler, new Times(2)).selectForRead();
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).append(isA(EventEntry.class),
                                     (Acknowledger) eq(null));
@@ -163,7 +163,7 @@ public class TestAppender {
         tmpFile.deleteOnExit();
         final Segment writeSegment = new Segment(eventChannel, tmpFile,
                                                  Mode.APPEND);
-        final Appender appender = new Appender(bundle, acknowledger, 5);
+        final Appender appender = new Appender(bundle, acknowledger);
         ServerSocketChannel server = ServerSocketChannel.open();
         server.configureBlocking(true);
         server.socket().bind(new InetSocketAddress("127.0.0.1", 0));
@@ -210,7 +210,7 @@ public class TestAppender {
             @Override
             public boolean value() {
                 appender.readReady();
-                return appender.getState() == AbstractAppenderFSM.Ready;
+                return appender.getState() == AbstractAppenderFSM.ReadBatchHeader;
             }
         }, 1000, 100);
 

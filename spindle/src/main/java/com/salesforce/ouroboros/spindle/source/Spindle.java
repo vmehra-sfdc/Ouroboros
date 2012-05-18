@@ -60,10 +60,10 @@ public class Spindle implements CommunicationsHandler {
     final Acknowledger           acknowledger;
     final Appender               appender;
 
-    public Spindle(Bundle bundle, int maxBatchedSize) {
+    public Spindle(Bundle bundle) {
         fsm.setName(String.format("?>%s", bundle.getId().processId));
         acknowledger = new Acknowledger(bundle);
-        appender = new Appender(bundle, acknowledger, maxBatchedSize);
+        appender = new Appender(bundle, acknowledger);
         this.bundle = bundle;
     }
 

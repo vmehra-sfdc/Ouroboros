@@ -133,7 +133,7 @@ public class TestDuplicator {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
 
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
-        final Duplicator replicator = new Duplicator(new Node(0), 5);
+        final Duplicator replicator = new Duplicator(new Node(0));
         assertEquals(DuplicatorFSM.Waiting, replicator.getState());
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);
@@ -171,7 +171,7 @@ public class TestDuplicator {
         EventEntry entry = new EventEntry(mock(Pool.class));
         BatchHeader header = new BatchHeader(mirror, event.totalSize(), magic,
                                              channel, sequenceNumber);
-        entry.set(header, 0, 0, eventChannel, segment, acknowledger);
+        entry.set(header, 0, 0, eventChannel, segment, acknowledger, handler);
         replicator.replicate(entry);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
@@ -208,8 +208,7 @@ public class TestDuplicator {
         Acknowledger inboundAcknowledger = mock(Acknowledger.class);
 
         final ReplicatingAppender inboundReplicator = new ReplicatingAppender(
-                                                                              inboundBundle,
-                                                                              5);
+                                                                              inboundBundle);
 
         File tmpOutboundFile = File.createTempFile("outbound", ".tst");
         tmpOutboundFile.deleteOnExit();
@@ -241,7 +240,7 @@ public class TestDuplicator {
                                                                                            0,
                                                                                            0));
 
-        final Duplicator outboundDuplicator = new Duplicator(new Node(0), 5);
+        final Duplicator outboundDuplicator = new Duplicator(new Node(0));
         assertEquals(DuplicatorFSM.Waiting, outboundDuplicator.getState());
         SocketOptions options = new SocketOptions();
         options.setSend_buffer_size(4);
@@ -289,7 +288,7 @@ public class TestDuplicator {
         @SuppressWarnings("unchecked")
         EventEntry entry = new EventEntry(mock(Pool.class));
         entry.set(batchHeader, 0, 0, eventChannel, outboundSegment,
-                  outboundAcknowledger);
+                  outboundAcknowledger, outboundHandler);
         outboundDuplicator.replicate(entry);
         Util.waitFor("Never achieved WAITING state", new Util.Condition() {
             @Override
