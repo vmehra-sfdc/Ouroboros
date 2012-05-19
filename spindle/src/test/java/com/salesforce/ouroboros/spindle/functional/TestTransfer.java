@@ -307,7 +307,7 @@ public class TestTransfer {
                                  mirrorXerox);
 
         assertTrue("Xerox never completed",
-                   xeroxLatch.await(60, TimeUnit.SECONDS));
+                   xeroxLatch.await(120, TimeUnit.SECONDS));
 
     }
 
