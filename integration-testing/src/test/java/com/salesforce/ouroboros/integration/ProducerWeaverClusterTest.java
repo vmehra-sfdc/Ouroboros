@@ -476,7 +476,7 @@ public class ProducerWeaverClusterTest {
         ArrayList<UUID> channels = openChannels();
         CountDownLatch latch = new CountDownLatch(sources.size());
 
-        int targetCount = BATCH_COUNT * 5;
+        int targetCount = BATCH_COUNT * 3;
         for (Source source : sources) {
             source.publish(BATCH_SIZE, latch, targetCount);
         }
