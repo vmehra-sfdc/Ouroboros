@@ -166,7 +166,6 @@ public class Producer implements CommunicationsHandler {
             events.add(event);
         }
         batch = new Batch(producerNode, channelId, batches.get(), events);
-        System.out.println(String.format("publishing %s", batch));
         batch.header.rewind();
         handler.selectForWrite();
     }

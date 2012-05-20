@@ -239,10 +239,10 @@ public class TestTransfer {
                                          batchSize, producerNode, primaryNode);
         spindleHandler.connectTo(spindleHandler.getLocalAddress(), producer);
         assertTrue("Did not publish all events in given time",
-                   producerLatch.await(30, TimeUnit.SECONDS));
+                   producerLatch.await(120, TimeUnit.SECONDS));
         System.out.println("Events published");
         assertTrue("Did not receive acknowledgement from all event writes and replications",
-                   ackLatch.await(30, TimeUnit.SECONDS));
+                   ackLatch.await(120, TimeUnit.SECONDS));
 
         // set up the xeroxes and sinks for both the primary and secondary
         Node primarySinkNode = new Node(3);
