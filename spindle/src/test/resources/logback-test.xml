@@ -10,6 +10,7 @@
 	</appender>
 
 	<logger name="org.springframework" level="WARN" />
+	<logger name="com.salesforce.ouroboros.replication.DuplicatorContext" level="TRACE" />
 
 	<root level="info">
 		<appender-ref ref="STDERR" />
