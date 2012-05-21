@@ -69,7 +69,7 @@ digraph Duplicator {
         "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Closed"
             [label="writeReady/\l"];
 
-        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Replicate"
+        "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Waiting"
             [label="writeReady/\l"];
 
         "DuplicatorFSM::WriteBatch" -> "DuplicatorFSM::Closed"

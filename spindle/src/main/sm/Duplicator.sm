@@ -112,7 +112,7 @@ Entry {
 		Closed{}
 		
 	writeReady
-		Replicate{}
+		Waiting{}
 }
 
 Closed
