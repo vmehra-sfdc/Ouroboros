@@ -174,6 +174,14 @@ public class Acknowledger {
                 }
                 inError = true;
                 return false;
+            } else if (buffer.hasRemaining()) {
+                if (handler.getChannel().write(buffer) < 0) {
+                    if (log.isTraceEnabled()) {
+                        log.trace("Closing channel");
+                    }
+                    inError = true;
+                    return false;
+                }
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {

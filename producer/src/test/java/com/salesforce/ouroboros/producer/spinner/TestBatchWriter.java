@@ -130,7 +130,6 @@ public class TestBatchWriter {
             }
         }, 2000, 100);
         batchWriter.writeReady();
-        batchWriter.writeReady();
         assertEquals(1, pending.size());
         assertEquals(batch, pending.get(batch));
         assertEquals(BatchWriterFSM.Waiting, batchWriter.getState());

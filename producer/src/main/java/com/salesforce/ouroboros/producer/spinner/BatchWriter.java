@@ -215,6 +215,19 @@ public class BatchWriter {
                 }
                 inError = true;
                 return false;
+            } else if (currentWrite[currentWrite.length - 1].hasRemaining()) {
+                // extra write attempt
+                written = handler.getChannel().write(currentWrite);
+                if (log.isTraceEnabled()) {
+                    log.trace(String.format("%s bytes written", written));
+                }
+                if (written < 0) {
+                    if (log.isTraceEnabled()) {
+                        log.trace("Closing channel");
+                    }
+                    inError = true;
+                    return false;
+                }
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {

@@ -96,10 +96,9 @@ public class TestAcknowledger {
         Util.waitFor("First write never occurred", new Util.Condition() {
             @Override
             public boolean value() {
-                return written.get() == 1;
+                return written.get() >= 1;
             }
         }, 2000, 100);
-
         acknowledger.writeReady();
         acknowledger.writeReady();
         acknowledger.writeReady();

@@ -135,8 +135,24 @@ public final class Duplicator {
         int written = (int) current.getSegment().transferTo(position,
                                                             remaining,
                                                             handler.getChannel());
+        if (written < 0) {
+            close();
+            return false;
+        }
         remaining -= written;
         position += written;
+        if (remaining > 0) {
+            // extra attempt at a write
+            written = (int) current.getSegment().transferTo(position,
+                                                            remaining,
+                                                            handler.getChannel());
+            if (written < 0) {
+                close();
+                return false;
+            }
+            remaining -= written;
+            position += written;
+        }
         if (log.isTraceEnabled()) {
             log.trace(String.format("Writing batch %s:%s, position=%s, written=%s, to %s on %s",
                                     current.getHeader().getChannel(),
@@ -270,6 +286,12 @@ public final class Duplicator {
             if (current.getHeader().write(handler.getChannel()) < 0) {
                 inError = true;
                 return false;
+            } else if (current.getHeader().hasRemaining()) {
+                // try an extra write
+                if (current.getHeader().write(handler.getChannel()) < 0) {
+                    inError = true;
+                    return false;
+                }
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {

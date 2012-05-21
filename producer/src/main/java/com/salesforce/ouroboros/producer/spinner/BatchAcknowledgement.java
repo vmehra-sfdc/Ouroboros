@@ -92,6 +92,17 @@ public class BatchAcknowledgement {
                 }
                 inError = true;
                 return false;
+            } else if (ackBuffer.hasRemaining()) {
+                // extra read attempt
+                int plusRead = handler.getChannel().read(ackBuffer);
+                if (plusRead < 0) {
+                    if (log.isInfoEnabled()) {
+                        log.info("closing channel");
+                    }
+                    inError = true;
+                    return false;
+                }
+                read += plusRead;
             }
         } catch (IOException e) {
             if (!Utils.isClose(e)) {

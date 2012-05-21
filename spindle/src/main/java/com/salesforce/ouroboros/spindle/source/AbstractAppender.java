@@ -127,6 +127,25 @@ abstract public class AbstractAppender {
         }
         position += written;
         remaining -= written;
+        if (remaining > 0) {
+            // try an extra read
+            try {
+                written = segment.transferFrom(handler.getChannel(), position,
+                                               remaining);
+            } catch (IOException e) {
+                if (Utils.isClose(e)) {
+                    getLogger().info(String.format("closing appender %s ",
+                                                   fsm.getName()));
+                } else {
+                    getLogger().error(String.format("Exception during append on %s",
+                                                    fsm.getName()), e);
+                }
+                error();
+                return false;
+            }
+            position += written;
+            remaining -= written;
+        }
         if (getLogger().isTraceEnabled()) {
             getLogger().trace(String.format("Appending, offset=%s, position=%s, remaining=%s, written=%s on %s",
                                             offset, position, remaining,
@@ -277,6 +296,13 @@ abstract public class AbstractAppender {
             if (batchHeader.read(handler.getChannel()) < 0) {
                 error();
                 return false;
+            }
+            if (batchHeader.hasRemaining()) {
+                // extra read
+                if (batchHeader.read(handler.getChannel()) < 0) {
+                    error();
+                    return false;
+                }
             }
         } catch (IOException e) {
             if (Utils.isClose(e)) {
