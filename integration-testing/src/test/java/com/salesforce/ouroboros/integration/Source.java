@@ -40,6 +40,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.annotation.PreDestroy;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -164,6 +166,7 @@ public class Source implements EventSource {
         return shutdown.get();
     }
 
+    @PreDestroy
     public void shutdown() {
         if (shutdown.compareAndSet(false, true)) {
             log.info(String.format("Stopping publishing on %s",
