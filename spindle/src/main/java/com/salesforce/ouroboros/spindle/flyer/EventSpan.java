@@ -34,41 +34,23 @@ import com.salesforce.ouroboros.spindle.Segment;
  * 
  */
 public class EventSpan {
-    // The offset of the last byte of the last event in the span
-    private final long    endpoint;
-    // The offset of the first event in the span
-    private final long    offset;
+    // the id of the first event of the span
+    public final long    eventId;
+    // The end point offset of the span within the segment
+    public final long    endpoint;
+    // The offset of the first event within the segment
+    public final long    offset;
     // The segment that contains the span
-    private final Segment segment;
+    public final Segment segment;
 
     /**
      * @param segment
      * @param offset
      */
-    public EventSpan(Segment segment, long offset, long endpoint) {
+    public EventSpan(long eventId, Segment segment, long offset, int length) {
+        this.eventId = eventId;
         this.segment = segment;
         this.offset = offset;
-        this.endpoint = endpoint;
-    }
-
-    /**
-     * @return the endpoint
-     */
-    public long getEndpoint() {
-        return endpoint;
-    }
-
-    /**
-     * @return the offset
-     */
-    public long getOffset() {
-        return offset;
-    }
-
-    /**
-     * @return the segment
-     */
-    public Segment getSegment() {
-        return segment;
+        this.endpoint = offset + length;
     }
 }
