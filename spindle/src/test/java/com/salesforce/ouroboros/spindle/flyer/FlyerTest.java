@@ -26,10 +26,13 @@
 package com.salesforce.ouroboros.spindle.flyer;
 
 import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertSame;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
@@ -38,6 +41,7 @@ import java.util.UUID;
 import java.util.concurrent.BlockingDeque;
 
 import org.junit.Test;
+import org.mockito.internal.verification.Times;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
@@ -98,6 +102,8 @@ public class FlyerTest {
         long written = flyer.push(channel, length + Flyer.HEADER_BYTE_SIZE);
 
         assertEquals(1024 + Flyer.HEADER_BYTE_SIZE, written);
+        verify(segment, new Times(1)).transferTo(isA(Long.class),
+                                                 isA(Long.class), eq(channel));
     }
 
     @Test
@@ -153,6 +159,8 @@ public class FlyerTest {
         assertEquals(Flyer.HEADER_BYTE_SIZE, written);
         written = flyer.push(channel, maxBytes);
         assertEquals(0, written);
+        verify(segment, new Times(5)).transferTo(isA(Long.class),
+                                                 isA(Long.class), eq(channel));
     }
 
     @Test
@@ -189,6 +197,8 @@ public class FlyerTest {
         long written = flyer.push(channel, 1024);
 
         assertEquals(-1, written);
+        verify(segment, new Times(1)).transferTo(isA(Long.class),
+                                                 isA(Long.class), eq(channel));
     }
 
     @Test
@@ -218,12 +228,133 @@ public class FlyerTest {
             }
         };
         when(channel.write(isA(ByteBuffer.class))).thenAnswer(writeHeader);
-        when(segment.transferTo(0, length - Flyer.HEADER_BYTE_SIZE, channel)).thenReturn((long) length - Flyer.HEADER_BYTE_SIZE);
+        when(segment.transferTo(0, length - Flyer.HEADER_BYTE_SIZE, channel)).thenReturn((long) length
+                                                                                                 - Flyer.HEADER_BYTE_SIZE);
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id);
 
         long written = flyer.push(channel, length);
 
         assertEquals(1024, written);
+        verify(segment, new Times(1)).transferTo(isA(Long.class),
+                                                 isA(Long.class), eq(channel));
+    }
+
+    @Test
+    public void testMultiplePushFull() throws Exception {
+        Flyer flyer = new Flyer();
+        SocketChannel channel = mock(SocketChannel.class);
+        Segment segment = mock(Segment.class);
+        EventChannel eventChannel = mock(EventChannel.class);
+        final long eventId1 = 0x666;
+        final long eventId2 = 0x777;
+        final int length1 = 1024;
+        final int length2 = 1024;
+        flyer.deliver(new EventSpan(eventId1, segment, 0, length1));
+        flyer.deliver(new EventSpan(eventId2, segment, 0, length2));
+        final UUID id1 = UUID.randomUUID();
+        final UUID id2 = UUID.randomUUID();
+        assertFalse(id1.equals(id2));
+
+        Answer<Long> writeHeader1 = new Answer<Long>() {
+            @Override
+            public Long answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                assertNotNull(buffer);
+                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(id1.getLeastSignificantBits(), buffer.getLong());
+                assertEquals(id1.getMostSignificantBits(), buffer.getLong());
+                assertEquals(eventId1, buffer.getLong());
+                assertEquals(length1, buffer.getInt());
+                return (long) Flyer.HEADER_BYTE_SIZE;
+            }
+        };
+
+        Answer<Long> writeHeader2 = new Answer<Long>() {
+            @Override
+            public Long answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                assertNotNull(buffer);
+                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(id2.getLeastSignificantBits(), buffer.getLong());
+                assertEquals(id2.getMostSignificantBits(), buffer.getLong());
+                assertEquals(eventId2, buffer.getLong());
+                assertEquals(length2, buffer.getInt());
+                return (long) Flyer.HEADER_BYTE_SIZE;
+            }
+        };
+        when(channel.write(isA(ByteBuffer.class))).thenAnswer(writeHeader1).thenAnswer(writeHeader2);
+        when(segment.transferTo(0, length1, channel)).thenReturn((long) length1);
+        when(segment.transferTo(0, length2, channel)).thenReturn((long) length2);
+        when(segment.getEventChannel()).thenReturn(eventChannel);
+        when(eventChannel.getId()).thenReturn(id1).thenReturn(id2);
+
+        int totalBytes = length1 + length2 + (2 * Flyer.HEADER_BYTE_SIZE);
+        long written = flyer.push(channel, totalBytes);
+
+        assertEquals(totalBytes, written);
+        verify(segment, new Times(2)).transferTo(isA(Long.class),
+                                                 isA(Long.class), eq(channel));
+    }
+
+    @Test
+    public void testMultiplePushPartial() throws Exception {
+        Flyer flyer = new Flyer();
+        SocketChannel channel = mock(SocketChannel.class);
+        Segment segment = mock(Segment.class);
+        EventChannel eventChannel = mock(EventChannel.class);
+        final long eventId1 = 0x666;
+        final long eventId2 = 0x777;
+        final int length1 = 1024;
+        final int length2 = 2048;
+        flyer.deliver(new EventSpan(eventId1, segment, 0, length1));
+        flyer.deliver(new EventSpan(eventId2, segment, 0, length2));
+        final UUID id1 = UUID.randomUUID();
+        final UUID id2 = UUID.randomUUID();
+        assertFalse(id1.equals(id2));
+
+        Answer<Long> writeHeader1 = new Answer<Long>() {
+            @Override
+            public Long answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                assertNotNull(buffer);
+                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(id1.getLeastSignificantBits(), buffer.getLong());
+                assertEquals(id1.getMostSignificantBits(), buffer.getLong());
+                assertEquals(eventId1, buffer.getLong());
+                assertEquals(length1, buffer.getInt());
+                return (long) Flyer.HEADER_BYTE_SIZE;
+            }
+        };
+
+        Answer<Long> writeHeader2 = new Answer<Long>() {
+            @Override
+            public Long answer(InvocationOnMock invocation) throws Throwable {
+                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
+                assertNotNull(buffer);
+                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(id2.getLeastSignificantBits(), buffer.getLong());
+                assertEquals(id2.getMostSignificantBits(), buffer.getLong());
+                assertEquals(eventId2, buffer.getLong());
+                assertEquals(length2, buffer.getInt());
+                return (long) Flyer.HEADER_BYTE_SIZE;
+            }
+        };
+        long increment = 256;
+        when(channel.write(isA(ByteBuffer.class))).thenAnswer(writeHeader1).thenAnswer(writeHeader2);
+        when(segment.transferTo(isA(Long.class), isA(Long.class), eq(channel))).thenReturn(increment).thenReturn(increment).thenReturn(increment).thenReturn(increment).thenReturn(0L).thenReturn(increment).thenReturn(increment).thenReturn(increment).thenReturn(increment).thenReturn(increment).thenReturn(increment).thenReturn(increment).thenReturn(increment);
+        when(segment.getEventChannel()).thenReturn(eventChannel);
+        when(eventChannel.getId()).thenReturn(id1).thenReturn(id2);
+
+        int totalBytes = length1 + length2 + (2 * Flyer.HEADER_BYTE_SIZE);
+
+        long written = flyer.push(channel, length1 + Flyer.HEADER_BYTE_SIZE);
+        assertEquals(length1 + Flyer.HEADER_BYTE_SIZE, written);
+
+        written = flyer.push(channel, totalBytes);
+        assertEquals(length2 + Flyer.HEADER_BYTE_SIZE, written);
+
+        verify(segment, new Times(13)).transferTo(isA(Long.class),
+                                                  isA(Long.class), eq(channel));
     }
 }
