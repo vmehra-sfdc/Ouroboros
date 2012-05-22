@@ -37,19 +37,19 @@
 		<dependency>
 			<groupId>com.hellblazer</groupId>
 			<artifactId>pinkie</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>0.0.1</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.hellblazer.jackal</groupId>
 			<artifactId>jackal</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>0.0.1</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.hellblazer.jackal</groupId>
 			<artifactId>jackal</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>0.0.1</version>
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
