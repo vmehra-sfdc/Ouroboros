@@ -186,11 +186,7 @@ public class BatchWriter {
             if (inError) {
                 fsm.close();
             } else {
-                if (inError) {
-                    fsm.close();
-                } else {
-                    handler.selectForWrite();
-                }
+                handler.selectForWrite();
             }
         }
     }
