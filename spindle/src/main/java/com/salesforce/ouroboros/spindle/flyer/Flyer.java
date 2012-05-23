@@ -26,12 +26,10 @@
 package com.salesforce.ouroboros.spindle.flyer;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import com.salesforce.ouroboros.spindle.EventChannel;
@@ -45,14 +43,12 @@ import com.salesforce.ouroboros.spindle.EventChannel;
  * 
  */
 public class Flyer {
-    public static final int         HEADER_BYTE_SIZE = 4 + 8 + 8 + 8 + 4;
-    public static final int         MAGIC            = 0x1638;
 
     private volatile EventSpan      current;
     private volatile long           position;
-    private final Set<EventChannel> subscriptions    = new HashSet<>();
-    private final Deque<EventSpan>  thread           = new LinkedBlockingDeque<>();
-    private final ByteBuffer        header           = ByteBuffer.allocateDirect(HEADER_BYTE_SIZE);
+    private final Set<EventChannel> subscriptions = new HashSet<>();
+    private final Deque<EventSpan>  thread        = new LinkedBlockingDeque<>();
+    private final SpanHeader        header        = new SpanHeader();
 
     /**
      * Add the event span to the flyer's thread of events
@@ -109,8 +105,8 @@ public class Flyer {
         long written = 0;
         if (current == null) {
             if (loadNextSpan()) {
-                written = channel.write(header);
-                if (written < 0 || header.hasRemaining()) {
+                written = channel.write(header.getBytes());
+                if (written < 0 || header.getBytes().hasRemaining()) {
                     return written;
                 }
                 maxBytes -= written;
@@ -121,11 +117,11 @@ public class Flyer {
                 written += currentWrite;
             }
         } else {
-            if (header.hasRemaining()) {
-                written = channel.write(header);
+            if (header.getBytes().hasRemaining()) {
+                written = channel.write(header.getBytes());
                 maxBytes -= written;
             }
-            if (written < 0 || header.hasRemaining()) {
+            if (written < 0 || header.getBytes().hasRemaining()) {
                 return written;
             }
             long currentWrite = writeCurrentSpan(channel, maxBytes);
@@ -177,18 +173,16 @@ public class Flyer {
         current = thread.poll();
         if (current != null) {
             position = current.offset;
+            header.set(SpanHeader.MAGIC,
+                       current.segment.getEventChannel().getId(),
+                       current.eventId,
+                       (int) (current.endpoint - current.offset));
             header.clear();
-            header.putInt(MAGIC);
-            UUID channelId = current.segment.getEventChannel().getId();
-            header.putLong(channelId.getLeastSignificantBits());
-            header.putLong(channelId.getMostSignificantBits());
-            header.putLong(current.eventId);
-            header.putInt((int) (current.endpoint - current.offset));
-            header.flip();
             return true;
         } else {
             position = -1L;
             return false;
         }
     }
+
 }

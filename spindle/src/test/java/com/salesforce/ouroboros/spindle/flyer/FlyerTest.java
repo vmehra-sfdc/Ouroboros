@@ -86,12 +86,12 @@ public class FlyerTest {
             public Long answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull(buffer);
-                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(SpanHeader.MAGIC, buffer.getInt());
                 assertEquals(id.getLeastSignificantBits(), buffer.getLong());
                 assertEquals(id.getMostSignificantBits(), buffer.getLong());
                 assertEquals(eventId, buffer.getLong());
                 assertEquals(length, buffer.getInt());
-                return (long) Flyer.HEADER_BYTE_SIZE;
+                return (long) SpanHeader.HEADER_BYTE_SIZE;
             }
         };
         when(channel.write(isA(ByteBuffer.class))).thenAnswer(writeHeader);
@@ -99,9 +99,9 @@ public class FlyerTest {
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id);
 
-        long written = flyer.push(channel, length + Flyer.HEADER_BYTE_SIZE);
+        long written = flyer.push(channel, length + SpanHeader.HEADER_BYTE_SIZE);
 
-        assertEquals(1024 + Flyer.HEADER_BYTE_SIZE, written);
+        assertEquals(1024 + SpanHeader.HEADER_BYTE_SIZE, written);
         verify(segment, new Times(1)).transferTo(isA(Long.class),
                                                  isA(Long.class), eq(channel));
     }
@@ -124,39 +124,41 @@ public class FlyerTest {
             public Long answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull(buffer);
-                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(SpanHeader.MAGIC, buffer.getInt());
                 assertEquals(id.getLeastSignificantBits(), buffer.getLong());
                 assertEquals(id.getMostSignificantBits(), buffer.getLong());
                 assertEquals(eventId, buffer.getLong());
                 assertEquals(length, buffer.getInt());
-                return (long) Flyer.HEADER_BYTE_SIZE;
+                return (long) SpanHeader.HEADER_BYTE_SIZE;
             }
         };
         when(channel.write(isA(ByteBuffer.class))).thenAnswer(writeHeader);
         long increment = 256L;
-        when(segment.transferTo(0, 1024 - Flyer.HEADER_BYTE_SIZE, channel)).thenReturn(increment);
+        when(segment.transferTo(0, 1024 - SpanHeader.HEADER_BYTE_SIZE, channel)).thenReturn(increment);
         when(
-             segment.transferTo(increment, 1024 - Flyer.HEADER_BYTE_SIZE
+             segment.transferTo(increment, 1024 - SpanHeader.HEADER_BYTE_SIZE
                                            - increment, channel)).thenReturn(increment);
         when(
-             segment.transferTo(increment * 2, 1024 - Flyer.HEADER_BYTE_SIZE
+             segment.transferTo(increment * 2, 1024
+                                               - SpanHeader.HEADER_BYTE_SIZE
                                                - 2 * increment, channel)).thenReturn(increment);
         when(
-             segment.transferTo(increment * 3, 1024 - Flyer.HEADER_BYTE_SIZE
+             segment.transferTo(increment * 3, 1024
+                                               - SpanHeader.HEADER_BYTE_SIZE
                                                - 3 * increment, channel)).thenReturn(1024
-                                                                                             - Flyer.HEADER_BYTE_SIZE
+                                                                                             - SpanHeader.HEADER_BYTE_SIZE
                                                                                              - 3
                                                                                              * increment);
         when(
-             segment.transferTo(1024 - Flyer.HEADER_BYTE_SIZE,
-                                Flyer.HEADER_BYTE_SIZE, channel)).thenReturn((long) Flyer.HEADER_BYTE_SIZE);
+             segment.transferTo(1024 - SpanHeader.HEADER_BYTE_SIZE,
+                                SpanHeader.HEADER_BYTE_SIZE, channel)).thenReturn((long) SpanHeader.HEADER_BYTE_SIZE);
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id);
 
         long maxBytes = 1024;
         long written = flyer.push(channel, maxBytes);
         written = flyer.push(channel, maxBytes);
-        assertEquals(Flyer.HEADER_BYTE_SIZE, written);
+        assertEquals(SpanHeader.HEADER_BYTE_SIZE, written);
         written = flyer.push(channel, maxBytes);
         assertEquals(0, written);
         verify(segment, new Times(5)).transferTo(isA(Long.class),
@@ -181,16 +183,18 @@ public class FlyerTest {
             public Long answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull(buffer);
-                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(SpanHeader.MAGIC, buffer.getInt());
                 assertEquals(id.getLeastSignificantBits(), buffer.getLong());
                 assertEquals(id.getMostSignificantBits(), buffer.getLong());
                 assertEquals(eventId, buffer.getLong());
                 assertEquals(length, buffer.getInt());
-                return (long) Flyer.HEADER_BYTE_SIZE;
+                return (long) SpanHeader.HEADER_BYTE_SIZE;
             }
         };
         when(channel.write(isA(ByteBuffer.class))).thenAnswer(writeHeader);
-        when(segment.transferTo(0, length - Flyer.HEADER_BYTE_SIZE, channel)).thenReturn(-1L);
+        when(
+             segment.transferTo(0, length - SpanHeader.HEADER_BYTE_SIZE,
+                                channel)).thenReturn(-1L);
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id);
 
@@ -219,17 +223,19 @@ public class FlyerTest {
             public Long answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull(buffer);
-                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(SpanHeader.MAGIC, buffer.getInt());
                 assertEquals(id.getLeastSignificantBits(), buffer.getLong());
                 assertEquals(id.getMostSignificantBits(), buffer.getLong());
                 assertEquals(eventId, buffer.getLong());
                 assertEquals(length, buffer.getInt());
-                return (long) Flyer.HEADER_BYTE_SIZE;
+                return (long) SpanHeader.HEADER_BYTE_SIZE;
             }
         };
         when(channel.write(isA(ByteBuffer.class))).thenAnswer(writeHeader);
-        when(segment.transferTo(0, length - Flyer.HEADER_BYTE_SIZE, channel)).thenReturn((long) length
-                                                                                                 - Flyer.HEADER_BYTE_SIZE);
+        when(
+             segment.transferTo(0, length - SpanHeader.HEADER_BYTE_SIZE,
+                                channel)).thenReturn((long) length
+                                                             - SpanHeader.HEADER_BYTE_SIZE);
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id);
 
@@ -261,12 +267,12 @@ public class FlyerTest {
             public Long answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull(buffer);
-                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(SpanHeader.MAGIC, buffer.getInt());
                 assertEquals(id1.getLeastSignificantBits(), buffer.getLong());
                 assertEquals(id1.getMostSignificantBits(), buffer.getLong());
                 assertEquals(eventId1, buffer.getLong());
                 assertEquals(length1, buffer.getInt());
-                return (long) Flyer.HEADER_BYTE_SIZE;
+                return (long) SpanHeader.HEADER_BYTE_SIZE;
             }
         };
 
@@ -275,12 +281,12 @@ public class FlyerTest {
             public Long answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull(buffer);
-                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(SpanHeader.MAGIC, buffer.getInt());
                 assertEquals(id2.getLeastSignificantBits(), buffer.getLong());
                 assertEquals(id2.getMostSignificantBits(), buffer.getLong());
                 assertEquals(eventId2, buffer.getLong());
                 assertEquals(length2, buffer.getInt());
-                return (long) Flyer.HEADER_BYTE_SIZE;
+                return (long) SpanHeader.HEADER_BYTE_SIZE;
             }
         };
         when(channel.write(isA(ByteBuffer.class))).thenAnswer(writeHeader1).thenAnswer(writeHeader2);
@@ -289,7 +295,7 @@ public class FlyerTest {
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id1).thenReturn(id2);
 
-        int totalBytes = length1 + length2 + (2 * Flyer.HEADER_BYTE_SIZE);
+        int totalBytes = length1 + length2 + (2 * SpanHeader.HEADER_BYTE_SIZE);
         long written = flyer.push(channel, totalBytes);
 
         assertEquals(totalBytes, written);
@@ -318,12 +324,12 @@ public class FlyerTest {
             public Long answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull(buffer);
-                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(SpanHeader.MAGIC, buffer.getInt());
                 assertEquals(id1.getLeastSignificantBits(), buffer.getLong());
                 assertEquals(id1.getMostSignificantBits(), buffer.getLong());
                 assertEquals(eventId1, buffer.getLong());
                 assertEquals(length1, buffer.getInt());
-                return (long) Flyer.HEADER_BYTE_SIZE;
+                return (long) SpanHeader.HEADER_BYTE_SIZE;
             }
         };
 
@@ -332,12 +338,12 @@ public class FlyerTest {
             public Long answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull(buffer);
-                assertEquals(Flyer.MAGIC, buffer.getInt());
+                assertEquals(SpanHeader.MAGIC, buffer.getInt());
                 assertEquals(id2.getLeastSignificantBits(), buffer.getLong());
                 assertEquals(id2.getMostSignificantBits(), buffer.getLong());
                 assertEquals(eventId2, buffer.getLong());
                 assertEquals(length2, buffer.getInt());
-                return (long) Flyer.HEADER_BYTE_SIZE;
+                return (long) SpanHeader.HEADER_BYTE_SIZE;
             }
         };
         long increment = 256;
@@ -346,13 +352,14 @@ public class FlyerTest {
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id1).thenReturn(id2);
 
-        int totalBytes = length1 + length2 + (2 * Flyer.HEADER_BYTE_SIZE);
+        int totalBytes = length1 + length2 + (2 * SpanHeader.HEADER_BYTE_SIZE);
 
-        long written = flyer.push(channel, length1 + Flyer.HEADER_BYTE_SIZE);
-        assertEquals(length1 + Flyer.HEADER_BYTE_SIZE, written);
+        long written = flyer.push(channel, length1
+                                           + SpanHeader.HEADER_BYTE_SIZE);
+        assertEquals(length1 + SpanHeader.HEADER_BYTE_SIZE, written);
 
         written = flyer.push(channel, totalBytes);
-        assertEquals(length2 + Flyer.HEADER_BYTE_SIZE, written);
+        assertEquals(length2 + SpanHeader.HEADER_BYTE_SIZE, written);
 
         verify(segment, new Times(13)).transferTo(isA(Long.class),
                                                   isA(Long.class), eq(channel));
