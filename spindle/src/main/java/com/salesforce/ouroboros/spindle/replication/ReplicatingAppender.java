@@ -33,8 +33,8 @@ import org.slf4j.LoggerFactory;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.NullNode;
+import com.salesforce.ouroboros.spindle.AppendSegment;
 import com.salesforce.ouroboros.spindle.Bundle;
-import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.source.AbstractAppender;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 

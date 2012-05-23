@@ -40,7 +40,6 @@ import org.junit.Test;
 
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.EventChannel.AppendSegment;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.util.Utils;
 
@@ -161,5 +160,14 @@ public class TestEventChannel {
             eventChannel.append(batchHeader, offset, logicalSegment.segment);
             position += eventSize;
         }
+    }
+
+    /**
+     * Test that the EventChannel correctly identifies the segment after a given
+     * segment
+     */
+    @Test
+    public void testSegmentAfter() {
+
     }
 }

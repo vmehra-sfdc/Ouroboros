@@ -32,8 +32,10 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,43 +64,6 @@ import com.salesforce.ouroboros.spindle.source.Acknowledger;
  * 
  */
 public class EventChannel {
-
-    public static class AppendSegment {
-        // The logical offset within the channel
-        public final long    offset;
-        // The translated position within the segment
-        public final int     position;
-        // The segment
-        public final Segment segment;
-
-        public AppendSegment(Segment segment, long offset, int position) {
-            this.segment = segment;
-            this.offset = offset;
-            this.position = position;
-        }
-
-        @Override
-        public String toString() {
-            return "AppendSegment [segment=" + segment + ", offset=" + offset
-                   + ", position=" + position + "]";
-        }
-    }
-
-    public static class EventSegment {
-        // The translated offset of the event payload in this segment
-        public final long    offset;
-        // The segment where the event lives
-        public final Segment segment;
-
-        /**
-         * @param offset
-         * @param segment
-         */
-        public EventSegment(long offset, Segment segment) {
-            this.offset = offset;
-            this.segment = segment;
-        }
-    }
 
     public enum Role {
         MIRROR, PRIMARY;
@@ -205,19 +170,20 @@ public class EventChannel {
         return Long.toHexString(segmentPrefix).toLowerCase() + SEGMENT_SUFFIX;
     }
 
+    private final ConcurrentMap<File, Segment> appendSegmentCache;
     private final File                         channel;
     private volatile long                      commited;
-    private boolean                            failedOver = false;
+    private boolean                            failedOver  = false;
     private final UUID                         id;
     private volatile long                      lastTimestamp;
     private final long                         maxSegmentSize;
     private volatile long                      nextOffset;
     private volatile Node                      partner;
+    private final ConcurrentMap<File, Segment> readSegmentCache;
     private volatile Replicator                replicator;
     private Role                               role;
-    private final ConcurrentMap<File, Segment> appendSegmentCache;
-    private final ConcurrentMap<File, Segment> readSegmentCache;
     private final Node                         self;
+    private final List<Flyer>                  subscribers = new CopyOnWriteArrayList<Flyer>();
 
     public EventChannel(Node self, Role role, Node partnerId,
                         final UUID channelId, final File root,
@@ -389,24 +355,6 @@ public class EventChannel {
         return channel.equals(((EventChannel) o).channel);
     }
 
-    /**
-     * Answer the segment for reading the event at the given offset
-     * 
-     * @param eventId
-     *            - the logical offset of the event in the channel
-     * @return the EventSegment translating this event within the channel
-     * @throws IOException
-     */
-    public EventSegment eventSegmentFor(long eventId) throws IOException {
-        long homeSegment = prefixFor(eventId, maxSegmentSize);
-        return new EventSegment(
-                                EventHeader.translateToPayload(eventId
-                                                               - homeSegment),
-                                getCachedReadSegment(new File(
-                                                              channel,
-                                                              segmentName(homeSegment))));
-    }
-
     public void failMirror() {
         replicator = null;
     }
@@ -522,6 +470,89 @@ public class EventChannel {
         this.replicator = replicator;
     }
 
+    /**
+     * Answer the next read segment that follows the supplied segment
+     * 
+     * @param segment
+     *            the segment
+     * @return the next segment after the supplied segment in the event channel
+     * @throws IOException
+     *             if we cannot retrieve the segment
+     */
+    public Segment segmentAfter(Segment segment) throws IOException {
+        return getCachedReadSegment(new File(channel,
+                                             segmentName(segment.getPrefix()
+                                                         + maxSegmentSize)));
+    }
+
+    /**
+     * Answer the segment for reading the event at the given offset
+     * 
+     * @param eventOffset
+     *            - the logical offset of the event in the channel
+     * @return the EventSegment translating this event within the channel
+     * @throws IOException
+     */
+    public EventSegment segmentFor(long eventOffset) throws IOException {
+        long homeSegment = prefixFor(eventOffset, maxSegmentSize);
+        return new EventSegment(
+                                EventHeader.translateToPayload(eventOffset
+                                                               - homeSegment),
+                                getCachedReadSegment(new File(
+                                                              channel,
+                                                              segmentName(homeSegment))));
+    }
+
+    /**
+     * Return the segment prefix for the logical offset;
+     * 
+     * @param logicalOffset
+     * @return the segment prefix corresponding to the logical offset
+     */
+    public long segmentPrefixFor(long logicalOffset) {
+        return prefixFor(logicalOffset, maxSegmentSize);
+    }
+
+    /**
+     * @param flyer
+     *            - the flyer spinning the event thread
+     * @param lastEventOffset
+     *            - the last event offset seen by this flyer, -1 if the flyer
+     *            wants only current events
+     * @throws IOException
+     *             if something goes wrong when dispatching current events to
+     *             the flyer
+     */
+    public void subscribe(Flyer flyer, long lastEventOffset) throws IOException {
+        if (lastEventOffset != -1) {
+            dispatchEventsFrom(lastEventOffset, flyer);
+        }
+        subscribers.add(flyer);
+    }
+
+    /**
+     * Dispatch all events in the channel to the flyer, starting with the event
+     * after the lastEventId seen by the flyer up to the current event of the
+     * channel
+     * 
+     * @param lastOffset
+     *            - the offset of the last event seen by the flyer
+     * @param flyer
+     *            - the flyer spinning the thread of events on this channel
+     * @throws IOException
+     *             if something goes wrong when dispatching
+     */
+    private void dispatchEventsFrom(long lastOffset, Flyer flyer)
+                                                                 throws IOException {
+        EventSegment currentSegment = segmentFor(lastOffset);
+        currentSegment = currentSegment.segmentAfter();
+        while (!currentSegment.contains(nextOffset)) {
+            flyer.deliver(currentSegment.span());
+            currentSegment = currentSegment.followingSegment();
+        }
+        flyer.deliver(currentSegment.span());
+    }
+
     private AppendSegment getAppendSegment(long offset, int position,
                                            File segment) throws IOException {
         return new AppendSegment(getCachedAppendSegment(segment), offset,
@@ -552,14 +583,5 @@ public class EventChannel {
             }
         });
         return segmentFiles;
-    }
-
-    /**
-     * @param flyer
-     * @param lastEventId
-     */
-    public void subscribe(Flyer flyer, long lastEventId) {
-        // TODO Auto-generated method stub
-
     }
 }

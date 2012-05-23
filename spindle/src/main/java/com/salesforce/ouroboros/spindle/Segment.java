@@ -45,6 +45,9 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.channels.WritableByteChannel;
 
+import com.salesforce.ouroboros.EventHeader;
+import com.salesforce.ouroboros.spindle.flyer.EventSpan;
+
 /**
  * Segments are the ultimate repository of events, corresponding to files within
  * the channel. Due to the bogosity in the way that FileChannels are linked with
@@ -100,6 +103,17 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     }
 
     /**
+     * Answer true if the receiver contains the logical event offset
+     * 
+     * @param logicalOffset
+     *            -the logical offset of an event
+     * @return true if the receiver contains the offset, false otherwise
+     */
+    public boolean contains(long logicalOffset) {
+        return getPrefix() == channel.segmentPrefixFor(logicalOffset);
+    }
+
+    /**
      * @param obj
      * @return
      * @see java.lang.Object#equals(java.lang.Object)
@@ -126,12 +140,15 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     }
 
     /**
-     * @return
+     * @return the physical file that backs this segment
      */
     public File getFile() {
         return file;
     }
 
+    /*
+     * Answer the prefix of this segment
+     */
     public long getPrefix() {
         String name = file.getName();
         int index = name.indexOf(EventChannel.SEGMENT_SUFFIX);
@@ -144,9 +161,9 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     }
 
     /**
-     * @return
+     * @return the String name of the segment file
      */
-    public Object getSegmentName() {
+    public String getSegmentName() {
         return file.getName().substring(0, file.getName().indexOf('.'));
     }
 
@@ -202,6 +219,36 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
     public MappedByteBuffer map(MapMode mode, long position, long size)
                                                                        throws IOException {
         return fileChannel.map(mode, position, size);
+    }
+
+    /**
+     * @return the next segment after the receiver in the logical event channel
+     * @throws IOException
+     *             if we cannot retrieve the segment
+     */
+    public Segment nextSegment() throws IOException {
+        return channel.segmentAfter(this);
+    }
+
+    /**
+     * Return the offset of the next event after the offset in the receiver, or
+     * -1 if this segment does not host the next event
+     * 
+     * @param offset
+     *            - the offset of the indicated event
+     * @return the offset of the next event after the offset in the receiver, or
+     *         -1 if this segment does not host the next event
+     * @throws IOException
+     *             if we are unable to read the event information from backing
+     *             file
+     */
+    public long offsetAfter(long offset) throws IOException {
+        long next = offset + EventHeader.totalLengthOf(offset, this);
+        if (next > file.length()) {
+            return -1;
+        } else {
+            return next;
+        }
     }
 
     /**
@@ -277,6 +324,18 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      */
     public long size() throws IOException {
         return fileChannel.size();
+    }
+
+    /**
+     * @param offset
+     *            - the concrete offset of the first event within this segment
+     * @return the EventSpan containing the events in the segment from the
+     *         indicated concrete offset through the end of the segment,
+     *         inclusive
+     */
+    public EventSpan spanFrom(long offset) {
+        return new EventSpan(getPrefix() + offset, this, offset,
+                             (int) (file.length() - offset));
     }
 
     /**

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011, salesforce.com, inc.
+ * Copyright (c) 2012, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -25,72 +25,29 @@
  */
 package com.salesforce.ouroboros.spindle;
 
-import static junit.framework.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
-
-import java.io.File;
-import java.util.Random;
-
-import org.junit.Test;
-
-import com.salesforce.ouroboros.spindle.Segment.Mode;
-
 /**
+ * The tuple that identifies the append position of an event within a segment
  * 
  * @author hhildebrand
  * 
  */
-public class TestSegment {
+public class AppendSegment {
+    // The logical offset within the channel
+    public final long    offset;
+    // The translated position within the segment
+    public final int     position;
+    // The segment
+    public final Segment segment;
 
-    @Test
-    public void testPrefixTranslation() throws Exception {
-        Random random = new Random();
-        long prefix = random.nextLong();
-        while (prefix < 0L) {
-            prefix = random.nextLong();
-        }
-
-        File file = new File(Long.toHexString(prefix)
-                             + EventChannel.SEGMENT_SUFFIX);
-        file.deleteOnExit();
-
-        Segment segment = new Segment(mock(EventChannel.class), file,
-                                      Mode.APPEND);
-        assertEquals(prefix, segment.getPrefix());
+    public AppendSegment(Segment segment, long offset, int position) {
+        this.segment = segment;
+        this.offset = offset;
+        this.position = position;
     }
 
-    /**
-     * Test the the segment correctly identifies whether or not it contains the
-     * logical offset
-     */
-    @Test
-    public void testContains() {
-
-    }
-
-    /**
-     * Test that the segment correctly identifies the segment following in the
-     * event channel
-     */
-    @Test
-    public void testNextSegment() {
-
-    }
-
-    /**
-     * Test that the segment correctly returns the offset of an event contained
-     * in that segment
-     */
-    @Test
-    public void testOffsetAfter() {
-
-    }
-
-    /**
-     * Test that the segment returns the correct EventSpan for a given offset
-     */
-    @Test
-    public void testSpan() {
-
+    @Override
+    public String toString() {
+        return "AppendSegment [segment=" + segment + ", offset=" + offset
+               + ", position=" + position + "]";
     }
 }

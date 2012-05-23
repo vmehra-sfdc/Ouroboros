@@ -61,6 +61,7 @@ import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.spinner.Spinner;
+import com.salesforce.ouroboros.spindle.AppendSegment;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
@@ -95,7 +96,7 @@ public class TestSpinnerSpindle {
         UUID channel = UUID.randomUUID();
         long sequenceNumber = System.currentTimeMillis();
         long offset = 0;
-        EventChannel.AppendSegment appendSegment = new EventChannel.AppendSegment(
+        AppendSegment appendSegment = new AppendSegment(
                                                                                   segment,
                                                                                   offset,
                                                                                   0);

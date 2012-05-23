@@ -45,10 +45,10 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 public class Flyer {
 
     private volatile EventSpan      current;
+    private final SpanHeader        header        = new SpanHeader();
     private volatile long           position;
     private final Set<EventChannel> subscriptions = new HashSet<>();
     private final Deque<EventSpan>  thread        = new LinkedBlockingDeque<>();
-    private final SpanHeader        header        = new SpanHeader();
 
     /**
      * Add the event span to the flyer's thread of events
@@ -86,6 +86,46 @@ public class Flyer {
             remainingBytes -= currentWrite;
         } while (remainingBytes > 0);
         return written;
+    }
+
+    /**
+     * Subscribe to the event channel, listening for events after the last event
+     * offset
+     * 
+     * @param channel
+     *            - the channel we're listening to
+     * @param lastEventOffset
+     *            - the offset of the last event seen on this channel, or -1 to
+     *            retreive only events after subscribing
+     * @throws IOException
+     *             if something goes wrong when subscribing
+     */
+    public void subscribe(EventChannel channel, long lastEventOffset)
+                                                                     throws IOException {
+        subscriptions.add(channel);
+        channel.subscribe(this, lastEventOffset);
+    }
+
+    /**
+     * Load the next span in the thread
+     * 
+     * @return true if a new event span is available for push, false if there
+     *         are no spans left
+     */
+    private boolean loadNextSpan() {
+        current = thread.poll();
+        if (current != null) {
+            position = current.offset;
+            header.set(SpanHeader.MAGIC,
+                       current.segment.getEventChannel().getId(),
+                       current.eventId,
+                       (int) (current.endpoint - current.offset));
+            header.clear();
+            return true;
+        } else {
+            position = -1L;
+            return false;
+        }
     }
 
     /**
@@ -156,33 +196,6 @@ public class Flyer {
             }
         }
         return written;
-    }
-
-    public void subscribe(EventChannel channel, long lastEventId) {
-        subscriptions.add(channel);
-        channel.subscribe(this, lastEventId);
-    }
-
-    /**
-     * Load the next span in the thread
-     * 
-     * @return true if a new event span is available for push, false if there
-     *         are no spans left
-     */
-    private boolean loadNextSpan() {
-        current = thread.poll();
-        if (current != null) {
-            position = current.offset;
-            header.set(SpanHeader.MAGIC,
-                       current.segment.getEventChannel().getId(),
-                       current.eventId,
-                       (int) (current.endpoint - current.offset));
-            header.clear();
-            return true;
-        } else {
-            position = -1L;
-            return false;
-        }
     }
 
 }
