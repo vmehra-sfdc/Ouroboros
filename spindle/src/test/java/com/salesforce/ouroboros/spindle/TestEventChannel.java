@@ -161,13 +161,4 @@ public class TestEventChannel {
             position += eventSize;
         }
     }
-
-    /**
-     * Test that the EventChannel correctly identifies the segment after a given
-     * segment
-     */
-    @Test
-    public void testSegmentAfter() {
-
-    }
 }
