@@ -155,6 +155,10 @@ public class Event extends EventHeader {
         super(bytes);
     }
 
+    public Event(int magic, byte[] body) {
+        this(magic, ByteBuffer.wrap(body));
+    }
+
     public Event(int magic, ByteBuffer payload) {
         this(ByteBuffer.allocate(HEADER_BYTE_SIZE + payload.remaining()));
         initialize(magic, payload);

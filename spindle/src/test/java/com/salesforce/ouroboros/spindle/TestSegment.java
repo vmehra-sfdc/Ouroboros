@@ -29,11 +29,14 @@ import static junit.framework.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.util.Random;
 
 import org.junit.Test;
 
+import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.spindle.Segment.Mode;
+import com.salesforce.ouroboros.spindle.flyer.EventSpan;
 
 /**
  * 
@@ -60,29 +63,39 @@ public class TestSegment {
     }
 
     /**
-     * Test the the segment correctly identifies whether or not it contains the
-     * logical offset
-     */
-    @Test
-    public void testContains() {
-
-    }
-
-    /**
-     * Test that the segment correctly identifies the segment following in the
-     * event channel
-     */
-    @Test
-    public void testNextSegment() {
-
-    }
-
-    /**
      * Test that the segment correctly returns the offset of an event contained
      * in that segment
      */
     @Test
-    public void testOffsetAfter() {
+    public void testOffsetAfter() throws Exception {
+        long prefix = 0x100000;
+        File file = new File(Long.toHexString(prefix)
+                             + EventChannel.SEGMENT_SUFFIX);
+        file.deleteOnExit();
+
+        byte[] body1 = "Give me food or give me SLACK".getBytes();
+        byte[] body2 = "or KILL ME".getBytes();
+
+        FileOutputStream fos = new FileOutputStream(file);
+
+        Event event1 = new Event(0x666, body1);
+        Event event2 = new Event(0x777, body2);
+
+        int totalBytes1 = event1.totalSize();
+        event1.rewind();
+        int totalBytes2 = event2.totalSize();
+        event2.rewind();
+
+        assertEquals(totalBytes1, event1.write(fos.getChannel()));
+        assertEquals(totalBytes2, event2.write(fos.getChannel()));
+
+        fos.close();
+
+        Segment segment = new Segment(mock(EventChannel.class), file, Mode.READ);
+
+        assertEquals(totalBytes1, segment.offsetAfter(0));
+
+        segment.close();
 
     }
 
@@ -90,7 +103,46 @@ public class TestSegment {
      * Test that the segment returns the correct EventSpan for a given offset
      */
     @Test
-    public void testSpan() {
+    public void testSpanFrom() throws Exception {
+        long prefix = 0x100000;
+        File file = new File(Long.toHexString(prefix)
+                             + EventChannel.SEGMENT_SUFFIX);
+        file.deleteOnExit();
 
+        byte[] body1 = "Give me food or give me SLACK".getBytes();
+        byte[] body2 = "or KILL ME".getBytes();
+
+        FileOutputStream fos = new FileOutputStream(file);
+
+        Event event1 = new Event(0x666, body1);
+        Event event2 = new Event(0x777, body2);
+
+        int totalBytes1 = event1.totalSize();
+        event1.rewind();
+        int totalBytes2 = event2.totalSize();
+        event2.rewind();
+
+        assertEquals(totalBytes1, event1.write(fos.getChannel()));
+        assertEquals(totalBytes2, event2.write(fos.getChannel()));
+
+        fos.close();
+
+        Segment segment = new Segment(mock(EventChannel.class), file, Mode.READ);
+
+        EventSpan span = segment.spanFrom(0);
+
+        assertEquals(prefix, span.eventId);
+        assertEquals(0, span.offset);
+        assertEquals(segment, span.segment);
+        assertEquals(span.endpoint, file.length());
+
+        span = segment.spanFrom(totalBytes1);
+        assertEquals(prefix + totalBytes1, span.eventId);
+        assertEquals(totalBytes1, span.offset);
+        assertEquals(segment, span.segment);
+        assertEquals(span.endpoint, file.length());
+
+
+        segment.close();
     }
 }
