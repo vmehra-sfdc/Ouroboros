@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.shuttle.PushResponse.Status;
 
 /**
  * 
@@ -44,7 +45,7 @@ import com.salesforce.ouroboros.spindle.EventChannel;
  */
 public class Flyer {
 
-    private volatile EventSpan      current;
+    private volatile EventSpan      currentSpan;
     private final SpanHeader        header        = new SpanHeader();
     private volatile long           position;
     private final Set<EventChannel> subscriptions = new HashSet<>();
@@ -67,25 +68,36 @@ public class Flyer {
      *            - the channel to write events to
      * @param maxBytes
      *            - the maximum number of bytes to write to the channel
-     * @return - the number of bytes written
+     * @return - the PushResponse of the push
      * @throws IOException
      *             if something goes wrong with the transfer
      */
-    public long push(SocketChannel channel, long maxBytes) throws IOException {
-        long written = 0;
-        long remainingBytes = maxBytes;
-        do {
-            long currentWrite = pushSpan(channel, remainingBytes);
-            if (currentWrite < 0) {
-                written = currentWrite;
-                break;
-            } else if (currentWrite == 0) {
-                break;
+    public PushResponse push(SocketChannel channel, long maxBytes)
+                                                                  throws IOException {
+
+        if (currentSpan == null) {
+            if (!loadNextSpan()) {
+                return new PushResponse(0, Status.NO_SPAN);
             }
-            written += currentWrite;
-            remainingBytes -= currentWrite;
-        } while (remainingBytes > 0);
-        return written;
+        }
+
+        long written = 0;
+        if (header.getBytes().hasRemaining()) {
+            written = channel.write(header.getBytes());
+            maxBytes -= written;
+        }
+        if (written < 0) {
+            return new PushResponse(written, Status.SOCKET_CLOSED);
+        } else if (header.getBytes().hasRemaining()) {
+            return new PushResponse(written, Status.CONTINUE);
+        }
+        long currentWrite = writeCurrentSpan(channel, maxBytes);
+        if (currentWrite < 0) {
+            return new PushResponse(currentWrite, Status.SOCKET_CLOSED);
+        }
+        return new PushResponse(written += currentWrite,
+                                currentSpan == null ? Status.SPAN_COMPLETE
+                                                   : Status.CONTINUE);
     }
 
     /**
@@ -113,64 +125,19 @@ public class Flyer {
      *         are no spans left
      */
     private boolean loadNextSpan() {
-        current = thread.poll();
-        if (current != null) {
-            position = current.offset;
+        currentSpan = thread.poll();
+        if (currentSpan != null) {
+            position = currentSpan.offset;
             header.set(SpanHeader.MAGIC,
-                       current.segment.getEventChannel().getId(),
-                       current.eventId,
-                       (int) (current.endpoint - current.offset));
+                       currentSpan.segment.getEventChannel().getId(),
+                       currentSpan.eventId,
+                       (int) (currentSpan.endpoint - currentSpan.offset));
             header.clear();
             return true;
         } else {
             position = -1L;
             return false;
         }
-    }
-
-    /**
-     * Push a span of events from the thread to the socket channel. Deliver only
-     * the maximum number of bytes indicated.
-     * 
-     * @param channel
-     *            - the channel to push the events
-     * @param maxBytes
-     *            - the maximum number of event bytes to send
-     * @return the number of bytes actually delivered
-     * @throws IOException
-     *             if something goes wrong with the transfer
-     */
-    private long pushSpan(SocketChannel channel, long maxBytes)
-                                                               throws IOException {
-        long written = 0;
-        if (current == null) {
-            if (loadNextSpan()) {
-                written = channel.write(header.getBytes());
-                if (written < 0 || header.getBytes().hasRemaining()) {
-                    return written;
-                }
-                maxBytes -= written;
-                long currentWrite = writeCurrentSpan(channel, maxBytes);
-                if (currentWrite < 0) {
-                    return currentWrite;
-                }
-                written += currentWrite;
-            }
-        } else {
-            if (header.getBytes().hasRemaining()) {
-                written = channel.write(header.getBytes());
-                maxBytes -= written;
-            }
-            if (written < 0 || header.getBytes().hasRemaining()) {
-                return written;
-            }
-            long currentWrite = writeCurrentSpan(channel, maxBytes);
-            if (currentWrite < 0) {
-                return currentWrite;
-            }
-            written += currentWrite;
-        }
-        return written;
     }
 
     /**
@@ -186,12 +153,13 @@ public class Flyer {
      */
     private long writeCurrentSpan(SocketChannel channel, long maxBytes)
                                                                        throws IOException {
-        maxBytes = Math.min(maxBytes, current.endpoint - position);
-        long written = current.segment.transferTo(position, maxBytes, channel);
+        maxBytes = Math.min(maxBytes, currentSpan.endpoint - position);
+        long written = currentSpan.segment.transferTo(position, maxBytes,
+                                                      channel);
         if (written > 0) {
             position += written;
-            if (position == current.endpoint) {
-                current = null;
+            if (position == currentSpan.endpoint) {
+                currentSpan = null;
                 position = -1L;
             }
         }

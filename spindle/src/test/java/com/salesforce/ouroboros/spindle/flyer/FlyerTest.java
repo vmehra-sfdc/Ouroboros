@@ -49,6 +49,8 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.shuttle.EventSpan;
 import com.salesforce.ouroboros.spindle.shuttle.Flyer;
+import com.salesforce.ouroboros.spindle.shuttle.PushResponse;
+import com.salesforce.ouroboros.spindle.shuttle.PushResponse.Status;
 import com.salesforce.ouroboros.spindle.shuttle.SpanHeader;
 import com.salesforce.ouroboros.testUtils.Util;
 
@@ -102,9 +104,11 @@ public class FlyerTest {
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id);
 
-        long written = flyer.push(channel, length + SpanHeader.HEADER_BYTE_SIZE);
+        PushResponse response = flyer.push(channel,
+                                           length + SpanHeader.HEADER_BYTE_SIZE);
 
-        assertEquals(1024 + SpanHeader.HEADER_BYTE_SIZE, written);
+        assertEquals(1024 + SpanHeader.HEADER_BYTE_SIZE, response.bytesWritten);
+        assertEquals(Status.SPAN_COMPLETE, response.writeStatus);
         verify(segment, new Times(1)).transferTo(isA(Long.class),
                                                  isA(Long.class), eq(channel));
     }
@@ -138,20 +142,9 @@ public class FlyerTest {
         when(channel.write(isA(ByteBuffer.class))).thenAnswer(writeHeader);
         long increment = 256L;
         when(segment.transferTo(0, 1024 - SpanHeader.HEADER_BYTE_SIZE, channel)).thenReturn(increment);
-        when(
-             segment.transferTo(increment, 1024 - SpanHeader.HEADER_BYTE_SIZE
-                                           - increment, channel)).thenReturn(increment);
-        when(
-             segment.transferTo(increment * 2, 1024
-                                               - SpanHeader.HEADER_BYTE_SIZE
-                                               - 2 * increment, channel)).thenReturn(increment);
-        when(
-             segment.transferTo(increment * 3, 1024
-                                               - SpanHeader.HEADER_BYTE_SIZE
-                                               - 3 * increment, channel)).thenReturn(1024
-                                                                                             - SpanHeader.HEADER_BYTE_SIZE
-                                                                                             - 3
-                                                                                             * increment);
+        when(segment.transferTo(increment, 1024 - increment, channel)).thenReturn(increment);
+        when(segment.transferTo(increment * 2, 1024 - 2 * increment, channel)).thenReturn(increment);
+        when(segment.transferTo(increment * 3, 1024 - 3 * increment, channel)).thenReturn(1024 - 3 * increment);
         when(
              segment.transferTo(1024 - SpanHeader.HEADER_BYTE_SIZE,
                                 SpanHeader.HEADER_BYTE_SIZE, channel)).thenReturn((long) SpanHeader.HEADER_BYTE_SIZE);
@@ -159,12 +152,29 @@ public class FlyerTest {
         when(eventChannel.getId()).thenReturn(id);
 
         long maxBytes = 1024;
-        long written = flyer.push(channel, maxBytes);
-        written = flyer.push(channel, maxBytes);
-        assertEquals(SpanHeader.HEADER_BYTE_SIZE, written);
-        written = flyer.push(channel, maxBytes);
-        assertEquals(0, written);
-        verify(segment, new Times(5)).transferTo(isA(Long.class),
+
+        PushResponse response = flyer.push(channel, maxBytes);
+        assertEquals(SpanHeader.HEADER_BYTE_SIZE + increment,
+                     response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, maxBytes);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+        assertEquals(increment, response.bytesWritten);
+
+        response = flyer.push(channel, maxBytes);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+        assertEquals(increment, response.bytesWritten);
+
+        response = flyer.push(channel, maxBytes);
+        assertEquals(Status.SPAN_COMPLETE, response.writeStatus);
+        assertEquals(increment, response.bytesWritten);
+
+        response = flyer.push(channel, maxBytes);
+        assertEquals(Status.NO_SPAN, response.writeStatus);
+        assertEquals(0, response.bytesWritten);
+
+        verify(segment, new Times(4)).transferTo(isA(Long.class),
                                                  isA(Long.class), eq(channel));
     }
 
@@ -201,9 +211,10 @@ public class FlyerTest {
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id);
 
-        long written = flyer.push(channel, 1024);
+        PushResponse response = flyer.push(channel, 1024);
 
-        assertEquals(-1, written);
+        assertEquals(-1, response.bytesWritten);
+        assertEquals(Status.SOCKET_CLOSED, response.writeStatus);
         verify(segment, new Times(1)).transferTo(isA(Long.class),
                                                  isA(Long.class), eq(channel));
     }
@@ -242,9 +253,10 @@ public class FlyerTest {
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id);
 
-        long written = flyer.push(channel, length);
+        PushResponse response = flyer.push(channel, length);
 
-        assertEquals(1024, written);
+        assertEquals(1024, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
         verify(segment, new Times(1)).transferTo(isA(Long.class),
                                                  isA(Long.class), eq(channel));
     }
@@ -298,10 +310,17 @@ public class FlyerTest {
         when(segment.getEventChannel()).thenReturn(eventChannel);
         when(eventChannel.getId()).thenReturn(id1).thenReturn(id2);
 
-        int totalBytes = length1 + length2 + (2 * SpanHeader.HEADER_BYTE_SIZE);
-        long written = flyer.push(channel, totalBytes);
+        int maxBytes = length1 + SpanHeader.HEADER_BYTE_SIZE;
+        PushResponse response = flyer.push(channel, maxBytes);
 
-        assertEquals(totalBytes, written);
+        assertEquals(length1 + SpanHeader.HEADER_BYTE_SIZE,
+                     response.bytesWritten);
+        assertEquals(Status.SPAN_COMPLETE, response.writeStatus);
+        response = flyer.push(channel, maxBytes);
+
+        assertEquals(length2 + SpanHeader.HEADER_BYTE_SIZE,
+                     response.bytesWritten);
+        assertEquals(Status.SPAN_COMPLETE, response.writeStatus);
         verify(segment, new Times(2)).transferTo(isA(Long.class),
                                                  isA(Long.class), eq(channel));
     }
@@ -357,12 +376,58 @@ public class FlyerTest {
 
         int totalBytes = length1 + length2 + (2 * SpanHeader.HEADER_BYTE_SIZE);
 
-        long written = flyer.push(channel, length1
-                                           + SpanHeader.HEADER_BYTE_SIZE);
-        assertEquals(length1 + SpanHeader.HEADER_BYTE_SIZE, written);
+        PushResponse response = flyer.push(channel, totalBytes);
+        assertEquals(increment + SpanHeader.HEADER_BYTE_SIZE,
+                     response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
 
-        written = flyer.push(channel, totalBytes);
-        assertEquals(length2 + SpanHeader.HEADER_BYTE_SIZE, written);
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.SPAN_COMPLETE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(SpanHeader.HEADER_BYTE_SIZE, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.CONTINUE, response.writeStatus);
+
+        response = flyer.push(channel, totalBytes);
+        assertEquals(increment, response.bytesWritten);
+        assertEquals(Status.SPAN_COMPLETE, response.writeStatus);
 
         verify(segment, new Times(13)).transferTo(isA(Long.class),
                                                   isA(Long.class), eq(channel));

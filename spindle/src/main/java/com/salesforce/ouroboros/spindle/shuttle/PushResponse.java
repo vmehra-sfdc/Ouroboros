@@ -1,6 +1,5 @@
-%{
 /**
- * Copyright (c) 2011, salesforce.com, inc.
+ * Copyright (c) 2012, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -24,24 +23,26 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.ouroboros.spindle.shuttle;
 
 /**
  * @author hhildebrand
+ * 
  */
-%}
+public class PushResponse {
+    public static enum Status {
+        SOCKET_CLOSED, CONTINUE, PACKET_COMPLETE, SPAN_COMPLETE, NO_SPAN;
+    }
 
-// The FSM of the Flyer
+    public final long   bytesWritten;
+    public final Status writeStatus;
 
-%class Flyer
-%package com.salesforce.ouroboros.spindle.shuttle
-
-%access public
-
-%start FlyerFSM::Suspended
-%map FlyerFSM
-%% 
-Suspended{ 
+    /**
+     * @param bytesWritten
+     * @param writeStatus
+     */
+    public PushResponse(long bytesWritten, Status writeStatus) {
+        this.bytesWritten = bytesWritten;
+        this.writeStatus = writeStatus;
+    }
 }
-Default {
-}
-%%
