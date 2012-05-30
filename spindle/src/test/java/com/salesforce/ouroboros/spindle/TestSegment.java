@@ -36,7 +36,7 @@ import org.junit.Test;
 
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.spindle.Segment.Mode;
-import com.salesforce.ouroboros.spindle.flyer.EventSpan;
+import com.salesforce.ouroboros.spindle.shuttle.EventSpan;
 
 /**
  * 

@@ -1,5 +1,6 @@
+%{
 /**
- * Copyright (c) 2012, salesforce.com, inc.
+ * Copyright (c) 2011, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -23,34 +24,24 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.flyer;
-
-import com.salesforce.ouroboros.spindle.Segment;
 
 /**
- * Marks a span of events in a channel's segment
- * 
  * @author hhildebrand
- * 
  */
-public class EventSpan {
-    // the id of the first event of the span
-    public final long    eventId;
-    // The end point offset of the span within the segment
-    public final long    endpoint;
-    // The offset of the first event within the segment
-    public final long    offset;
-    // The segment that contains the span
-    public final Segment segment;
+%}
 
-    /**
-     * @param segment
-     * @param offset
-     */
-    public EventSpan(long eventId, Segment segment, long offset, int length) {
-        this.eventId = eventId;
-        this.segment = segment;
-        this.offset = offset;
-        this.endpoint = offset + length;
-    }
+// The FSM of the Flyer
+
+%class Flyer
+%package com.salesforce.ouroboros.spindle.shuttle
+
+%access public
+
+%start FlyerFSM::Suspended
+%map FlyerFSM
+%% 
+Suspended{ 
 }
+Default {
+}
+%%

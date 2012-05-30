@@ -47,6 +47,9 @@ import org.mockito.stubbing.Answer;
 
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
+import com.salesforce.ouroboros.spindle.shuttle.EventSpan;
+import com.salesforce.ouroboros.spindle.shuttle.Flyer;
+import com.salesforce.ouroboros.spindle.shuttle.SpanHeader;
 import com.salesforce.ouroboros.testUtils.Util;
 
 /**

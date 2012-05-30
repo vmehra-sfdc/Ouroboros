@@ -46,7 +46,7 @@ import java.nio.channels.ScatteringByteChannel;
 import java.nio.channels.WritableByteChannel;
 
 import com.salesforce.ouroboros.EventHeader;
-import com.salesforce.ouroboros.spindle.flyer.EventSpan;
+import com.salesforce.ouroboros.spindle.shuttle.EventSpan;
 
 /**
  * Segments are the ultimate repository of events, corresponding to files within

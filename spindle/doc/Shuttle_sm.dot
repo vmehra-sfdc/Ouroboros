@@ -1,0 +1,60 @@
+digraph Shuttle {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_ShuttleFSM {
+
+        label="ShuttleFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "ShuttleFSM::Suspended"
+            [label="{Suspended}"];
+
+        "ShuttleFSM::Established"
+            [label="{Established}"];
+
+        "ShuttleFSM::Handshake"
+            [label="{Handshake}"];
+
+        "ShuttleFSM::Closed"
+            [label="{Closed}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "ShuttleFSM::Suspended" -> "ShuttleFSM::Handshake"
+            [label="acceptHandshake/\l"];
+
+        "ShuttleFSM::Suspended" -> "ShuttleFSM::Closed"
+            [label="close/\l"];
+
+        "ShuttleFSM::Established" -> "ShuttleFSM::Closed"
+            [label="close/\l"];
+
+        "ShuttleFSM::Handshake" -> "ShuttleFSM::Closed"
+            [label="readReady/\l"];
+
+        "ShuttleFSM::Handshake" -> "ShuttleFSM::Established"
+            [label="readReady/\l"];
+
+        "ShuttleFSM::Handshake" -> "ShuttleFSM::Established"
+            [label="established/\l"];
+
+        "ShuttleFSM::Handshake" -> "ShuttleFSM::Closed"
+            [label="close/\l"];
+
+        "ShuttleFSM::Closed" -> "ShuttleFSM::Closed"
+            [label="close/\l"];
+
+        "%start" -> "ShuttleFSM::Suspended"
+    }
+
+}

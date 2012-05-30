@@ -44,10 +44,10 @@ import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Segment.Mode;
-import com.salesforce.ouroboros.spindle.flyer.Flyer;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
+import com.salesforce.ouroboros.spindle.shuttle.Flyer;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
