@@ -166,4 +166,11 @@ public class Flyer {
         return written;
     }
 
+    /**
+     * @return
+     */
+    public EventSpan getCurrentSpan() {
+        return currentSpan;
+    }
+
 }

@@ -20,6 +20,12 @@ digraph Shuttle {
         "ShuttleFSM::Handshake"
             [label="{Handshake}"];
 
+        "ShuttleFSM::ReadWeft"
+            [label="{ReadWeft}"];
+
+        "ShuttleFSM::WriteSpan"
+            [label="{WriteSpan}"];
+
         "ShuttleFSM::Closed"
             [label="{Closed}"];
 
@@ -31,10 +37,13 @@ digraph Shuttle {
         //
 
         "ShuttleFSM::Suspended" -> "ShuttleFSM::Handshake"
-            [label="acceptHandshake/\l"];
+            [label="accept/\l"];
 
         "ShuttleFSM::Suspended" -> "ShuttleFSM::Closed"
             [label="close/\l"];
+
+        "ShuttleFSM::Established" -> "ShuttleFSM::ReadWeft"
+            [label="readReady/\l"];
 
         "ShuttleFSM::Established" -> "ShuttleFSM::Closed"
             [label="close/\l"];
@@ -51,7 +60,31 @@ digraph Shuttle {
         "ShuttleFSM::Handshake" -> "ShuttleFSM::Closed"
             [label="close/\l"];
 
-        "ShuttleFSM::Closed" -> "ShuttleFSM::Closed"
+        "ShuttleFSM::ReadWeft" -> "ShuttleFSM::Closed"
+            [label="readReady/\l"];
+
+        "ShuttleFSM::ReadWeft" -> "ShuttleFSM::WriteSpan"
+            [label="readReady/\l"];
+
+        "ShuttleFSM::ReadWeft" -> "ShuttleFSM::WriteSpan"
+            [label="writeSpan/\l"];
+
+        "ShuttleFSM::ReadWeft" -> "ShuttleFSM::Closed"
+            [label="close/\l"];
+
+        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::Closed"
+            [label="writeReady/\l"];
+
+        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::Established"
+            [label="writeReady/\l"];
+
+        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::Established"
+            [label="unknownSubscription/\l"];
+
+        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::Established"
+            [label="packetDelivered/\l"];
+
+        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::Closed"
             [label="close/\l"];
 
         "%start" -> "ShuttleFSM::Suspended"

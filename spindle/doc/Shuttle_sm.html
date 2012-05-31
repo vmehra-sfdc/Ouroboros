@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=5>
+        <th colspan=9>
           Transition
         </th>
       </tr>
@@ -27,7 +27,7 @@
          Exit
         </th>
         <th>
-          acceptHandshake
+          accept
         </th>
         <th>
           close
@@ -36,7 +36,19 @@
           established
         </th>
         <th>
+          packetDelivered
+        </th>
+        <th>
           readReady
+        </th>
+        <th>
+          unknownSubscription
+        </th>
+        <th>
+          writeReady
+        </th>
+        <th>
+          writeSpan
         </th>
         <th>
           <b>Default</b>
@@ -64,6 +76,14 @@
         </td>
         <td>
         </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -71,12 +91,24 @@
         </td>
         <td>
           <pre>
-established();
+selectForRead();
           </pre>
         </td>
         <td>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReadWeft
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -109,6 +141,8 @@ handshake();
           </pre>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
 [!ctxt.readHandshake() && !ctxt.inError()]
   Handshake
@@ -126,6 +160,112 @@ handshake();
         </td>
         <td>
         </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReadWeft
+        </td>
+        <td>
+          <pre>
+    nextWeft();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.readWeft() && !ctxt.inError()]
+  ReadWeft
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  WriteSpan
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  WriteSpan
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          WriteSpan
+        </td>
+        <td>
+          <pre>
+    nextSpan();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
+          <pre>
+[!ctxt.writeSpan() && !ctxt.inError()]
+  WriteSpan
+  {
+    selectForWrite();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
       </tr>
       <tr>
         <td>
@@ -135,6 +275,18 @@ handshake();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Closed
+  {}
+          </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>

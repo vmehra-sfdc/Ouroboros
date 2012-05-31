@@ -41,15 +41,17 @@
 %map ShuttleFSM
 %% 
 Suspended{
-	acceptHandshake
+	accept
 	   Handshake{}
 }
 
 Established
 Entry{
-	established();
+	selectForRead();
 }
 {
+	readReady
+		ReadWeft{}
 }
 
 Handshake
@@ -72,13 +74,62 @@ Entry{
         
     established
         Established{}
-} 
+}
+
+ReadWeft
+Entry{
+	nextWeft();
+}
+{
+    readReady
+        [!ctxt.readWeft() && !ctxt.inError()]
+        nil{
+            selectForRead();
+        }
+        
+    readReady
+        [ctxt.inError()]
+        Closed{}
+        
+    readReady
+        WriteSpan{}
+        
+    writeSpan
+        WriteSpan{}
+}
+
+WriteSpan
+Entry {
+	nextSpan();
+}
+{
+	writeReady
+		[!ctxt.writeSpan() && !ctxt.inError()]
+		nil {
+			selectForWrite();
+		}
+	writeReady
+		[ctxt.inError()]
+		Closed{}
+		
+	writeReady
+		Established{}
+		
+	unknownSubscription
+		Established{}
+		
+	packetDelivered
+		Established{}
+}
 
 Closed
 Entry {
 	close();
 }
-{}
+{
+	close
+		nil{}
+}
 
 Default {  
 	close

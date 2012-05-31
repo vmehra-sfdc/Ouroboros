@@ -26,7 +26,6 @@
 package com.salesforce.ouroboros.spindle.shuttle;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.UUID;
 
 /**
@@ -36,13 +35,8 @@ import java.util.UUID;
 public class WeftHeader {
     private static int       CLIENT_ID_MSB_INDEX = 0;
     private static int       CLIENT_ID_LSB_INDEX = CLIENT_ID_MSB_INDEX + 8;
-    private static int       HEADER_BYTE_SIZE    = CLIENT_ID_LSB_INDEX + 8;
-    private static byte[]    END_MARKER;
-
-    static {
-        END_MARKER = new byte[HEADER_BYTE_SIZE];
-        Arrays.fill(END_MARKER, (byte) 0);
-    }
+    private static int       PACKET_SIZE_INDEX   = CLIENT_ID_LSB_INDEX + 8;
+    private static int       HEADER_BYTE_SIZE    = PACKET_SIZE_INDEX + 8;
 
     private final ByteBuffer bytes;
 
@@ -66,8 +60,8 @@ public class WeftHeader {
                         bytes.getLong(CLIENT_ID_LSB_INDEX));
     }
 
-    public boolean isEndMarker() {
-        return Arrays.equals(END_MARKER, bytes.array());
+    public int getPacketSize() {
+        return bytes.getInt(PACKET_SIZE_INDEX);
     }
 
     public void setClientId(UUID clientId) {
@@ -75,8 +69,7 @@ public class WeftHeader {
         bytes.putLong(CLIENT_ID_LSB_INDEX, clientId.getLeastSignificantBits());
     }
 
-    public void setEndMarker() {
-        bytes.rewind();
-        bytes.put(END_MARKER);
+    public void setPacketSize(int packetSize) {
+        bytes.putInt(PACKET_SIZE_INDEX, packetSize);
     }
 }
