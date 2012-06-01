@@ -41,6 +41,7 @@ public class MultiProcessTest extends ProcessTest {
         System.setProperty("javax.net.debug", "all");
         Utils.initializeDirectory(TEST_DIR);
         testDir = new File(TEST_DIR);
+        System.out.println("FIRST CHANGE");
     }
 
     protected void copyTestClassFile() throws Exception {
