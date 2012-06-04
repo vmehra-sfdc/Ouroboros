@@ -1,0 +1,84 @@
+digraph Controller {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_ControllerFSM {
+
+        label="ControllerFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "ControllerFSM::Suspended"
+            [label="{Suspended}"];
+
+        "ControllerFSM::Handshake"
+            [label="{Handshake}"];
+
+        "ControllerFSM::Waiting"
+            [label="{Waiting}"];
+
+        "ControllerFSM::WriteBatch"
+            [label="{WriteBatch}"];
+
+        "ControllerFSM::Closed"
+            [label="{Closed}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "ControllerFSM::Suspended" -> "ControllerFSM::Handshake"
+            [label="accept/\l"];
+
+        "ControllerFSM::Suspended" -> "ControllerFSM::Closed"
+            [label="close/\l"];
+
+        "ControllerFSM::Handshake" -> "ControllerFSM::Closed"
+            [label="readReady/\l"];
+
+        "ControllerFSM::Handshake" -> "ControllerFSM::Waiting"
+            [label="readReady/\l"];
+
+        "ControllerFSM::Handshake" -> "ControllerFSM::Waiting"
+            [label="established/\l"];
+
+        "ControllerFSM::Handshake" -> "ControllerFSM::Closed"
+            [label="close/\l"];
+
+        "ControllerFSM::Waiting" -> "ControllerFSM::WriteBatch"
+            [label="writeBatch/\l"];
+
+        "ControllerFSM::Waiting" -> "ControllerFSM::Closed"
+            [label="close/\l"];
+
+        "ControllerFSM::WriteBatch" -> "ControllerFSM::Closed"
+            [label="writeReady/\l"];
+
+        "ControllerFSM::WriteBatch" -> "ControllerFSM::WriteBatch"
+            [label="writeReady/\l"];
+
+        "ControllerFSM::WriteBatch" -> "ControllerFSM::Waiting"
+            [label="writeReady/\l"];
+
+        "ControllerFSM::WriteBatch" -> "ControllerFSM::WriteBatch"
+            [label="payloadWritten/\l"];
+
+        "ControllerFSM::WriteBatch" -> "ControllerFSM::Waiting"
+            [label="payloadWritten/\l"];
+
+        "ControllerFSM::WriteBatch" -> "ControllerFSM::Closed"
+            [label="close/\l"];
+
+        "ControllerFSM::Closed" -> "ControllerFSM::Closed"
+            [label="close/\l"];
+
+        "%start" -> "ControllerFSM::Suspended"
+    }
+
+}
