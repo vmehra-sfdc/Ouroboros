@@ -52,7 +52,7 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class Acknowledger {
-    static final Logger                        log            = LoggerFactory.getLogger(Acknowledger.class.getCanonicalName());
+    static final Logger                        log            = LoggerFactory.getLogger(Acknowledger.class);
     static final int                           MAX_BATCH_SIZE = 1000;
 
     private final ByteBuffer                   buffer         = ByteBuffer.allocateDirect(MAX_BATCH_SIZE
@@ -128,7 +128,11 @@ public class Acknowledger {
     }
 
     public void acknowledge(UUID channel, long sequenceNumber) {
-        pending.add(new BatchIdentity(channel, sequenceNumber));
+        try {
+            pending.put(new BatchIdentity(channel, sequenceNumber));
+        } catch (InterruptedException e) {
+            return;
+        }
     }
 
     protected boolean hasNext() {
