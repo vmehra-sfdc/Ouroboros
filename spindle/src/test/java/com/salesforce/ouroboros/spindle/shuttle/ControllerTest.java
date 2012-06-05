@@ -46,6 +46,7 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.shuttle.ControllerContext.ControllerFSM;
 import com.salesforce.ouroboros.testUtils.Util;
 
@@ -57,7 +58,8 @@ public class ControllerTest {
 
     @Test
     public void testPush() throws IOException, InterruptedException {
-
+        Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         final Node partner = new Node(1);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
@@ -99,7 +101,7 @@ public class ControllerTest {
 
         doAnswer(firstWrite).doAnswer(writeBatchBytes).doAnswer(writeBatchBytes).doAnswer(writeBatchBytes).when(socketChannel).write(isA(ByteBuffer.class));
 
-        Controller controller = new Controller(new Node(0));
+        Controller controller = new Controller(bundle);
         controller.accept(handler);
 
         assertEquals(ControllerFSM.Handshake, controller.getState());

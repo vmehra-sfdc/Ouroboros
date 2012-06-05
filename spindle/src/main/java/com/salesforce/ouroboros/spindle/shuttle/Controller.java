@@ -29,8 +29,10 @@ import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -42,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.shuttle.ControllerContext.ControllerState;
 import com.salesforce.ouroboros.util.Utils;
 
@@ -58,6 +61,7 @@ public class Controller implements CommunicationsHandler {
 
     private final ByteBuffer          buffer         = ByteBuffer.allocateDirect(MAX_BATCH_SIZE
                                                                                  * UUID_BYTE_SIZE);
+    private final Bundle              bundle;
     private final Thread              consumer;
     private final ArrayList<UUID>     drain          = new ArrayList<>(
                                                                        MAX_BATCH_SIZE);
@@ -68,17 +72,13 @@ public class Controller implements CommunicationsHandler {
     private final BlockingQueue<UUID> pending        = new LinkedBlockingQueue<>();
     private final Semaphore           quantum        = new Semaphore(0);
     private final AtomicBoolean       run            = new AtomicBoolean(true);
-    private final Node                self;
+    private final List<UUID>          subscriptions  = new CopyOnWriteArrayList<>();
 
-    public Controller(Node self) {
+    public Controller(Bundle b) {
+        bundle = b;
         consumer = new Thread(consumerAction());
         consumer.setName(String.format("Consumer thread for Acknowledger[?<%s]",
-                                       self));
-        this.self = self;
-    }
-
-    public void signal(UUID channel) {
-        pending.add(channel);
+                                       bundle.getId()));
     }
 
     /* (non-Javadoc)
@@ -119,6 +119,10 @@ public class Controller implements CommunicationsHandler {
     @Override
     public void readReady() {
         fsm.readReady();
+    }
+
+    public void signal(UUID channel) {
+        pending.add(channel);
     }
 
     /* (non-Javadoc)
@@ -165,7 +169,7 @@ public class Controller implements CommunicationsHandler {
     protected void establish() {
         buffer.flip();
         Node n = new Node(buffer);
-        fsm.setName(String.format("%s>%s", self, n));
+        fsm.setName(String.format("%s>%s", bundle.getId(), n));
         consumer.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
@@ -240,7 +244,7 @@ public class Controller implements CommunicationsHandler {
             if (!Utils.isClose(e)) {
                 if (log.isWarnEnabled()) {
                     log.warn(String.format("exception reading handshake on %s",
-                                           self), e);
+                                           bundle.getId()), e);
                 }
             }
             error();

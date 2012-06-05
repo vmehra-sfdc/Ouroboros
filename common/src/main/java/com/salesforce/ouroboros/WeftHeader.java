@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.shuttle;
+package com.salesforce.ouroboros;
 
 import java.nio.ByteBuffer;
 import java.util.UUID;
@@ -32,25 +32,28 @@ import java.util.UUID;
  * @author hhildebrand
  * 
  */
-public class SpanHeader {
-    private static final int MAGIC_INDEX          = 0;
-    private static final int CHANNEL_ID_LSB_INDEX = MAGIC_INDEX + 4;
-    private static final int CHANNEL_ID_MSB_INDEX = CHANNEL_ID_LSB_INDEX + 8;
-    private static final int EVENT_ID_INDEX       = CHANNEL_ID_MSB_INDEX + 8;
-    private static final int SPAN_LENGTH_INDEX    = EVENT_ID_INDEX + 8;
-    public static final int  HEADER_BYTE_SIZE     = SPAN_LENGTH_INDEX + 4;
-    public static final int  MAGIC                = 0x1638;
+public class WeftHeader {
+    private static int       CHANNEL_ID_MSB_INDEX = 0;
+    private static int       CHANNEL_ID_LSB_INDEX = CHANNEL_ID_MSB_INDEX + 8;
+    private static int       EVENT_ID_INDEX       = CHANNEL_ID_LSB_INDEX + 8;
+    private static int       PACKET_SIZE_INDEX    = EVENT_ID_INDEX + 8;
+    private static int       POSITION_INDEX       = PACKET_SIZE_INDEX + 4;
+    private static int       ENDPOINT_INDEX       = POSITION_INDEX + 4;
+    public static int        HEADER_BYTE_SIZE     = ENDPOINT_INDEX + 4;
 
     private final ByteBuffer bytes;
 
-    public SpanHeader() {
+    public WeftHeader() {
         this(ByteBuffer.allocateDirect(HEADER_BYTE_SIZE));
     }
 
-    public SpanHeader(ByteBuffer bytes) {
+    public WeftHeader(ByteBuffer bytes) {
         this.bytes = bytes;
     }
 
+    /**
+     * @return the bytes
+     */
     public ByteBuffer getBytes() {
         return bytes;
     }
@@ -60,28 +63,29 @@ public class SpanHeader {
                         bytes.getLong(CHANNEL_ID_LSB_INDEX));
     }
 
+    public int getPacketSize() {
+        return bytes.getInt(PACKET_SIZE_INDEX);
+    }
+
+    public int getPosition() {
+        return bytes.getInt(POSITION_INDEX);
+    }
+
+    public int getEndpoint() {
+        return bytes.getInt(ENDPOINT_INDEX);
+    }
+
     public long getEventId() {
         return bytes.getLong(EVENT_ID_INDEX);
     }
 
-    public int getMagic() {
-        return bytes.getInt(MAGIC_INDEX);
-    }
-
-    public int getSpanLength() {
-        return bytes.getInt(SPAN_LENGTH_INDEX);
-    }
-
-    public void set(int magic, UUID channel, long eventId, int spanLength) {
-        bytes.clear();
-        bytes.putInt(MAGIC_INDEX, MAGIC);
-        bytes.putLong(CHANNEL_ID_LSB_INDEX, channel.getLeastSignificantBits());
+    public void set(UUID channel, long eventId, int packetSize, int position,
+                    int endpoint) {
         bytes.putLong(CHANNEL_ID_MSB_INDEX, channel.getMostSignificantBits());
+        bytes.putLong(CHANNEL_ID_LSB_INDEX, channel.getLeastSignificantBits());
         bytes.putLong(EVENT_ID_INDEX, eventId);
-        bytes.putInt(SPAN_LENGTH_INDEX, spanLength);
-    }
-
-    public void clear() {
-        bytes.clear();
+        bytes.putInt(PACKET_SIZE_INDEX, packetSize);
+        bytes.putInt(POSITION_INDEX, position);
+        bytes.putInt(ENDPOINT_INDEX, endpoint);
     }
 }

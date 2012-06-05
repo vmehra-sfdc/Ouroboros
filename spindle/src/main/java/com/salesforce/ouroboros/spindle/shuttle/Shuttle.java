@@ -27,9 +27,6 @@ package com.salesforce.ouroboros.spindle.shuttle;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +34,10 @@ import org.slf4j.LoggerFactory;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.WeftHeader;
+import com.salesforce.ouroboros.spindle.Bundle;
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.shuttle.ShuttleContext.ShuttleState;
 import com.salesforce.ouroboros.util.Utils;
 
@@ -45,23 +46,23 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class Shuttle implements CommunicationsHandler {
-    private static final Logger              log           = LoggerFactory.getLogger(Shuttle.class);
+    private static final Logger  log       = LoggerFactory.getLogger(Shuttle.class);
 
-    private Node                             consumer;
-    private Flyer                            currentFlyer;
-    private boolean                          error         = false;
-    private final ShuttleContext             fsm           = new ShuttleContext(
-                                                                                this);
-    private SocketChannelHandler             handler;
-    private final ByteBuffer                 handshake     = ByteBuffer.allocate(Node.BYTE_LENGTH);
-    private final WeftHeader                 header        = new WeftHeader();
-    private int                              packetSize;
-    private final Node                       self;
-    private final ConcurrentMap<UUID, Flyer> subscriptions = new ConcurrentHashMap<>();
+    private Node                 consumer;
+    private boolean              error     = false;
+    private final ShuttleContext fsm       = new ShuttleContext(this);
+    private SocketChannelHandler handler;
+    private final ByteBuffer     handshake = ByteBuffer.allocate(Node.BYTE_LENGTH);
+    private final WeftHeader     header    = new WeftHeader();
+    private int                  packetSize;
+    private int                  position;
+    private int                  endpoint;
+    private Segment              segment;
+    private final Bundle         bundle;
 
-    public Shuttle(Node self) {
-        this.self = self;
-        fsm.setName(String.format("%s<?", self));
+    public Shuttle(Bundle bundle) {
+        this.bundle = bundle;
+        fsm.setName(String.format("%s<?", bundle.getId()));
     }
 
     /* (non-Javadoc)
@@ -73,18 +74,14 @@ public class Shuttle implements CommunicationsHandler {
         fsm.accept();
     }
 
-    public void addSubscription(UUID client, Flyer flyer) {
-        subscriptions.put(client, flyer);
-    }
-
     /* (non-Javadoc)
      * @see com.hellblazer.pinkie.CommunicationsHandler#closing()
      */
     @Override
     public void closing() {
         if (log.isInfoEnabled()) {
-            log.info(String.format("Closing shuttle from %s to %s", self,
-                                   consumer));
+            log.info(String.format("Closing shuttle from %s to %s",
+                                   bundle.getId(), consumer));
         }
         fsm.close();
     }
@@ -109,10 +106,6 @@ public class Shuttle implements CommunicationsHandler {
         fsm.readReady();
     }
 
-    public void removeSubscription(UUID client) {
-        subscriptions.remove(client);
-    }
-
     /* (non-Javadoc)
      * @see com.hellblazer.pinkie.CommunicationsHandler#writeReady()
      */
@@ -127,13 +120,26 @@ public class Shuttle implements CommunicationsHandler {
      * @return true if the flyer was successfully acquired, false otherwise
      */
     private boolean setCurrentFlyer() {
-        currentFlyer = subscriptions.get(header.getClientId());
-        if (currentFlyer == null) {
-            log.info(String.format("Span requested for client %s from consumer %s is not subscribed on %s",
-                                   header.getClientId(), consumer, self));
+        EventChannel channel = bundle.eventChannelFor(header.getChannel());
+        if (channel == null) {
+            log.warn(String.format("Span requested for channel %s from consumer %s does not exist on %s",
+                                   header.getChannel(), consumer,
+                                   bundle.getId()));
             return false;
         }
         packetSize = header.getPacketSize();
+        position = header.getPosition();
+        endpoint = header.getEndpoint();
+
+        try {
+            segment = channel.segmentFor(header.getEventId()).segment;
+        } catch (IOException e) {
+            log.warn(String.format("Segment requested for event %s on channel %s from consumer %s does not exist on %s",
+                                   header.getEventId(), header.getChannel(),
+                                   consumer, bundle.getId()), e);
+            return false;
+        }
+
         return true;
     }
 
@@ -217,7 +223,7 @@ public class Shuttle implements CommunicationsHandler {
             if (!Utils.isClose(e)) {
                 if (log.isWarnEnabled()) {
                     log.warn(String.format("exception reading handshake on %s",
-                                           self), e);
+                                           bundle.getId()), e);
                 }
             }
             error = true;
@@ -228,7 +234,7 @@ public class Shuttle implements CommunicationsHandler {
         } else {
             handshake.flip();
             consumer = new Node(handshake);
-            fsm.setName(String.format("%s>%s", self, consumer));
+            fsm.setName(String.format("%s>%s", bundle.getId(), consumer));
             return true;
         }
     }
@@ -246,7 +252,7 @@ public class Shuttle implements CommunicationsHandler {
             if (!Utils.isClose(e)) {
                 if (log.isWarnEnabled()) {
                     log.warn(String.format("exception reading weft from %s on %s",
-                                           consumer, self), e);
+                                           consumer, bundle.getId()), e);
                 }
             }
             error = true;
@@ -267,35 +273,30 @@ public class Shuttle implements CommunicationsHandler {
      * @return true if the span packet was completely written, false otherwise
      */
     protected boolean writeSpan() {
-        PushResponse response;
+        int maxBytes = Math.min(packetSize, endpoint - position);
+        long written;
         try {
-            response = currentFlyer.push(handler.getChannel(), packetSize);
+            written = segment.transferTo(position, maxBytes,
+                                         handler.getChannel());
         } catch (IOException e) {
             if (!Utils.isClose(e)) {
                 if (log.isWarnEnabled()) {
                     log.warn(String.format("exception pushing span %s from %s to %s",
-                                           currentFlyer.getCurrentSpan(), self,
-                                           consumer), e);
+                                           header, bundle.getId(), consumer), e);
                 }
             }
             error = true;
             return false;
         }
-        switch (response.writeStatus) {
-            case CONTINUE:
-                packetSize -= response.bytesWritten;
-                return false;
-            case SPAN_COMPLETE:
-            case PACKET_COMPLETE:
-            case NO_SPAN:
-                return true;
-            case SOCKET_CLOSED:
-                error = true;
-                return false;
-            default:
-                throw new IllegalStateException(
-                                                String.format("Unknown write status: %s",
-                                                              response.writeStatus));
+        if (written < 0) {
+            inError();
+            return false;
         }
+        position += written;
+        if (position == endpoint) {
+            return true;
+        }
+        packetSize -= written;
+        return false;
     }
 }

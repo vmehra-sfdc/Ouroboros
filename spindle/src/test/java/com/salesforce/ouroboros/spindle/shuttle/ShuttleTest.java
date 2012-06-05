@@ -43,7 +43,11 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.shuttle.PushResponse.Status;
+import com.salesforce.ouroboros.WeftHeader;
+import com.salesforce.ouroboros.spindle.Bundle;
+import com.salesforce.ouroboros.spindle.EventChannel;
+import com.salesforce.ouroboros.spindle.EventSegment;
+import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.shuttle.ShuttleContext.ShuttleFSM;
 
 /**
@@ -57,7 +61,8 @@ public class ShuttleTest {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel channel = mock(SocketChannel.class);
         when(handler.getChannel()).thenReturn(channel);
-        Node self = new Node(0);
+        Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         final Node consumer = new Node(1);
         when(channel.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(new Answer<Integer>() {
                                                                                @Override
@@ -70,7 +75,7 @@ public class ShuttleTest {
                                                                                    return Node.BYTE_LENGTH;
                                                                                }
                                                                            });
-        Shuttle shuttle = new Shuttle(self);
+        Shuttle shuttle = new Shuttle(bundle);
         assertEquals("not in the suspended state", ShuttleFSM.Suspended,
                      shuttle.getState());
         shuttle.accept(handler);
@@ -84,16 +89,22 @@ public class ShuttleTest {
 
     @Test
     public void testReadWeft() throws Exception {
+        EventChannel eventChannel = mock(EventChannel.class);
+        Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel channel = mock(SocketChannel.class);
         when(handler.getChannel()).thenReturn(channel);
-        Flyer flyer = mock(Flyer.class);
-        Node self = new Node(0);
         final Node consumer = new Node(1);
-        final UUID clientId = UUID.randomUUID();
+        final UUID channelId = UUID.randomUUID();
+        Segment segment = mock(Segment.class);
+        final int position = 0x1638;
+        final long eventId = 0x666;
+        final int endpoint = position + 0x10;
         final int packetSize = 1024;
-        PushResponse response = new PushResponse(0, Status.CONTINUE);
-        when(flyer.push(channel, packetSize)).thenReturn(response);
+        when(bundle.eventChannelFor(channelId)).thenReturn(eventChannel);
+        when(eventChannel.segmentFor(eventId)).thenReturn(new EventSegment(0,
+                                                                           segment));
         Answer<Integer> readHandshake = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
@@ -109,24 +120,22 @@ public class ShuttleTest {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull("null buffer", buffer);
                 WeftHeader header = new WeftHeader();
-                header.setClientId(clientId);
-                header.setPacketSize(packetSize);
+                header.set(channelId, eventId, packetSize, position, endpoint);
                 header.getBytes().rewind();
                 buffer.put(header.getBytes());
-                return Node.BYTE_LENGTH;
+                return WeftHeader.HEADER_BYTE_SIZE;
             }
         };
         when(channel.read(isA(ByteBuffer.class))).thenAnswer(readHandshake).thenReturn(0).then(readWeft).thenReturn(0);
 
-        Shuttle shuttle = new Shuttle(self);
-        shuttle.addSubscription(clientId, flyer);
+        Shuttle shuttle = new Shuttle(bundle);
 
         shuttle.accept(handler);
         assertEquals("Did not complete handshake", ShuttleFSM.Established,
                      shuttle.getState());
 
         shuttle.readReady();
-        assertEquals("Did not attemp to read weft", ShuttleFSM.ReadWeft,
+        assertEquals("Did not attempt to read weft", ShuttleFSM.ReadWeft,
                      shuttle.getState());
 
         shuttle.readReady();
@@ -137,14 +146,22 @@ public class ShuttleTest {
 
     @Test
     public void testWriteSpan() throws Exception {
+        EventChannel eventChannel = mock(EventChannel.class);
+        Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel channel = mock(SocketChannel.class);
         when(handler.getChannel()).thenReturn(channel);
-        Flyer flyer = mock(Flyer.class);
-        Node self = new Node(0);
         final Node consumer = new Node(1);
-        final UUID clientId = UUID.randomUUID();
+        final UUID channelId = UUID.randomUUID();
+        Segment segment = mock(Segment.class);
+        final int position = 0x1638;
+        final long eventId = 0x666;
+        final int endpoint = position + 1024;
         final int packetSize = 1024;
+        when(bundle.eventChannelFor(channelId)).thenReturn(eventChannel);
+        when(eventChannel.segmentFor(eventId)).thenReturn(new EventSegment(0,
+                                                                           segment));
         Answer<Integer> readHandshake = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
@@ -160,32 +177,20 @@ public class ShuttleTest {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull("null buffer", buffer);
                 WeftHeader header = new WeftHeader();
-                header.setClientId(clientId);
-                header.setPacketSize(packetSize);
+                header.set(channelId, eventId, packetSize, position, endpoint);
                 header.getBytes().rewind();
                 buffer.put(header.getBytes());
-                return Node.BYTE_LENGTH;
+                return WeftHeader.HEADER_BYTE_SIZE;
             }
         };
         when(channel.read(isA(ByteBuffer.class))).thenAnswer(readHandshake).thenReturn(0).then(readWeft).thenReturn(0);
 
-        when(flyer.push(channel, packetSize)).thenReturn(new PushResponse(
-                                                                          0,
-                                                                          Status.CONTINUE)).thenReturn(new PushResponse(
-                                                                                                                        256,
-                                                                                                                        Status.CONTINUE));
-        when(flyer.push(channel, 768)).thenReturn(new PushResponse(
-                                                                   256,
-                                                                   Status.CONTINUE));
-        when(flyer.push(channel, 512)).thenReturn(new PushResponse(
-                                                                   256,
-                                                                   Status.CONTINUE));
-        when(flyer.push(channel, 256)).thenReturn(new PushResponse(
-                                                                   256,
-                                                                   Status.SPAN_COMPLETE));
+        when(segment.transferTo(position, 1024, channel)).thenReturn(0L).thenReturn(256L);
+        when(segment.transferTo(position + 256, 768, channel)).thenReturn(256L);
+        when(segment.transferTo(position + 512, 512, channel)).thenReturn(256L);
+        when(segment.transferTo(position + 768, 256, channel)).thenReturn(256L);
 
-        Shuttle shuttle = new Shuttle(self);
-        shuttle.addSubscription(clientId, flyer);
+        Shuttle shuttle = new Shuttle(bundle);
 
         shuttle.accept(handler);
 
@@ -206,22 +211,30 @@ public class ShuttleTest {
         assertEquals("Did not write span", ShuttleFSM.Established,
                      shuttle.getState());
 
-        verify(flyer, new Times(2)).push(channel, packetSize);
-        verify(flyer).push(channel, 768);
-        verify(flyer).push(channel, 512);
-        verify(flyer).push(channel, 256);
+        verify(segment, new Times(2)).transferTo(position, 1024, channel);
+        verify(segment).transferTo(position + 256, 768, channel);
+        verify(segment).transferTo(position + 512, 512, channel);
+        verify(segment).transferTo(position + 768, 256, channel);
     }
 
     @Test
     public void testBatching() throws Exception {
+        EventChannel eventChannel = mock(EventChannel.class);
+        Bundle bundle = mock(Bundle.class);
+        when(bundle.getId()).thenReturn(new Node(0));
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel channel = mock(SocketChannel.class);
         when(handler.getChannel()).thenReturn(channel);
-        Flyer flyer = mock(Flyer.class);
-        Node self = new Node(0);
         final Node consumer = new Node(1);
-        final UUID clientId = UUID.randomUUID();
+        final UUID channelId = UUID.randomUUID();
+        Segment segment = mock(Segment.class);
+        final int position = 0x1638;
+        final long eventId = 0x666;
+        final int endpoint = position + 1024;
         final int packetSize = 1024;
+        when(bundle.eventChannelFor(channelId)).thenReturn(eventChannel);
+        when(eventChannel.segmentFor(eventId)).thenReturn(new EventSegment(0,
+                                                                           segment));
         Answer<Integer> readHandshake = new Answer<Integer>() {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
@@ -237,23 +250,17 @@ public class ShuttleTest {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull("null buffer", buffer);
                 WeftHeader header = new WeftHeader();
-                header.setClientId(clientId);
-                header.setPacketSize(packetSize);
+                header.set(channelId, eventId, packetSize, position, endpoint);
                 header.getBytes().rewind();
                 buffer.put(header.getBytes());
-                return Node.BYTE_LENGTH;
+                return WeftHeader.HEADER_BYTE_SIZE;
             }
         };
         when(channel.read(isA(ByteBuffer.class))).thenAnswer(readHandshake).thenReturn(0).then(readWeft).then(readWeft).thenReturn(0);
 
-        PushResponse writeComplete = new PushResponse(1024,
-                                                      Status.SPAN_COMPLETE);
-        when(flyer.push(channel, packetSize)).thenReturn(new PushResponse(
-                                                                          0,
-                                                                          Status.CONTINUE)).thenReturn(writeComplete).thenReturn(writeComplete);
+        when(segment.transferTo(position, 1024, channel)).thenReturn(0L).thenReturn(1024L).thenReturn(1024L);
 
-        Shuttle shuttle = new Shuttle(self);
-        shuttle.addSubscription(clientId, flyer);
+        Shuttle shuttle = new Shuttle(bundle);
 
         shuttle.accept(handler);
 
@@ -264,7 +271,7 @@ public class ShuttleTest {
         shuttle.writeReady();
         assertEquals("Did not write spans", ShuttleFSM.Established,
                      shuttle.getState());
-        verify(flyer, new Times(2)).push(channel, packetSize);
+        verify(segment, new Times(2)).transferTo(position, 1024, channel);
 
     }
 }

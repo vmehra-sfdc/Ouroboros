@@ -25,51 +25,10 @@
  */
 package com.salesforce.ouroboros.spindle.shuttle;
 
-import java.nio.ByteBuffer;
-import java.util.UUID;
-
 /**
  * @author hhildebrand
  * 
  */
-public class WeftHeader {
-    private static int       CLIENT_ID_MSB_INDEX = 0;
-    private static int       CLIENT_ID_LSB_INDEX = CLIENT_ID_MSB_INDEX + 8;
-    private static int       PACKET_SIZE_INDEX   = CLIENT_ID_LSB_INDEX + 8;
-    private static int       HEADER_BYTE_SIZE    = PACKET_SIZE_INDEX + 8;
-
-    private final ByteBuffer bytes;
-
-    public WeftHeader() {
-        this(ByteBuffer.allocateDirect(HEADER_BYTE_SIZE));
-    }
-
-    public WeftHeader(ByteBuffer bytes) {
-        this.bytes = bytes;
-    }
-
-    /**
-     * @return the bytes
-     */
-    public ByteBuffer getBytes() {
-        return bytes;
-    }
-
-    public UUID getClientId() {
-        return new UUID(bytes.getLong(CLIENT_ID_MSB_INDEX),
-                        bytes.getLong(CLIENT_ID_LSB_INDEX));
-    }
-
-    public int getPacketSize() {
-        return bytes.getInt(PACKET_SIZE_INDEX);
-    }
-
-    public void setClientId(UUID clientId) {
-        bytes.putLong(CLIENT_ID_MSB_INDEX, clientId.getMostSignificantBits());
-        bytes.putLong(CLIENT_ID_LSB_INDEX, clientId.getLeastSignificantBits());
-    }
-
-    public void setPacketSize(int packetSize) {
-        bytes.putInt(PACKET_SIZE_INDEX, packetSize);
-    }
+public enum ControllerMessage {
+    Subscribe, Unsubscribe, PushSpan;
 }

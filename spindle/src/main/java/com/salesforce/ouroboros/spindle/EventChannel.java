@@ -47,7 +47,7 @@ import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
-import com.salesforce.ouroboros.spindle.shuttle.Flyer;
+import com.salesforce.ouroboros.spindle.shuttle.Controller;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
@@ -183,7 +183,7 @@ public class EventChannel {
     private volatile Replicator                replicator;
     private Role                               role;
     private final Node                         self;
-    private final List<Flyer>                  subscribers = new CopyOnWriteArrayList<Flyer>();
+    private final List<Controller>             subscribers = new CopyOnWriteArrayList<Controller>();
 
     public EventChannel(Node self, Role role, Node partnerId,
                         final UUID channelId, final File root,
@@ -514,43 +514,11 @@ public class EventChannel {
     }
 
     /**
-     * @param flyer
-     *            - the flyer spinning the event thread
-     * @param lastEventOffset
-     *            - the last event offset seen by this flyer, -1 if the flyer
-     *            wants only current events
-     * @throws IOException
-     *             if something goes wrong when dispatching current events to
-     *             the flyer
+     * @param controller
+     *            - the controller managing subscribing clients
      */
-    public void subscribe(Flyer flyer, long lastEventOffset) throws IOException {
-        if (lastEventOffset != -1) {
-            dispatchEventsFrom(lastEventOffset, flyer);
-        }
-        subscribers.add(flyer);
-    }
-
-    /**
-     * Dispatch all events in the channel to the flyer, starting with the event
-     * after the lastEventId seen by the flyer up to the current event of the
-     * channel
-     * 
-     * @param lastOffset
-     *            - the offset of the last event seen by the flyer
-     * @param flyer
-     *            - the flyer spinning the thread of events on this channel
-     * @throws IOException
-     *             if something goes wrong when dispatching
-     */
-    private void dispatchEventsFrom(long lastOffset, Flyer flyer)
-                                                                 throws IOException {
-        EventSegment currentSegment = segmentFor(lastOffset);
-        currentSegment = currentSegment.segmentAfter();
-        while (!currentSegment.contains(nextOffset)) {
-            flyer.deliver(currentSegment.span());
-            currentSegment = currentSegment.followingSegment();
-        }
-        flyer.deliver(currentSegment.span());
+    public void subscribe(Controller controller) {
+        subscribers.add(controller);
     }
 
     private AppendSegment getAppendSegment(long offset, int position,
