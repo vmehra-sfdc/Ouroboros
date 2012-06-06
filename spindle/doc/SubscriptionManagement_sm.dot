@@ -1,0 +1,57 @@
+digraph SubscriptionManagement {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_SubscriptionManagementFSM {
+
+        label="SubscriptionManagementFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "SubscriptionManagementFSM::Suspended"
+            [label="{Suspended}"];
+
+        "SubscriptionManagementFSM::ReadMessage"
+            [label="{ReadMessage}"];
+
+        "SubscriptionManagementFSM::Closed"
+            [label="{Closed}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "SubscriptionManagementFSM::Suspended" -> "SubscriptionManagementFSM::ReadMessage"
+            [label="connect/\l"];
+
+        "SubscriptionManagementFSM::Suspended" -> "SubscriptionManagementFSM::Closed"
+            [label="failover/\l"];
+
+        "SubscriptionManagementFSM::Suspended" -> "SubscriptionManagementFSM::Closed"
+            [label="close/\l"];
+
+        "SubscriptionManagementFSM::ReadMessage" -> "SubscriptionManagementFSM::Closed"
+            [label="readReady/\l"];
+
+        "SubscriptionManagementFSM::ReadMessage" -> "SubscriptionManagementFSM::Closed"
+            [label="failover/\l"];
+
+        "SubscriptionManagementFSM::ReadMessage" -> "SubscriptionManagementFSM::Closed"
+            [label="close/\l"];
+
+        "SubscriptionManagementFSM::Closed" -> "SubscriptionManagementFSM::Closed"
+            [label="failover/\l"];
+
+        "SubscriptionManagementFSM::Closed" -> "SubscriptionManagementFSM::Closed"
+            [label="close/\l"];
+
+        "%start" -> "SubscriptionManagementFSM::Suspended"
+    }
+
+}

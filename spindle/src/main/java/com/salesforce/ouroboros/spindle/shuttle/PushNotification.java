@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.EventSpan;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.SubscriptionEvent;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.shuttle.PushNotificationContext.PushNotificationState;
@@ -195,10 +196,6 @@ public class PushNotification {
         quantum.release();
     }
 
-    protected void selectForRead() {
-        handler.selectForRead();
-    }
-
     protected void selectForWrite() {
         handler.selectForWrite();
     }
@@ -232,5 +229,25 @@ public class PushNotification {
             return false;
         }
         return !buffer.hasRemaining();
+    }
+
+    /**
+     * Handle the subscription event
+     * 
+     * @param event
+     */
+    public void handle(SubscriptionEvent event) {
+        EventChannel channel = bundle.eventChannelFor(event.channel);
+        if (channel == null) {
+            if (log.isInfoEnabled()) {
+                log.info("No channel for %s on %s", event, bundle.getId());
+            }
+            return;
+        }
+        if (event.subscribe) {
+            channel.subscribe(this);
+        } else {
+            channel.unsubscribe(this);
+        }
     }
 }

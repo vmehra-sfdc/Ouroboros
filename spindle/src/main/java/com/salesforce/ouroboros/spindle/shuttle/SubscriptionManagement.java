@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011, salesforce.com, inc.
+ * Copyright (c) 2012, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer.spinner;
+package com.salesforce.ouroboros.spindle.shuttle;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -32,49 +32,44 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.BatchIdentity;
-import com.salesforce.ouroboros.producer.spinner.BatchAcknowledgementContext.BatchAcknowledgementState;
+import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.SubscriptionEvent;
+import com.salesforce.ouroboros.spindle.shuttle.SubscriptionManagementContext.SubscriptionManagementState;
 import com.salesforce.ouroboros.util.Utils;
 
 /**
- * The state machine implementing the batch event acknowledgement protocol
- * 
  * @author hhildebrand
  * 
  */
-public class BatchAcknowledgement {
-    private final static int                  MAX_ACK_BATCH = 1000;
-    private final static Logger               log           = LoggerFactory.getLogger(BatchAcknowledgement.class.getCanonicalName());
+public class SubscriptionManagement {
+    private static final Logger                 log            = LoggerFactory.getLogger(SubscriptionManagement.class);
+    private static final int                    MAX_BATCH_SIZE = 1000;
 
-    private final ByteBuffer                  ackBuffer     = ByteBuffer.allocate(BatchIdentity.BYTE_SIZE
-                                                                                  * MAX_ACK_BATCH);
-    private final BatchAcknowledgementContext fsm           = new BatchAcknowledgementContext(
-                                                                                              this);
-    private SocketChannelHandler              handler;
-    private boolean                           inError       = false;
-    private final Spinner                     spinner;
+    private boolean                             error;
+    private final ByteBuffer                    eventBuffer    = ByteBuffer.allocate(SubscriptionEvent.BYTE_SIZE
+                                                                                     * MAX_BATCH_SIZE);
+    private final SubscriptionManagementContext fsm            = new SubscriptionManagementContext(
+                                                                                                   this);
+    private SocketChannelHandler                handler;
+    private final PushNotification              notification;
+    private final Node                          self;
 
-    public BatchAcknowledgement(Spinner spinner, String fsmName) {
-        this.spinner = spinner;
-        fsm.setName(fsmName);
+    public SubscriptionManagement(Node node, PushNotification notification) {
+        self = node;
+        this.notification = notification;
+        fsm.setName(String.format("%s<?", self));
     }
 
-    public void closing() {
-        if (!fsm.isInTransition()) {
-            fsm.close();
-        }
-    }
-
-    public void connect(SocketChannelHandler handler) {
+    public void connect(SocketChannelHandler handler, Node partner) {
         this.handler = handler;
+        fsm.setName(String.format("%s<%s", self, partner));
         fsm.connect();
     }
 
-    public void failover() {
-        fsm.close();
-    }
-
-    public BatchAcknowledgementState getState() {
+    /**
+     * @return
+     */
+    public SubscriptionManagementState getState() {
         return fsm.getState();
     }
 
@@ -85,21 +80,21 @@ public class BatchAcknowledgement {
     private boolean fillBuffer() {
         int read;
         try {
-            read = handler.getChannel().read(ackBuffer);
+            read = handler.getChannel().read(eventBuffer);
             if (read < 0) {
                 if (log.isInfoEnabled()) {
                     log.info("closing channel");
                 }
-                inError = true;
+                error = true;
                 return false;
-            } else if (ackBuffer.hasRemaining()) {
+            } else if (eventBuffer.hasRemaining()) {
                 // extra read attempt
-                int plusRead = handler.getChannel().read(ackBuffer);
+                int plusRead = handler.getChannel().read(eventBuffer);
                 if (plusRead < 0) {
                     if (log.isInfoEnabled()) {
                         log.info("closing channel");
                     }
-                    inError = true;
+                    error = true;
                     return false;
                 }
                 read += plusRead;
@@ -107,33 +102,32 @@ public class BatchAcknowledgement {
         } catch (IOException e) {
             if (!Utils.isClose(e)) {
                 if (log.isInfoEnabled()) {
-                    log.info("Closing batch acknowlegement");
+                    log.info(String.format("Closing subscription management %s",
+                                           fsm.getName()));
                 }
             }
-            inError = true;
+            error = true;
             return false;
         }
         return read != 0;
     }
 
     protected void close() {
-        if (handler != null) {
-            handler.close();
-        }
+        handler.close();
     }
 
     protected boolean inError() {
-        return inError;
+        return error;
     }
 
-    protected boolean readAcknowledgements() {
+    protected boolean readMessage() {
         while (fillBuffer()) {
-            ackBuffer.flip();
-            while (ackBuffer.remaining() >= BatchIdentity.BYTE_SIZE) {
-                BatchIdentity ack = new BatchIdentity(ackBuffer);
-                spinner.acknowledge(ack);
+            eventBuffer.flip();
+            while (eventBuffer.remaining() >= SubscriptionEvent.BYTE_SIZE) {
+                SubscriptionEvent event = new SubscriptionEvent(eventBuffer);
+                notification.handle(event);
             }
-            ackBuffer.compact();
+            eventBuffer.compact();
         }
         return false;
     }
@@ -141,4 +135,5 @@ public class BatchAcknowledgement {
     protected void selectForRead() {
         handler.selectForRead();
     }
+
 }

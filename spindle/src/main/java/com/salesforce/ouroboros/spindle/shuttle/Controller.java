@@ -44,19 +44,23 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class Controller implements CommunicationsHandler {
-    private static final Logger     log         = LoggerFactory.getLogger(Controller.class);
+    private static final Logger          log         = LoggerFactory.getLogger(Controller.class);
 
-    private final PushNotification  pushNotification;
-    private SocketChannelHandler    handler;
-    private final AtomicBoolean     established = new AtomicBoolean();
-    private ByteBuffer              handshake   = ByteBuffer.allocateDirect(Node.BYTE_LENGTH);
-    private final ControllerContext fsm         = new ControllerContext(this);
-    private boolean                 error;
-    private final Bundle            bundle;
+    private final Bundle                 bundle;
+    private boolean                      error;
+    private final AtomicBoolean          established = new AtomicBoolean();
+    private final ControllerContext      fsm         = new ControllerContext(
+                                                                             this);
+    private SocketChannelHandler         handler;
+    private ByteBuffer                   handshake   = ByteBuffer.allocateDirect(Node.BYTE_LENGTH);
+    private final PushNotification       pushNotification;
+    private final SubscriptionManagement subsciptionManagement;
 
     public Controller(Bundle b) {
         bundle = b;
         pushNotification = new PushNotification(bundle);
+        subsciptionManagement = new SubscriptionManagement(bundle.getId(),
+                                                           pushNotification);
     }
 
     /* (non-Javadoc)
@@ -66,6 +70,10 @@ public class Controller implements CommunicationsHandler {
     public void accept(SocketChannelHandler handler) {
         this.handler = handler;
         fsm.accept();
+    }
+
+    public void close() {
+        handler.close();
     }
 
     /* (non-Javadoc)
@@ -90,7 +98,7 @@ public class Controller implements CommunicationsHandler {
     @Override
     public void readReady() {
         if (established.get()) {
-
+            subsciptionManagement.readReady();
         } else {
             fsm.readReady();
         }
@@ -112,6 +120,8 @@ public class Controller implements CommunicationsHandler {
         handshake.flip();
         Node n = new Node(handshake);
         fsm.setName(String.format("%s>%s", bundle.getId(), n));
+        established.set(true);
+        pushNotification.accept(handler, n);
     }
 
     protected void handshake() {
@@ -158,9 +168,5 @@ public class Controller implements CommunicationsHandler {
 
     protected void selectForRead() {
         handler.selectForRead();
-    }
-
-    public void close() {
-        handler.close();
     }
 }
