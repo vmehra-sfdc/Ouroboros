@@ -32,10 +32,10 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedList;
-import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +47,7 @@ import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
-import com.salesforce.ouroboros.spindle.shuttle.Controller;
+import com.salesforce.ouroboros.spindle.shuttle.PushNotification;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
@@ -183,7 +183,7 @@ public class EventChannel {
     private volatile Replicator                replicator;
     private Role                               role;
     private final Node                         self;
-    private final List<Controller>             subscribers = new CopyOnWriteArrayList<Controller>();
+    private final Set<PushNotification>              subscribers = new CopyOnWriteArraySet<PushNotification>();
 
     public EventChannel(Node self, Role role, Node partnerId,
                         final UUID channelId, final File root,
@@ -517,8 +517,15 @@ public class EventChannel {
      * @param controller
      *            - the controller managing subscribing clients
      */
-    public void subscribe(Controller controller) {
+    public void subscribe(PushNotification controller) {
         subscribers.add(controller);
+    }
+
+    /**
+     * @param controller
+     */
+    public void unsubscribe(PushNotification controller) {
+        subscribers.remove(controller);
     }
 
     private AppendSegment getAppendSegment(long offset, int position,

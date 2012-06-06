@@ -45,16 +45,17 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.EventSpan;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
-import com.salesforce.ouroboros.spindle.shuttle.ControllerContext.ControllerFSM;
+import com.salesforce.ouroboros.spindle.shuttle.PushNotificationContext.PushNotificationFSM;
 import com.salesforce.ouroboros.testUtils.Util;
 
 /**
  * @author hhildebrand
  * 
  */
-public class ControllerTest {
+public class PushNotificationTest {
 
     @Test
     public void testPush() throws IOException, InterruptedException {
@@ -63,21 +64,12 @@ public class ControllerTest {
         final Node partner = new Node(1);
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
-        final ArrayList<UUID> channels = new ArrayList<>();
+        final ArrayList<EventSpan> spans = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            channels.add(new UUID(0, i));
+            spans.add(new EventSpan(i, UUID.randomUUID(), i, i));
         }
 
         when(handler.getChannel()).thenReturn(socketChannel);
-
-        Answer<Integer> handshake = new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                partner.serialize(buffer);
-                return Node.BYTE_LENGTH;
-            }
-        };
 
         final AtomicInteger written = new AtomicInteger(0);
         Answer<Integer> firstWrite = new Answer<Integer>() {
@@ -91,27 +83,22 @@ public class ControllerTest {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                UUID pushed = new UUID(buffer.getLong(), buffer.getLong());
-                assertEquals(channels.get(written.get() - 1), pushed);
+                EventSpan pushed = new EventSpan(buffer);
+                assertEquals(spans.get(written.get() - 1), pushed);
                 written.incrementAndGet();
-                return 16;
+                return EventSpan.BYTE_SIZE;
             }
         };
-        when(socketChannel.read(isA(ByteBuffer.class))).thenReturn(0).thenAnswer(handshake);
 
         doAnswer(firstWrite).doAnswer(writeBatchBytes).doAnswer(writeBatchBytes).doAnswer(writeBatchBytes).when(socketChannel).write(isA(ByteBuffer.class));
 
-        Controller controller = new Controller(bundle);
-        controller.accept(handler);
+        PushNotification controller = new PushNotification(bundle);
+        controller.accept(handler, partner);
 
-        assertEquals(ControllerFSM.Handshake, controller.getState());
+        assertEquals(PushNotificationFSM.Waiting, controller.getState());
 
-        controller.readReady();
-
-        assertEquals(ControllerFSM.Waiting, controller.getState());
-
-        for (UUID channel : channels) {
-            controller.signal(channel);
+        for (EventSpan span : spans) {
+            controller.push(span);
         }
         Util.waitFor("First write never occurred", new Util.Condition() {
             @Override

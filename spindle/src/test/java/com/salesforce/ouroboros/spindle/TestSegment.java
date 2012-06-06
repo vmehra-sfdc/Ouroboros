@@ -26,17 +26,18 @@
 package com.salesforce.ouroboros.spindle;
 
 import static junit.framework.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.*;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.Random;
+import java.util.UUID;
 
 import org.junit.Test;
 
 import com.salesforce.ouroboros.Event;
+import com.salesforce.ouroboros.EventSpan;
 import com.salesforce.ouroboros.spindle.Segment.Mode;
-import com.salesforce.ouroboros.spindle.shuttle.EventSpan;
 
 /**
  * 
@@ -127,21 +128,23 @@ public class TestSegment {
 
         fos.close();
 
-        Segment segment = new Segment(mock(EventChannel.class), file, Mode.READ);
+        EventChannel channel = mock(EventChannel.class);
+        UUID channelId = UUID.randomUUID();
+        when(channel.getId()).thenReturn(channelId);
+        Segment segment = new Segment(channel, file, Mode.READ);
 
         EventSpan span = segment.spanFrom(0);
 
         assertEquals(prefix, span.eventId);
         assertEquals(0, span.offset);
-        assertEquals(segment, span.segment);
+        assertEquals(channelId, span.channel);
         assertEquals(span.endpoint, file.length());
 
         span = segment.spanFrom(totalBytes1);
         assertEquals(prefix + totalBytes1, span.eventId);
         assertEquals(totalBytes1, span.offset);
-        assertEquals(segment, span.segment);
+        assertEquals(channelId, span.channel);
         assertEquals(span.endpoint, file.length());
-
 
         segment.close();
     }

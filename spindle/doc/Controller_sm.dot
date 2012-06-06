@@ -17,11 +17,8 @@ digraph Controller {
         "ControllerFSM::Handshake"
             [label="{Handshake}"];
 
-        "ControllerFSM::Waiting"
-            [label="{Waiting}"];
-
-        "ControllerFSM::WriteBatch"
-            [label="{WriteBatch}"];
+        "ControllerFSM::Established"
+            [label="{Established}"];
 
         "ControllerFSM::Closed"
             [label="{Closed}"];
@@ -42,37 +39,16 @@ digraph Controller {
         "ControllerFSM::Handshake" -> "ControllerFSM::Closed"
             [label="readReady/\l"];
 
-        "ControllerFSM::Handshake" -> "ControllerFSM::Waiting"
+        "ControllerFSM::Handshake" -> "ControllerFSM::Established"
             [label="readReady/\l"];
 
-        "ControllerFSM::Handshake" -> "ControllerFSM::Waiting"
+        "ControllerFSM::Handshake" -> "ControllerFSM::Established"
             [label="established/\l"];
 
         "ControllerFSM::Handshake" -> "ControllerFSM::Closed"
             [label="close/\l"];
 
-        "ControllerFSM::Waiting" -> "ControllerFSM::WriteBatch"
-            [label="writeBatch/\l"];
-
-        "ControllerFSM::Waiting" -> "ControllerFSM::Closed"
-            [label="close/\l"];
-
-        "ControllerFSM::WriteBatch" -> "ControllerFSM::Closed"
-            [label="writeReady/\l"];
-
-        "ControllerFSM::WriteBatch" -> "ControllerFSM::WriteBatch"
-            [label="writeReady/\l"];
-
-        "ControllerFSM::WriteBatch" -> "ControllerFSM::Waiting"
-            [label="writeReady/\l"];
-
-        "ControllerFSM::WriteBatch" -> "ControllerFSM::WriteBatch"
-            [label="payloadWritten/\l"];
-
-        "ControllerFSM::WriteBatch" -> "ControllerFSM::Waiting"
-            [label="payloadWritten/\l"];
-
-        "ControllerFSM::WriteBatch" -> "ControllerFSM::Closed"
+        "ControllerFSM::Established" -> "ControllerFSM::Closed"
             [label="close/\l"];
 
         "ControllerFSM::Closed" -> "ControllerFSM::Closed"

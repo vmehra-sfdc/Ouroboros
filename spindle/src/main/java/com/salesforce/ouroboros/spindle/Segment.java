@@ -46,7 +46,7 @@ import java.nio.channels.ScatteringByteChannel;
 import java.nio.channels.WritableByteChannel;
 
 import com.salesforce.ouroboros.EventHeader;
-import com.salesforce.ouroboros.spindle.shuttle.EventSpan;
+import com.salesforce.ouroboros.EventSpan;
 
 /**
  * Segments are the ultimate repository of events, corresponding to files within
@@ -334,7 +334,7 @@ public class Segment implements Channel, InterruptibleChannel, ByteChannel,
      *         inclusive
      */
     public EventSpan spanFrom(long offset) {
-        return new EventSpan(getPrefix() + offset, this, offset,
+        return new EventSpan(getPrefix() + offset, channel.getId(), offset,
                              (int) (file.length() - offset));
     }
 

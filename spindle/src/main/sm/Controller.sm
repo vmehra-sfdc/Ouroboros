@@ -61,61 +61,25 @@ Entry{
         Closed{}
         
     readReady
-        Waiting{}
+        Established{}
         
     established
-        Waiting{}
+        Established{}
 }
 
-Waiting 
+Established
 Entry {
-	nextQuantum();
+	established();
 }
-{
-	writeBatch
-		WriteBatch{}
-}
-
-WriteBatch
-Entry {
-	nextBatch();
-}
-{
-	writeReady
-		[!ctxt.writeBatch() && !ctxt.inError()]
-		nil{
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{}
-		
-	writeReady
-		[ctxt.hasNext()]
-		WriteBatch{}
-		
-	writeReady
-		Waiting{}
-		
-	payloadWritten
-		[ctxt.hasNext()]
-		WriteBatch{}
-		
-	payloadWritten
-		Waiting{}
-}
+{}
 
 Closed
 Entry {
 	close();
 }
-{
-}
+{}
 
-Default {
-	writeReady
-		nil{}
+Default { 
 	close
 		Closed{}
 }

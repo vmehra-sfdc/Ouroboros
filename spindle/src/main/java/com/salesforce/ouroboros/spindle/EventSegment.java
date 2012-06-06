@@ -27,7 +27,7 @@ package com.salesforce.ouroboros.spindle;
 
 import java.io.IOException;
 
-import com.salesforce.ouroboros.spindle.shuttle.EventSpan;
+import com.salesforce.ouroboros.EventSpan;
 
 /**
  * The tuple representing an event at a given concrete offset within a segment

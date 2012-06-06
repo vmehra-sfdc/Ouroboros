@@ -1,5 +1,6 @@
+%{
 /**
- * Copyright (c) 2012, salesforce.com, inc.
+ * Copyright (c) 2011, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -23,12 +24,77 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.shuttle;
 
 /**
  * @author hhildebrand
- * 
  */
-public enum ControllerMessage {
-    Subscribe, Unsubscribe, PushSpan;
+%}
+
+// The FSM of the PushNotification protocol
+
+%class PushNotification
+%package com.salesforce.ouroboros.spindle.shuttle
+%access public
+
+%start PushNotificationFSM::Suspended
+%map PushNotificationFSM
+%%
+
+Suspended {
+	accept
+		Waiting {}
 }
+
+Waiting 
+Entry {
+	nextQuantum();
+}
+{
+	writeBatch
+		WriteBatch{}
+}
+
+WriteBatch
+Entry {
+	nextBatch();
+}
+{
+	writeReady
+		[!ctxt.writeBatch() && !ctxt.inError()]
+		nil{
+			selectForWrite();
+		}
+		
+	writeReady
+		[ctxt.inError()]
+		Closed{}
+		
+	writeReady
+		[ctxt.hasNext()]
+		WriteBatch{}
+		
+	writeReady
+		Waiting{}
+		
+	payloadWritten
+		[ctxt.hasNext()]
+		WriteBatch{}
+		
+	payloadWritten
+		Waiting{}
+}
+
+Closed
+Entry {
+	close();
+}
+{
+}
+
+Default {
+	writeReady
+		nil{}
+	close
+		Closed{}
+}
+%%

@@ -1,12 +1,12 @@
 <html>
   <head>
-    <title>Controller</title>
+    <title>PushNotification</title>
   </head>
 
   <body>
     <table align=center border=3 cellspacing=2 cellpadding=2>
       <caption align="top">
-        ControllerFSM Finite State Machine
+        PushNotificationFSM Finite State Machine
       </caption>
       <tr>
         <th rowspan=2>
@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=5>
+        <th colspan=6>
           Transition
         </th>
       </tr>
@@ -33,10 +33,13 @@
           close
         </th>
         <th>
-          established
+          payloadWritten
         </th>
         <th>
-          readReady
+          writeBatch
+        </th>
+        <th>
+          writeReady
         </th>
         <th>
           <b>Default</b>
@@ -52,9 +55,11 @@
         </td>
         <td>
           <pre>
-  Handshake
+  Waiting
   {}
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
@@ -67,11 +72,11 @@
       </tr>
       <tr>
         <td>
-          Handshake
+          Waiting
         </td>
         <td>
           <pre>
-handshake();
+nextQuantum();
           </pre>
         </td>
         <td>
@@ -81,48 +86,64 @@ handshake();
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
-  Established
+  WriteBatch
   {}
           </pre>
         </td>
         <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          WriteBatch
+        </td>
+        <td>
           <pre>
-[!ctxt.readHandshake() && !ctxt.inError()]
-  Handshake
+nextBatch();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[ctxt.hasNext()]
+  WriteBatch
+  {}
+
+  Waiting
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.writeBatch() && !ctxt.inError()]
+  WriteBatch
   {
-    selectForRead();
+    selectForWrite();
   }
 
 [ctxt.inError()]
   Closed
   {}
 
-  Established
+[ctxt.hasNext()]
+  WriteBatch
+  {}
+
+  Waiting
   {}
           </pre>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          Established
-        </td>
-        <td>
-          <pre>
-    established();
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -135,6 +156,8 @@ handshake();
           <pre>
     close();
           </pre>
+        </td>
+        <td>
         </td>
         <td>
         </td>
