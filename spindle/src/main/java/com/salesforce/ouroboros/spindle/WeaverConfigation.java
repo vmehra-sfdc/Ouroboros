@@ -63,11 +63,27 @@ public class WeaverConfigation {
     public static final TimeUnit      DEFAULT_PARTITION_TIMEOUT_UNIT = TimeUnit.SECONDS;
     public static final int           DEFAULT_REPLICATION_QUEUE_SIZE = 100;
     public static final String        DEFAULT_STATE_NAME             = "weavers";
+    private static final String       CONTROLLER                     = "controller";
+    private static final String       FLYER                          = "flyer";
     private static final String       REPLICATOR                     = "replicator";
     private static final String       SPINDLE                        = "spindle";
     private static final String       XEROX                          = "xerox";
 
     private int                       appendSegmentConcurrencyLevel  = 16;
+    private InetSocketAddress         controllerAddress              = new InetSocketAddress(
+                                                                                             "127.0.0.1",
+                                                                                             0);
+    private final ExecutorService     controllers                    = Executors.newFixedThreadPool(10,
+                                                                                                    new LabeledThreadFactory(
+                                                                                                                             CONTROLLER));
+    private final SocketOptions       controllerSocketOptions        = new SocketOptions();
+    private InetSocketAddress         shuttleAddress                 = new InetSocketAddress(
+                                                                                             "127.0.0.1",
+                                                                                             0);
+    private final ExecutorService     shuttles                       = Executors.newFixedThreadPool(10,
+                                                                                                    new LabeledThreadFactory(
+                                                                                                                             FLYER));
+    private final SocketOptions       shuttleSocketOptions           = new SocketOptions();
     private Node                      id;
     private int                       initialAppendSegmentCapacity   = 16;
     private int                       initialReadSegmentCapacity     = 16;
@@ -83,6 +99,7 @@ public class WeaverConfigation {
                                                                                              "127.0.0.1",
                                                                                              0);
     private int                       replicationQueueSize           = DEFAULT_REPLICATION_QUEUE_SIZE;
+
     private final SocketOptions       replicationSocketOptions       = new SocketOptions();
     private ExecutorService           replicators                    = Executors.newFixedThreadPool(10,
                                                                                                     new LabeledThreadFactory(
@@ -93,15 +110,18 @@ public class WeaverConfigation {
     private InetSocketAddress         spindleAddress                 = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
-
     private ExecutorService           spindles                       = Executors.newFixedThreadPool(10,
                                                                                                     new LabeledThreadFactory(
                                                                                                                              SPINDLE));
+
     private final SocketOptions       spindleSocketOptions           = new SocketOptions();
+
     private String                    stateName                      = DEFAULT_STATE_NAME;
+
     private InetSocketAddress         xeroxAddress                   = new InetSocketAddress(
                                                                                              "127.0.0.1",
                                                                                              0);
+
     private ExecutorService           xeroxes                        = Executors.newFixedThreadPool(10,
                                                                                                     new LabeledThreadFactory(
                                                                                                                              XEROX));
@@ -120,6 +140,30 @@ public class WeaverConfigation {
      */
     public int getAppendSegmentConcurrencyLevel() {
         return appendSegmentConcurrencyLevel;
+    }
+
+    public InetSocketAddress getControllerAddress() {
+        return controllerAddress;
+    }
+
+    public ExecutorService getControllers() {
+        return controllers;
+    }
+
+    public SocketOptions getControllerSocketOptions() {
+        return controllerSocketOptions;
+    }
+
+    public InetSocketAddress getShuttleAddress() {
+        return shuttleAddress;
+    }
+
+    public ExecutorService getShuttles() {
+        return shuttles;
+    }
+
+    public SocketOptions getShuttleSocketOptions() {
+        return shuttleSocketOptions;
     }
 
     /**
@@ -303,6 +347,14 @@ public class WeaverConfigation {
      */
     public void setAppendSegmentConcurrencyLevel(int segmentConcurrencyLevel) {
         appendSegmentConcurrencyLevel = segmentConcurrencyLevel;
+    }
+
+    public void setControllerAddress(InetSocketAddress controllerAddress) {
+        this.controllerAddress = controllerAddress;
+    }
+
+    public void setShuttleAddress(InetSocketAddress flyerAddress) {
+        this.shuttleAddress = flyerAddress;
     }
 
     /**

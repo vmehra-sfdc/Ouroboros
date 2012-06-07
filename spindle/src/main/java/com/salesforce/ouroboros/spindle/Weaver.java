@@ -52,6 +52,8 @@ import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.WeaverConfigation.RootDirectory;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
+import com.salesforce.ouroboros.spindle.shuttle.Controller;
+import com.salesforce.ouroboros.spindle.shuttle.Shuttle;
 import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.spindle.transfer.Sink;
@@ -70,10 +72,24 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * 
  */
 public class Weaver implements Bundle, Comparable<Weaver> {
+    private class ControllerFactory implements CommunicationsHandlerFactory {
+        @Override
+        public Controller createCommunicationsHandler(SocketChannel channel) {
+            return new Controller(Weaver.this);
+        }
+    }
+
     private class ReplicatorFactory implements CommunicationsHandlerFactory {
         @Override
         public Replicator createCommunicationsHandler(SocketChannel channel) {
             return new Replicator(Weaver.this);
+        }
+    }
+
+    private class ShuttleFactory implements CommunicationsHandlerFactory {
+        @Override
+        public Shuttle createCommunicationsHandler(SocketChannel channel) {
+            return new Shuttle(Weaver.this);
         }
     }
 
@@ -93,16 +109,17 @@ public class Weaver implements Bundle, Comparable<Weaver> {
 
     private static final Logger                     log               = LoggerFactory.getLogger(Weaver.class.getCanonicalName());
 
+    private static final String                     WEAVER_CONTROLLER = "Weaver Controller";
     private static final String                     WEAVER_REPLICATOR = "Weaver Replicator";
+    private static final String                     WEAVER_SHUTTLE    = "Weaver Shuttle";
     private static final String                     WEAVER_SPINDLE    = "Weaver Spindle";
     private static final String                     WEAVER_XEROX      = "Weaver Xerox";
-    static final int                                HANDSHAKE_SIZE    = Node.BYTE_LENGTH + 4;
-    static final int                                MAGIC             = 0x1638;
-    private final ConcurrentMap<Node, Acknowledger> acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
 
+    private final ConcurrentMap<Node, Acknowledger> acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
     private final ConcurrentMap<File, Segment>      appendSegmentCache;
     private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
     private final ContactInformation                contactInfo;
+    private final ServerSocketChannelHandler        controllerHandler;
     private final long                              maxSegmentSize;
     private ConsistentHashFunction<Node>            nextRing;
     private final ConcurrentMap<File, Segment>      readSegmentCache;
@@ -110,7 +127,9 @@ public class Weaver implements Bundle, Comparable<Weaver> {
     private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
     private final ConsistentHashFunction<File>      roots;
     private final Node                              self;
+    private final ServerSocketChannelHandler        shuttleHandler;
     private final ServerSocketChannelHandler        spindleHandler;
+
     private ConsistentHashFunction<Node>            weaverRing;
     private final ServerSocketChannelHandler        xeroxHandler;
 
@@ -157,6 +176,18 @@ public class Weaver implements Bundle, Comparable<Weaver> {
                                                       configuration.getXeroxAddress(),
                                                       configuration.getXeroxes(),
                                                       new SinkFactory());
+        shuttleHandler = new ServerSocketChannelHandler(
+                                                        WEAVER_SHUTTLE,
+                                                        configuration.getShuttleSocketOptions(),
+                                                        configuration.getShuttleAddress(),
+                                                        configuration.getShuttles(),
+                                                        new ShuttleFactory());
+        controllerHandler = new ServerSocketChannelHandler(
+                                                           WEAVER_CONTROLLER,
+                                                           configuration.getControllerSocketOptions(),
+                                                           configuration.getControllerAddress(),
+                                                           configuration.getControllers(),
+                                                           new ControllerFactory());
         contactInfo = new ContactInformation(
                                              spindleHandler.getLocalAddress(),
                                              replicationHandler.getLocalAddress(),
@@ -600,6 +631,8 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         spindleHandler.start();
         replicationHandler.start();
         xeroxHandler.start();
+        shuttleHandler.start();
+        controllerHandler.start();
     }
 
     /**
@@ -610,6 +643,8 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         spindleHandler.terminate();
         replicationHandler.terminate();
         xeroxHandler.terminate();
+        shuttleHandler.terminate();
+        controllerHandler.terminate();
         for (EventChannel channel : channels.values()) {
             channel.close(self);
         }
