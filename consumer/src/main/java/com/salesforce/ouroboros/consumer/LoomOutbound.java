@@ -25,50 +25,23 @@
  */
 package com.salesforce.ouroboros.consumer;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.LinkedBlockingDeque;
-
-import com.salesforce.ouroboros.EventSpan;
-
 /**
- * The client state.
- * 
  * @author hhildebrand
  * 
  */
-public class Session {
-    private final UUID                id;
-    private EventSpan                 currentSpan;
-    private long                      position;
-    private final Deque<EventSpan>    thread        = new LinkedBlockingDeque<>();
-    private final Map<String, String> properties    = new HashMap<>();
-    private final List<UUID>          subscriptions = new ArrayList<>();
-    private ByteBuffer                currentPage;
+public interface LoomOutbound {
 
-    public Session(UUID id, int pageSize) {
-        this.id = id;
-    }
+    boolean writeHandshake();
 
-    public EventSpan getCurrentSpan() {
-        return currentSpan;
-    }
+    boolean inError();
 
-    public UUID getId() {
-        return id;
-    }
+    void selectForWrite();
 
-    public Map<String, String> getProperties() {
-        return properties;
-    }
+    void checkAgenda();
 
-    public List<UUID> getSubscriptions() {
-        return Collections.unmodifiableList(subscriptions);
-    }
+    void advanceAgenda();
+
+    void close();
+
+    boolean writeAgenda();
 }

@@ -52,10 +52,10 @@ import com.hellblazer.jackal.testUtil.gossip.GossipControllerCfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode1Cfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipDiscoveryNode2Cfg;
 import com.hellblazer.jackal.testUtil.gossip.GossipTestCfg;
+import com.salesforce.ouroboros.endpoint.EndpointCoordinatorContext;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.SwitchboardContext.SwitchboardFSM;
 import com.salesforce.ouroboros.producer.ProducerCoordinator;
-import com.salesforce.ouroboros.producer.ProducerCoordinatorContext;
 import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext;
 import com.salesforce.ouroboros.testUtils.Util;
@@ -223,7 +223,7 @@ public class TestProducerChannelBuffer {
                      new Util.Condition() {
                          @Override
                          public boolean value() {
-                             return producer.getState() == ProducerCoordinatorContext.CoordinatorFSM.Stable;
+                             return producer.getState() == EndpointCoordinatorContext.CoordinatorFSM.Stable;
                          }
                      }, 30000, 200);
     }

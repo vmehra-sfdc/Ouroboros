@@ -42,7 +42,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
  */
 public enum UpdateMessage implements MemberDispatch {
     UPDATE;
-    private static final Logger log = LoggerFactory.getLogger(ProducerRebalanceMessage.class.getCanonicalName());
+    private static final Logger log = LoggerFactory.getLogger(UpdateMessage.class.getCanonicalName());
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,

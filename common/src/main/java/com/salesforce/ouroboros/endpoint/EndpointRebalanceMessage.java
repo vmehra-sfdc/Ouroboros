@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.producer;
+package com.salesforce.ouroboros.endpoint;
 
 import java.io.Serializable;
 
@@ -40,13 +40,13 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * @author hhildebrand
  * 
  */
-public enum ProducerRebalanceMessage implements MemberDispatch {
+public enum EndpointRebalanceMessage implements MemberDispatch {
     INITIATE_REBALANCE, PREPARE_FOR_REBALANCE, MEMBER_REBALANCED {
 
         @Override
         void dispatch(Switchboard switchboard, Node sender,
                       Serializable[] arguments, long time,
-                      ProducerCoordinator coordinator) {
+                      EndpointCoordinator coordinator) {
             coordinator.dispatch(this, sender, arguments, time, switchboard);
         }
 
@@ -55,31 +55,31 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
         @Override
         void dispatch(Switchboard switchboard, Node sender,
                       Serializable[] arguments, long time,
-                      ProducerCoordinator coordinator) {
+                      EndpointCoordinator coordinator) {
             coordinator.dispatch(this, sender, arguments, time, switchboard);
             switchboard.forwardToNextInRing(new Message(sender, this, arguments),
                                             coordinator.getActiveMembers());
         }
     };
 
-    private static final Logger log = LoggerFactory.getLogger(ProducerRebalanceMessage.class.getCanonicalName());
+    private static final Logger log = LoggerFactory.getLogger(EndpointRebalanceMessage.class.getCanonicalName());
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,
                          Serializable[] arguments, long time) {
-        if (!(switchboard.getMember() instanceof ProducerCoordinator)) {
+        if (!(switchboard.getMember() instanceof EndpointCoordinator)) {
             log.warn(String.format("ReplicatorMessage %s must be targeted at producer coordinator, not %s",
                                    this, switchboard.getMember()));
             return;
         }
-        ProducerCoordinator coordinator = (ProducerCoordinator) switchboard.getMember();
+        EndpointCoordinator coordinator = (EndpointCoordinator) switchboard.getMember();
         dispatch(switchboard, sender, arguments, time, coordinator);
 
     }
 
     void dispatch(Switchboard switchboard, Node sender,
                   Serializable[] arguments, long time,
-                  ProducerCoordinator coordinator) {
+                  EndpointCoordinator coordinator) {
         coordinator.dispatch(this, sender, arguments, time, switchboard);
         switchboard.forwardToNextInRing(new Message(sender, this, arguments),
                                         coordinator.getNextMembership());

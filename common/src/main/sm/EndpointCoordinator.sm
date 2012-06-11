@@ -30,10 +30,10 @@
  */
 %}
 
-// The FSM of the Coordinator for the Ouroboros producer
+// The FSM of the Coordinator for Ouroboros endpoint processes
 
-%class ProducerCoordinator
-%package com.salesforce.ouroboros.producer
+%class EndpointCoordinator
+%package com.salesforce.ouroboros.endpoint
 %import com.salesforce.ouroboros.Node
 %import java.util.UUID
 %access public
@@ -43,26 +43,26 @@
 %%
 Unstable
 Entry {
-	cleanUp();
+    cleanUp();
 }
 {
-	stabilize
-		[ctxt.isActive()]
-		AwaitingFailover{}
+    stabilize
+        [ctxt.isActive()]
+        AwaitingFailover{}
         
     stabilize
-    	[!ctxt.hasActiveMembers() && ctxt.isInactiveLeader()]
-    	Bootstrapping/push(ControllerFSM::Bootstrap){}
+        [!ctxt.hasActiveMembers() && ctxt.isInactiveLeader()]
+        Bootstrapping/push(ControllerFSM::Bootstrap){}
         
     stabilize
-    	[!ctxt.hasActiveMembers()]
-    	Bootstrapping{}
-    	
-  	stabilize
-  		Stable{}
-		
-	destabilize
-		nil{}
+        [!ctxt.hasActiveMembers()]
+        Bootstrapping{}
+        
+    stabilize
+        Stable{}
+        
+    destabilize
+        nil{}
 }
 
 AwaitingFailover{
@@ -71,102 +71,102 @@ AwaitingFailover{
 }
 
 Stable{
-		
+        
     rebalance(joiningMembers: Node[])
         [ctxt.isActiveLeader()]
         AwaitingTakeover/push(ControllerFSM::CoordinateRebalance) {
-        	beginRebalance(joiningMembers);
+            beginRebalance(joiningMembers);
         }
-		
-	open(channel:UUID)
-		nil {
-			openChannel(channel);
-		}
+        
+    open(channel:UUID)
+        nil {
+            openChannel(channel);
+        }
     
     rebalance
         Rebalance{}
 }
 
 Bootstrapping{
-	bootstrapped
-		Stable{}
+    bootstrapped
+        Stable{}
 }
 
 Rebalance{
-	rebalanced
-		AwaitingTakeover{}
-		
-	rebalanceCancelled
+    rebalanced
+        AwaitingTakeover{}
+        
+    rebalanceCancelled
         nil {
             destabilizePartition();
         }
 }
 
 AwaitingTakeover {
-	commitTakeover
-		Stable{}
+    commitTakeover
+        Stable{}
 }
 
 Default {
-	destabilize
-		Unstable{}
+    destabilize
+        Unstable{}
 }
 %%
 %map ControllerFSM
 %%
 Bootstrap {
-	bootstrapSystem(joiningMembers: Node[])
-		CoordinateBootstrap{
-			setJoiningMembers(joiningMembers);
-		}
+    bootstrapSystem(joiningMembers: Node[])
+        CoordinateBootstrap{
+            setJoiningMembers(joiningMembers);
+        }
 }
 
 CoordinateBootstrap
 Entry{
-	coordinateBootstrap();
+    coordinateBootstrap();
 }
 {
-	bootstrapped
-		pop(bootstrapped){}
+    bootstrapped
+        pop(bootstrapped){}
 }
 
 CoordinateRebalance
 Entry{
-	coordinateRebalance();
+    coordinateRebalance();
 }
 {
-	rebalance
-		Rebalance{}
-		
+    rebalance
+        Rebalance{}
+        
 }
 
 Rebalance
 Entry {
-	rebalancePrepared();
+    rebalancePrepared();
 }
 {
-	rebalanced
-		nil{}
-		
-	memberRebalanced
-		[ctxt.tallyComplete()]
-		CoordinateTakeover{}
-		
-	memberRebalanced
-		nil{}
+    rebalanced
+        nil{}
+        
+    memberRebalanced
+        [ctxt.tallyComplete()]
+        CoordinateTakeover{}
+        
+    memberRebalanced
+        nil{}
 }
 
 CoordinateTakeover
 Entry{
-	coordinateTakeover();
+    coordinateTakeover();
 }
 {
-	commitTakeover
-		pop(commitTakeover) {}
+    commitTakeover
+        pop(commitTakeover) {}
 }
 
 Default{
-	destabilize 
-		pop(destabilize){}
+    destabilize 
+        pop(destabilize){}
 }
 %%

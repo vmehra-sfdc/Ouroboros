@@ -35,16 +35,14 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import statemap.StateUndefinedException;
-
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.EndpointCoordinator;
+import com.salesforce.ouroboros.endpoint.EndpointCoordinator;
+import com.salesforce.ouroboros.endpoint.EndpointRebalanceMessage;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
@@ -52,7 +50,6 @@ import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.producer.Producer.UpdateState;
-import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.ProducerCoordinatorState;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
@@ -68,12 +65,9 @@ public class ProducerCoordinator extends EndpointCoordinator {
 
     private final static Logger                log              = LoggerFactory.getLogger(ProducerCoordinator.class.getCanonicalName());
 
-    private final ProducerCoordinatorContext   fsm              = new ProducerCoordinatorContext(
-                                                                                                 this);
     private final ConcurrentMap<UUID, Pending> pendingChannels  = new ConcurrentHashMap<UUID, ProducerCoordinator.Pending>();
     private final Producer                     producer;
     private final List<UpdateState>            rebalanceUpdates = new ArrayList<Producer.UpdateState>();
-    private final AtomicInteger                tally            = new AtomicInteger();
 
     public ProducerCoordinator(Switchboard switchboard, Producer producer)
                                                                           throws IOException {
@@ -266,39 +260,6 @@ public class ProducerCoordinator extends EndpointCoordinator {
         }
     }
 
-    public void dispatch(ProducerRebalanceMessage type, Node sender,
-                         Serializable[] arguments, long time,
-                         Switchboard switchboard2) {
-        switch (type) {
-            case PREPARE_FOR_REBALANCE:
-                rebalance((Node[]) arguments[0]);
-                break;
-            case INITIATE_REBALANCE:
-                rebalance();
-                break;
-            case MEMBER_REBALANCED: {
-                if (isActiveLeader()) {
-                    log.info(String.format("%s marked as rebalanced on %s",
-                                           sender, self));
-                    tally.decrementAndGet();
-                    fsm.memberRebalanced();
-                } else {
-                    switchboard.forwardToNextInRing(new Message(sender, type,
-                                                                arguments),
-                                                    nextMembership);
-                }
-                break;
-            }
-            case TAKEOVER:
-                rebalanced();
-                break;
-            default:
-                throw new IllegalStateException(
-                                                String.format("Invalid rebalance message %s",
-                                                              type));
-        }
-    }
-
     public void dispatch(UpdateMessage updateMessage, Node sender,
                          Serializable[] arguments, long time,
                          Switchboard switchboard2) {
@@ -313,18 +274,6 @@ public class ProducerCoordinator extends EndpointCoordinator {
      */
     public Producer getProducer() {
         return producer;
-    }
-
-    /**
-     * @return the state of the reciver. return null if the state is undefined,
-     *         such as when the coordinator is transititioning between states
-     */
-    public ProducerCoordinatorState getState() {
-        try {
-            return fsm.getState();
-        } catch (StateUndefinedException e) {
-            return null;
-        }
     }
 
     @Override
@@ -350,7 +299,6 @@ public class ProducerCoordinator extends EndpointCoordinator {
     protected void cleanUp() {
         super.cleanUp();
         pendingChannels.clear();
-        tally.set(0);
         rebalanceUpdates.clear();
         producer.cleanUp();
     }
@@ -367,33 +315,6 @@ public class ProducerCoordinator extends EndpointCoordinator {
         switchboard.ringCast(new Message(self,
                                          BootstrapMessage.BOOTSTRAP_PRODUCERS,
                                          (Serializable) joiningMembers));
-    }
-
-    /**
-     * The receiver is the controller for the group. Coordinate the rebalancing
-     * of the system by including the new members.
-     */
-    @Override
-    protected void coordinateRebalance() {
-        if (log.isInfoEnabled()) {
-            log.info(String.format("Coordinating rebalancing on %s", self));
-        }
-        tally.set(nextMembership.size());
-        switchboard.ringCast(new Message(
-                                         self,
-                                         ProducerRebalanceMessage.PREPARE_FOR_REBALANCE,
-                                         (Serializable) joiningMembers),
-                             nextMembership);
-    }
-
-    /**
-     * Coordinate the takeover of the completion of the rebalancing
-     */
-    @Override
-    protected void coordinateTakeover() {
-        switchboard.ringCast(new Message(self,
-                                         ProducerRebalanceMessage.TAKEOVER),
-                             nextMembership);
     }
 
     /**
@@ -465,7 +386,7 @@ public class ProducerCoordinator extends EndpointCoordinator {
         fsm.rebalanced();
         switchboard.ringCast(new Message(
                                          self,
-                                         ProducerRebalanceMessage.MEMBER_REBALANCED),
+                                         EndpointRebalanceMessage.MEMBER_REBALANCED),
                              nextMembership);
     }
 
@@ -506,21 +427,6 @@ public class ProducerCoordinator extends EndpointCoordinator {
         rebalanceUpdates.clear();
         active = true;
         fsm.commitTakeover();
-    }
-
-    @Override
-    protected void rebalancePrepared() {
-        switchboard.ringCast(new Message(
-                                         self,
-                                         ProducerRebalanceMessage.INITIATE_REBALANCE),
-                             nextMembership);
-    }
-
-    /**
-     * @return true if the tally is equal to the required size
-     */
-    protected boolean tallyComplete() {
-        return tally.get() == 0;
     }
 
 }

@@ -1,0 +1,194 @@
+<html>
+  <head>
+    <title>LoomOutbound</title>
+  </head>
+
+  <body>
+    <table align=center border=3 cellspacing=2 cellpadding=2>
+      <caption align="top">
+        LoomOutboundFSM Finite State Machine
+      </caption>
+      <tr>
+        <th rowspan=2>
+          State
+        </th>
+        <th colspan=2>
+          Actions
+        </th>
+        <th colspan=5>
+          Transition
+        </th>
+      </tr>
+      <tr>
+        <th>
+          Entry
+        </th>
+        <th>
+         Exit
+        </th>
+        <th>
+          agendaComplete
+        </th>
+        <th>
+          established
+        </th>
+        <th>
+          pushAgenda
+        </th>
+        <th>
+          writeReady
+        </th>
+        <th>
+          <b>Default</b>
+        </th>
+      </tr>
+      <tr>
+        <td>
+          Suspended
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          WriteHandshake
+        </td>
+        <td>
+          <pre>
+writeHandshake();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.writeHandshake() && !ctxt.inError()]
+  WriteHandshake
+  {
+    selectForWrite();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Established
+        </td>
+        <td>
+          <pre>
+    checkAgenda();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  PushAgenda
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          PushAgenda
+        </td>
+        <td>
+          <pre>
+    advanceAgenda();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.writeAgenda() && !ctxt.inError()]
+  PushAgenda
+  {
+    selectForWrite();
+  }
+
+[ctxt.inError()]
+  Closed
+  {}
+
+  Established
+  {}
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Closed
+        </td>
+        <td>
+          <pre>
+    close();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -58,6 +58,9 @@ import com.fasterxml.uuid.Generators;
 import com.hellblazer.jackal.testUtil.TestController;
 import com.hellblazer.jackal.testUtil.TestNode;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.endpoint.EndpointCoordinatorContext;
+import com.salesforce.ouroboros.endpoint.EndpointCoordinatorContext.ControllerFSM;
+import com.salesforce.ouroboros.endpoint.EndpointCoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.integration.util.ClusterControllerCfg;
 import com.salesforce.ouroboros.integration.util.ClusterDiscoveryNode1Cfg;
 import com.salesforce.ouroboros.integration.util.ClusterDiscoveryNode2Cfg;
@@ -68,9 +71,6 @@ import com.salesforce.ouroboros.integration.util.ClusterTestCfg;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.ProducerCoordinator;
-import com.salesforce.ouroboros.producer.ProducerCoordinatorContext;
-import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.ControllerFSM;
-import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.CoordinatorFSM;
 import com.salesforce.ouroboros.spindle.Weaver;
 import com.salesforce.ouroboros.spindle.WeaverCoordinator;
 import com.salesforce.ouroboros.spindle.WeaverCoordinatorContext;
@@ -566,7 +566,7 @@ public class ProducerWeaverClusterTest {
                     + coordinator, new Condition() {
                 @Override
                 public boolean value() {
-                    return ProducerCoordinatorContext.CoordinatorFSM.Stable == c.getState();
+                    return EndpointCoordinatorContext.CoordinatorFSM.Stable == c.getState();
                 }
             }, 120000, 1000);
         }

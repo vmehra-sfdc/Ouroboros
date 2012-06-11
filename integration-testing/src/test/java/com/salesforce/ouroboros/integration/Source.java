@@ -194,8 +194,10 @@ public class Source implements EventSource {
                 shutdown();
                 return;
             }
+            /*
             log.info(String.format("currently no event to publish on %s ",
                                    producer.getId()));
+                                   */
             executor.execute(new Runnable() {
                 @Override
                 public void run() {

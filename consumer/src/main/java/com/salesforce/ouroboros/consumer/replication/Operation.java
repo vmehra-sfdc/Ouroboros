@@ -23,52 +23,12 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.consumer;
-
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.LinkedBlockingDeque;
-
-import com.salesforce.ouroboros.EventSpan;
+package com.salesforce.ouroboros.consumer.replication;
 
 /**
- * The client state.
- * 
  * @author hhildebrand
  * 
  */
-public class Session {
-    private final UUID                id;
-    private EventSpan                 currentSpan;
-    private long                      position;
-    private final Deque<EventSpan>    thread        = new LinkedBlockingDeque<>();
-    private final Map<String, String> properties    = new HashMap<>();
-    private final List<UUID>          subscriptions = new ArrayList<>();
-    private ByteBuffer                currentPage;
-
-    public Session(UUID id, int pageSize) {
-        this.id = id;
-    }
-
-    public EventSpan getCurrentSpan() {
-        return currentSpan;
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public Map<String, String> getProperties() {
-        return properties;
-    }
-
-    public List<UUID> getSubscriptions() {
-        return Collections.unmodifiableList(subscriptions);
-    }
+public enum Operation {
+    CreateSession, RemoveSession, Subscribe, Unsubscribe, PullSpan;
 }

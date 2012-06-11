@@ -1,0 +1,60 @@
+digraph LoomOutbound {
+
+    node
+        [shape=Mrecord width=1.5];
+
+    subgraph cluster_LoomOutboundFSM {
+
+        label="LoomOutboundFSM";
+
+        //
+        // States (Nodes)
+        //
+
+        "LoomOutboundFSM::Suspended"
+            [label="{Suspended}"];
+
+        "LoomOutboundFSM::WriteHandshake"
+            [label="{WriteHandshake}"];
+
+        "LoomOutboundFSM::Established"
+            [label="{Established}"];
+
+        "LoomOutboundFSM::PushAgenda"
+            [label="{PushAgenda}"];
+
+        "LoomOutboundFSM::Closed"
+            [label="{Closed}"];
+
+        "%start"
+            [label="" shape=circle style=filled fillcolor=black width=0.25];
+
+        //
+        // Transitions (Edges)
+        //
+
+        "LoomOutboundFSM::WriteHandshake" -> "LoomOutboundFSM::Closed"
+            [label="writeReady/\l"];
+
+        "LoomOutboundFSM::WriteHandshake" -> "LoomOutboundFSM::Established"
+            [label="writeReady/\l"];
+
+        "LoomOutboundFSM::WriteHandshake" -> "LoomOutboundFSM::Established"
+            [label="established/\l"];
+
+        "LoomOutboundFSM::Established" -> "LoomOutboundFSM::PushAgenda"
+            [label="pushAgenda/\l"];
+
+        "LoomOutboundFSM::PushAgenda" -> "LoomOutboundFSM::Closed"
+            [label="writeReady/\l"];
+
+        "LoomOutboundFSM::PushAgenda" -> "LoomOutboundFSM::Established"
+            [label="writeReady/\l"];
+
+        "LoomOutboundFSM::PushAgenda" -> "LoomOutboundFSM::Established"
+            [label="agendaComplete/\l"];
+
+        "%start" -> "LoomOutboundFSM::Suspended"
+    }
+
+}

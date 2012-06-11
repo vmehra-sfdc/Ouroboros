@@ -25,117 +25,24 @@
  */
 package com.salesforce.ouroboros.consumer;
 
-import java.io.Serializable;
-
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.partition.Switchboard.Member;
-import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
-import com.salesforce.ouroboros.partition.messages.ChannelMessage;
-import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
-import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 
 /**
- * 
- * The event consumer of Ouroboros.
- * 
  * @author hhildebrand
  * 
  */
-public class Consumer implements Member {
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.partition.Switchboard.Member#advertise()
-     */
-    @Override
-    public void advertise() {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.partition.Switchboard.Member#becomeInactive()
-     */
-    @Override
-    public void becomeInactive() {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.partition.Switchboard.Member#destabilize()
-     */
-    @Override
-    public void destabilize() {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.partition.Switchboard.Member#dispatch(com.salesforce.ouroboros.partition.messages.BootstrapMessage, com.salesforce.ouroboros.Node, java.io.Serializable[], long)
-     */
-    @Override
-    public void dispatch(BootstrapMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.partition.Switchboard.Member#dispatch(com.salesforce.ouroboros.partition.messages.ChannelMessage, com.salesforce.ouroboros.Node, java.io.Serializable[], long)
-     */
-    @Override
-    public void dispatch(ChannelMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.partition.Switchboard.Member#dispatch(com.salesforce.ouroboros.partition.messages.DiscoveryMessage, com.salesforce.ouroboros.Node, java.io.Serializable[], long)
-     */
-    @Override
-    public void dispatch(DiscoveryMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.partition.Switchboard.Member#dispatch(com.salesforce.ouroboros.partition.messages.FailoverMessage, com.salesforce.ouroboros.Node, java.io.Serializable[], long)
-     */
-    @Override
-    public void dispatch(FailoverMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.partition.Switchboard.Member#dispatch(com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage, com.salesforce.ouroboros.Node, java.io.Serializable[], long)
-     */
-    @Override
-    public void dispatch(WeaverRebalanceMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see com.salesforce.ouroboros.partition.Switchboard.Member#stabilized()
-     */
-    @Override
-    public void stabilized() {
-        // TODO Auto-generated method stub
-
-    }
+public class Consumer {
+    private final Node self;
 
     /**
-     * 
+     * @param self
      */
-    public void destabilizePartition() {
-        // TODO Auto-generated method stub
-
+    public Consumer(Node self) {
+        super();
+        this.self = self;
     }
 
+    public Node getId() {
+        return self;
+    }
 }
