@@ -32,11 +32,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
@@ -46,14 +44,13 @@ import statemap.StateUndefinedException;
 
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.partition.EndpointCoordinator;
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
-import com.salesforce.ouroboros.partition.Switchboard.Member;
 import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
 import com.salesforce.ouroboros.partition.messages.FailoverMessage;
-import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.producer.Producer.UpdateState;
 import com.salesforce.ouroboros.producer.ProducerCoordinatorContext.ProducerCoordinatorState;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
@@ -64,38 +61,25 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * @author hhildebrand
  * 
  */
-public class ProducerCoordinator implements Member {
+public class ProducerCoordinator extends EndpointCoordinator {
     private static enum Pending {
         MIRROR_OPENED, PENDING, PRIMARY_OPENED
     };
 
-    private final static Logger                 log                    = LoggerFactory.getLogger(ProducerCoordinator.class.getCanonicalName());
+    private final static Logger                log              = LoggerFactory.getLogger(ProducerCoordinator.class.getCanonicalName());
 
-    private boolean                             active                 = false;
-    private final SortedSet<Node>               activeProducers        = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>               activeWeavers          = new ConcurrentSkipListSet<Node>();
-    private final ProducerCoordinatorContext    fsm                    = new ProducerCoordinatorContext(
-                                                                                                        this);
-    private final SortedSet<Node>               inactiveMembers        = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>               inactiveWeavers        = new ConcurrentSkipListSet<Node>();
-    private final SortedSet<Node>               joiningWeavers         = new ConcurrentSkipListSet<Node>();
-    private Node[]                              joiningProducers       = new Node[0];
-    private final SortedSet<Node>               nextProducerMembership = new ConcurrentSkipListSet<Node>();
-    private final ConcurrentMap<UUID, Pending>  pendingChannels        = new ConcurrentHashMap<UUID, ProducerCoordinator.Pending>();
-    private final Producer                      producer;
-    private final List<UpdateState>             rebalanceUpdates       = new ArrayList<Producer.UpdateState>();
-    private final Node                          self;
-    private final Switchboard                   switchboard;
-    private final AtomicInteger                 tally                  = new AtomicInteger();
-    private final Map<Node, ContactInformation> yellowPages            = new ConcurrentHashMap<Node, ContactInformation>();
+    private final ProducerCoordinatorContext   fsm              = new ProducerCoordinatorContext(
+                                                                                                 this);
+    private final ConcurrentMap<UUID, Pending> pendingChannels  = new ConcurrentHashMap<UUID, ProducerCoordinator.Pending>();
+    private final Producer                     producer;
+    private final List<UpdateState>            rebalanceUpdates = new ArrayList<Producer.UpdateState>();
+    private final AtomicInteger                tally            = new AtomicInteger();
 
     public ProducerCoordinator(Switchboard switchboard, Producer producer)
                                                                           throws IOException {
+        super(switchboard, producer.getId());
         this.producer = producer;
-        self = producer.getId();
         fsm.setName(Integer.toString(self.processId));
-        switchboard.setMember(this);
-        this.switchboard = switchboard;
     }
 
     @Override
@@ -107,8 +91,8 @@ public class ProducerCoordinator implements Member {
 
     @Override
     public void becomeInactive() {
+        super.becomeInactive();
         producer.inactivate();
-        active = false;
     }
 
     @Override
@@ -130,7 +114,7 @@ public class ProducerCoordinator implements Member {
                 for (Node node : nodes) {
                     ring.add(node, node.capacity);
                     inactiveMembers.remove(node);
-                    activeProducers.add(node);
+                    activeMembers.add(node);
                 }
                 producer.setProducerRing(ring);
                 active = true;
@@ -252,19 +236,11 @@ public class ProducerCoordinator implements Member {
                          Serializable[] arguments, long time) {
         switch (type) {
             case ADVERTISE_CHANNEL_BUFFER:
-                if ((Boolean) arguments[1]) {
-                    activeWeavers.add(sender);
-                } else {
-                    inactiveWeavers.add(sender);
-                }
-                yellowPages.put(sender, (ContactInformation) arguments[0]);
+                advertiseChannelBuffer(sender, (Boolean) arguments[1],
+                                       (ContactInformation) arguments[0]);
                 break;
             case ADVERTISE_PRODUCER:
-                if ((Boolean) arguments[0]) {
-                    activeProducers.add(sender);
-                } else {
-                    inactiveMembers.add(sender);
-                }
+                advertiseMember(sender, (Boolean) arguments[0], null);
                 break;
             default:
                 break;
@@ -309,7 +285,7 @@ public class ProducerCoordinator implements Member {
                 } else {
                     switchboard.forwardToNextInRing(new Message(sender, type,
                                                                 arguments),
-                                                    nextProducerMembership);
+                                                    nextMembership);
                 }
                 break;
             }
@@ -332,62 +308,6 @@ public class ProducerCoordinator implements Member {
         }
     }
 
-    @Override
-    public void dispatch(WeaverRebalanceMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        switch (type) {
-            case PREPARE_FOR_REBALANCE: {
-                for (Node n : (Node[]) arguments[0]) {
-                    joiningWeavers.add(n);
-                }
-                break;
-            }
-            case REBALANCE_COMPLETE: {
-                ConsistentHashFunction<Node> ring = producer.createRing();
-                for (Node node : joiningWeavers) {
-                    inactiveWeavers.remove(node);
-                    activeWeavers.add(node);
-                }
-                for (Node node : activeWeavers) {
-                    ring.add(node, node.capacity);
-                }
-                producer.createSpinners(joiningWeavers, yellowPages);
-                producer.remapWeavers(ring);
-                producer.resumePausedChannels();
-                joiningWeavers.clear();
-                break;
-            }
-            case INITIATE_REBALANCE:
-                break;
-            case TAKEOVER:
-                break;
-            default:
-                throw new IllegalStateException(
-                                                String.format("Unknown rebalance message: %s",
-                                                              type));
-        }
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (o == null) {
-            return false;
-        }
-        if (o instanceof ProducerCoordinator) {
-            return self.equals(((ProducerCoordinator) o).self);
-        }
-        return false;
-    }
-
-    /**
-     * Answer the node represting this coordinator's id
-     * 
-     * @return the Node representing this process
-     */
-    public Node getId() {
-        return self;
-    }
-
     /**
      * @return
      */
@@ -408,93 +328,6 @@ public class ProducerCoordinator implements Member {
     }
 
     @Override
-    public int hashCode() {
-        return self.hashCode();
-    }
-
-    /**
-     * Initiate the bootstrapping of the producer ring using the set of inactive
-     * members
-     */
-    public void initiateBootstrap() {
-        initiateBootstrap(inactiveMembers.toArray(new Node[inactiveMembers.size()]));
-    }
-
-    /**
-     * Initiate the bootstrapping of the producer ring
-     * 
-     * @param joiningMembers
-     *            - the bootstrap membership set
-     */
-    public void initiateBootstrap(Node[] joiningMembers) {
-        if (!isInactiveLeader()) {
-            throw new IllegalStateException(
-                                            "This node must be inactive and the leader to initiate rebalancing");
-        }
-        if (activeProducers.size() != 0) {
-            throw new IllegalStateException(
-                                            "There must be no active members in the partition");
-        }
-        if (joiningMembers == null) {
-            throw new IllegalArgumentException(
-                                               "joining members must not be null");
-        }
-        for (Node node : joiningMembers) {
-            if (!inactiveMembers.contains(node)) {
-                throw new IllegalArgumentException(
-                                                   "Joining members must be inactive");
-            }
-        }
-        fsm.bootstrapSystem(joiningMembers);
-    }
-
-    /**
-     * Initiate the rebalancing of the producer ring using the set of inactive
-     * members
-     */
-    public void initiateRebalance() {
-        initiateRebalance(inactiveMembers.toArray(new Node[inactiveMembers.size()]));
-    }
-
-    /**
-     * Initiate the rebalancing of the producer ring.
-     */
-    public void initiateRebalance(Node[] joiningMembers) {
-        if (!isActiveLeader()) {
-            throw new IllegalStateException(
-                                            "This node must be active and the leader to initiate rebalancing");
-        }
-        if (joiningMembers == null) {
-            throw new IllegalArgumentException(
-                                               "joining members must not be null");
-        }
-        for (Node node : joiningMembers) {
-            if (!inactiveMembers.contains(node)) {
-                throw new IllegalArgumentException(
-                                                   "Joining members must be inactive");
-            }
-        }
-        fsm.rebalance(joiningMembers);
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    /**
-     * Answer true if the receiver is active and the leader of the active group
-     * 
-     * @return
-     */
-    public boolean isActiveLeader() {
-        if (active) {
-            return activeProducers.isEmpty() ? true
-                                            : activeProducers.last().equals(self);
-        }
-        return false;
-    }
-
-    @Override
     public void stabilized() {
         filterSystemMembership();
         fsm.stabilize();
@@ -505,31 +338,18 @@ public class ProducerCoordinator implements Member {
         return String.format("Coordinator for producer [%s]", self.processId);
     }
 
-    private void calculateNextProducerRing() {
-        ConsistentHashFunction<Node> newRing = producer.createRing();
-        for (Node node : activeProducers) {
-            Node clone = node.clone();
-            newRing.add(clone, clone.capacity);
-        }
-        for (Node node : joiningProducers) {
-            Node clone = node.clone();
-            newRing.add(clone, clone.capacity);
-        }
-        producer.setNextProducerRing(newRing);
-    }
-
-    protected void beginRebalance(Node[] joiningMembers) {
-        setJoiningProducers(joiningMembers);
+    @Override
+    protected void bootstrapSystem(Node[] joiningMembers) {
+        fsm.bootstrapSystem(joiningMembers);
     }
 
     /**
      * Clean up any state when destabilizing the partition.
      */
+    @Override
     protected void cleanUp() {
-        joiningProducers = new Node[0];
-        joiningWeavers.clear();
+        super.cleanUp();
         pendingChannels.clear();
-        nextProducerMembership.clear();
         tally.set(0);
         rebalanceUpdates.clear();
         producer.cleanUp();
@@ -538,6 +358,7 @@ public class ProducerCoordinator implements Member {
     /**
      * Coordinate the bootstrapping of the producer process group.
      */
+    @Override
     protected void coordinateBootstrap() {
         if (log.isInfoEnabled()) {
             log.info(String.format("Coordinating producer bootstrap on %s",
@@ -545,42 +366,41 @@ public class ProducerCoordinator implements Member {
         }
         switchboard.ringCast(new Message(self,
                                          BootstrapMessage.BOOTSTRAP_PRODUCERS,
-                                         (Serializable) joiningProducers));
+                                         (Serializable) joiningMembers));
     }
 
     /**
      * The receiver is the controller for the group. Coordinate the rebalancing
      * of the system by including the new members.
      */
+    @Override
     protected void coordinateRebalance() {
         if (log.isInfoEnabled()) {
             log.info(String.format("Coordinating rebalancing on %s", self));
         }
-        tally.set(nextProducerMembership.size());
+        tally.set(nextMembership.size());
         switchboard.ringCast(new Message(
                                          self,
                                          ProducerRebalanceMessage.PREPARE_FOR_REBALANCE,
-                                         (Serializable) joiningProducers),
-                             nextProducerMembership);
+                                         (Serializable) joiningMembers),
+                             nextMembership);
     }
 
     /**
      * Coordinate the takeover of the completion of the rebalancing
      */
+    @Override
     protected void coordinateTakeover() {
         switchboard.ringCast(new Message(self,
                                          ProducerRebalanceMessage.TAKEOVER),
-                             nextProducerMembership);
-    }
-
-    protected void destabilizePartition() {
-        switchboard.destabilize();
+                             nextMembership);
     }
 
     /**
      * Failover the process, assuming primary role for any failed primaries this
      * process is serving as the mirror
      */
+    @Override
     protected void failover() {
         if (log.isInfoEnabled()) {
             log.info(String.format("Initiating failover on %s", self));
@@ -593,43 +413,9 @@ public class ProducerCoordinator implements Member {
         fsm.failedOver();
     }
 
-    /**
-     * Remove all dead members and partition out the new members from the
-     * members that were part of the previous partition
-     */
-    protected void filterSystemMembership() {
-        activeProducers.removeAll(switchboard.getDeadMembers());
-        activeWeavers.removeAll(switchboard.getDeadMembers());
-        inactiveMembers.removeAll(switchboard.getDeadMembers());
-        inactiveWeavers.removeAll(switchboard.getDeadMembers());
-        nextProducerMembership.clear();
-        nextProducerMembership.addAll(activeProducers);
-    }
-
-    protected SortedSet<Node> getActiveProducers() {
-        return activeProducers;
-    }
-
-    protected SortedSet<Node> getNextProducerMembership() {
-        return nextProducerMembership;
-    }
-
-    protected boolean hasActiveMembers() {
-        return !activeProducers.isEmpty();
-    }
-
-    /**
-     * Answer true if the receiver is not active and the leader of the inactive
-     * group
-     * 
-     * @return
-     */
-    protected boolean isInactiveLeader() {
-        if (!active) {
-            return inactiveMembers.isEmpty() ? true
-                                            : inactiveMembers.last().equals(self);
-        }
-        return false;
+    @Override
+    protected void initialiateRebalancing(Node[] joiningMembers) {
+        fsm.rebalance(joiningMembers);
     }
 
     protected void openChannel(UUID channel) {
@@ -637,6 +423,7 @@ public class ProducerCoordinator implements Member {
 
     }
 
+    @Override
     protected void rebalance() {
         rebalance(producer.remap());
     }
@@ -647,13 +434,14 @@ public class ProducerCoordinator implements Member {
      * @param remapped
      *            - the mapping of channels to their new primary/mirror pairs
      */
+    @Override
     protected void rebalance(Map<UUID, Node[][]> remappping) {
         HashMap<Node, List<UpdateState>> remapped = new HashMap<Node, List<UpdateState>>();
         for (Entry<UUID, Node[][]> entry : remappping.entrySet()) {
             producer.rebalance(remapped, entry.getKey(),
                                entry.getValue()[0][0], entry.getValue()[0][1],
                                entry.getValue()[1][0], entry.getValue()[1][1],
-                               activeProducers);
+                               activeMembers);
         }
 
         for (Map.Entry<Node, List<Producer.UpdateState>> entry : remapped.entrySet()) {
@@ -670,7 +458,7 @@ public class ProducerCoordinator implements Member {
                                                  new Serializable[] {
                                                          entry.getKey(),
                                                          packet.toArray(new Producer.UpdateState[packet.size()]) }),
-                                     nextProducerMembership);
+                                     nextMembership);
             }
         }
 
@@ -678,7 +466,7 @@ public class ProducerCoordinator implements Member {
         switchboard.ringCast(new Message(
                                          self,
                                          ProducerRebalanceMessage.MEMBER_REBALANCED),
-                             nextProducerMembership);
+                             nextMembership);
     }
 
     /**
@@ -688,47 +476,44 @@ public class ProducerCoordinator implements Member {
      * @param joiningMembers
      *            - the list of producers that are joining the process group
      */
+    @Override
     protected void rebalance(Node[] joiningMembers) {
-        setJoiningProducers(joiningMembers);
-        calculateNextProducerRing();
+        setJoiningMembers(joiningMembers);
+        producer.setNextProducerRing(calculateNextProducerRing(producer.createRing()));
         fsm.rebalance();
+    }
+
+    @Override
+    protected void rebalanceComplete() {
+        ConsistentHashFunction<Node> newRing = producer.createRing();
+        for (Node node : activeWeavers) {
+            newRing.add(node, node.capacity);
+        }
+        producer.createSpinners(joiningWeavers, yellowPages);
+        producer.remapWeavers(newRing);
+        producer.resumePausedChannels();
     }
 
     /**
      * The producer cluster has been rebalanced. Switch over to the new
      * membership and commit the takeover
      */
+    @Override
     protected void rebalanced() {
-        activeProducers.clear();
-        activeProducers.addAll(nextProducerMembership);
-        inactiveMembers.removeAll(nextProducerMembership);
-        joiningProducers = new Node[0];
+        super.rebalanced();
         producer.createSpinners(activeWeavers, yellowPages);
         producer.commitProducerRing(rebalanceUpdates);
         rebalanceUpdates.clear();
-        nextProducerMembership.clear();
         active = true;
         fsm.commitTakeover();
     }
 
+    @Override
     protected void rebalancePrepared() {
         switchboard.ringCast(new Message(
                                          self,
                                          ProducerRebalanceMessage.INITIATE_REBALANCE),
-                             nextProducerMembership);
-    }
-
-    /**
-     * Set the joining members of the receiver
-     * 
-     * @param joiningMembers
-     */
-    protected void setJoiningProducers(Node[] joiningMembers) {
-        assert joiningMembers != null : "joining members must not be null";
-        joiningProducers = joiningMembers;
-        for (Node node : joiningMembers) {
-            nextProducerMembership.add(node);
-        }
+                             nextMembership);
     }
 
     /**
@@ -737,4 +522,5 @@ public class ProducerCoordinator implements Member {
     protected boolean tallyComplete() {
         return tally.get() == 0;
     }
+
 }

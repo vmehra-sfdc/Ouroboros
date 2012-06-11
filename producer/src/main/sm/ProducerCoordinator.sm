@@ -117,7 +117,7 @@ Default {
 Bootstrap {
 	bootstrapSystem(joiningMembers: Node[])
 		CoordinateBootstrap{
-			setJoiningProducers(joiningMembers);
+			setJoiningMembers(joiningMembers);
 		}
 }
 

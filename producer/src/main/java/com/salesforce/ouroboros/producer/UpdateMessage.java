@@ -54,7 +54,7 @@ public enum UpdateMessage implements MemberDispatch {
         ProducerCoordinator coordinator = (ProducerCoordinator) switchboard.getMember();
         if (!coordinator.getId().equals(arguments[0])) {
             switchboard.forwardToNextInRing(new Message(sender, this, arguments),
-                                            coordinator.getNextProducerMembership());
+                                            coordinator.getNextMembership());
         } else {
             coordinator.dispatch(this, sender, arguments, time, switchboard);
         }

@@ -58,7 +58,7 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
                       ProducerCoordinator coordinator) {
             coordinator.dispatch(this, sender, arguments, time, switchboard);
             switchboard.forwardToNextInRing(new Message(sender, this, arguments),
-                                            coordinator.getActiveProducers());
+                                            coordinator.getActiveMembers());
         }
     };
 
@@ -82,6 +82,6 @@ public enum ProducerRebalanceMessage implements MemberDispatch {
                   ProducerCoordinator coordinator) {
         coordinator.dispatch(this, sender, arguments, time, switchboard);
         switchboard.forwardToNextInRing(new Message(sender, this, arguments),
-                                        coordinator.getNextProducerMembership());
+                                        coordinator.getNextMembership());
     }
 }
