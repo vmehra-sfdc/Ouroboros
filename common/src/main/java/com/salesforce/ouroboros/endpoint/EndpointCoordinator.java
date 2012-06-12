@@ -44,6 +44,7 @@ import com.salesforce.ouroboros.endpoint.EndpointCoordinatorContext.EndpointCoor
 import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.Switchboard.Member;
+import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.partition.messages.WeaverRebalanceMessage;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
@@ -85,6 +86,11 @@ abstract public class EndpointCoordinator implements Member {
         setJoiningMembers(joiningMembers);
     }
 
+    @Override
+    public void destabilize() {
+        fsm.destabilize();
+    }
+
     public void destabilizePartition() {
         switchboard.destabilize();
     }
@@ -119,6 +125,25 @@ abstract public class EndpointCoordinator implements Member {
                 throw new IllegalStateException(
                                                 String.format("Invalid rebalance message %s",
                                                               type));
+        }
+    }
+
+    @Override
+    public void dispatch(FailoverMessage type, Node sender,
+                         Serializable[] arguments, long time) {
+        switch (type) {
+            case PREPARE:
+                break;
+            case FAILOVER:
+                if (active) {
+                    failover();
+                }
+                break;
+            default: {
+                if (log.isWarnEnabled()) {
+                    log.warn(String.format("Invalid failover message: %s", type));
+                }
+            }
         }
     }
 
@@ -238,7 +263,7 @@ abstract public class EndpointCoordinator implements Member {
     }
 
     /**
-     * Initiate the rebalancing of the producer ring using the set of inactive
+     * Initiate the rebalancing of the endpoint ring using the set of inactive
      * members
      */
     public void initiateRebalance() {
@@ -246,7 +271,7 @@ abstract public class EndpointCoordinator implements Member {
     }
 
     /**
-     * Initiate the rebalancing of the producer ring.
+     * Initiate the rebalancing of the endpoint's ring.
      */
     public void initiateRebalance(Node[] joiningMembers) {
         if (!isActiveLeader()) {
@@ -310,6 +335,12 @@ abstract public class EndpointCoordinator implements Member {
         }
     }
 
+    @Override
+    public void stabilized() {
+        filterSystemMembership();
+        fsm.stabilize();
+    }
+
     protected void advertiseChannelBuffer(Node sender, boolean isActive,
                                           ContactInformation contactInfo) {
         if (isActive) {
@@ -332,10 +363,9 @@ abstract public class EndpointCoordinator implements Member {
         }
     }
 
-    /**
-     * @param joiningMembers
-     */
-    protected abstract void bootstrapSystem(Node[] joiningMembers);
+    protected void bootstrapSystem(Node[] joiningMembers) {
+        fsm.bootstrapSystem(joiningMembers);
+    }
 
     protected ConsistentHashFunction<Node> calculateNextProducerRing(ConsistentHashFunction<Node> newRing) {
         for (Node node : activeMembers) {
@@ -408,10 +438,9 @@ abstract public class EndpointCoordinator implements Member {
         nextMembership.addAll(activeMembers);
     }
 
-    /**
-     * @param joiningMembers
-     */
-    abstract protected void initialiateRebalancing(Node[] joiningMembers);
+    protected void initialiateRebalancing(Node[] joiningMembers) {
+        fsm.rebalance(joiningMembers);
+    }
 
     /**
      * @param channel
@@ -445,6 +474,8 @@ abstract public class EndpointCoordinator implements Member {
         inactiveMembers.removeAll(nextMembership);
         joiningMembers = new Node[0];
         nextMembership.clear();
+        active = true;
+        fsm.commitTakeover();
     }
 
     protected void rebalancePrepared() {

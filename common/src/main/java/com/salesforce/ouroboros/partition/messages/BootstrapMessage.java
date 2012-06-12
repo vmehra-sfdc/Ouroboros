@@ -38,7 +38,7 @@ import com.salesforce.ouroboros.partition.Switchboard;
  * 
  */
 public enum BootstrapMessage implements MemberDispatch {
-    BOOTSTRAP_SPINDLES, BOOTSTRAP_PRODUCERS;
+    BOOTSTRAP_SPINDLES, BOOTSTRAP_PRODUCERS, BOOTSTRAP_CONSUMERS;
 
     @Override
     public void dispatch(Switchboard switchboard, Node sender,

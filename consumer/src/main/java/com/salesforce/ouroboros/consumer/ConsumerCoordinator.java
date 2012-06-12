@@ -28,16 +28,20 @@ package com.salesforce.ouroboros.consumer;
 import java.io.Serializable;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.endpoint.EndpointCoordinator;
+import com.salesforce.ouroboros.endpoint.EndpointRebalanceMessage;
+import com.salesforce.ouroboros.partition.Message;
 import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
-import com.salesforce.ouroboros.partition.messages.FailoverMessage;
+import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
  * 
@@ -47,31 +51,66 @@ import com.salesforce.ouroboros.partition.messages.FailoverMessage;
  * 
  */
 public class ConsumerCoordinator extends EndpointCoordinator {
+    private final static Logger log = LoggerFactory.getLogger(ConsumerCoordinator.class);
 
-    private final ConcurrentMap<UUID, Session> sessions      = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, Session> subscriptions = new ConcurrentHashMap<>();
+    private final Consumer      consumer;
 
     public ConsumerCoordinator(Switchboard switchboard, Consumer consumer) {
         super(switchboard, consumer.getId());
+        this.consumer = consumer;
+        fsm.setName(String.format("Consumer %s", self.processId));
     }
 
     @Override
     public void advertise() {
-        // TODO Auto-generated method stub
-
+        switchboard.ringCast(new Message(self,
+                                         DiscoveryMessage.ADVERTISE_CONSUMER,
+                                         active));
     }
 
     @Override
-    public void destabilize() {
-        // TODO Auto-generated method stub
-
+    public void becomeInactive() {
+        super.becomeInactive();
+        consumer.inactivate();
     }
 
     @Override
     public void dispatch(BootstrapMessage type, Node sender,
                          Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-
+        Node[] nodes = (Node[]) arguments[0];
+        switch (type) {
+            case BOOTSTRAP_CONSUMERS: {
+                if (log.isInfoEnabled()) {
+                    log.info(String.format("Bootstrapping consumers on: %s",
+                                           self));
+                }
+                ConsistentHashFunction<Node> ring = consumer.createRing();
+                for (Node node : nodes) {
+                    ring.add(node, node.capacity);
+                    inactiveMembers.remove(node);
+                    activeMembers.add(node);
+                }
+                consumer.setConsumerRing(ring);
+                active = true;
+                fsm.bootstrapped();
+                break;
+            }
+            case BOOTSTRAP_SPINDLES: {
+                ConsistentHashFunction<Node> ring = consumer.createRing();
+                for (Node node : nodes) {
+                    ring.add(node, node.capacity);
+                    inactiveWeavers.remove(node);
+                    activeWeavers.add(node);
+                }
+                consumer.createLooms(activeWeavers, yellowPages);
+                consumer.remapWeavers(ring);
+                break;
+            }
+            default:
+                throw new IllegalStateException(
+                                                String.format("Invalid bootstrap message: %s",
+                                                              type));
+        }
     }
 
     @Override
@@ -84,45 +123,62 @@ public class ConsumerCoordinator extends EndpointCoordinator {
     @Override
     public void dispatch(DiscoveryMessage type, Node sender,
                          Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-
+        switch (type) {
+            case ADVERTISE_CHANNEL_BUFFER:
+                advertiseChannelBuffer(sender, (Boolean) arguments[1],
+                                       (ContactInformation) arguments[0]);
+                break;
+            case ADVERTISE_CONSUMER:
+                advertiseMember(sender, (Boolean) arguments[0],
+                                (ContactInformation) arguments[0]);
+                break;
+            default:
+                break;
+        }
     }
 
+    public Consumer getConsumer() {
+        return consumer;
+    }
+
+    /**
+     * Clean up any state when destabilizing the partition.
+     */
     @Override
-    public void dispatch(FailoverMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        // TODO Auto-generated method stub
-
+    protected void cleanUp() {
+        super.cleanUp();
+        consumer.cleanUp();
     }
 
-    @Override
-    public void stabilized() {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    protected void bootstrapSystem(Node[] joiningMembers) {
-        // TODO Auto-generated method stub
-
-    }
-
+    /**
+     * Coordinate the bootstrapping of the consumer process group.
+     */
     @Override
     protected void coordinateBootstrap() {
-        // TODO Auto-generated method stub
-
+        if (log.isInfoEnabled()) {
+            log.info(String.format("Coordinating consumer bootstrap on %s",
+                                   self));
+        }
+        switchboard.ringCast(new Message(self,
+                                         BootstrapMessage.BOOTSTRAP_CONSUMERS,
+                                         (Serializable) joiningMembers));
     }
 
+    /**
+     * Failover the process, assuming primary role for any failed primaries this
+     * process is serving as the mirror
+     */
     @Override
     protected void failover() {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    protected void initialiateRebalancing(Node[] joiningMembers) {
-        // TODO Auto-generated method stub
-
+        if (log.isInfoEnabled()) {
+            log.info(String.format("Initiating failover on %s", self));
+        }
+        try {
+            consumer.failover(switchboard.getDeadMembers());
+        } catch (InterruptedException e) {
+            return;
+        }
+        fsm.failedOver();
     }
 
     @Override
@@ -133,26 +189,56 @@ public class ConsumerCoordinator extends EndpointCoordinator {
 
     @Override
     protected void rebalance() {
-        // TODO Auto-generated method stub
-
+        rebalance(consumer.remap());
     }
 
+    /**
+     * Rebalance the channels which this node has responsibility for
+     * 
+     * @param remapped
+     *            - the mapping of channels to their new primary/mirror pairs
+     */
     @Override
     protected void rebalance(Map<UUID, Node[][]> remappping) {
-        // TODO Auto-generated method stub
-
+        fsm.rebalanced();
+        switchboard.ringCast(new Message(
+                                         self,
+                                         EndpointRebalanceMessage.MEMBER_REBALANCED),
+                             nextMembership);
     }
 
+    /**
+     * Calculate the rebalancing of the system using the supplied list of
+     * joining producer processes.
+     * 
+     * @param joiningMembers
+     *            - the list of producers that are joining the process group
+     */
     @Override
     protected void rebalance(Node[] joiningMembers) {
-        // TODO Auto-generated method stub
-
+        setJoiningMembers(joiningMembers);
+        consumer.setNextConsumerRing(calculateNextProducerRing(consumer.createRing()));
+        fsm.rebalance();
     }
 
     @Override
     protected void rebalanceComplete() {
-        // TODO Auto-generated method stub
-
+        ConsistentHashFunction<Node> newRing = consumer.createRing();
+        for (Node node : activeWeavers) {
+            newRing.add(node, node.capacity);
+        }
+        consumer.createLooms(joiningWeavers, yellowPages);
+        consumer.remapWeavers(newRing);
     }
 
+    /**
+     * The producer cluster has been rebalanced. Switch over to the new
+     * membership and commit the takeover
+     */
+    @Override
+    protected void rebalanced() {
+        consumer.createLooms(activeWeavers, yellowPages);
+        consumer.commitConsumerRing();
+        super.rebalanced();
+    }
 }

@@ -25,14 +25,30 @@
  */
 package com.salesforce.ouroboros.consumer;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.SortedSet;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
 /**
  * @author hhildebrand
  * 
  */
 public class Consumer {
-    private final Node self;
+    private static final Logger                log           = LoggerFactory.getLogger(Consumer.class);
+
+    private final Node                         self;
+    private final ConcurrentMap<UUID, Session> sessions      = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Session> subscriptions = new ConcurrentHashMap<>();
 
     /**
      * @param self
@@ -42,7 +58,90 @@ public class Consumer {
         this.self = self;
     }
 
+    /**
+     * 
+     */
+    public void cleanUp() {
+        // TODO Auto-generated method stub
+
+    }
+
+    /**
+     * 
+     */
+    public void commitConsumerRing() {
+        // TODO Auto-generated method stub
+
+    }
+
+    /**
+     * @param activeWeavers
+     * @param yellowPages
+     */
+    public void createLooms(SortedSet<Node> activeWeavers,
+                            Map<Node, ContactInformation> yellowPages) {
+        // TODO Auto-generated method stub
+
+    }
+
+    /**
+     * @return
+     */
+    public ConsistentHashFunction<Node> createRing() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    /**
+     * @param deadMembers
+     */
+    public void failover(Collection<Node> deadMembers)
+                                                      throws InterruptedException {
+        // TODO Auto-generated method stub
+
+    }
+
     public Node getId() {
         return self;
+    }
+
+    /**
+     * 
+     */
+    public void inactivate() {
+        // TODO Auto-generated method stub
+
+    }
+
+    /**
+     * @return
+     */
+    public Map<UUID, Node[][]> remap() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    /**
+     * @param ring
+     */
+    public void remapWeavers(ConsistentHashFunction<Node> ring) {
+        // TODO Auto-generated method stub
+
+    }
+
+    /**
+     * @param ring
+     */
+    public void setConsumerRing(ConsistentHashFunction<Node> ring) {
+        // TODO Auto-generated method stub
+
+    }
+
+    /**
+     * @param calculateNextProducerRing
+     */
+    public void setNextConsumerRing(ConsistentHashFunction<Node> calculateNextProducerRing) {
+        // TODO Auto-generated method stub
+
     }
 }

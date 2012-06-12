@@ -48,7 +48,6 @@ import com.salesforce.ouroboros.partition.Switchboard;
 import com.salesforce.ouroboros.partition.messages.BootstrapMessage;
 import com.salesforce.ouroboros.partition.messages.ChannelMessage;
 import com.salesforce.ouroboros.partition.messages.DiscoveryMessage;
-import com.salesforce.ouroboros.partition.messages.FailoverMessage;
 import com.salesforce.ouroboros.producer.Producer.UpdateState;
 import com.salesforce.ouroboros.util.ConsistentHashFunction;
 
@@ -73,7 +72,7 @@ public class ProducerCoordinator extends EndpointCoordinator {
                                                                           throws IOException {
         super(switchboard, producer.getId());
         this.producer = producer;
-        fsm.setName(Integer.toString(self.processId));
+        fsm.setName(String.format("Producer[%s]", self.processId));
     }
 
     @Override
@@ -87,11 +86,6 @@ public class ProducerCoordinator extends EndpointCoordinator {
     public void becomeInactive() {
         super.becomeInactive();
         producer.inactivate();
-    }
-
-    @Override
-    public void destabilize() {
-        fsm.destabilize();
     }
 
     @Override
@@ -241,25 +235,6 @@ public class ProducerCoordinator extends EndpointCoordinator {
         }
     }
 
-    @Override
-    public void dispatch(FailoverMessage type, Node sender,
-                         Serializable[] arguments, long time) {
-        switch (type) {
-            case PREPARE:
-                break;
-            case FAILOVER:
-                if (active) {
-                    failover();
-                }
-                break;
-            default: {
-                if (log.isWarnEnabled()) {
-                    log.warn(String.format("Invalid failover message: %s", type));
-                }
-            }
-        }
-    }
-
     public void dispatch(UpdateMessage updateMessage, Node sender,
                          Serializable[] arguments, long time,
                          Switchboard switchboard2) {
@@ -277,19 +252,8 @@ public class ProducerCoordinator extends EndpointCoordinator {
     }
 
     @Override
-    public void stabilized() {
-        filterSystemMembership();
-        fsm.stabilize();
-    }
-
-    @Override
     public String toString() {
         return String.format("Coordinator for producer [%s]", self.processId);
-    }
-
-    @Override
-    protected void bootstrapSystem(Node[] joiningMembers) {
-        fsm.bootstrapSystem(joiningMembers);
     }
 
     /**
@@ -332,11 +296,6 @@ public class ProducerCoordinator extends EndpointCoordinator {
             return;
         }
         fsm.failedOver();
-    }
-
-    @Override
-    protected void initialiateRebalancing(Node[] joiningMembers) {
-        fsm.rebalance(joiningMembers);
     }
 
     protected void openChannel(UUID channel) {
@@ -421,12 +380,10 @@ public class ProducerCoordinator extends EndpointCoordinator {
      */
     @Override
     protected void rebalanced() {
-        super.rebalanced();
         producer.createSpinners(activeWeavers, yellowPages);
         producer.commitProducerRing(rebalanceUpdates);
         rebalanceUpdates.clear();
-        active = true;
-        fsm.commitTakeover();
+        super.rebalanced();
     }
 
 }
