@@ -51,13 +51,14 @@ public class SubscriptionManagement {
     private final SubscriptionManagementContext fsm            = new SubscriptionManagementContext(
                                                                                                    this);
     private SocketChannelHandler                handler;
-    private final PushNotification              notification;
     private final Node                          self;
+    private final SubscriptionHandler           subscriptionHandler;
 
-    public SubscriptionManagement(Node node, PushNotification notification) {
+    public SubscriptionManagement(Node node,
+                                  SubscriptionHandler subscriptionHandler) {
         self = node;
-        this.notification = notification;
         fsm.setName(String.format("%s<?", self));
+        this.subscriptionHandler = subscriptionHandler;
     }
 
     public void connect(SocketChannelHandler handler, Node partner) {
@@ -125,7 +126,7 @@ public class SubscriptionManagement {
             eventBuffer.flip();
             while (eventBuffer.remaining() >= SubscriptionEvent.BYTE_SIZE) {
                 SubscriptionEvent event = new SubscriptionEvent(eventBuffer);
-                notification.handle(event);
+                subscriptionHandler.handle(event);
             }
             eventBuffer.compact();
         }

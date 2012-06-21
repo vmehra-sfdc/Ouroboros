@@ -28,8 +28,7 @@ package com.salesforce.ouroboros.util;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * A non thread safe pooling implementation. Designed to be used via thread
- * locals
+ * A thread safe pooling implementation.
  * 
  * @author hhildebrand
  * 

@@ -15,7 +15,7 @@
         <th colspan=2>
           Actions
         </th>
-        <th colspan=1>
+        <th colspan=4>
           Transition
         </th>
       </tr>
@@ -27,12 +27,92 @@
          Exit
         </th>
         <th>
+          close
+        </th>
+        <th>
+          connect
+        </th>
+        <th>
+          readReady
+        </th>
+        <th>
           <b>Default</b>
         </th>
       </tr>
       <tr>
         <td>
           Suspended
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  ReceivePush
+  {
+    selectForRead();
+  }
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          ReceivePush
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+[!ctxt.readPush() && !ctxt.inError()]
+  ReceivePush
+  {
+    selectForRead();
+  }
+
+[ctxt.inError()]
+  Closed
+  {
+    close();
+  }
+
+  ReceivePush
+  {
+    selectForRead();
+  }
+          </pre>
+        </td>
+        <td>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Closed
+        </td>
+        <td>
+          <pre>
+    close();
+          </pre>
+        </td>
+        <td>
+        </td>
+        <td>
+          <pre>
+  Closed
+  {}
+          </pre>
         </td>
         <td>
         </td>

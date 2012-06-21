@@ -23,12 +23,60 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.consumer;
+package com.salesforce.ouroboros.consumer.shuttle;
+
+import com.hellblazer.pinkie.CommunicationsHandler;
+import com.hellblazer.pinkie.SocketChannelHandler;
 
 /**
  * @author hhildebrand
  *
  */
-public interface LoomInbound {
+public class Controller implements CommunicationsHandler {
+
+    /* (non-Javadoc)
+     * @see com.hellblazer.pinkie.CommunicationsHandler#accept(com.hellblazer.pinkie.SocketChannelHandler)
+     */
+    @Override
+    public void accept(SocketChannelHandler handler) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    /* (non-Javadoc)
+     * @see com.hellblazer.pinkie.CommunicationsHandler#closing()
+     */
+    @Override
+    public void closing() {
+        // TODO Auto-generated method stub
+        
+    }
+
+    /* (non-Javadoc)
+     * @see com.hellblazer.pinkie.CommunicationsHandler#connect(com.hellblazer.pinkie.SocketChannelHandler)
+     */
+    @Override
+    public void connect(SocketChannelHandler handler) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    /* (non-Javadoc)
+     * @see com.hellblazer.pinkie.CommunicationsHandler#readReady()
+     */
+    @Override
+    public void readReady() {
+        // TODO Auto-generated method stub
+        
+    }
+
+    /* (non-Javadoc)
+     * @see com.hellblazer.pinkie.CommunicationsHandler#writeReady()
+     */
+    @Override
+    public void writeReady() {
+        // TODO Auto-generated method stub
+        
+    }
 
 }

@@ -66,7 +66,7 @@ public class Spinner implements CommunicationsHandler {
     private ByteBuffer                               handshake           = ByteBuffer.allocate(HANDSHAKE_BYTE_SIZE);
     private boolean                                  inError;
     private final NavigableMap<BatchIdentity, Batch> pending             = new ConcurrentSkipListMap<BatchIdentity, Batch>();
-    private final BatchWriter                        writer;
+    private final BatchEventWriter                        writer;
     private final Node                               to;
 
     public Spinner(int maxBatchedSize, Producer producer, Node to,
@@ -79,7 +79,7 @@ public class Spinner implements CommunicationsHandler {
         handshake.putInt(MAGIC);
         producer.getId().serialize(handshake);
         handshake.flip();
-        writer = new BatchWriter(maxQueueLength, maxBatchedSize, fsmName);
+        writer = new BatchEventWriter(maxQueueLength, maxBatchedSize, fsmName);
         ack = new BatchAcknowledgement(
                                        this,
                                        String.format("%s<%s",

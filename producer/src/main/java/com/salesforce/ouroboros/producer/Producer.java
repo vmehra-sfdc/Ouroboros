@@ -172,6 +172,7 @@ public class Producer implements Comparable<Producer> {
 
     private final Pool<Batch>                       batchPool;
     private final ConcurrentMap<UUID, PrimaryState> channelState      = new ConcurrentHashMap<UUID, PrimaryState>();
+    private final ProducerConfiguration             configuration;
     private final Controller                        controller;
     private final Map<UUID, MirrorState>            mirrors           = new ConcurrentHashMap<UUID, MirrorState>();
     private ConsistentHashFunction<Node>            nextProducerRing;
@@ -187,7 +188,6 @@ public class Producer implements Comparable<Producer> {
     private final ChannelHandler                    spinnerHandler;
     private final ConcurrentMap<Node, Spinner>      spinners          = new ConcurrentHashMap<Node, Spinner>();
     private ConsistentHashFunction<Node>            weaverRing;
-    private final ProducerConfiguration             configuration;
 
     public Producer(Node self, EventSource source, ProducerConfiguration config)
                                                                                 throws IOException {

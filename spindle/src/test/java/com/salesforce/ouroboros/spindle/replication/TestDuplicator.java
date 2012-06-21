@@ -44,9 +44,11 @@ import org.junit.Test;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.AppendSegment;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
@@ -54,7 +56,6 @@ import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorFSM;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.testUtils.Util;
 import com.salesforce.ouroboros.util.Pool;
 
@@ -116,7 +117,8 @@ public class TestDuplicator {
         tmpFile.deleteOnExit();
         Segment segment = new Segment(eventChannel, tmpFile, Mode.APPEND);
         Bundle bundle = mock(Bundle.class);
-        Acknowledger acknowledger = mock(Acknowledger.class);
+        @SuppressWarnings("unchecked")
+        BatchWriter<BatchIdentity> acknowledger = mock(BatchWriter.class);
 
         int magic = 666;
         UUID channel = UUID.randomUUID();
@@ -189,7 +191,7 @@ public class TestDuplicator {
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
         verify(eventChannel).commit(0);
-        verify(acknowledger).acknowledge(channel, sequenceNumber);
+        verify(acknowledger).send(new BatchIdentity(channel, sequenceNumber));
     }
 
     @Test
@@ -204,8 +206,10 @@ public class TestDuplicator {
         EventChannel inboundEventChannel = mock(EventChannel.class);
         Bundle inboundBundle = mock(Bundle.class);
         when(inboundBundle.getId()).thenReturn(new Node(0));
-        Acknowledger outboundAcknowledger = mock(Acknowledger.class);
-        Acknowledger inboundAcknowledger = mock(Acknowledger.class);
+        @SuppressWarnings("unchecked")
+        BatchWriter<BatchIdentity> outboundAcknowledger = mock(BatchWriter.class);
+        @SuppressWarnings("unchecked")
+        BatchWriter<BatchIdentity> inboundAcknowledger = mock(BatchWriter.class);
 
         final ReplicatingAppender inboundReplicator = new ReplicatingAppender(
                                                                               inboundBundle);
@@ -312,7 +316,9 @@ public class TestDuplicator {
         assertEquals(event.getMagic(), replicatedEvent.getMagic());
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
-        verify(outboundAcknowledger).acknowledge(channel, sequenceNumber);
-        verify(inboundAcknowledger).acknowledge(channel, sequenceNumber);
+        verify(outboundAcknowledger).send(new BatchIdentity(channel,
+                                                            sequenceNumber));
+        verify(inboundAcknowledger).send(new BatchIdentity(channel,
+                                                           sequenceNumber));
     }
 }

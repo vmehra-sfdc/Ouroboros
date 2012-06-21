@@ -1,5 +1,6 @@
+%{
 /**
- * Copyright (c) 2012, salesforce.com, inc.
+ * Copyright (c) 2011, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -23,22 +24,69 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.consumer;
-
-import java.nio.ByteBuffer;
-import java.util.List;
 
 /**
  * @author hhildebrand
- * 
  */
-public class Loom {
-    private List<Session>    agenda;
-    private final ByteBuffer outBuffer;
-    private final ByteBuffer inBuffer;
+%}
 
-    public Loom(int bufferCapacity) {
-        inBuffer = ByteBuffer.allocateDirect(bufferCapacity);
-        outBuffer = ByteBuffer.allocateDirect(bufferCapacity);
-    }
+// The FSM of the BatchWriter protocol
+
+%class BatchWriter
+%package com.salesforce.ouroboros.batch
+%access public
+
+%start BatchWriterFSM::Suspended
+%map BatchWriterFSM
+%%
+
+Suspended {
+    connect
+        Waiting {}
 }
+
+Waiting 
+Entry {
+    nextQuantum();
+}
+{
+    writeBatch
+        WriteBatch{}
+}
+
+WriteBatch
+Entry {
+    nextBatch();
+}
+{
+    writeReady
+        [!ctxt.writeBatch() && !ctxt.inError()]
+        nil{
+            selectForWrite();
+        }
+        
+    writeReady
+        [ctxt.inError()]
+        Closed{}
+        
+    writeReady
+        Waiting{}
+        
+    payloadWritten
+        Waiting{}
+}
+
+Closed
+Entry {
+    close();
+}
+{
+}
+
+Default {
+    writeReady
+        nil{}
+    close
+        Closed{}
+}
+%%

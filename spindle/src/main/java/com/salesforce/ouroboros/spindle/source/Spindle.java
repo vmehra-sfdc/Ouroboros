@@ -33,7 +33,9 @@ import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.source.SpindleContext.SpindleFSM;
 import com.salesforce.ouroboros.spindle.source.SpindleContext.SpindleState;
@@ -48,21 +50,24 @@ import com.salesforce.ouroboros.util.Utils;
  */
 public class Spindle implements CommunicationsHandler {
 
-    public static final Integer  HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
-    public final static int      MAGIC          = 0x1638;
-    private final static Logger  log            = LoggerFactory.getLogger(Spindle.class.getCanonicalName());
+    public static final Integer      HANDSHAKE_SIZE = Node.BYTE_LENGTH + 4;
+    public final static int          MAGIC          = 0x1638;
+    private final static Logger      log            = LoggerFactory.getLogger(Spindle.class.getCanonicalName());
 
-    private final Bundle         bundle;
-    private final SpindleContext fsm            = new SpindleContext(this);
-    private SocketChannelHandler handler;
-    private ByteBuffer           handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
-    private boolean              inError;
-    final Acknowledger           acknowledger;
-    final Appender               appender;
+    private final Bundle             bundle;
+    private final SpindleContext     fsm            = new SpindleContext(this);
+    private SocketChannelHandler     handler;
+    private ByteBuffer               handshake      = ByteBuffer.allocate(HANDSHAKE_SIZE);
+    private boolean                  inError;
+    final BatchWriter<BatchIdentity> acknowledger;
+    final Appender                   appender;
+    private Node                     producer;
 
     public Spindle(Bundle bundle) {
         fsm.setName(String.format("?>%s", bundle.getId().processId));
-        acknowledger = new Acknowledger(bundle);
+        String ackFsmName = String.format("Acknowledger[?<%s]", bundle.getId());
+        acknowledger = new BatchWriter<BatchIdentity>(BatchIdentity.BYTE_SIZE,
+                                                      1000, ackFsmName);
         appender = new Appender(bundle, acknowledger);
         this.bundle = bundle;
     }
@@ -83,6 +88,7 @@ public class Spindle implements CommunicationsHandler {
     public void closing() {
         acknowledger.closing();
         appender.closing();
+        bundle.closeAcknowledger(producer);
     }
 
     @Override
@@ -122,14 +128,13 @@ public class Spindle implements CommunicationsHandler {
             close();
             return;
         }
-        Node producer = new Node(handshake);
+        producer = new Node(handshake);
         String fsmName = String.format("%s>%s", producer.processId,
                                        bundle.getId().processId);
         fsm.setName(fsmName);
         appender.setFsmName(fsmName);
         acknowledger.setFsmName(String.format("%s<%s", producer.processId,
                                               bundle.getId().processId));
-        acknowledger.setProducer(producer);
         bundle.map(producer, acknowledger);
         if (log.isInfoEnabled()) {
             log.info(String.format("Established on %s for %s", bundle.getId(),

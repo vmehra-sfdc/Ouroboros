@@ -41,14 +41,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.EventHeader;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
 import com.salesforce.ouroboros.spindle.replication.ReplicatedBatchHeader;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.shuttle.PushNotification;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
  * The representation of the event channel. A channel is a logical collection of
@@ -183,7 +184,7 @@ public class EventChannel {
     private volatile Replicator                replicator;
     private Role                               role;
     private final Node                         self;
-    private final Set<PushNotification>              subscribers = new CopyOnWriteArraySet<PushNotification>();
+    private final Set<PushNotification>        subscribers = new CopyOnWriteArraySet<PushNotification>();
 
     public EventChannel(Node self, Role role, Node partnerId,
                         final UUID channelId, final File root,
@@ -247,16 +248,18 @@ public class EventChannel {
      * @param acknowledger
      * @throws IOException
      */
-    public void append(EventEntry entry, Acknowledger mirrorAcknowledger)
-                                                                         throws IOException {
+    public void append(EventEntry entry,
+                       BatchWriter<BatchIdentity> mirrorAcknowledger)
+                                                                     throws IOException {
         ReplicatedBatchHeader batchHeader = entry.getHeader();
         append(batchHeader, batchHeader.getOffset(), entry.getSegment());
         if (replicator == null) {
-            entry.getAcknowledger().acknowledge(batchHeader.getChannel(),
-                                                batchHeader.getSequenceNumber());
+            BatchIdentity event = new BatchIdentity(
+                                                    batchHeader.getChannel(),
+                                                    batchHeader.getSequenceNumber());
+            entry.getAcknowledger().send(event);
             if (mirrorAcknowledger != null) {
-                mirrorAcknowledger.acknowledge(batchHeader.getChannel(),
-                                               batchHeader.getSequenceNumber());
+                mirrorAcknowledger.send(event);
             }
             entry.selectAndFree();
         } else {

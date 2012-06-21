@@ -28,13 +28,15 @@ package com.salesforce.ouroboros;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
+import com.salesforce.ouroboros.batch.BufferSerializable;
+
 /**
  * Marks a span of events in a channel's segment
  * 
  * @author hhildebrand
  * 
  */
-public class EventSpan {
+public class EventSpan implements BufferSerializable {
     public static final int BYTE_SIZE = 5 * 8;
 
     // the id of the first event of the span

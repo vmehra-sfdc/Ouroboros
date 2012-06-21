@@ -87,40 +87,6 @@
       </tr>
       <tr>
         <td>
-          Established
-        </td>
-        <td>
-          <pre>
-selectForRead();
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-          <pre>
-  ReadWeft
-  {}
-          </pre>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-        <td>
-        </td>
-      </tr>
-      <tr>
-        <td>
           Handshake
         </td>
         <td>
@@ -136,7 +102,7 @@ handshake();
         </td>
         <td>
           <pre>
-  Established
+  ProcessAgenda
   {}
           </pre>
         </td>
@@ -154,7 +120,7 @@ handshake();
   Closed
   {}
 
-  Established
+  ProcessAgenda
   {}
           </pre>
         </td>
@@ -169,11 +135,11 @@ handshake();
       </tr>
       <tr>
         <td>
-          ReadWeft
+          ProcessAgenda
         </td>
         <td>
           <pre>
-    nextWeft();
+    advanceAgenda();
           </pre>
         </td>
         <td>
@@ -188,8 +154,8 @@ handshake();
         </td>
         <td>
           <pre>
-[!ctxt.readWeft() && !ctxt.inError()]
-  ReadWeft
+[!ctxt.readAgenda() && !ctxt.inError()]
+  ProcessAgenda
   {
     selectForRead();
   }
@@ -198,7 +164,7 @@ handshake();
   Closed
   {}
 
-  WriteSpan
+  ProcessAgenda
   {}
           </pre>
         </td>
@@ -221,7 +187,7 @@ handshake();
         </td>
         <td>
           <pre>
-    nextSpan();
+    selectForWrite();
           </pre>
         </td>
         <td>
@@ -234,7 +200,7 @@ handshake();
         </td>
         <td>
           <pre>
-  Established
+  ProcessAgenda
   {}
           </pre>
         </td>
@@ -242,7 +208,7 @@ handshake();
         </td>
         <td>
           <pre>
-  Established
+  ProcessAgenda
   {}
           </pre>
         </td>
@@ -258,7 +224,7 @@ handshake();
   Closed
   {}
 
-  Established
+  ProcessAgenda
   {}
           </pre>
         </td>

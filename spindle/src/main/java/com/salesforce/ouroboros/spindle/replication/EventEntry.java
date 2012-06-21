@@ -27,9 +27,10 @@ package com.salesforce.ouroboros.spindle.replication;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.BatchIdentity;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.util.Pool;
 import com.salesforce.ouroboros.util.Pool.Clearable;
 
@@ -40,12 +41,12 @@ import com.salesforce.ouroboros.util.Pool.Clearable;
  * 
  */
 public class EventEntry implements Clearable {
-    private final Pool<EventEntry>        pool;
-    private volatile Acknowledger         acknowledger;
-    private volatile EventChannel         eventChannel;
-    private volatile SocketChannelHandler handler;
-    private final ReplicatedBatchHeader   header = new ReplicatedBatchHeader();
-    private volatile Segment              segment;
+    private final Pool<EventEntry>              pool;
+    private volatile BatchWriter<BatchIdentity> acknowledger;
+    private volatile EventChannel               eventChannel;
+    private volatile SocketChannelHandler       handler;
+    private final ReplicatedBatchHeader         header = new ReplicatedBatchHeader();
+    private volatile Segment                    segment;
 
     public EventEntry(Pool<EventEntry> pool) {
         this.pool = pool;
@@ -72,7 +73,7 @@ public class EventEntry implements Clearable {
     /**
      * @return the acknowledger
      */
-    public Acknowledger getAcknowledger() {
+    public BatchWriter<BatchIdentity> getAcknowledger() {
         return acknowledger;
     }
 
@@ -108,7 +109,8 @@ public class EventEntry implements Clearable {
 
     public void set(BatchHeader batchHeader, long offset, int startPosition,
                     EventChannel eventChannel, Segment segment,
-                    Acknowledger acknowledger, SocketChannelHandler handler) {
+                    BatchWriter<BatchIdentity> acknowledger,
+                    SocketChannelHandler handler) {
         assert batchHeader != null : "Batch header cannot be null";
         assert eventChannel != null : "Event channel cannot be null";
         assert segment != null : "Segment cannot be null";

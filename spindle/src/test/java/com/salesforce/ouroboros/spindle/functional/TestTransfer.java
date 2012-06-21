@@ -52,14 +52,15 @@ import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.replication.ReplicatorContext.ReplicatorFSM;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.spindle.transfer.Sink;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
@@ -220,7 +221,8 @@ public class TestTransfer {
         int batches = 2500;
         int batchSize = 100;
         final CountDownLatch ackLatch = new CountDownLatch(batches);
-        Acknowledger ack = mock(Acknowledger.class);
+        @SuppressWarnings("unchecked")
+        BatchWriter<BatchIdentity> ack = mock(BatchWriter.class);
         Answer<Void> acknowledge = new Answer<Void>() {
             @Override
             public Void answer(InvocationOnMock invocation) throws Throwable {
@@ -228,8 +230,7 @@ public class TestTransfer {
                 return null;
             }
         };
-        doAnswer(acknowledge).when(ack).acknowledge(isA(UUID.class),
-                                                    isA(Long.class));
+        doAnswer(acknowledge).when(ack).send(isA(BatchIdentity.class));
 
         when(primaryBundle.getAcknowledger(isA(Node.class))).thenReturn(ack);
         when(mirrorBundle.getAcknowledger(isA(Node.class))).thenReturn(ack);

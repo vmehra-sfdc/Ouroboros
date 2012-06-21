@@ -33,13 +33,49 @@
 // The FSM for managing the inbound data for the Loom
 
 %class LoomInbound
-%package com.salesforce.ouroboros.consumer
+%package com.salesforce.ouroboros.consumer.shuttle
 %access public
 
 %start LoomInboundFSM::Suspended
 %map LoomInboundFSM
 %%
-Suspended
+Suspended {
+    connect
+        ReceivePush {
+            selectForRead();
+        }
+}
+
+ReceivePush {
+    readReady
+        [!ctxt.readPush() && !ctxt.inError()]
+        nil {
+            selectForRead();
+        }
+        
+    readReady
+        [ctxt.inError()]
+        Closed {
+            close();
+        }
+        
+    readReady 
+        nil {
+            selectForRead();
+        }
+}
+
+Closed
+Entry {
+    close();
+}
 {
+    close
+        nil{}
+} 
+
+Default {
+    close
+        Closed{}
 }
 %%

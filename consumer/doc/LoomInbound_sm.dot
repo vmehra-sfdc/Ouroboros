@@ -14,12 +14,30 @@ digraph LoomInbound {
         "LoomInboundFSM::Suspended"
             [label="{Suspended}"];
 
+        "LoomInboundFSM::ReceivePush"
+            [label="{ReceivePush}"];
+
+        "LoomInboundFSM::Closed"
+            [label="{Closed}"];
+
         "%start"
             [label="" shape=circle style=filled fillcolor=black width=0.25];
 
         //
         // Transitions (Edges)
         //
+
+        "LoomInboundFSM::Suspended" -> "LoomInboundFSM::ReceivePush"
+            [label="connect/\l"];
+
+        "LoomInboundFSM::Suspended" -> "LoomInboundFSM::Closed"
+            [label="close/\l"];
+
+        "LoomInboundFSM::ReceivePush" -> "LoomInboundFSM::Closed"
+            [label="readReady/\l"];
+
+        "LoomInboundFSM::ReceivePush" -> "LoomInboundFSM::Closed"
+            [label="close/\l"];
 
         "%start" -> "LoomInboundFSM::Suspended"
     }

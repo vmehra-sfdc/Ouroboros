@@ -1,12 +1,12 @@
 <html>
   <head>
-    <title>PushNotification</title>
+    <title>BatchWriter</title>
   </head>
 
   <body>
     <table align=center border=3 cellspacing=2 cellpadding=2>
       <caption align="top">
-        PushNotificationFSM Finite State Machine
+        BatchWriterFSM Finite State Machine
       </caption>
       <tr>
         <th rowspan=2>
@@ -27,10 +27,10 @@
          Exit
         </th>
         <th>
-          accept
+          close
         </th>
         <th>
-          close
+          connect
         </th>
         <th>
           payloadWritten
@@ -54,12 +54,12 @@
         <td>
         </td>
         <td>
+        </td>
+        <td>
           <pre>
   Waiting
   {}
           </pre>
-        </td>
-        <td>
         </td>
         <td>
         </td>
@@ -115,10 +115,6 @@ nextBatch();
         </td>
         <td>
           <pre>
-[ctxt.hasNext()]
-  WriteBatch
-  {}
-
   Waiting
   {}
           </pre>
@@ -135,10 +131,6 @@ nextBatch();
 
 [ctxt.inError()]
   Closed
-  {}
-
-[ctxt.hasNext()]
-  WriteBatch
   {}
 
   Waiting

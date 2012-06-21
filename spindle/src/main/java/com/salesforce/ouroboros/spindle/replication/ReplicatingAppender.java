@@ -31,12 +31,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.NullNode;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.AppendSegment;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.source.AbstractAppender;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
  * The appender for receiving duplicated events from the primary.
@@ -66,7 +67,7 @@ public class ReplicatingAppender extends AbstractAppender {
             return;
         }
         Node node = batchHeader.getProducerMirror();
-        Acknowledger acknowledger = bundle.getAcknowledger(node);
+        BatchWriter<BatchIdentity> acknowledger = bundle.getAcknowledger(node);
         if (acknowledger == null) {
             if (node.processId != NullNode.INSTANCE.processId) {
                 log.warn(String.format("Could not find an acknowledger for %s",
@@ -78,8 +79,8 @@ public class ReplicatingAppender extends AbstractAppender {
             log.trace(String.format("Acknowledging replication of %s on %s",
                                     batchHeader, bundle.getId()));
         }
-        acknowledger.acknowledge(batchHeader.getChannel(),
-                                 batchHeader.getSequenceNumber());
+        acknowledger.send(new BatchIdentity(batchHeader.getChannel(),
+                                            batchHeader.getSequenceNumber()));
     }
 
     @Override
@@ -93,7 +94,7 @@ public class ReplicatingAppender extends AbstractAppender {
     @Override
     protected void drain() {
         Node node = batchHeader.getProducerMirror();
-        Acknowledger acknowledger = bundle.getAcknowledger(node);
+        BatchWriter<BatchIdentity> acknowledger = bundle.getAcknowledger(node);
         if (acknowledger == null) {
             if (node.processId != NullNode.INSTANCE.processId) {
                 log.warn(String.format("Could not find an acknowledger for %s",
@@ -107,8 +108,8 @@ public class ReplicatingAppender extends AbstractAppender {
                                    batchHeader.getSequenceNumber(),
                                    bundle.getId()));
         }
-        acknowledger.acknowledge(batchHeader.getChannel(),
-                                 batchHeader.getSequenceNumber());
+        acknowledger.send(new BatchIdentity(batchHeader.getChannel(),
+                                            batchHeader.getSequenceNumber()));
         super.drain();
     }
 

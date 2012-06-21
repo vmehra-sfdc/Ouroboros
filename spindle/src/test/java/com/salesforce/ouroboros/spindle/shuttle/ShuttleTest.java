@@ -43,7 +43,7 @@ import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.WeftHeader;
+import com.salesforce.ouroboros.Weft;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.EventSegment;
@@ -83,7 +83,7 @@ public class ShuttleTest {
                      shuttle.getState());
 
         shuttle.readReady();
-        assertEquals("Did not complete handshake", ShuttleFSM.Established,
+        assertEquals("Did not complete handshake", ShuttleFSM.ProcessAgenda,
                      shuttle.getState());
     }
 
@@ -119,11 +119,10 @@ public class ShuttleTest {
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull("null buffer", buffer);
-                WeftHeader header = new WeftHeader();
-                header.set(channelId, eventId, packetSize, position, endpoint);
-                header.getBytes().rewind();
-                buffer.put(header.getBytes());
-                return WeftHeader.HEADER_BYTE_SIZE;
+                Weft header = new Weft(channelId, eventId, packetSize,
+                                       position, endpoint);
+                header.serializeOn(buffer);
+                return Weft.BYTE_SIZE;
             }
         };
         when(channel.read(isA(ByteBuffer.class))).thenAnswer(readHandshake).thenReturn(0).then(readWeft).thenReturn(0);
@@ -131,14 +130,14 @@ public class ShuttleTest {
         Shuttle shuttle = new Shuttle(bundle);
 
         shuttle.accept(handler);
-        assertEquals("Did not complete handshake", ShuttleFSM.Established,
+        assertEquals("Did not complete handshake", ShuttleFSM.ProcessAgenda,
                      shuttle.getState());
 
         shuttle.readReady();
-        assertEquals("Did not attempt to read weft", ShuttleFSM.ReadWeft,
+        assertEquals("Did not attempt to read weft", ShuttleFSM.WriteSpan,
                      shuttle.getState());
 
-        shuttle.readReady();
+        shuttle.writeReady();
         assertEquals("Did not attempt to write span", ShuttleFSM.WriteSpan,
                      shuttle.getState());
 
@@ -176,11 +175,10 @@ public class ShuttleTest {
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull("null buffer", buffer);
-                WeftHeader header = new WeftHeader();
-                header.set(channelId, eventId, packetSize, position, endpoint);
-                header.getBytes().rewind();
-                buffer.put(header.getBytes());
-                return WeftHeader.HEADER_BYTE_SIZE;
+                Weft header = new Weft(channelId, eventId, packetSize,
+                                       position, endpoint);
+                header.serializeOn(buffer);
+                return Weft.BYTE_SIZE;
             }
         };
         when(channel.read(isA(ByteBuffer.class))).thenAnswer(readHandshake).thenReturn(0).then(readWeft).thenReturn(0);
@@ -195,7 +193,6 @@ public class ShuttleTest {
         shuttle.accept(handler);
 
         shuttle.readReady();
-        shuttle.readReady();
         assertEquals("Did not attempt to write span", ShuttleFSM.WriteSpan,
                      shuttle.getState());
         shuttle.writeReady();
@@ -208,7 +205,7 @@ public class ShuttleTest {
         assertEquals("Did not continue to write span", ShuttleFSM.WriteSpan,
                      shuttle.getState());
         shuttle.writeReady();
-        assertEquals("Did not write span", ShuttleFSM.Established,
+        assertEquals("Did not write span", ShuttleFSM.ProcessAgenda,
                      shuttle.getState());
 
         verify(segment, new Times(2)).transferTo(position, 1024, channel);
@@ -249,11 +246,10 @@ public class ShuttleTest {
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
                 assertNotNull("null buffer", buffer);
-                WeftHeader header = new WeftHeader();
-                header.set(channelId, eventId, packetSize, position, endpoint);
-                header.getBytes().rewind();
-                buffer.put(header.getBytes());
-                return WeftHeader.HEADER_BYTE_SIZE;
+                Weft header = new Weft(channelId, eventId, packetSize,
+                                       position, endpoint);
+                header.serializeOn(buffer);
+                return Weft.BYTE_SIZE;
             }
         };
         when(channel.read(isA(ByteBuffer.class))).thenAnswer(readHandshake).thenReturn(0).then(readWeft).then(readWeft).thenReturn(0);
@@ -265,11 +261,10 @@ public class ShuttleTest {
         shuttle.accept(handler);
 
         shuttle.readReady();
-        shuttle.readReady();
         assertEquals("Did not attempt to write span", ShuttleFSM.WriteSpan,
                      shuttle.getState());
         shuttle.writeReady();
-        assertEquals("Did not write spans", ShuttleFSM.Established,
+        assertEquals("Did not write spans", ShuttleFSM.ProcessAgenda,
                      shuttle.getState());
         verify(segment, new Times(2)).transferTo(position, 1024, channel);
 

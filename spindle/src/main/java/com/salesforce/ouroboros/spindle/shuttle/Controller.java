@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.EventSpan;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.util.Utils;
@@ -54,13 +55,15 @@ public class Controller implements CommunicationsHandler {
     private SocketChannelHandler         handler;
     private ByteBuffer                   handshake   = ByteBuffer.allocateDirect(Node.BYTE_LENGTH);
     private final PushNotification       pushNotification;
-    private final SubscriptionManagement subsciptionManagement;
+    private final SubscriptionManagement subscriptionManagement;
 
     public Controller(Bundle b) {
         bundle = b;
-        pushNotification = new PushNotification(bundle);
-        subsciptionManagement = new SubscriptionManagement(bundle.getId(),
-                                                           pushNotification);
+        pushNotification = new PushNotification(EventSpan.BYTE_SIZE, 1000,
+                                                "Push Notification[%s]", bundle);
+        pushNotification.setFsmName(String.format("%s>?", bundle.getId()));
+        subscriptionManagement = new SubscriptionManagement(bundle.getId(),
+                                                            pushNotification);
     }
 
     /* (non-Javadoc)
@@ -98,7 +101,7 @@ public class Controller implements CommunicationsHandler {
     @Override
     public void readReady() {
         if (established.get()) {
-            subsciptionManagement.readReady();
+            subscriptionManagement.readReady();
         } else {
             fsm.readReady();
         }
@@ -119,9 +122,11 @@ public class Controller implements CommunicationsHandler {
     protected void established() {
         handshake.flip();
         Node n = new Node(handshake);
-        fsm.setName(String.format("%s>%s", bundle.getId(), n));
+        String fsmName = String.format("%s>%s", bundle.getId(), n);
+        fsm.setName(fsmName);
+        pushNotification.setFsmName(fsmName);
         established.set(true);
-        pushNotification.accept(handler, n);
+        pushNotification.connect(handler);
     }
 
     protected void handshake() {

@@ -45,15 +45,6 @@ Suspended{
 	   Handshake{}
 }
 
-Established
-Entry{
-	selectForRead();
-}
-{
-	readReady
-		ReadWeft{}
-}
-
 Handshake
 Entry{
     handshake();
@@ -70,19 +61,19 @@ Entry{
         Closed{}
         
     readReady
-        Established{}
+        ProcessAgenda{}
         
     established
-        Established{}
+        ProcessAgenda{}
 }
 
-ReadWeft
+ProcessAgenda
 Entry{
-	nextWeft();
+	advanceAgenda();
 }
 {
     readReady
-        [!ctxt.readWeft() && !ctxt.inError()]
+        [!ctxt.readAgenda() && !ctxt.inError()]
         nil{
             selectForRead();
         }
@@ -92,7 +83,7 @@ Entry{
         Closed{}
         
     readReady
-        WriteSpan{}
+        ProcessAgenda{}
         
     writeSpan
         WriteSpan{}
@@ -100,7 +91,7 @@ Entry{
 
 WriteSpan
 Entry {
-	nextSpan();
+	selectForWrite();
 }
 {
 	writeReady
@@ -113,13 +104,13 @@ Entry {
 		Closed{}
 		
 	writeReady
-		Established{}
+		ProcessAgenda{}
 		
 	unknownSubscription
-		Established{}
+		ProcessAgenda{}
 		
 	packetDelivered
-		Established{}
+		ProcessAgenda{}
 }
 
 Closed

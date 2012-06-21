@@ -1,6 +1,5 @@
-%{
 /**
- * Copyright (c) 2011, salesforce.com, inc.
+ * Copyright (c) 2012, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -24,77 +23,32 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.ouroboros.consumer.shuttle;
 
 /**
  * @author hhildebrand
+ * 
  */
-%}
+public interface LoomInbound {
 
-// The FSM of the PushNotification protocol
+    /**
+     * 
+     */
+    void close();
 
-%class PushNotification
-%package com.salesforce.ouroboros.spindle.shuttle
-%access public
+    /**
+     * @return
+     */
+    boolean inError();
 
-%start PushNotificationFSM::Suspended
-%map PushNotificationFSM
-%%
+    /**
+     * 
+     */
+    void selectForRead();
 
-Suspended {
-	accept
-		Waiting {}
-}
+    /**
+     * @return
+     */
+    boolean readPush();
 
-Waiting 
-Entry {
-	nextQuantum();
 }
-{
-	writeBatch
-		WriteBatch{}
-}
-
-WriteBatch
-Entry {
-	nextBatch();
-}
-{
-	writeReady
-		[!ctxt.writeBatch() && !ctxt.inError()]
-		nil{
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{}
-		
-	writeReady
-		[ctxt.hasNext()]
-		WriteBatch{}
-		
-	writeReady
-		Waiting{}
-		
-	payloadWritten
-		[ctxt.hasNext()]
-		WriteBatch{}
-		
-	payloadWritten
-		Waiting{}
-}
-
-Closed
-Entry {
-	close();
-}
-{
-}
-
-Default {
-	writeReady
-		nil{}
-	close
-		Closed{}
-}
-%%

@@ -1,12 +1,12 @@
 <html>
   <head>
-    <title>BatchWriter</title>
+    <title>BatchEventWriter</title>
   </head>
 
   <body>
     <table align=center border=3 cellspacing=2 cellpadding=2>
       <caption align="top">
-        BatchWriterFSM Finite State Machine
+        BatchEventWriterFSM Finite State Machine
       </caption>
       <tr>
         <th rowspan=2>
@@ -101,6 +101,10 @@ nextQuantum();
           </pre>
         </td>
         <td>
+          <pre>
+  Waiting
+  {}
+          </pre>
         </td>
         <td>
         </td>
@@ -141,6 +145,12 @@ nextBatch();
 [ctxt.inError()]
   Closed
   {}
+
+[ctxt.hasInflight()]
+  WriteBatch
+  {
+    selectForWrite();
+  }
 
   Waiting
   {}

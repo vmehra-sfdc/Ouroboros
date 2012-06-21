@@ -23,26 +23,14 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.shuttle;
+package com.salesforce.ouroboros.batch;
+
+import java.nio.ByteBuffer;
 
 /**
  * @author hhildebrand
- * 
+ *
  */
-public class PushResponse {
-    public static enum Status {
-        SOCKET_CLOSED, CONTINUE, PACKET_COMPLETE, SPAN_COMPLETE, NO_SPAN;
-    }
-
-    public final long   bytesWritten;
-    public final Status writeStatus;
-
-    /**
-     * @param bytesWritten
-     * @param writeStatus
-     */
-    public PushResponse(long bytesWritten, Status writeStatus) {
-        this.bytesWritten = bytesWritten;
-        this.writeStatus = writeStatus;
-    }
+public interface BufferSerializable {
+    void serializeOn(ByteBuffer buffer);
 }

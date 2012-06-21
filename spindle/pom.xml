@@ -121,6 +121,7 @@
 							<table>true</table>
 							<graph>true</graph>
 							<graphLevel>2</graphLevel>
+							<debugLevel>2</debugLevel>
 							<verbose>true</verbose>
 							<serialize>true</serialize>
 							<sync>true</sync>

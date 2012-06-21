@@ -1,6 +1,5 @@
-%{
 /**
- * Copyright (c) 2011, salesforce.com, inc.
+ * Copyright (c) 2012, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -24,80 +23,49 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.ouroboros;
+
+import java.nio.ByteBuffer;
+import java.util.UUID;
+
+import com.salesforce.ouroboros.batch.BufferSerializable;
 
 /**
  * @author hhildebrand
+ * 
  */
-%}
+public class Weft implements BufferSerializable {
+    public static int BYTE_SIZE = 8 + 8 + 8 + 4 + 4 + 4;
 
-// The FSM for writing event batches to channel buffers.
+    public final UUID channel;
+    public final int  endpoint;
+    public final long eventId;
+    public final int  packetSize;
+    public final int  position;
 
-%class BatchWriter
-%package com.salesforce.ouroboros.producer.spinner
-%access public
+    public Weft(ByteBuffer buffer) {
+        channel = new UUID(buffer.getLong(), buffer.getLong());
+        eventId = buffer.getLong();
+        packetSize = buffer.getInt();
+        position = buffer.getInt();
+        endpoint = buffer.getInt();
+    }
 
-%start BatchWriterFSM::Suspended
-%map BatchWriterFSM
-%%
-Suspended {
-	connect
-		Waiting {}
+    public Weft(UUID channel, long eventId, int packetSize, int position,
+                int endpoint) {
+        this.channel = channel;
+        this.eventId = eventId;
+        this.position = position;
+        this.endpoint = endpoint;
+        this.packetSize = packetSize;
+    }
+
+    public void serializeOn(ByteBuffer buffer) {
+        buffer.putLong(channel.getMostSignificantBits());
+        buffer.putLong(channel.getLeastSignificantBits());
+        buffer.putLong(eventId);
+        buffer.putInt(packetSize);
+        buffer.putInt(position);
+        buffer.putInt(endpoint);
+    }
 }
-
-Waiting 
-Entry {
-	nextQuantum();
-}
-{
-	writeBatch
-		WriteBatch{}
-}
-
-WriteBatch
-Entry {
-	nextBatch();
-}
-{
-	writeReady
-		[!ctxt.writeBatch() && !ctxt.inError()]
-		nil{
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{}
-		
-	writeReady
-		Waiting{}
-		
-	payloadWritten
-		Waiting{}
-}
-
-Closed
-Entry{
-	close();
-}
-{
-	failover
-		nil{}
-		
-	close
-		nil{}
-		
-	writeBatch
-		nil{}
-
-	writeReady
-		nil{}
-}
-
-Default {
-	failover
-		Closed{}
-
-	close
-		Closed{}
-}
-%%

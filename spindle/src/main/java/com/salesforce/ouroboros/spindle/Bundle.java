@@ -27,9 +27,10 @@ package com.salesforce.ouroboros.spindle;
 
 import java.util.UUID;
 
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
  * The interface which provides the segments for appending within a channel,
@@ -63,12 +64,12 @@ public interface Bundle {
     EventChannel eventChannelFor(UUID channelId);
 
     /**
-     * Answer the Acknowledger associated the node
+     * Answer the BatchWriter associated the node
      * 
      * @param node
-     * @return the Acknowledger associated with the node
+     * @return the BatchWriter associated with the node
      */
-    Acknowledger getAcknowledger(Node node);
+    BatchWriter<BatchIdentity> getAcknowledger(Node node);
 
     /**
      * @return the Node id of the bundle
@@ -81,7 +82,7 @@ public interface Bundle {
      * @param producer
      * @param acknowledger
      */
-    void map(Node producer, Acknowledger acknowledger);
+    void map(Node producer, BatchWriter<BatchIdentity> acknowledger);
 
     /**
      * Map the partner node to the replicator

@@ -1,6 +1,6 @@
 /**
  */
-package com.salesforce.ouroboros.producer.spinner;
+package com.salesforce.ouroboros;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;

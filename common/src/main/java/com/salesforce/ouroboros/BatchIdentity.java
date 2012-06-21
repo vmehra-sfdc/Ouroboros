@@ -28,12 +28,15 @@ package com.salesforce.ouroboros;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
+import com.salesforce.ouroboros.batch.BufferSerializable;
+
 /**
  * 
  * @author hhildebrand
  * 
  */
-public class BatchIdentity implements Comparable<BatchIdentity> {
+public class BatchIdentity implements Comparable<BatchIdentity>,
+        BufferSerializable {
     public static final int BYTE_SIZE = 3 * 8;
 
     public volatile UUID    channel;

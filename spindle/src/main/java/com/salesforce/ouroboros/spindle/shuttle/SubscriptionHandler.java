@@ -1,6 +1,5 @@
-%{
 /**
- * Copyright (c) 2011, salesforce.com, inc.
+ * Copyright (c) 2012, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -24,77 +23,14 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.ouroboros.spindle.shuttle;
+
+import com.salesforce.ouroboros.SubscriptionEvent;
 
 /**
  * @author hhildebrand
+ * 
  */
-%}
-
-// The FSM of the Acknowledger protocol
-
-%class Acknowledger
-%package com.salesforce.ouroboros.spindle.source
-%access public
-
-%start AcknowledgerFSM::Suspended
-%map AcknowledgerFSM
-%%
-
-Suspended {
-	connect
-		Waiting {}
+public interface SubscriptionHandler {
+    void handle(SubscriptionEvent event);
 }
-
-Waiting 
-Entry {
-	nextQuantum();
-}
-{
-	writeBatch
-		WriteBatch{}
-}
-
-WriteBatch
-Entry {
-	nextBatch();
-}
-{
-	writeReady
-		[!ctxt.writeBatch() && !ctxt.inError()]
-		nil{
-			selectForWrite();
-		}
-		
-	writeReady
-		[ctxt.inError()]
-		Closed{}
-		
-	writeReady
-		[ctxt.hasNext()]
-		WriteBatch{}
-		
-	writeReady
-		Waiting{}
-		
-	payloadWritten
-		[ctxt.hasNext()]
-		WriteBatch{}
-		
-	payloadWritten
-		Waiting{}
-}
-
-Closed
-Entry {
-	close();
-}
-{
-}
-
-Default {
-	writeReady
-		nil{}
-	close
-		Closed{}
-}
-%%

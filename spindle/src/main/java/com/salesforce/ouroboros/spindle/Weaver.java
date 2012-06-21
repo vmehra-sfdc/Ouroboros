@@ -47,14 +47,17 @@ import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.CommunicationsHandlerFactory;
 import com.hellblazer.pinkie.ServerSocketChannelHandler;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.ContactInformation;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.SubscriptionEvent;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.EventChannel.Role;
 import com.salesforce.ouroboros.spindle.WeaverConfigation.RootDirectory;
 import com.salesforce.ouroboros.spindle.replication.Replicator;
 import com.salesforce.ouroboros.spindle.shuttle.Controller;
 import com.salesforce.ouroboros.spindle.shuttle.Shuttle;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
+import com.salesforce.ouroboros.spindle.shuttle.SubscriptionHandler;
 import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.spindle.transfer.Sink;
 import com.salesforce.ouroboros.spindle.transfer.Xerox;
@@ -71,7 +74,7 @@ import com.salesforce.ouroboros.util.Rendezvous;
  * @author hhildebrand
  * 
  */
-public class Weaver implements Bundle, Comparable<Weaver> {
+public class Weaver implements Bundle, Comparable<Weaver>, SubscriptionHandler {
     private class ControllerFactory implements CommunicationsHandlerFactory {
         @Override
         public Controller createCommunicationsHandler(SocketChannel channel) {
@@ -107,31 +110,31 @@ public class Weaver implements Bundle, Comparable<Weaver> {
         }
     }
 
-    private static final Logger                     log               = LoggerFactory.getLogger(Weaver.class.getCanonicalName());
+    private static final Logger                                   log               = LoggerFactory.getLogger(Weaver.class.getCanonicalName());
 
-    private static final String                     WEAVER_CONTROLLER = "Weaver Controller";
-    private static final String                     WEAVER_REPLICATOR = "Weaver Replicator";
-    private static final String                     WEAVER_SHUTTLE    = "Weaver Shuttle";
-    private static final String                     WEAVER_SPINDLE    = "Weaver Spindle";
-    private static final String                     WEAVER_XEROX      = "Weaver Xerox";
+    private static final String                                   WEAVER_CONTROLLER = "Weaver Controller";
+    private static final String                                   WEAVER_REPLICATOR = "Weaver Replicator";
+    private static final String                                   WEAVER_SHUTTLE    = "Weaver Shuttle";
+    private static final String                                   WEAVER_SPINDLE    = "Weaver Spindle";
+    private static final String                                   WEAVER_XEROX      = "Weaver Xerox";
 
-    private final ConcurrentMap<Node, Acknowledger> acknowledgers     = new ConcurrentHashMap<Node, Acknowledger>();
-    private final ConcurrentMap<File, Segment>      appendSegmentCache;
-    private final ConcurrentMap<UUID, EventChannel> channels          = new ConcurrentHashMap<UUID, EventChannel>();
-    private final ContactInformation                contactInfo;
-    private final ServerSocketChannelHandler        controllerHandler;
-    private final long                              maxSegmentSize;
-    private ConsistentHashFunction<Node>            nextRing;
-    private final ConcurrentMap<File, Segment>      readSegmentCache;
-    private final ServerSocketChannelHandler        replicationHandler;
-    private final ConcurrentMap<Node, Replicator>   replicators       = new ConcurrentHashMap<Node, Replicator>();
-    private final ConsistentHashFunction<File>      roots;
-    private final Node                              self;
-    private final ServerSocketChannelHandler        shuttleHandler;
-    private final ServerSocketChannelHandler        spindleHandler;
+    private final ConcurrentMap<Node, BatchWriter<BatchIdentity>> acknowledgers     = new ConcurrentHashMap<>();
+    private final ConcurrentMap<File, Segment>                    appendSegmentCache;
+    private final ConcurrentMap<UUID, EventChannel>               channels          = new ConcurrentHashMap<>();
+    private final ContactInformation                              contactInfo;
+    private final ServerSocketChannelHandler                      controllerHandler;
+    private final long                                            maxSegmentSize;
+    private ConsistentHashFunction<Node>                          nextRing;
+    private final ConcurrentMap<File, Segment>                    readSegmentCache;
+    private final ServerSocketChannelHandler                      replicationHandler;
+    private final ConcurrentMap<Node, Replicator>                 replicators       = new ConcurrentHashMap<>();
+    private final ConsistentHashFunction<File>                    roots;
+    private final Node                                            self;
+    private final ServerSocketChannelHandler                      shuttleHandler;
+    private final ServerSocketChannelHandler                      spindleHandler;
 
-    private ConsistentHashFunction<Node>            weaverRing;
-    private final ServerSocketChannelHandler        xeroxHandler;
+    private ConsistentHashFunction<Node>                          weaverRing;
+    private final ServerSocketChannelHandler                      xeroxHandler;
 
     public Weaver(WeaverConfigation configuration) throws IOException {
         configuration.validate();
@@ -215,7 +218,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
      */
     @Override
     public void closeAcknowledger(Node producer) {
-        Acknowledger ack = acknowledgers.remove(producer);
+        BatchWriter<BatchIdentity> ack = acknowledgers.remove(producer);
         if (ack != null) {
             ack.close();
         }
@@ -378,7 +381,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
      * @see com.salesforce.ouroboros.spindle.Bundle#getAcknowledger(com.salesforce.ouroboros.Node)
      */
     @Override
-    public Acknowledger getAcknowledger(Node node) {
+    public BatchWriter<BatchIdentity> getAcknowledger(Node node) {
         return acknowledgers.get(node);
     }
 
@@ -431,7 +434,7 @@ public class Weaver implements Bundle, Comparable<Weaver> {
      * @see com.salesforce.ouroboros.spindle.Bundle#map(com.salesforce.ouroboros.Node, com.salesforce.ouroboros.spindle.Acknowledger)
      */
     @Override
-    public void map(Node producer, Acknowledger acknowledger) {
+    public void map(Node producer, BatchWriter<BatchIdentity> acknowledger) {
         acknowledgers.put(producer, acknowledger);
     }
 
@@ -768,5 +771,14 @@ public class Weaver implements Bundle, Comparable<Weaver> {
             xeroxes.put(node, xerox);
         }
         xerox.addChannel(eventChannel);
+    }
+
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.shuttle.SubscriptionHandler#handle(com.salesforce.ouroboros.SubscriptionEvent)
+     */
+    @Override
+    public void handle(SubscriptionEvent event) {
+        // TODO Auto-generated method stub
+        
     }
 }

@@ -47,8 +47,10 @@ import org.mockito.internal.verification.Times;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.AppendSegment;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
@@ -65,12 +67,13 @@ import com.salesforce.ouroboros.testUtils.Util;
  */
 public class TestAppender {
 
+    @SuppressWarnings("unchecked")
     @Test
     public void testAppend() throws Exception {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
         when(bundle.getId()).thenReturn(new Node(0));
-        Acknowledger acknowledger = mock(Acknowledger.class);
+        BatchWriter<BatchIdentity> acknowledger = mock(BatchWriter.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("append", ".tst");
         tmpFile.deleteOnExit();
@@ -147,7 +150,7 @@ public class TestAppender {
         verify(handler, new Times(2)).selectForRead();
         verify(bundle).eventChannelFor(channel);
         verify(eventChannel).append(isA(EventEntry.class),
-                                    (Acknowledger) eq(null));
+                                    (BatchWriter<BatchIdentity>) eq(null));
         verify(eventChannel).appendSegmentFor(eq(header));
         verify(eventChannel).isDuplicate(eq(header));
     }
@@ -157,7 +160,8 @@ public class TestAppender {
         final SocketChannelHandler handler = mock(SocketChannelHandler.class);
         Bundle bundle = mock(Bundle.class);
         when(bundle.getId()).thenReturn(new Node(0));
-        Acknowledger acknowledger = mock(Acknowledger.class);
+        @SuppressWarnings("unchecked")
+        BatchWriter<BatchIdentity> acknowledger = mock(BatchWriter.class);
         EventChannel eventChannel = mock(EventChannel.class);
         File tmpFile = File.createTempFile("duplicate", ".tst");
         tmpFile.deleteOnExit();

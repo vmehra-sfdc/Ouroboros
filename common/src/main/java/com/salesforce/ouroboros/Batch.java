@@ -26,7 +26,6 @@
 package com.salesforce.ouroboros;
 
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -41,7 +40,7 @@ import com.salesforce.ouroboros.util.Pool.Clearable;
 public class Batch extends BatchIdentity implements Clearable {
     private static final double ONE_BILLION = 1000000000D;
 
-    public MappedByteBuffer     batch;
+    public ByteBuffer           batch;
     public final BatchHeader    header      = new BatchHeader();
     private long                created;
     private long                interval;
@@ -119,7 +118,7 @@ public class Batch extends BatchIdentity implements Clearable {
         }
 
         if (batch == null || batch.capacity() < totalSize) {
-            batch = (MappedByteBuffer) ByteBuffer.allocateDirect(totalSize);
+            batch = ByteBuffer.allocateDirect(totalSize);
         } else {
             batch.limit(totalSize);
             batch.rewind();
@@ -147,13 +146,5 @@ public class Batch extends BatchIdentity implements Clearable {
     public String toString() {
         return String.format("Batch [#events=%s, created=%s, channel=%s, sequenceNumber=%s]",
                              batch.capacity(), created, channel, sequenceNumber);
-    }
-
-    /**
-     * @param buffers
-     */
-    public void appendBuffersTo(List<ByteBuffer> buffers) {
-        header.appendTo(buffers);
-        buffers.add(batch);
     }
 }

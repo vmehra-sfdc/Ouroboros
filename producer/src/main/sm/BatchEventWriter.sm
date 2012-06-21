@@ -1,5 +1,6 @@
+%{
 /**
- * Copyright (c) 2012, salesforce.com, inc.
+ * Copyright (c) 2011, salesforce.com, inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided
@@ -23,25 +24,89 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.consumer;
 
 /**
  * @author hhildebrand
- * 
  */
-public interface LoomOutbound {
+%}
 
-    boolean writeHandshake();
+// The FSM for writing event batches to channel buffers.
 
-    boolean inError();
+%class BatchEventWriter
+%package com.salesforce.ouroboros.producer.spinner
+%access public
 
-    void selectForWrite();
-
-    void checkAgenda();
-
-    void advanceAgenda();
-
-    void close();
-
-    boolean writeAgenda();
+%start BatchEventWriterFSM::Suspended
+%map BatchEventWriterFSM
+%%
+Suspended {
+	connect
+		Waiting {}
 }
+
+Waiting 
+Entry {
+	nextQuantum();
+}
+{
+	writeBatch
+		WriteBatch{}
+		
+    writeReady
+        nil {}
+}
+
+WriteBatch
+Entry {
+	nextBatch();
+}
+{
+	writeReady
+		[!ctxt.writeBatch() && !ctxt.inError()]
+		nil{
+			selectForWrite();
+		}
+		
+	writeReady
+		[ctxt.inError()]
+		Closed{}
+        
+    writeReady
+        [ctxt.hasInflight()]
+        nil{
+            selectForWrite();
+        }
+		
+	writeReady
+		Waiting{}
+		
+	payloadWritten
+		Waiting{}
+}
+
+Closed
+Entry{
+	close();
+}
+{
+	failover
+		nil{}
+		
+	close
+		nil{}
+		
+	writeBatch
+		nil{}
+
+	writeReady
+		nil{}
+}
+
+Default {
+	failover
+		Closed{}
+
+	close
+		Closed{}
+}
+%%

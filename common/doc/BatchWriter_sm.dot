@@ -34,16 +34,10 @@ digraph BatchWriter {
             [label="connect/\l"];
 
         "BatchWriterFSM::Suspended" -> "BatchWriterFSM::Closed"
-            [label="failover/\l"];
-
-        "BatchWriterFSM::Suspended" -> "BatchWriterFSM::Closed"
             [label="close/\l"];
 
         "BatchWriterFSM::Waiting" -> "BatchWriterFSM::WriteBatch"
             [label="writeBatch/\l"];
-
-        "BatchWriterFSM::Waiting" -> "BatchWriterFSM::Closed"
-            [label="failover/\l"];
 
         "BatchWriterFSM::Waiting" -> "BatchWriterFSM::Closed"
             [label="close/\l"];
@@ -58,9 +52,9 @@ digraph BatchWriter {
             [label="payloadWritten/\l"];
 
         "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::Closed"
-            [label="failover/\l"];
+            [label="close/\l"];
 
-        "BatchWriterFSM::WriteBatch" -> "BatchWriterFSM::Closed"
+        "BatchWriterFSM::Closed" -> "BatchWriterFSM::Closed"
             [label="close/\l"];
 
         "%start" -> "BatchWriterFSM::Suspended"

@@ -31,8 +31,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.NullNode;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.AppendSegment;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
@@ -45,14 +47,14 @@ import com.salesforce.ouroboros.util.Pool.Factory;
  * 
  */
 public class Appender extends AbstractAppender {
-    private final static Logger    log                   = LoggerFactory.getLogger(Appender.class.getCanonicalName());
-    private static int             EVENT_ENTRY_POOL_SIZE = 100;
+    private final static Logger              log                   = LoggerFactory.getLogger(Appender.class.getCanonicalName());
+    private static int                       EVENT_ENTRY_POOL_SIZE = 100;
 
-    private final Acknowledger     acknowledger;
-    private volatile int           startPosition;
-    private final Pool<EventEntry> eventEntryPool;
+    private final BatchWriter<BatchIdentity> acknowledger;
+    private volatile int                     startPosition;
+    private final Pool<EventEntry>           eventEntryPool;
 
-    public Appender(Bundle bundle, Acknowledger acknowledger) {
+    public Appender(Bundle bundle, BatchWriter<BatchIdentity> acknowledger) {
         super(bundle);
         this.acknowledger = acknowledger;
         eventEntryPool = new Pool<EventEntry>("EventEntry",
@@ -84,7 +86,7 @@ public class Appender extends AbstractAppender {
                       eventChannel.getCachedReadSegment(segment.getFile()),
                       acknowledger, handler);
             Node producerMirror = batchHeader.getProducerMirror();
-            Acknowledger mirrorAcknowledger = null;
+            BatchWriter<BatchIdentity> mirrorAcknowledger = null;
             if (producerMirror.processId != NullNode.INSTANCE.processId) {
                 mirrorAcknowledger = bundle.getAcknowledger(producerMirror);
                 if (mirrorAcknowledger == null) {
@@ -119,23 +121,23 @@ public class Appender extends AbstractAppender {
      */
     @Override
     protected void drain() {
-        acknowledger.acknowledge(batchHeader.getChannel(),
-                                 batchHeader.getSequenceNumber());
+        acknowledger.send(new BatchIdentity(batchHeader.getChannel(),
+                                            batchHeader.getSequenceNumber()));
         if (log.isTraceEnabled()) {
             log.trace(String.format("Acknowledging replication of duplicate %s:%s on %s",
                                     batchHeader.getChannel(),
                                     batchHeader.getSequenceNumber(),
                                     bundle.getId()));
         }
-        Acknowledger mirrorAcknowledger = bundle.getAcknowledger(batchHeader.getProducerMirror());
+        BatchWriter<BatchIdentity> mirrorAcknowledger = bundle.getAcknowledger(batchHeader.getProducerMirror());
         if (mirrorAcknowledger == null) {
             if (batchHeader.getProducerMirror().processId != NullNode.INSTANCE.processId) {
                 log.warn(String.format("Could not find an acknowledger for %s",
                                        batchHeader.getProducerMirror()));
             }
         } else {
-            mirrorAcknowledger.acknowledge(batchHeader.getChannel(),
-                                           batchHeader.getSequenceNumber());
+            mirrorAcknowledger.send(new BatchIdentity(batchHeader.getChannel(),
+                                                      batchHeader.getSequenceNumber()));
             if (log.isTraceEnabled()) {
                 log.trace(String.format("Acknowledging mirror replication of duplicate %s:%s on %s",
                                         batchHeader.getChannel(),

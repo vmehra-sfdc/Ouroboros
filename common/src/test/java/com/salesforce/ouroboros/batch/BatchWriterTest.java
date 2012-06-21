@@ -23,7 +23,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package com.salesforce.ouroboros.spindle.shuttle;
+package com.salesforce.ouroboros.batch;
 
 import static junit.framework.Assert.assertEquals;
 import static org.mockito.Matchers.isA;
@@ -45,28 +45,45 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
-import com.salesforce.ouroboros.EventSpan;
-import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.spindle.Bundle;
-import com.salesforce.ouroboros.spindle.shuttle.PushNotificationContext.PushNotificationFSM;
 import com.salesforce.ouroboros.testUtils.Util;
 
 /**
  * @author hhildebrand
  * 
  */
-public class PushNotificationTest {
+public class BatchWriterTest {
+
+    private static class BatchEvent implements BufferSerializable {
+        static final int   BYTE_SIZE = 8 * 2;
+
+        private final UUID id;
+
+        BatchEvent(ByteBuffer buffer) {
+            id = new UUID(buffer.getLong(), buffer.getLong());
+        }
+
+        BatchEvent(UUID id) {
+            this.id = id;
+        }
+
+        /* (non-Javadoc)
+         * @see com.salesforce.ouroboros.batch.BufferSerializable#serializeOn(java.nio.ByteBuffer)
+         */
+        @Override
+        public void serializeOn(ByteBuffer buffer) {
+            buffer.putLong(id.getMostSignificantBits());
+            buffer.putLong(id.getLeastSignificantBits());
+        }
+    }
 
     @Test
-    public void testPush() throws IOException, InterruptedException {
-        Bundle bundle = mock(Bundle.class);
-        when(bundle.getId()).thenReturn(new Node(0));
-        final Node partner = new Node(1);
+    public void testAcknowledge() throws IOException, InterruptedException {
         SocketChannelHandler handler = mock(SocketChannelHandler.class);
         SocketChannel socketChannel = mock(SocketChannel.class);
-        final ArrayList<EventSpan> spans = new ArrayList<>();
+        final ArrayList<UUID> ids = new ArrayList<UUID>();
+
         for (int i = 0; i < 3; i++) {
-            spans.add(new EventSpan(i, UUID.randomUUID(), i, i));
+            ids.add(new UUID(0, i));
         }
 
         when(handler.getChannel()).thenReturn(socketChannel);
@@ -83,22 +100,21 @@ public class PushNotificationTest {
             @Override
             public Integer answer(InvocationOnMock invocation) throws Throwable {
                 ByteBuffer buffer = (ByteBuffer) invocation.getArguments()[0];
-                EventSpan pushed = new EventSpan(buffer);
-                assertEquals(spans.get(written.get() - 1), pushed);
+                BatchEvent identity = new BatchEvent(buffer);
+                assertEquals(ids.get(written.get() - 1), identity.id);
                 written.incrementAndGet();
-                return EventSpan.BYTE_SIZE;
+                return BatchEvent.BYTE_SIZE;
             }
         };
-
         doAnswer(firstWrite).doAnswer(writeBatchBytes).doAnswer(writeBatchBytes).doAnswer(writeBatchBytes).when(socketChannel).write(isA(ByteBuffer.class));
 
-        PushNotification controller = new PushNotification(bundle);
-        controller.accept(handler, partner);
-
-        assertEquals(PushNotificationFSM.Waiting, controller.getState());
-
-        for (EventSpan span : spans) {
-            controller.push(span);
+        BatchWriter<BatchEvent> batchWriter = new BatchWriter<BatchEvent>(
+                                                                          BatchEvent.BYTE_SIZE,
+                                                                          3,
+                                                                          "test");
+        batchWriter.connect(handler);
+        for (int i = 0; i < 3; i++) {
+            batchWriter.send(new BatchEvent(ids.get(i)));
         }
         Util.waitFor("First write never occurred", new Util.Condition() {
             @Override
@@ -106,10 +122,10 @@ public class PushNotificationTest {
                 return written.get() >= 1;
             }
         }, 2000, 100);
-        controller.writeReady();
-        controller.writeReady();
-        controller.writeReady();
-        Util.waitFor("Acknowledgement not written", new Util.Condition() {
+        batchWriter.writeReady();
+        batchWriter.writeReady();
+        batchWriter.writeReady();
+        Util.waitFor("Events not written", new Util.Condition() {
             @Override
             public boolean value() {
                 return written.get() == 4;

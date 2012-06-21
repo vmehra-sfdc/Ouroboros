@@ -44,57 +44,42 @@ import com.salesforce.ouroboros.util.ConsistentHashFunction;
  * 
  */
 public class Consumer {
-    private static final Logger                log           = LoggerFactory.getLogger(Consumer.class);
+    private static final Logger                log                 = LoggerFactory.getLogger(Consumer.class);
 
+    private ConsistentHashFunction<Node>       consumerRing;
+    private final ConcurrentMap<UUID, Session> mirrorSubscriptions = new ConcurrentHashMap<>();
+    private ConsistentHashFunction<Node>       nextConsumerRing;
     private final Node                         self;
-    private final ConcurrentMap<UUID, Session> sessions      = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, Session> subscriptions = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Session> sessions            = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Session> subscriptions       = new ConcurrentHashMap<>();
+    private ConsistentHashFunction<Node>       weaverRing;
 
-    /**
-     * @param self
-     */
     public Consumer(Node self) {
         super();
         this.self = self;
     }
 
-    /**
-     * 
-     */
     public void cleanUp() {
         // TODO Auto-generated method stub
 
     }
 
-    /**
-     * 
-     */
     public void commitConsumerRing() {
-        // TODO Auto-generated method stub
-
+        consumerRing = nextConsumerRing;
+        nextConsumerRing = null;
     }
 
-    /**
-     * @param activeWeavers
-     * @param yellowPages
-     */
     public void createLooms(SortedSet<Node> activeWeavers,
                             Map<Node, ContactInformation> yellowPages) {
         // TODO Auto-generated method stub
 
     }
 
-    /**
-     * @return
-     */
     public ConsistentHashFunction<Node> createRing() {
         // TODO Auto-generated method stub
         return null;
     }
 
-    /**
-     * @param deadMembers
-     */
     public void failover(Collection<Node> deadMembers)
                                                       throws InterruptedException {
         // TODO Auto-generated method stub
@@ -105,33 +90,21 @@ public class Consumer {
         return self;
     }
 
-    /**
-     * 
-     */
     public void inactivate() {
         // TODO Auto-generated method stub
 
     }
 
-    /**
-     * @return
-     */
     public Map<UUID, Node[][]> remap() {
         // TODO Auto-generated method stub
         return null;
     }
 
-    /**
-     * @param ring
-     */
     public void remapWeavers(ConsistentHashFunction<Node> ring) {
         // TODO Auto-generated method stub
 
     }
 
-    /**
-     * @param ring
-     */
     public void setConsumerRing(ConsistentHashFunction<Node> ring) {
         // TODO Auto-generated method stub
 

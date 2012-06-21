@@ -25,229 +25,69 @@
  */
 package com.salesforce.ouroboros.spindle.shuttle;
 
-import java.io.IOException;
-import java.lang.Thread.UncaughtExceptionHandler;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.EventSpan;
-import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.SubscriptionEvent;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
-import com.salesforce.ouroboros.spindle.shuttle.PushNotificationContext.PushNotificationState;
-import com.salesforce.ouroboros.util.Utils;
 
 /**
- * Used to control the event span push between the consumer and channel buffer.
- * 
  * @author hhildebrand
  * 
  */
-public class PushNotification {
-    static final Logger                    log            = LoggerFactory.getLogger(PushNotification.class);
-    static final int                       MAX_BATCH_SIZE = 1000;
+public class PushNotification extends BatchWriter<EventSpan> implements
+        SubscriptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(PushNotification.class);
 
-    private final ByteBuffer               buffer         = ByteBuffer.allocateDirect(MAX_BATCH_SIZE
-                                                                                      * EventSpan.BYTE_SIZE);
-    private final Bundle                   bundle;
-    private final Thread                   consumer;
-    private final ArrayList<EventSpan>     drain          = new ArrayList<>(
-                                                                            MAX_BATCH_SIZE);
-    private final PushNotificationContext  fsm            = new PushNotificationContext(
-                                                                                        this);
-    private SocketChannelHandler           handler;
-    private boolean                        inError;
-    private final BlockingQueue<EventSpan> pending        = new LinkedBlockingQueue<>();
-    private final Semaphore                quantum        = new Semaphore(0);
-    private final AtomicBoolean            run            = new AtomicBoolean(
-                                                                              true);
-    private final Set<UUID>                subscriptions  = new CopyOnWriteArraySet<>();
-
-    public PushNotification(Bundle b) {
-        bundle = b;
-        consumer = new Thread(consumerAction());
-        consumer.setName(String.format("Consumer thread for Acknowledger[?<%s]",
-                                       bundle.getId()));
-    }
-
-    public void accept(SocketChannelHandler handler, Node partner) {
-        this.handler = handler;
-        buffer.flip();
-        fsm.setName(String.format("%s>%s", bundle.getId(), partner));
-        consumer.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
-            @Override
-            public void uncaughtException(Thread t, Throwable e) {
-                log.warn(String.format("Uncaught exception on %s", t), e);
-            }
-        });
-        consumer.setDaemon(true);
-        consumer.start();
-        fsm.accept();
-    }
-
-    public void closing() {
-        if (log.isInfoEnabled()) {
-            log.info(String.format("Closing signaler %s", fsm.getName()));
-        }
-        for (UUID channelId : subscriptions) {
-            EventChannel channel = bundle.eventChannelFor(channelId);
-            if (channel != null) {
-                channel.unsubscribe(this);
-            }
-        }
-        fsm.close();
-    }
-
-    public PushNotificationState getState() {
-        return fsm.getState();
-    }
+    private final Bundle        bundle;
 
     /**
-     * Push the event span to the consumer
-     * 
-     * @param span
+     * @param ebs
+     * @param bs
+     * @param nameFormat
      */
-    public void push(EventSpan span) {
-        pending.add(span);
+    public PushNotification(int ebs, int bs, String nameFormat, Bundle bundle) {
+        super(ebs, bs, nameFormat);
+        this.bundle = bundle;
     }
 
-    public void writeReady() {
-        fsm.writeReady();
-    }
-
-    private void error() {
-        inError = true;
-    }
-
-    protected void close() {
-        handler.close();
-    }
-
-    protected Runnable consumerAction() {
-        return new Runnable() {
-            @Override
-            public void run() {
-                while (run.get()) {
-                    try {
-                        quantum.acquire();
-                        do {
-                            if (!run.get()) {
-                                return;
-                            }
-                            EventSpan span = pending.poll(1, TimeUnit.SECONDS);
-                            if (span != null) {
-                                drain.add(span);
-                            }
-                        } while (drain.isEmpty());
-                    } catch (InterruptedException e) {
-                        return;
-                    }
-                    fsm.writeBatch();
-                }
-            }
-        };
-    }
-
-    protected boolean hasNext() {
-        return !pending.isEmpty();
-    }
-
-    protected boolean inError() {
-        return inError;
-    }
-
-    protected void nextBatch() {
-        buffer.clear();
-        pending.drainTo(drain, MAX_BATCH_SIZE - 1);
-        for (EventSpan span : drain) {
-            span.serializeOn(buffer);
-        }
-        drain.clear();
-        buffer.flip();
-        if (writeBatch()) {
-            fsm.payloadWritten();
-        } else {
-            if (inError) {
-                fsm.close();
-            } else {
-                if (inError) {
-                    fsm.close();
-                } else {
-                    handler.selectForWrite();
-                }
-            }
-        }
-    }
-
-    protected void nextQuantum() {
-        quantum.release();
-    }
-
-    protected void selectForWrite() {
-        handler.selectForWrite();
-    }
-
-    protected boolean writeBatch() {
-        try {
-            if (handler.getChannel().write(buffer) < 0) {
-                if (log.isTraceEnabled()) {
-                    log.trace("Closing channel");
-                }
-                inError = true;
-                return false;
-            } else if (buffer.hasRemaining()) {
-                if (handler.getChannel().write(buffer) < 0) {
-                    if (log.isTraceEnabled()) {
-                        log.trace("Closing channel");
-                    }
-                    inError = true;
-                    return false;
-                }
-            }
-        } catch (IOException e) {
-            if (Utils.isClose(e)) {
-                log.info(String.format("closing acknowledger %s ",
-                                       fsm.getName()));
-            } else {
-                log.warn(String.format("Unable to write batch commit acknowledgement %s",
-                                       fsm.getName()), e);
-            }
-            error();
-            return false;
-        }
-        return !buffer.hasRemaining();
-    }
-
-    /**
-     * Handle the subscription event
-     * 
-     * @param event
+    /* (non-Javadoc)
+     * @see com.salesforce.ouroboros.spindle.shuttle.SubscriptionHandler#handle(com.salesforce.ouroboros.SubscriptionEvent)
      */
+    @Override
     public void handle(SubscriptionEvent event) {
-        EventChannel channel = bundle.eventChannelFor(event.channel);
-        if (channel == null) {
-            if (log.isInfoEnabled()) {
-                log.info("No channel for %s on %s", event, bundle.getId());
-            }
-            return;
-        }
         if (event.subscribe) {
-            channel.subscribe(this);
+            EventChannel channel = bundle.eventChannelFor(event.channel);
+            if (channel != null) {
+                channel.subscribe(this);
+                if (log.isInfoEnabled()) {
+                    log.info(String.format("New subscription for %s on %s",
+                                           event.channel, fsm.getName()));
+                }
+            } else {
+                if (log.isInfoEnabled()) {
+                    log.info(String.format("New subscription for non existent channel %s on %s",
+                                           event.channel, fsm.getName()));
+                }
+            }
         } else {
-            channel.unsubscribe(this);
+            EventChannel channel = bundle.eventChannelFor(event.channel);
+            if (channel != null) {
+                channel.subscribe(this);
+                if (log.isInfoEnabled()) {
+                    log.info(String.format("Unsubscribing from %s on %s",
+                                           event.channel, fsm.getName()));
+                }
+            } else {
+                if (log.isInfoEnabled()) {
+                    log.info(String.format("Unsubscribing from a non existent channel %s on %s",
+                                           event.channel, fsm.getName()));
+                }
+            }
         }
     }
+
 }

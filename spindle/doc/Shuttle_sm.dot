@@ -14,14 +14,11 @@ digraph Shuttle {
         "ShuttleFSM::Suspended"
             [label="{Suspended}"];
 
-        "ShuttleFSM::Established"
-            [label="{Established}"];
-
         "ShuttleFSM::Handshake"
             [label="{Handshake}"];
 
-        "ShuttleFSM::ReadWeft"
-            [label="{ReadWeft}"];
+        "ShuttleFSM::ProcessAgenda"
+            [label="{ProcessAgenda}"];
 
         "ShuttleFSM::WriteSpan"
             [label="{WriteSpan}"];
@@ -42,46 +39,40 @@ digraph Shuttle {
         "ShuttleFSM::Suspended" -> "ShuttleFSM::Closed"
             [label="close/\l"];
 
-        "ShuttleFSM::Established" -> "ShuttleFSM::ReadWeft"
-            [label="readReady/\l"];
-
-        "ShuttleFSM::Established" -> "ShuttleFSM::Closed"
-            [label="close/\l"];
-
         "ShuttleFSM::Handshake" -> "ShuttleFSM::Closed"
             [label="readReady/\l"];
 
-        "ShuttleFSM::Handshake" -> "ShuttleFSM::Established"
+        "ShuttleFSM::Handshake" -> "ShuttleFSM::ProcessAgenda"
             [label="readReady/\l"];
 
-        "ShuttleFSM::Handshake" -> "ShuttleFSM::Established"
+        "ShuttleFSM::Handshake" -> "ShuttleFSM::ProcessAgenda"
             [label="established/\l"];
 
         "ShuttleFSM::Handshake" -> "ShuttleFSM::Closed"
             [label="close/\l"];
 
-        "ShuttleFSM::ReadWeft" -> "ShuttleFSM::Closed"
+        "ShuttleFSM::ProcessAgenda" -> "ShuttleFSM::Closed"
             [label="readReady/\l"];
 
-        "ShuttleFSM::ReadWeft" -> "ShuttleFSM::WriteSpan"
+        "ShuttleFSM::ProcessAgenda" -> "ShuttleFSM::ProcessAgenda"
             [label="readReady/\l"];
 
-        "ShuttleFSM::ReadWeft" -> "ShuttleFSM::WriteSpan"
+        "ShuttleFSM::ProcessAgenda" -> "ShuttleFSM::WriteSpan"
             [label="writeSpan/\l"];
 
-        "ShuttleFSM::ReadWeft" -> "ShuttleFSM::Closed"
+        "ShuttleFSM::ProcessAgenda" -> "ShuttleFSM::Closed"
             [label="close/\l"];
 
         "ShuttleFSM::WriteSpan" -> "ShuttleFSM::Closed"
             [label="writeReady/\l"];
 
-        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::Established"
+        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::ProcessAgenda"
             [label="writeReady/\l"];
 
-        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::Established"
+        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::ProcessAgenda"
             [label="unknownSubscription/\l"];
 
-        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::Established"
+        "ShuttleFSM::WriteSpan" -> "ShuttleFSM::ProcessAgenda"
             [label="packetDelivered/\l"];
 
         "ShuttleFSM::WriteSpan" -> "ShuttleFSM::Closed"

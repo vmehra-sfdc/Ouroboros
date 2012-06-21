@@ -27,6 +27,7 @@ package com.salesforce.ouroboros.spindle.shuttle;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,7 @@ import org.slf4j.LoggerFactory;
 import com.hellblazer.pinkie.CommunicationsHandler;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.salesforce.ouroboros.Node;
-import com.salesforce.ouroboros.WeftHeader;
+import com.salesforce.ouroboros.Weft;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
@@ -46,19 +47,23 @@ import com.salesforce.ouroboros.util.Utils;
  * 
  */
 public class Shuttle implements CommunicationsHandler {
-    private static final Logger  log       = LoggerFactory.getLogger(Shuttle.class);
+    private static final Logger  log        = LoggerFactory.getLogger(Shuttle.class);
+    private static final int     MAX_AGENDA = 1000;
 
     private Node                 consumer;
-    private boolean              error     = false;
-    private final ShuttleContext fsm       = new ShuttleContext(this);
+    private boolean              error      = false;
+    private final ShuttleContext fsm        = new ShuttleContext(this);
     private SocketChannelHandler handler;
-    private final ByteBuffer     handshake = ByteBuffer.allocate(Node.BYTE_LENGTH);
-    private final WeftHeader     header    = new WeftHeader();
-    private int                  packetSize;
-    private int                  position;
+    private final ByteBuffer     handshake  = ByteBuffer.allocate(Node.BYTE_LENGTH);
+    private long                 eventId;
+    private UUID                 channel;
     private int                  endpoint;
+    private int                  position;
+    private int                  packetSize;
     private Segment              segment;
     private final Bundle         bundle;
+    private final ByteBuffer     agenda     = ByteBuffer.allocateDirect(MAX_AGENDA
+                                                                        * Weft.BYTE_SIZE);
 
     public Shuttle(Bundle bundle) {
         this.bundle = bundle;
@@ -115,31 +120,32 @@ public class Shuttle implements CommunicationsHandler {
     }
 
     /**
-     * Initialize the current flyer from the weft header
+     * Initialize the current flyer
      * 
      * @return true if the flyer was successfully acquired, false otherwise
      */
     private boolean setCurrentFlyer() {
-        EventChannel channel = bundle.eventChannelFor(header.getChannel());
-        if (channel == null) {
+        Weft weft = new Weft(agenda);
+        channel = weft.channel;
+        eventId = weft.eventId;
+        packetSize = weft.packetSize;
+        position = weft.position;
+        endpoint = weft.endpoint;
+        EventChannel eventChannel = bundle.eventChannelFor(channel);
+        if (eventChannel == null) {
             log.warn(String.format("Span requested for channel %s from consumer %s does not exist on %s",
-                                   header.getChannel(), consumer,
-                                   bundle.getId()));
+                                   channel, consumer, bundle.getId()));
             return false;
         }
-        packetSize = header.getPacketSize();
-        position = header.getPosition();
-        endpoint = header.getEndpoint();
 
         try {
-            segment = channel.segmentFor(header.getEventId()).segment;
+            segment = eventChannel.segmentFor(eventId).segment;
         } catch (IOException e) {
             log.warn(String.format("Segment requested for event %s on channel %s from consumer %s does not exist on %s",
-                                   header.getEventId(), header.getChannel(),
-                                   consumer, bundle.getId()), e);
+                                   eventId, channel, consumer, bundle.getId()),
+                     e);
             return false;
         }
-
         return true;
     }
 
@@ -188,19 +194,24 @@ public class Shuttle implements CommunicationsHandler {
      * batch all the things. Keep reading and writing until we can't read or
      * write any more
      */
-    protected void nextWeft() {
-        header.getBytes().rewind();
-        while (readWeft()) {
-            if (setCurrentFlyer()) {
-                if (!writeSpan()) {
-                    if (inError()) {
-                        fsm.close();
-                    } else {
-                        selectForWrite();
+    protected void advanceAgenda() {
+        while (readAgenda()) {
+            agenda.flip();
+            while (agenda.remaining() >= Weft.BYTE_SIZE) {
+                if (setCurrentFlyer()) {
+                    if (!writeSpan()) {
+                        if (inError()) {
+                            fsm.close();
+                        } else {
+                            agenda.compact();
+                            agenda.flip();
+                            fsm.writeSpan();
+                        }
+                        return;
                     }
                 }
             }
-            header.getBytes().rewind();
+            agenda.compact();
         }
 
         if (inError()) {
@@ -240,11 +251,12 @@ public class Shuttle implements CommunicationsHandler {
     }
 
     /**
-     * @return true if the weft header was completely read, false otherwise
+     * @return true if the read agenda has at least one header available, false
+     *         otherwise
      */
-    protected boolean readWeft() {
+    protected boolean readAgenda() {
         try {
-            if (handler.getChannel().read(header.getBytes()) < 0) {
+            if (handler.getChannel().read(agenda) < 0) {
                 error = true;
                 return false;
             }
@@ -258,7 +270,7 @@ public class Shuttle implements CommunicationsHandler {
             error = true;
             return false;
         }
-        return !header.getBytes().hasRemaining();
+        return agenda.position() >= Weft.BYTE_SIZE;
     }
 
     protected void selectForRead() {
@@ -281,8 +293,9 @@ public class Shuttle implements CommunicationsHandler {
         } catch (IOException e) {
             if (!Utils.isClose(e)) {
                 if (log.isWarnEnabled()) {
-                    log.warn(String.format("exception pushing span %s from %s to %s",
-                                           header, bundle.getId(), consumer), e);
+                    log.warn(String.format("exception pushing span %s:%s from %s to %s",
+                                           channel, eventId, bundle.getId(),
+                                           consumer), e);
                 }
             }
             error = true;

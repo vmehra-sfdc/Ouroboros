@@ -37,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.hellblazer.pinkie.SocketChannelHandler;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Node;
 import com.salesforce.ouroboros.spindle.replication.DuplicatorContext.DuplicatorState;
 import com.salesforce.ouroboros.util.Utils;
@@ -260,8 +261,9 @@ public final class Duplicator {
                                             current.getHeader().getSequenceNumber(),
                                             fsm.getName()));
                 }
-                current.getAcknowledger().acknowledge(current.getHeader().getChannel(),
-                                                      current.getHeader().getSequenceNumber());
+                current.getAcknowledger().send(new BatchIdentity(
+                                                                 current.getHeader().getChannel(),
+                                                                 current.getHeader().getSequenceNumber()));
                 current.free();
                 current = null;
                 return true;

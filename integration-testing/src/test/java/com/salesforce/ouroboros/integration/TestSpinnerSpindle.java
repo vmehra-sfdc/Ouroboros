@@ -59,6 +59,7 @@ import com.salesforce.ouroboros.Batch;
 import com.salesforce.ouroboros.BatchHeader;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.producer.Producer;
 import com.salesforce.ouroboros.producer.spinner.Spinner;
 import com.salesforce.ouroboros.spindle.AppendSegment;
@@ -67,7 +68,6 @@ import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.replication.EventEntry;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 import com.salesforce.ouroboros.spindle.source.Spindle;
 import com.salesforce.ouroboros.testUtils.Util;
 
@@ -79,6 +79,7 @@ import com.salesforce.ouroboros.testUtils.Util;
 public class TestSpinnerSpindle {
     private final static Logger log = LoggerFactory.getLogger(TestSpinnerSpindle.class);
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     @Test
     public void testSimpleAppend() throws Exception {
         log.info("TestSpinnerSpindle.testSimpleAppend");
@@ -96,10 +97,7 @@ public class TestSpinnerSpindle {
         UUID channel = UUID.randomUUID();
         long sequenceNumber = System.currentTimeMillis();
         long offset = 0;
-        AppendSegment appendSegment = new AppendSegment(
-                                                                                  segment,
-                                                                                  offset,
-                                                                                  0);
+        AppendSegment appendSegment = new AppendSegment(segment, offset, 0);
 
         when(eventChannel.getCachedReadSegment(segmentFile)).thenReturn(segment);
         when(bundle.eventChannelFor(channel)).thenReturn(eventChannel);
@@ -112,7 +110,7 @@ public class TestSpinnerSpindle {
                 return null;
             }
         }).when(eventChannel).append(isA(EventEntry.class),
-                                     (Acknowledger) eq(null));
+                                     (BatchWriter) eq(null));
 
         final ArrayList<Spindle> spindles = new ArrayList<Spindle>();
 

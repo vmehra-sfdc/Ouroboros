@@ -43,15 +43,16 @@ import org.junit.Test;
 import com.hellblazer.pinkie.SocketChannelHandler;
 import com.hellblazer.pinkie.SocketOptions;
 import com.salesforce.ouroboros.BatchHeader;
+import com.salesforce.ouroboros.BatchIdentity;
 import com.salesforce.ouroboros.Event;
 import com.salesforce.ouroboros.Node;
+import com.salesforce.ouroboros.batch.BatchWriter;
 import com.salesforce.ouroboros.spindle.AppendSegment;
 import com.salesforce.ouroboros.spindle.Bundle;
 import com.salesforce.ouroboros.spindle.EventChannel;
 import com.salesforce.ouroboros.spindle.Segment;
 import com.salesforce.ouroboros.spindle.Segment.Mode;
 import com.salesforce.ouroboros.spindle.source.AbstractAppenderContext.AbstractAppenderFSM;
-import com.salesforce.ouroboros.spindle.source.Acknowledger;
 
 /**
  * 
@@ -66,7 +67,8 @@ public class TestReplicatingAppender {
         File tmpFile = File.createTempFile("inbound-replication", ".tst");
         tmpFile.deleteOnExit();
         Segment segment = new Segment(eventChannel, tmpFile, Mode.APPEND);
-        Acknowledger acknowledger = mock(Acknowledger.class);
+        @SuppressWarnings("unchecked")
+        BatchWriter<BatchIdentity> acknowledger = mock(BatchWriter.class);
 
         int magic = BatchHeader.MAGIC;
         UUID channel = UUID.randomUUID();
@@ -136,6 +138,6 @@ public class TestReplicatingAppender {
         assertEquals(event.getCrc32(), replicatedEvent.getCrc32());
         assertTrue(replicatedEvent.validate());
         verify(eventChannel).append(header, 0L, segment);
-        verify(acknowledger).acknowledge(channel, sequenceNumber);
+        verify(acknowledger).send(new BatchIdentity(channel, sequenceNumber));
     }
 }
